@@ -420,6 +420,7 @@ void MapMaker::draw_trifan( const int_list &indices, vector<float*> &v,
 
   while ( index != indices.end() ) {
     bool smooth=false;
+    bool save_shade = output->getShade();
     vert2 = *(index++);
 
     sgCopyVec3( t[2], v[vert2] );
@@ -429,6 +430,8 @@ void MapMaker::draw_trifan( const int_list &indices, vector<float*> &v,
     if (col == 12 || col == 13) {
       // do not shade ocean/lake/etc.
       output->setColor(palette[col]);
+      // DCL - and switch lighting off for water for now (see the Jan 2005 mailing list archives)
+      output->setShade(false);
     } else {
       int dcol;
       if (col>=0) {
@@ -453,6 +456,9 @@ void MapMaker::draw_trifan( const int_list &indices, vector<float*> &v,
     sgCopyVec2( p[1], p[2] );
     sgCopyVec3( t[1], t[2] );
     sgCopyVec3( nrm[1], nrm[2] );
+    
+    // DCL - restore the original lighting in case we turned it off for water
+    output->setShade(save_shade);
   }
 
   if (col < 0 && !(features & DO_SMOOTH_COLOR)) {
