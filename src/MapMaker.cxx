@@ -141,7 +141,7 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
     nb_frag += 1;
   nb_frag *= nb_frag;
   if ( nb_frag > 1 ) {
-    printf("________________________________\r");
+    printf("________________________________\r"); fflush( stdout );
   }
 
   int i = 0, j = 0;
@@ -277,7 +277,7 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
       ++i;
       if ( nb_frag > 32 ) {
         if ( i > nb_frag ) {
-          printf(".");
+          printf("."); fflush( stdout );
           i -= nb_frag;
         }
       } else if ( nb_frag > 1 ) {
@@ -285,6 +285,7 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
           printf(".");
           j++;
         }
+	fflush( stdout );
       }
     }
   }
