@@ -379,8 +379,13 @@ int main( int argc, char **argv ) {
   }
   
   set_fg_scenery(raw_scenery_path);
-  scenerypath = new char[max_path_length + 256];
-  scenery_pos = 0;
+  if(fg_scenery.size()) {
+    scenerypath = new char[max_path_length + 256];
+    scenery_pos = 0;
+  } else {
+    cout << "No scenery paths could be found.  You need to set either a valid FG_ROOT and/or FG_SCENERY variable, or specify a valid --fg-root and/or --fg-scenery on the command line.\n";
+    exit(-1);
+  }
   
   mapobj.setFeatures(features);
 
