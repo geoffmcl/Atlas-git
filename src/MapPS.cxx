@@ -32,9 +32,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <dirent.h>
 #include "MapMaker.hxx"
 #include "OutputPS.hxx"
+#include <plib/ul.h>
 
 float clat = -100.0f, clon = -100.0f;   // initialize to unreasonable values
 char *outp = "map.eps";                 // output file name
@@ -145,8 +145,8 @@ int main( int argc, char **argv ) {
   } else {
     char outname[512], *scenerypath = new char[strlen(mapobj.getFGRoot()) + 256];
     int opathl, spathl;
-    DIR *dir1, *dir2;
-    dirent *ent;
+    ulDir *dir1, *dir2;
+    ulDirEnt *ent;
 
     int s = mapobj.getSize();
     if ( (s & (s-1)) != 0 ) {           // Thanks for this cutie, Steve
@@ -160,18 +160,18 @@ int main( int argc, char **argv ) {
     strcat( scenerypath, "/Scenery/" );
     spathl = strlen(scenerypath);
     
-    if ( (dir1 = opendir(scenerypath)) == NULL ) {
+    if ( (dir1 = ulOpenDir(scenerypath)) == NULL ) {
       fprintf( stderr, "%s: Couldn't open directory \"%s\".\n", 
 	       argv[0], scenerypath );
       return 1;
     }
 
-    while ( (ent = readdir(dir1)) != NULL ) {
+    while ( (ent = ulReadDir(dir1)) != NULL ) {
       if (ent->d_name[0] != '.') {
 	strcpy( scenerypath+spathl, ent->d_name );
-	if ( (dir2 = opendir(scenerypath)) != NULL ) {
+	if ( (dir2 = ulOpenDir(scenerypath)) != NULL ) {
 
-	  while ( (ent = readdir(dir2)) != NULL ) {
+	  while ( (ent = ulReadDir(dir2)) != NULL ) {
 	    char ns, ew;
 	    int lat, lon;
 	    if (ent->d_name[0] != '.' && sscanf(ent->d_name, "%c%d%c%d",
@@ -190,11 +190,11 @@ int main( int argc, char **argv ) {
 	  }
 	}
 
-	closedir(dir2);
+	ulCloseDir(dir2);
       }
     }
 
-    closedir(dir1);
+    ulCloseDir(dir1);
     delete scenerypath;
   }
 
