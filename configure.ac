@@ -8,7 +8,7 @@ AC_CONFIG_SRCDIR([src/Atlas.cxx])
 
 dnl Initialize the automake stuff
 AC_PREREQ(2.52)
-AM_INIT_AUTOMAKE(Atlas, 0.2.1)
+AM_INIT_AUTOMAKE(Atlas, 0.2.2)
 AC_CONFIG_HEADERS
 
 dnl Checks for programs.
