@@ -515,6 +515,37 @@ int MapMaker::process_file( char *tile_name, sgVec3 xyz ) {
       }
     }
     break;
+
+    case 'f': {
+      if (strncmp(lbuffer, "f ", 2) == 0) {
+         // Triangle
+         list<int> vertex_indices;
+
+         token = strtok(lbuffer+2, " /");
+         while ( token != NULL ) {
+          i1 = atoi(token);
+          token = strtok(NULL, delimiters);
+          i2 = atoi(token);
+
+          if (i1 >= verts || i1 >= normals) {
+            fprintf(stderr, "Tile \"%s\" contains triangle indices out of " \
+                    "bounds.\n", tile_name);
+            vertex_indices.clear();
+            break;
+          }
+          
+          vertex_indices.push_back( i1 );
+          token = strtok(NULL, " /");
+         }
+         
+         if ( !vertex_indices.empty() ) {
+          draw_trifan( vertex_indices, v, n, material );
+          polys++;
+         }
+      }
+    }
+    break;
+
     }    
   }
 
