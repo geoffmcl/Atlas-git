@@ -174,10 +174,10 @@ void MapBrowser::update() {
   int sgnlat = (clat < 0.0f) ? 1 : 0;
   int sgnlon = (clon < 0.0f) ? 1 : 0;
   // calculate minimum and maximum latitude/longitude of displayed tiles
-  int min_lat = (int)( (clat - dlat) * SG_DEGREES_TO_RADIANS ) - sgnlat;
-  int max_lat = (int)( (clat + dlat) * SG_DEGREES_TO_RADIANS ) - sgnlat;
-  int min_lon = (int)( (clon - dlon) * SG_DEGREES_TO_RADIANS ) - sgnlon;
-  int max_lon = (int)( (clon + dlon) * SG_DEGREES_TO_RADIANS ) - sgnlon;
+  int min_lat = (int)( (clat - dlat) * SG_RADIANS_TO_DEGREES ) - sgnlat;
+  int max_lat = (int)( (clat + dlat) * SG_RADIANS_TO_DEGREES ) - sgnlat;
+  int min_lon = (int)( (clon - dlon) * SG_RADIANS_TO_DEGREES ) - sgnlon;
+  int max_lon = (int)( (clon + dlon) * SG_RADIANS_TO_DEGREES ) - sgnlon;
   int num_lat = (max_lat - min_lat) + 1, num_lon = (max_lon - min_lon) + 1;
 
   // remove old tiles
