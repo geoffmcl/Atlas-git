@@ -30,6 +30,11 @@
   2004-12-22        DCL: Now reads FG_SCENERY when present.
 ---------------------------------------------------------------------------*/
 
+#include <GL/gl.h>
+#include <GL/glext.h>
+#ifndef _WIN32
+  #include <GL/glx.h>
+#endif
 #include <GL/glut.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -53,7 +58,8 @@ typedef vector<string> string_list;
 float clat = -100.0f, clon = -100.0f;   // initialize to unreasonable values
 float autoscale = 0.0f;                 // 0.0f == no autoscale
 char *outp = "map.png";                 // output file name
-bool global = false, doublebuffer = true;
+bool global = false;
+bool doublebuffer = true, headless = false;
 bool smooth_shade = true, textured_fonts = true;
 int features = MapMaker::DO_SHADE;
 MapMaker mapobj;
@@ -91,7 +97,7 @@ void redrawMap() {
     sprintf(title_buffer, "%c%.1f %c%.1f",
 	    (clat<0.0f)?'S':'N', fabs(clat * SG_RADIANS_TO_DEGREES),
 	    (clon<0.0f)?'W':'E', fabs(clon * SG_RADIANS_TO_DEGREES));
-    glutSetWindowTitle(title_buffer);
+    if(!headless) glutSetWindowTitle(title_buffer);
 
     OutputGL output( outp, mapobj.getSize(), smooth_shade, 
 		     textured_fonts, font_name );
@@ -170,16 +176,16 @@ void redrawMap() {
     sprintf(title_buffer, "%c%.1f %c%.1f",
 	    (clat<0.0f)?'S':'N', clat * SG_RADIANS_TO_DEGREES,
 	    (clon<0.0f)?'W':'E', clon * SG_RADIANS_TO_DEGREES);
-    glutSetWindowTitle(title_buffer);
+    if(!headless) glutSetWindowTitle(title_buffer);
 
     OutputGL output(outname, s, smooth_shade, textured_fonts, font_name);
     mapobj.createMap( &output, clat, clon, fg_scenery[scenery_pos], 1.0f );
     output.closeOutput();
-    if (doublebuffer) {
+    if (doublebuffer && !headless) {
       glutSwapBuffers();
     }
 
-    glutPostRedisplay();
+    if(!headless) glutPostRedisplay();
   }
 }
 
@@ -257,6 +263,9 @@ void print_help() {
   printf("  --atlas=path            Create maps of all scenery, and store them in path\n");
   printf("  --verbose               Display information during processing\n");
   printf("  --singlebuffer          Use single buffered display\n");
+#ifdef GLX_VERSION_1_3
+  printf("  --headless              Don't display output (render into an off-screen buffer)\n");
+#endif
   printf("  --glutfonts             Use GLUT built-in fonts\n");
   printf("  --palette=path          Set the palette file to use\n");
   printf("  --smooth-color          Make smooth color heights\n");
@@ -297,6 +306,14 @@ bool parse_arg(char* arg) {
     // do nothing
   } else if ( strcmp(arg, "--singlebuffer") == 0 ) {
     doublebuffer = false;
+  } else if ( strcmp(arg, "--headless") == 0 ) {
+#ifdef GLX_VERSION_1_3
+    headless = true;
+#else
+    cout << "Headless support is only available if compiled and run on a GLX version 1.3 or better machine\n";
+    cout << "Exiting...\n";
+    exit(-1);
+#endif
   } else if ( sscanf(arg, "--atlas=%s", cparam) == 1 ) {
     global = true;
     outp = strdup( cparam );
@@ -321,6 +338,98 @@ bool parse_arg(char* arg) {
 
   return true;
 }
+
+// All the pbuffer stuff might as well be commented out for non-GLX-1.3 or better platforms for now
+#ifdef GLX_VERSION_1_3
+// Return true if string 1 contains string 2, assuming the required string is whitespace delimited
+bool HaveTarget(char* s1, const char* s2) {
+  // TODO - parse on whitespace - currently we can return true if a substring of a longer string exists.
+  return(strstr(s1, s2) == NULL ? false : true);
+}
+
+// Query whether a given extension exists
+bool HaveExtension(const char* ext) {
+  char* exts = (char*)glGetString(GL_EXTENSIONS);
+  return(HaveTarget(exts, ext));
+}
+
+// Query whether a given windowing extension exists
+// (Very OS specific! - currently only implemented for GLX)
+bool HaveXExtension(const char* wext, Display* dpy) {
+  char* wexts = (char*)glXQueryExtensionsString (dpy, DefaultScreen(dpy));
+  return(HaveTarget(wexts, wext));
+}
+
+bool ContinueIfNoHeadless() {
+  cout << "Unable to continue in headless mode - revert to doublebuffer mode? [Y/n] ";
+  char c;
+  cin >> c;
+  return((c == 'n' || c == 'N') ? false : true);
+}
+
+bool InitPbuffer() {
+  Display *dpy = XOpenDisplay(0);
+
+  /*	
+  const char *glxext = "";		
+  glxext = glXQueryExtensionsString (dpy, DefaultScreen(dpy));
+  cout << "GLX extensions:\n" << glxext << endl;
+  */
+
+  bool have_glx_sgix_fbconfig = HaveXExtension("GLX_SGIX_fbconfig", dpy);
+  bool have_glx_sgix_pbuffer = HaveXExtension("GLX_SGIX_pbuffer", dpy);
+  cout << "Seaching for extensions...\n";
+  cout << "GLX_SGIX_fbconfig: " << (have_glx_sgix_fbconfig ? "YES\n" : "NO\n");
+  cout << "GLX_SGIX_pbuffer: " << (have_glx_sgix_pbuffer ? "YES\n" : "NO\n");
+  if(!have_glx_sgix_fbconfig || !have_glx_sgix_pbuffer) {
+    cout << "\nOne or more required extension(s) could not be found:\n";
+    if(!have_glx_sgix_fbconfig) cout << "GLX_SGIX_fbconfig\n";
+    if(!have_glx_sgix_pbuffer) cout << "GLX_SGIX_pbuffer\n";
+    bool cont = ContinueIfNoHeadless();
+    if(cont) return(false);
+    else exit(-1);
+  }	    
+
+  int scn=DefaultScreen(dpy);
+  int cnt;
+  GLXFBConfig *cfg = glXGetFBConfigs(dpy, scn, &cnt);
+  printf("glXGetFBConfigs returned %d matches\n", cnt);
+  int fbw, fbh;
+  bool size_ok = false;
+  for(int i=0; i < cnt; ++i) {
+	  glXGetFBConfigAttrib(dpy, cfg[i], GLX_MAX_PBUFFER_WIDTH, &fbw);
+	  glXGetFBConfigAttrib(dpy, cfg[i], GLX_MAX_PBUFFER_HEIGHT, &fbh);
+	  cout << "Checking for fgconfig of size " << mapobj.getSize() << "x" << mapobj.getSize() << " or greater...\n";
+	  size_ok = (fbw >= mapobj.getSize() && fbh >= mapobj.getSize());
+	  cout << "Buffer " << i << ": " << fbw << "x" << fbh << "... " << (size_ok ? "OK\n" : "insufficient\n");
+	  if(size_ok) break;
+  }
+  if(!size_ok) {
+    // TODO - ought to say what the maximum size returned was.
+    cout << "Unable to get a fbconfig of sufficient size to hold requested image size :-(\n";
+    cout << "Try requesting a smaller image size using the --size= argument\n";
+    exit(-1);
+  }
+  int attrlist[] =
+  {
+    GLX_PBUFFER_WIDTH, mapobj.getSize(),
+    GLX_PBUFFER_HEIGHT, mapobj.getSize(),
+    GLX_PRESERVED_CONTENTS, True,
+    0
+  };
+  GLXPbufferSGIX pBuffer = glXCreatePbuffer(dpy, cfg[0], attrlist);
+  GLXContext cx = glXCreateNewContext(dpy, cfg[0], GLX_RGBA_TYPE, 0, GL_TRUE);
+  bool cur_ok = glXMakeContextCurrent(dpy, pBuffer, pBuffer, cx);
+  if(cur_ok) {
+    cout << "Sucessfully set pbuffer as rendering context!\n";
+  } else {
+    bool cont = ContinueIfNoHeadless();
+    if(cont) return(false);
+    else exit(-1);
+  }
+  return(cur_ok);
+}
+#endif  // GLX_VERSION_1_3
 
 int main( int argc, char **argv ) {
   if (argc == 0)
@@ -448,6 +557,18 @@ int main( int argc, char **argv ) {
     }
   }
 
+#ifdef GLX_VERSION_1_3
+  if(headless) {
+    headless = InitPbuffer();
+    if(headless) {
+      while(1) {
+	redrawMap();
+      }
+      exit(0);
+    }
+  }
+#endif
+
   // now initialize GLUT
   glutInit( &argc, argv );
 
@@ -458,6 +579,7 @@ int main( int argc, char **argv ) {
   }
   glutInitWindowSize( mapobj.getSize(), mapobj.getSize() );
   glutCreateWindow( "MAP - Please wait while drawing" );
+  
   glutReshapeFunc( reshapeMap );
   glutDisplayFunc( redrawMap );
 
