@@ -1,2 +1,10 @@
+.deps
+Atlas
+Map
+MapPS
+buildmaps.sh
+config.h
+config.h.in
+stamp-h1
 Makefile
 Makefile.in
