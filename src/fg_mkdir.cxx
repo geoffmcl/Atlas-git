@@ -41,7 +41,9 @@ using namespace std;
 
 // NOTE: the system mkdir will accept either a "/" or a "\"
 //       command.com ( the shell ) only accepts "\" in the path.
+#ifdef _MSC_VER
 static char SEP[] = "/\\";
+#endif
 
 void fg_mkdir( const char *path )
 {
