@@ -15,6 +15,9 @@ OutputGL::OutputGL( char *filename, int size, bool smooth_shading,
   GfxOutput(filename, size), filename(filename), 
   useTexturedFont(useTexturedFont), jpeg(jpg), jpeg_quality(q), rescale(r)
 {
+  if ( filename == NULL )
+    openFragment( 0, 0, size );
+
   glEnable(GL_BLEND);
   glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
 
