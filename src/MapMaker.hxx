@@ -85,7 +85,7 @@ public:
   inline int getFeatures() { return features; }
 
   int createMap(GfxOutput *output, float theta, float alpha, 
-		bool do_square = false);
+		float autoscale = 0.0f);
   int drawOverlays(GfxOutput *output, float theta, float alpha, 
 		bool do_square = false, bool flipy = false );
 

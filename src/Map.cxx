@@ -40,8 +40,9 @@
 #include "OutputGL.hxx"
 
 float clat = -100.0f, clon = -100.0f;   // initialize to unreasonable values
+float autoscale = 0.0f;                 // 0.0f == no autoscale
 char *outp = "map.png";                 // output file name
-bool autoscale = false, global = false, doublebuffer = true;
+bool global = false, doublebuffer = true;
 bool smooth_shade = true, textured_fonts = true;
 int features = MapMaker::DO_SHADE;
 MapMaker mapobj;
@@ -147,7 +148,7 @@ void redrawMap() {
     glutSetWindowTitle(title_buffer);
 
     OutputGL output(outname, s, smooth_shade, textured_fonts, font_name);
-    mapobj.createMap( &output, clat, clon, true );
+    mapobj.createMap( &output, clat, clon, 1.0f );
     output.closeOutput();
     if (doublebuffer) {
       glutSwapBuffers();
@@ -210,7 +211,9 @@ bool parse_arg(char* arg) {
   } else if ( strcmp(arg, "--flat-shading" ) == 0 ) {
     smooth_shade = false;
   } else if ( strcmp(arg, "--autoscale") == 0 ) {
-    autoscale = true;
+    autoscale = 1.0f;
+  } else if ( sscanf(arg, "--autoscale=%f", &autoscale) == 1 ) {
+    // do nothing
   } else if ( strcmp(arg, "--singlebuffer") == 0 ) {
     doublebuffer = false;
   } else if ( sscanf(arg, "--atlas=%s", cparam) == 1 ) {
@@ -287,11 +290,6 @@ int main( int argc, char **argv ) {
 	    "%s: Invalid position. Check latitude and longitude.\n", argv[0]);
     print_help();
     exit(1);
-  }
-
-  if (autoscale) {
-    clat = ((int)clat) + 0.5f;
-    clon = ((int)clon) + 0.5f;
   }
 
   mapobj.setFeatures(features);

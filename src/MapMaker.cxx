@@ -100,7 +100,7 @@ void MapMaker::setPalette( char* filename ) {
 }
 
 int MapMaker::createMap(GfxOutput *output,float theta, float alpha, 
-                         bool do_square) {
+                         float autoscale) {
   this->output = output;
   
   modified = false;
@@ -131,11 +131,11 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
   // calculate which tiles we will have to load
   float dtheta, dalpha;
 
-  if (do_square) {
-    // set scale to 1 degree in meters at this latitude
-    scle = (int)(earth_radius_lat(theta)*2.0f*SG_PI / 360.0f);
-    dtheta = 0.8f * SG_DEGREES_TO_RADIANS;
-    dalpha = (0.8f + fabs(tan(theta)) * 0.35f) * SG_DEGREES_TO_RADIANS;
+  if (autoscale > 0.0f) {
+    // set scale to autoscale degrees in meters at this latitude
+    scle = (int)(earth_radius_lat(theta)*2.0f * autoscale *SG_PI / 360.0f);
+    dtheta = autoscale * 0.8f * SG_DEGREES_TO_RADIANS;
+    dalpha = (autoscale * 0.8f + fabs(tan(theta)) * 0.35f) * SG_DEGREES_TO_RADIANS;
   } else {
     lat_ab( scle/2, scle/2, theta, alpha, &dtheta, &dalpha );
     dtheta -= theta;
