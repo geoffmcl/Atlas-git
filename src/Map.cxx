@@ -100,7 +100,7 @@ void redrawMap() {
 	  dir2 = ulOpenDir(scenerypath);
 	} else {
 	  ulCloseDir(dir1);
-	  delete scenerypath;
+	  delete[] scenerypath;
 	  exit(0); // done reading top directory
 	}
       }
@@ -276,7 +276,7 @@ int main( int argc, char **argv ) {
     fclose(rc);
   }
 
-  delete rcpath;
+  delete[] rcpath;
 
   // process command line arguments
   for (int arg = 1; arg < argc; arg++) {

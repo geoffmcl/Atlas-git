@@ -61,14 +61,14 @@ MapMaker::MapMaker( char *fg_root, char *ap_filter, int features,
 
 MapMaker::~MapMaker() {
   for (StrMap::iterator it = materials.begin(); it != materials.end(); it++) {
-    delete (*it).first;
+    delete[] (*it).first;
   }
 
   for (unsigned int i = 0; i < palette.size(); i++) {
-    delete palette[i];
+    delete[] palette[i];
   }
 
-  delete fg_root;
+  delete[] fg_root;
 }
 
 void MapMaker::setFGRoot( char *fg_root ) {
@@ -500,10 +500,10 @@ int MapMaker::process_binary_file( char *tile_name, sgVec3 xyz ) {
   }
 
   for (i = 0; i < v.size(); i++) {
-    delete v[i];
+    delete[] v[i];
   }
   for (i = 0; i < n.size(); i++) {
-    delete n[i];
+    delete[] n[i];
   }
 
   return 1;
@@ -823,7 +823,7 @@ void MapMaker::read_materials(char *fname /* = NULL */) {
   fclose(fd);
 
   if (fname == NULL)
-    delete filename;
+    delete[] filename;
 
   palette_loaded = true;
 }

@@ -825,7 +825,7 @@ void Overlays::load_navaids() {
     delete n;
 
   gzclose(nav);
-  delete navname;
+  delete[] navname;
  
   navaids_loaded = true;
 }
@@ -864,7 +864,7 @@ void Overlays::load_fixes() {
     }
   }
 
-  delete navname;
+  delete[] navname;
   gzclose(fix);
   fixes_loaded = true;
 }

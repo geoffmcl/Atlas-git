@@ -105,14 +105,14 @@ void OutputGL::closeOutput() {
   // actually write the image
   png_write_image(png_ptr, row_pointers);
 
-  delete row_pointers;
+  delete[] row_pointers;
 
   png_write_end(png_ptr, info_ptr);
   png_destroy_write_struct(&png_ptr, &info_ptr);
   fclose(fp);
   printf("Written '%s'\n", filename);
 
-  delete image;
+  delete[] image;
 
   return;           
 }
