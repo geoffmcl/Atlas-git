@@ -53,16 +53,6 @@ inline void ab_xy( sgVec3 xyz, sgVec3 ref, sgVec3 dst) {
   dst[1]    = dst[2] / (r * rr) * (xyr * xyz[2] - xy * ref[2]);
 }
 
-inline void ab_lat( float lat, float lon, float lat_r, float lon_r,
-		    sgVec3 dst ) {
-/*  dst[2] = rec;
-  dst[0] = dst[2] * (lon-lon_r);
-  dst[1] = dst[2] * (lat-lat_r); Playing with projections -- molv */
-  dst[2] = earth_radius_lat( lat_r );
-  dst[0] = dst[2] * cos(lat)*(lon-lon_r);   // even Alexei wasn't sure here :-)
-  dst[1] = dst[2] * (lat-lat_r);
-}
-
 inline void geod_geoc( float ang, float *Sin, float *Cos ) {
   const float rec4  = rec*rec*rec*rec;
   const float rpol4 = rpol*rpol*rpol*rpol;

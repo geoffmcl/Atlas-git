@@ -25,6 +25,7 @@
 #include "OutputGL.hxx"
 #include "Overlays.hxx"
 #include "FlightTrack.hxx"
+#include "Projection.hxx"
 #include <GL/gl.h>
 #include <math.h>
 #include <list>
@@ -33,7 +34,7 @@
 class MapBrowser {
 public:
   static const int CACHE_LIMIT = 2;
-
+  
   MapBrowser( GLfloat x1, GLfloat y1, GLfloat size, int features, 
               char *fg_root, bool texturedFonts = true );
   ~MapBrowser();
@@ -47,7 +48,8 @@ public:
   void toggleFeaturesAllNavaids();
   void setTextured( bool texture = true );
   void setFlightTrack( FlightTrack *track );
-
+  void setProjectionByID(int id);
+   
   inline float getLat()   { return clat;  }
   inline float getLon()   { return clon;  }
   inline float getScale() { return scle; }
@@ -56,10 +58,15 @@ public:
   inline bool getTextured() { return textured; }
   inline FlightTrack* getFlightTrack() { return track;   }
   inline Overlays*    getOverlays()    { return overlay; }
-
   void loadDb();
   void draw();
-
+  inline const char *getProjectionNameByID(int id) { 
+     return projection->getSystemName(id);
+  }
+  inline int getNumProjections() {
+     return projection->NUM_PROJECTIONS;
+  }
+   
 protected:
   void update();
 
@@ -114,4 +121,5 @@ protected:
   OutputGL *output;
   Overlays *overlay;
   FlightTrack *track;
+  Projection *projection;
 };

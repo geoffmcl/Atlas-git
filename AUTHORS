@@ -5,7 +5,7 @@ Curtis L. Olson, curt@flightgear.org (patches and ideas)
 Christian Mayer, vader@t-online.de (some MSVC patches and the PostScript code)
 Norman Vine, nhv@cape.com (coordinate printing and some misc. stuff)
 Steve Falco, sfalco@worldnet.att.net (misc patches)
-Martin Olveyra, molv@adinet.com.uy (ideas and bug fixes)
+Martin Olveyra, molv@adinet.com.uy (misc patches, multiple projection engine)
 
 Parts of the Atlas project is based on a nice Perl-script that was written
 by Alexei Novikov (anovikov@heron.itep.ru).

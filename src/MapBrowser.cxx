@@ -55,6 +55,8 @@ MapBrowser::MapBrowser(GLfloat left, GLfloat top, GLfloat size, int features,
   overlay->setOutput( output );
   overlay->setFeatures(features);
 
+  projection = new Projection;
+  overlay->setProjection(projection);
   textured = true;
   track = NULL;
 }
@@ -63,6 +65,12 @@ MapBrowser::~MapBrowser() {
   delete font_name;
   delete output;
   delete overlay;
+  delete projection;
+}
+
+void MapBrowser::setProjectionByID(int id) {
+   projection->setSystem(id);
+   update();
 }
 
 void MapBrowser::setLocation( float lat, float lon ) {
@@ -214,16 +222,16 @@ void MapBrowser::update() {
     } else {
       // update tiles position
       sgVec3 xyr;
-      ab_lat( rad((float) tile->c.lat), rad((float) tile->c.lon), clat, clon, 
+      projection->ab_lat( rad((float) tile->c.lat), rad((float) tile->c.lon), clat, clon, 
               xyr );
       scale( xyr[0], xyr[1], &tile->xsw, &tile->ysw );
-      ab_lat( rad(tile->c.lat+1.0f), rad((float) tile->c.lon), clat, clon, 
+      projection->ab_lat( rad(tile->c.lat+1.0f), rad((float) tile->c.lon), clat, clon, 
               xyr );
       scale( xyr[0], xyr[1], &tile->xnw, &tile->ynw );
-      ab_lat( rad(tile->c.lat+1.0f), rad(tile->c.lon+1.0f), clat, clon, 
+      projection->ab_lat( rad(tile->c.lat+1.0f), rad(tile->c.lon+1.0f), clat, clon, 
               xyr );
       scale( xyr[0], xyr[1], &tile->xno, &tile->yno );
-      ab_lat( rad((float) tile->c.lat), rad(tile->c.lon+1.0f), clat, clon, 
+      projection->ab_lat( rad((float) tile->c.lat), rad(tile->c.lon+1.0f), clat, clon, 
               xyr );
       scale( xyr[0], xyr[1], &tile->xso, &tile->yso );
     }
@@ -277,16 +285,16 @@ void MapBrowser::update() {
         }
 
 	sgVec3 xyr;
-	ab_lat( rad((float) nt->c.lat), rad((float) nt->c.lon), clat, clon, 
+	projection->ab_lat( rad((float) nt->c.lat), rad((float) nt->c.lon), clat, clon, 
 		xyr );
 	scale( xyr[0], xyr[1], &nt->xsw, &nt->ysw );
-	ab_lat( rad(nt->c.lat+1.0f), rad((float) nt->c.lon), clat, clon, 
+	projection->ab_lat( rad(nt->c.lat+1.0f), rad((float) nt->c.lon), clat, clon, 
 		xyr );
 	scale( xyr[0], xyr[1], &nt->xnw, &nt->ynw );
-	ab_lat( rad(nt->c.lat+1.0f), rad(nt->c.lon+1.0f), clat, clon, 
+	projection->ab_lat( rad(nt->c.lat+1.0f), rad(nt->c.lon+1.0f), clat, clon, 
 		xyr );
 	scale( xyr[0], xyr[1], &nt->xno, &nt->yno );
-	ab_lat( rad((float) nt->c.lat), rad(nt->c.lon+1.0f), clat, clon, 
+	projection->ab_lat( rad((float) nt->c.lat), rad(nt->c.lon+1.0f), clat, clon, 
 		xyr );
 	scale( xyr[0], xyr[1], &nt->xso, &nt->yso );
 

@@ -70,6 +70,7 @@ Overlays::Overlays( char *fg_root = NULL, float scale = 1.0f,
   setGridColor( grid_color );
   setTrackColor( track_color );
   flight_track = new FlightTrack;
+  projection= new Projection;
 
   time_params = new SGTime();
   time_params->update( 0.0, 0.0, 0 );
@@ -144,43 +145,6 @@ static string dms_format(const char ns[2], float angle_rad, float resolution_rad
   return string(s);
 }
 
-// Pick nice angles close to xaim and yaim. Prefer a pair with similar
-// relationships to their respective aims, to make the grid fairly square.
-static void nice_angle_pair( float xaim, float yaim, float *pxnice, float *pynice ) {
-  // If each spacing is an integer multiple of the previous, new lines
-  // appear but none disappear as you zoom in.
-  const float nice_angles[] = { 180, 90, 45, 15, 5, 1, .5, .25, 5.0/60, 1.0/60 };
-
-  int ix, iy;
-
-  for (ix = 1; ix < sizeof(nice_angles)/sizeof(nice_angles[0]) - 1; ix++) {
-    if (nice_angles[ix] < xaim) break;
-  }
-
-  for (iy = 1; iy < sizeof(nice_angles)/sizeof(nice_angles[0]) - 1; iy++) {
-    if (nice_angles[iy] < yaim) break;
-  }
-
-  // ix and iy each index the second of two possible angles.
-
-  float xbest, ybest;
-  float prev_lerr = 999;
-  for (int x = ix-1; x <= ix; x++) {
-    for (int y = iy-1; y <= iy; y++) {
-      float xlerr = log(nice_angles[x]) - log(xaim);
-      float ylerr = log(nice_angles[y]) - log(yaim);
-      float lerr = max(fabs(xlerr - ylerr), max(fabs(xlerr), fabs(ylerr)));
-      if (lerr < prev_lerr) {
-        prev_lerr = lerr;
-        xbest = nice_angles[x];
-        ybest = nice_angles[y];
-      }
-    }
-  }
-  *pxnice = xbest;
-  *pynice = ybest;
-}
-
 // Draw grid lines in latitude range lat-dtheta to lat+dtheta radians,
 // longitude range lon-dalpha to lon+dalpha.
 // 'spacing' is the desired approximate latitude interval in radians.
@@ -189,7 +153,7 @@ void Overlays::draw_gridlines( float dtheta, float dalpha, float spacing ) {
   const float STEP = 10.0f / 60.0f * SG_DEGREES_TO_RADIANS;
 
   float grid_theta, grid_alpha;
-  nice_angle_pair(spacing * SG_RADIANS_TO_DEGREES,
+  projection->nice_angle_pair(spacing * SG_RADIANS_TO_DEGREES,
 		  spacing * SG_RADIANS_TO_DEGREES * dalpha / dtheta,
 		  &grid_theta, &grid_alpha);
   grid_theta *= SG_DEGREES_TO_RADIANS;
@@ -207,7 +171,7 @@ void Overlays::draw_gridlines( float dtheta, float dalpha, float spacing ) {
        glon <= lon + dalpha; glon += grid_alpha) {
     for (float glat = rint(max(lat - dtheta, -SG_PI/2 + grid_theta) / grid_theta) * grid_theta; 
 	 glat <= min(lat + dtheta, SG_PI/2 - grid_theta/2); glat += grid_theta) {
-      ab_lat( glat, glon, lat, lon, xyr );
+      projection->ab_lat( glat, glon, lat, lon, xyr );
       sgSetVec2( p1, ::scale(xyr[0], output->getSize(), scale), 
 		 ::scale(xyr[1], output->getSize(), scale) );
       string label =
@@ -223,7 +187,7 @@ void Overlays::draw_gridlines( float dtheta, float dalpha, float spacing ) {
     first = true;
 
     for (float glat = max(lat - dtheta, -SG_PI/2); glat <= lat + dtheta + STEP; glat += STEP) {
-      ab_lat( min(glat, SG_PI/2), glon, lat, lon, xyr );
+      projection->ab_lat( min(glat, SG_PI/2), glon, lat, lon, xyr );
       sgSetVec2( p1, ::scale(xyr[0], output->getSize(), scale), 
 		 ::scale(xyr[1], output->getSize(), scale) );
 
@@ -243,7 +207,7 @@ void Overlays::draw_gridlines( float dtheta, float dalpha, float spacing ) {
     first = true;
 
     for (float glon = lon - dalpha; glon <= lon + dalpha + STEP; glon += STEP) {
-      ab_lat( glat, glon, lat, lon, xyr );
+      projection->ab_lat( glat, glon, lat, lon, xyr );
       sgSetVec2( p1, ::scale(xyr[0], output->getSize(), scale), 
 		 ::scale(xyr[1], output->getSize(), scale) );
 
@@ -270,7 +234,7 @@ void Overlays::draw_flighttrack() {
 
     while ( (point = flight_track->getNextPoint()) != NULL ) {
       sgVec3 xyr;
-      ab_lat( point->lat, point->lon, lat, lon, xyr );
+      projection->ab_lat( point->lat, point->lon, lat, lon, xyr );
       
       sgSetVec2( p1, ::scale(xyr[0], output->getSize(), scale), 
 		 ::scale(xyr[1], output->getSize(), scale) );
@@ -309,7 +273,7 @@ void Overlays::airport_labels(float theta, float alpha,
     sgVec3 xyr;
 
     if (fabs(ap->lat - theta) < dtheta && fabs(wrap_angle(ap->lon - alpha)) < dalpha) {
-      ab_lat( ap->lat, ap->lon, theta, alpha, xyr );
+      projection->ab_lat( ap->lat, ap->lon, theta, alpha, xyr );
       sgVec2 p;
 
       sgSetVec2( p, ::scale(xyr[0], output->getSize(), scale), 
@@ -338,7 +302,7 @@ void Overlays::airport_labels(float theta, float alpha,
 	sgSetVec2( rwyw, 
 		   (*j)->width*4.0f * scale  * cos(-(*j)->hdg), 
 		   (*j)->width*4.0f * scale  * sin(-(*j)->hdg) );
-	ab_lat( (*j)->lat, (*j)->lon, theta, alpha, xyr );
+	projection->ab_lat( (*j)->lat, (*j)->lon, theta, alpha, xyr );
 	// runway center point
 	rwyc[0] = ::scale(xyr[0], output->getSize(), scale);
 	rwyc[1] = ::scale(xyr[1], output->getSize(), scale);
@@ -384,7 +348,7 @@ void Overlays::draw_navaids( float theta, float alpha,
     sgVec2 p;
 
     if (fabs(n->lat - theta) < dtheta && fabs(wrap_angle(n->lon - alpha)) < dalpha) {
-      ab_lat( n->lat, n->lon, theta, alpha, xyr );
+      projection->ab_lat( n->lat, n->lon, theta, alpha, xyr );
 
       sgSetVec2( p,  ::scale(xyr[0], output->getSize(), scale), 
 		 ::scale(xyr[1], output->getSize(), scale) );

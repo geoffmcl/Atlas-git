@@ -33,6 +33,7 @@
 
 #include "Output.hxx"
 #include "FlightTrack.hxx"
+#include "Projection.hxx"
 
 class Overlays {
 public:
@@ -91,11 +92,14 @@ public:
   inline void setFeatures(int features) {
     this->features = features;
   }
+  
+  inline void setProjection(Projection *pr) {
+     projection=pr;
+  }
 
   inline float getScale() { return scale; }
   inline FlightTrack *getFlightTrack() { return flight_track; }
   inline int getFeatures() { return features; }
-
   void load_airports();
   void load_navaids();
   void load_fixes();
@@ -149,6 +153,7 @@ protected:
   char *fg_root;
   GfxOutput *output;
   FlightTrack *flight_track;
+  Projection *projection;
 
   static const float airport_color1[4]; 
   static const float airport_color2[4];

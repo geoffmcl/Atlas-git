@@ -15,7 +15,8 @@ Atlas_SOURCES = \
 	MapMaker.cxx MapMaker.hxx \
 	Output.cxx Output.hxx \
 	OutputGL.cxx OutputGL.hxx \
-	Overlays.cxx Overlays.hxx
+	Overlays.cxx Overlays.hxx \
+	Projection.cxx Projection.hxx
 
 Atlas_LDADD = \
 	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgserial -lsgdebug -lsgbucket\
@@ -29,7 +30,8 @@ Map_SOURCES = \
 	MapMaker.cxx MapMaker.hxx \
 	Output.cxx Output.hxx \
 	OutputGL.cxx OutputGL.hxx \
-	Overlays.cxx Overlays.hxx
+	Overlays.cxx Overlays.hxx \
+	Projection.cxx Projection.hxx
 
 Map_LDADD = \
 	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgdebug \
@@ -43,7 +45,8 @@ MapPS_SOURCES = \
 	MapMaker.cxx MapMaker.hxx \
 	Output.cxx Output.hxx \
 	OutputPS.cxx OutputPS.hxx \
-	Overlays.cxx Overlays.hxx
+	Overlays.cxx Overlays.hxx \
+	Projection.cxx Projection.hxx
 
 MapPS_LDADD = \
 	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgdebug \

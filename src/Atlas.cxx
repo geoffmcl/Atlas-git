@@ -60,7 +60,7 @@ puFont *font;
 puPopup *main_interface, *minimized, *info_interface;
 puFrame *frame, *info_frame;
 puOneShot *zoomin, *zoomout, *minimize_button, *minimized_button;
-puOneShot *clear_ftrack;
+puOneShot *clear_ftrack, *choose_projection_button;
 puButton *show_arp, *show_nav, *show_name, *show_id;
 puButton *show_vor, *show_ndb, *show_fix;
 puButton *show_ftrack, *follow;
@@ -68,6 +68,9 @@ puText *labeling, *txt_lat, *txt_lon;
 puText *txt_info_lat, *txt_info_lon, *txt_info_alt;
 puText *txt_info_hdg, *txt_info_spd;
 puInput *inp_lat, *inp_lon;
+puPopupMenu *choose_projection_menu;
+puObject *proj_item[MAX_NUM_PROJECTIONS];
+
 bool softcursor = false;
 char lat_str[80], lon_str[80], alt_str[80], hdg_str[80], spd_str[80];
 
@@ -423,7 +426,7 @@ static char *coord_format_latlon(float latitude, float longitude, char *buf)
 }
 
 /******************************************************************************
- PUI code
+ PUI code (HANDLERS)
 ******************************************************************************/
 void zoom_cb ( puObject *cb )
 {
@@ -434,6 +437,7 @@ void zoom_cb ( puObject *cb )
     map_object->setScale( map_object->getScale() * SCALECHANGEFACTOR );
     scalefactor *= SCALECHANGEFACTOR;
   }
+  printf("scale: %f\n", map_object->getScale());
   glutPostRedisplay();
 }
 
@@ -512,12 +516,31 @@ void restore_cb ( puObject *cb ) {
   main_interface->reveal();
 }
 
+void projection_cb (puObject *cb) {
+   if (cb == choose_projection_button) {
+      choose_projection_menu->reveal();
+   }
+   else {
+      int i;
+      for (i=0;i<map_object->getNumProjections();i++) {
+	 if (cb==proj_item[i])
+	   break;
+      }
+      map_object->setProjectionByID(i);
+      choose_projection_menu->hide();
+   }
+   glutPostRedisplay();
+}
+      
+/*****************************************************************************
+ PUI Code (WIDGETS)
+*****************************************************************************/
 void init_gui(bool textureFonts) {
   puInit();
 
   int curx,cury;
 
-  int puxoff=20,puyoff=20,puxsiz=205,puysiz=380;
+  int puxoff=20,puyoff=20,puxsiz=205,puysiz=420;
 
   if (textureFonts) {
     char font_name[512];
@@ -611,6 +634,11 @@ void init_gui(bool textureFonts) {
     clear_ftrack -> setCallback( clear_ftrack_cb );
   }
 
+  cury+=60;
+  choose_projection_button = new puOneShot(curx, cury, "Change Projection");
+  choose_projection_button->setSize(182,24);
+  choose_projection_button->setCallback(projection_cb);
+   
   cury=puyoff+puysiz-10;
 
   minimize_button = new puOneShot(curx+185-20, cury-24, "X");
@@ -641,6 +669,13 @@ void init_gui(bool textureFonts) {
     puShowCursor();
   }
 
+  choose_projection_menu = new puPopupMenu(260, 150);
+  
+  for (int i=0; i<map_object->getNumProjections(); i++) {
+	proj_item[i]=choose_projection_menu->add_item(map_object->getProjectionNameByID(i), projection_cb);
+  }	
+  choose_projection_menu->close();
+	
 }
 /******************************************************************************
  GLUT event handlers
@@ -655,8 +690,8 @@ void reshapeMap( int _width, int _height ) {
 
 void redrawMap() {
   char buf[256];
-
-  glClearColor( 1.0f, 1.0f, 1.0f, 0.0f );
+  
+  glClearColor( 0.643f, 0.714f, 0.722f, 0.0f );
   glClear( GL_COLOR_BUFFER_BIT );
 
   /* Fix so that center of map is actually the center of the window.
