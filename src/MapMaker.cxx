@@ -162,6 +162,8 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
   // Draw a quad spanning the full area and the same as the clear color
   // to avoid corruption from the pixel read not reading areas we don't
   // explicitly draw to on some platforms.
+  bool save_shade = output->getShade();
+  output->setShade(false);
   output->setColor(palette[12]);
   sgVec2 baseQuad[4];
   sgSetVec2(baseQuad[0], 0.0, 0.0);
@@ -169,6 +171,7 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
   sgSetVec2(baseQuad[2], (float)size, (float)size);
   sgSetVec2(baseQuad[3], (float)size, 0.0);
   output->drawQuad(&baseQuad[0], simple_normals);
+  output->setShade(save_shade);
 
   // calculate which tiles we will have to load
   float dtheta, dalpha;
