@@ -927,12 +927,12 @@ void Overlays::load_very_old_airports() {
     to call this function multiple times, since it will just
     return immediately) */
 void Overlays::load_new_navaids() {
+  if (navaids_loaded)
+    return;
+	
   char *navname = new char[strlen(fg_root) + 512];
   char line[256];
   //double magdummy[6];
-
-  if (navaids_loaded)
-    return;
   
   strcpy( navname, fg_root );
   strcat( navname, "/Navaids/nav.dat.gz" );
@@ -1032,12 +1032,12 @@ void Overlays::load_new_navaids() {
     to call this function multiple times, since it will just
     return immediately) */
 void Overlays::load_navaids() {
+  if (navaids_loaded)
+    return;
+	
   char *navname = new char[strlen(fg_root) + 512];
   char line[256];
   //double magdummy[6];
-
-  if (navaids_loaded)
-    return;
   
   strcpy( navname, fg_root );
   strcat( navname, "/Navaids/default.nav.gz" );
