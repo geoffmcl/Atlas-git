@@ -102,7 +102,9 @@ public:
   void load_airports();
   void load_new_airports();
   void load_navaids();
+  void load_new_navaids();
   void load_fixes();
+  void load_new_fixes();
   void drawOverlays();
 
   // Aiport & Navaid databases

@@ -377,8 +377,8 @@ void Overlays::airport_labels(float theta, float alpha,
 // Draws all navaids in the specified region
 void Overlays::draw_navaids( float theta, float alpha, 
 			     float dtheta, float dalpha ) {
-  load_navaids();
-  load_fixes();
+  load_new_navaids();
+  load_new_fixes();
 
   bool save_shade = output->getShade();
   output->setShade(false);
@@ -751,6 +751,98 @@ void Overlays::load_airports() {
   airports_loaded = true;
 }
 
+/* Loads the new format (FG-0.9.6? onwards) navaid database if it isn't already loaded
+   (if *one* instance of the Overlays class has loaded the db,
+    no other instance will have to load it again, but it's safe
+    to call this function multiple times, since it will just
+    return immediately) */
+void Overlays::load_new_navaids() {
+  char *navname = new char[strlen(fg_root) + 512];
+  char line[256];
+  //double magdummy[6];
+
+  if (navaids_loaded)
+    return;
+  
+  strcpy( navname, fg_root );
+  strcat( navname, "/Navaids/nav.dat.gz" );
+
+  gzFile nav;
+
+  nav = gzopen( navname, "rb" );
+  if (nav == NULL) {
+    fprintf( stderr, "load_navaids: Couldn't open \"%s\" .\n", navname );
+    delete[] navname;
+    // Try loading the old format instead
+    fprintf( stderr, "Attempting to load old format navaids file instead...\n" );
+    load_navaids();
+    return;
+  }
+
+  NAV *n = NULL;
+  while (!gzeof(nav)) {
+    //char sNavtype[10];
+    int iNavtype;
+    char sMagVar[10];
+    int elev;
+
+    if (n == NULL)
+      n = new NAV;
+    
+    gzgets( nav, line, 256 );
+    
+    if ( sscanf(line, "%d %f %f %d %f %s %s",
+		&iNavtype, &n->lat, &n->lon, &elev, &n->freq, n->id, sMagVar) == 7 ) {
+	bool bNavaid = true;
+	switch (iNavtype) {
+	case 3: n->navtype = NAV_VOR; break;
+	case 12: n->navtype = NAV_DME; break;
+	case 2: n->navtype = NAV_NDB; break;
+	default: bNavaid = false;
+	}
+
+	// cout << "lat = " << n->lat << " lon = " << n->lon << " elev = " 
+	//      << elev << " JD = " << time_params->getJD() << endl;
+	
+	if(bNavaid) {
+
+	    n->lat *= SG_DEGREES_TO_RADIANS;
+	    n->lon *= SG_DEGREES_TO_RADIANS;
+	    elev = (int) ( elev * SG_FEET_TO_METER );
+    
+    	    /* TODO - handle new format magvar values
+	    if ( strcmp( sMagVar, "XXX" ) == 0 ) {
+		// no magvar specified, calculate our own
+		n->magvar = sgGetMagVar(n->lon, n->lat, elev, time_params->getJD());
+	    } else {
+		n->magvar = ( (sMagVar[0] - '0') * 10.0f + (sMagVar[1] - '0') );
+		n->magvar *= SG_DEGREES_TO_RADIANS;
+		if ( sMagVar[2] == 'W' ) {
+		    n->magvar = -n->magvar;
+		}
+	    }
+	    */
+	    n->magvar = sgGetMagVar(n->lon, n->lat, elev, time_params->getJD());
+	    // cout << "navid = " << n->id << " magvar = " << n->magvar * RAD_TO_DEG
+	    //      << endl;
+    
+	    //strcpy(n->name, line+55);  // 51?
+	    strcpy(n->name, line+52);
+    
+	    navaids.push_back(n);
+	    n = NULL;
+	}
+    }
+  }
+  if (n != NULL)
+    delete n;
+
+  gzclose(nav);
+  delete[] navname;
+ 
+  navaids_loaded = true;
+}
+
 /* Loads the navaid database if it isn't already loaded
    (if *one* instance of the Overlays class has loaded the db,
     no other instance will have to load it again, but it's safe
@@ -771,6 +863,7 @@ void Overlays::load_navaids() {
 
   nav = gzopen( navname, "rb" );
   if (nav == NULL) {
+    delete[] navname;      
     fprintf( stderr, "load_navaids: Couldn't open \"%s\" .\n", navname );
     return;
   }
@@ -830,6 +923,49 @@ void Overlays::load_navaids() {
   navaids_loaded = true;
 }
 
+void Overlays::load_new_fixes() {
+  char *navname = new char[strlen(fg_root) + 512];
+  char line[256];
+
+  if (fixes_loaded)
+    return;
+  
+  strcpy( navname, fg_root );
+  strcat( navname, "/Navaids/fix.dat.gz" );
+
+  gzFile fix;
+
+  fix = gzopen( navname, "rb" );
+  if (fix == NULL) {
+    delete[] navname;
+    fprintf( stderr, "load_fixes: Couldn't open \"%s\" .\n", navname );
+    // Try loading the old format instead
+    fprintf( stderr, "Attempting to load old format fixes file instead...\n" );
+    load_fixes();
+    return;
+  }
+
+  NAV *n = NULL;
+  while (!gzeof(fix)) {
+    if (n == NULL)
+      n = new NAV;
+    
+    gzgets( fix, line, 256 );
+    if ( sscanf(line, "%f %f %s", &n->lat, &n->lon, n->name) == 3 ) {
+      strcpy(n->id, n->name);
+      n->navtype = NAV_FIX;
+      n->lat *= SG_DEGREES_TO_RADIANS;
+      n->lon *= SG_DEGREES_TO_RADIANS;
+      navaids.push_back(n);
+      n = NULL;
+    }
+  }
+
+  delete[] navname;
+  gzclose(fix);
+  fixes_loaded = true;
+}
+
 void Overlays::load_fixes() {
   char *navname = new char[strlen(fg_root) + 512];
   char line[256];
@@ -844,6 +980,7 @@ void Overlays::load_fixes() {
 
   fix = gzopen( navname, "rb" );
   if (fix == NULL) {
+    delete[] navname;
     fprintf( stderr, "load_fixes: Couldn't open \"%s\" .\n", navname );
     return;
   }
