@@ -53,5 +53,3 @@ MapPS_LDADD = \
 	-lplibsg -lplibpu -lplibul -lsgbucket \
 	$(opengl_LIBS) \
 	-lpng -lz
-
-CPPFLAGS=-DFGBASE_DIR=\"$(fgbase_dir)\"

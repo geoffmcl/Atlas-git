@@ -52,8 +52,16 @@ if test "x$with_fgbase" != "x" ; then
     fgbase_dir="$with_fgbase"
 else
     echo "FlightGear base package location not specified"
-    fgbase_dir="/usr/local/lib/FlightGear"
+    if test "x$prefix" != "x" ; then
+	echo "Default ${prefix}/lib/FlightGear"
+        fgbase_dir="${prefix}/lib/FlightGear"
+    else
+	echo "Default /usr/local/lib/FlightGear"
+        fgbase_dir="/usr/local/lib/FlightGear"
+    fi
 fi
+CXXFLAGS="$CXXFLAGS -DFGBASE_DIR='\"$fgbase_dir\"'"
+
 AC_SUBST(fgbase_dir)
 
 dnl set the $host variable based on local machine/os
@@ -80,6 +88,7 @@ AC_SUBST(ARFLAGS)
 
 dnl extra library and include directories
 EXTRA_DIRS="${SIMGEAR_DIR} ${PLIB_DIR} /usr/local/plib /usr/X11R6"
+echo "------ prefix $prefix ------"
 
 if test -d /opt/X11R6 ; then
      EXTRA_DIRS="$EXTRA_DIRS /opt/X11R6"
@@ -303,3 +312,10 @@ AC_CONFIG_FILES([ \
 	src/data/Makefile
 ])
 AC_OUTPUT
+
+echo ""
+echo "Configure Summary"
+echo "================="
+
+echo "Prefix: $prefix"
+echo ""
