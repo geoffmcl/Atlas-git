@@ -59,9 +59,10 @@ int features = MapMaker::DO_SHADE;
 MapMaker mapobj;
 
 char outname[512], *scenerypath, *palette;
-string raw_scenery_path = "", default_scenery_path;  // default_scenery_path is a temporary hack - don't rely on it remaining.
+string raw_scenery_path = "";
 string_list fg_scenery;
 unsigned int scenery_pos;
+unsigned int max_path_length = 0;
 int opathl, spathl;
 ulDir *dir1, *dir2 = NULL;
 ulDirEnt *ent;
@@ -94,7 +95,7 @@ void redrawMap() {
 
     OutputGL output( outp, mapobj.getSize(), smooth_shade, 
 		     textured_fonts, font_name );
-    mapobj.createMap( &output, clat, clon, default_scenery_path, autoscale );
+    mapobj.createMap( &output, clat, clon, scenerypath, autoscale );
     output.closeOutput();
     exit(0);
   } else {
@@ -203,6 +204,7 @@ void set_fg_scenery(const string &scenery) {
     
     for (unsigned i = 0; i < path_list.size(); i++) {
 
+        max_path_length = ( path_list[i].size() > max_path_length ? path_list[i].size() : max_path_length );
         ulDir *d = ulOpenDir( path_list[i].c_str() );
         if (d == NULL)
             continue;
@@ -376,11 +378,9 @@ int main( int argc, char **argv ) {
     exit(1);
   }
   
-  // DCL: default_scenery_path is a temporary hack - don't count on it remaining.
-  default_scenery_path = mapobj.getFGRoot();
-  default_scenery_path += "/Scenery/Terrain/";
-  
   set_fg_scenery(raw_scenery_path);
+  scenerypath = new char[max_path_length + 256];
+  scenery_pos = 0;
   
   mapobj.setFeatures(features);
 
@@ -397,9 +397,6 @@ int main( int argc, char **argv ) {
 	      "these maps with the Atlas program!\n", argv[0] );
     }
 
-    
-    scenerypath = new char[strlen(mapobj.getFGRoot()) + 256];
-    scenery_pos = 0;
     dir1 = ulOpenDir(fg_scenery[0].c_str());
     strcpy(scenerypath, fg_scenery[0].c_str());
     NormalisePath(scenerypath);
@@ -410,6 +407,40 @@ int main( int argc, char **argv ) {
    
     strcpy(outname, outp);
     opathl = strlen(outname);
+  } else {
+    // Need to set the scenery path to point to the required location
+    float dlat = clat * SG_RADIANS_TO_DEGREES, dlon = clon * SG_RADIANS_TO_DEGREES;
+    int lat2 = (int)floor(dlat), lon2 = (int)floor(dlon);
+    int lat1 = (int)(floor((float)lat2 / 10.0f) * 10.0), lon1 = (int)(floor((float)lon2 / 10.0f) * 10.0);
+    char* dpath1 = new char[32];
+    char* dpath2 = new char[32];
+    sprintf(dpath1, "%c%03d%c%02d", (lon1 < 0 ? 'w' : 'e'), abs(lon1), (lat1 < 0 ? 's' : 'n'), abs(lat1));
+    sprintf(dpath2, "%c%03d%c%02d", (lon2 < 0 ? 'w' : 'e'), abs(lon2), (lat2 < 0 ? 's' : 'n'), abs(lat2));
+    bool path_found = false;
+    for(unsigned int i = 0; i < fg_scenery.size(); ++i) {
+      strcpy(scenerypath, fg_scenery[i].c_str());
+      NormalisePath(scenerypath);
+      int sz = strlen(scenerypath);
+      strcat(scenerypath, dpath1);
+      NormalisePath(scenerypath);
+      strcat(scenerypath, dpath2);
+      dir1 = ulOpenDir(scenerypath);
+      if(dir1 != NULL) {
+	path_found = true;
+	scenerypath[sz] = '\0';
+	//cout << "Scenerypath found,  = " << scenerypath << '\n';
+	break;
+      }
+      //cout << scenerypath << (dir1 == NULL ? " does not exist..." : " exists!") << '\n';
+    }
+    if(!path_found) {
+      cout << "Unable to find required subdirectory " << dpath1 << '/' << dpath2 << " on the available scenery paths:\n";
+      for(unsigned int i = 0; i < fg_scenery.size(); ++i) {
+	cout << fg_scenery[i] << '\n';
+      }
+      cout << "... unable to continue - exiting!\n";
+      exit(-1);
+    }
   }
 
   // now initialize GLUT
