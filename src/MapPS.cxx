@@ -55,6 +55,7 @@ void print_help() {
   printf("  --fgroot=path           Overrides FG_ROOT environment variable\n");
   printf("  --disable-airports      Don't show airports\n");
   printf("  --disable-navaids       Don't show navaids\n");
+  printf("  --only-navaids=which    Which navaids (vor,ndb,fix) to show, e.g. \"vor,ndb\"\n");                   
   printf("  --disable-shading       Don't do nice shading of the terrain\n");
   printf("  --atlas=path            Create maps of all scenery, and store them in path\n");
   printf("  --verbose               Display information during processing\n\n");
@@ -91,6 +92,10 @@ int main( int argc, char **argv ) {
       features &= ~MapMaker::DO_AIRPORTS;
     } else if ( strcmp(argv[arg], "--disable-navaids" ) == 0 ) {
       features &= ~MapMaker::DO_NAVAIDS;
+    } else if ( sscanf(argv[arg], "--only-navaids=%s", cparam) ==1 ) {
+      if (!strstr(cparam,"vor")) features &= ~MapMaker::DO_NAVAIDS_VOR;
+      if (!strstr(cparam,"ndb")) features &= ~MapMaker::DO_NAVAIDS_NDB;
+      if (!strstr(cparam,"fix")) features &= ~MapMaker::DO_NAVAIDS_FIX;
     } else if ( strcmp(argv[arg], "--disable-shading" ) == 0 ) {
       features &= ~MapMaker::DO_SHADE;
     } else if ( strcmp(argv[arg], "--autoscale") == 0 ) {
@@ -126,6 +131,13 @@ int main( int argc, char **argv ) {
   // convert lat & lon to radians
   clat *= SG_DEGREES_TO_RADIANS;
   clon *= SG_DEGREES_TO_RADIANS;
+
+
+  // Hack alert -- set the nav1_freq and nav2_freq variables to things
+  //   which will prevent MapPS from thinking a radio is set to these
+  //   frequencies
+
+  nav1_freq=nav2_freq=-1000.;
 
   if (!global) {
     OutputPS output( outp, mapobj.getSize() );

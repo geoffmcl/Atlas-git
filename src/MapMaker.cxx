@@ -201,7 +201,12 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
 
     int features = Overlays::OVERLAY_NAMES | Overlays::OVERLAY_IDS;
     if (getAirports()) features += Overlays::OVERLAY_AIRPORTS;
-    if (getNavaids()) features += Overlays::OVERLAY_NAVAIDS;    
+    if (getNavaids()) {
+      features += Overlays::OVERLAY_NAVAIDS;
+      if (getNavaidsVOR()) features += Overlays::OVERLAY_NAVAIDS_VOR;
+      if (getNavaidsNDB()) features += Overlays::OVERLAY_NAVAIDS_NDB;
+      if (getNavaidsFIX()) features += Overlays::OVERLAY_NAVAIDS_FIX;
+    }
     overlays.setFeatures(features);
 
     overlays.drawOverlays();

@@ -64,8 +64,7 @@ OutputPS::OutputPS( char *filename, int size, bool smooth_shading ) :
   //" x  y moveto "
   //"dx dy rlineto"
   //"stroke       "
-  fprintf( ps_file, "/l{moveto rlineto stroke}def\n");
-  
+  fprintf( ps_file, "/l{newpath moveto rlineto stroke}def\n");  
   fprintf( ps_file, "%%%%EndProlog\n" );
   fprintf( ps_file, "%%%%Page: 1 1\n" );
   
@@ -94,6 +93,7 @@ void OutputPS::closeOutput() {
 
   open = false;
   // write resulting map image
+  fprintf( ps_file," showpage\n" );
   fprintf( ps_file, "%%%%Trailer\n" );
   fprintf( ps_file, "%%%%EOF\n\n" );
   fclose( ps_file );
@@ -211,6 +211,6 @@ void OutputPS::drawText( sgVec2 p, char *s ) {
 }
 
 void OutputPS::drawCircle( sgVec2 p, int radius ) {
-  fprintf(ps_file, "%.3f %.3f %i 0 360 arc stroke\n", 
+  fprintf(ps_file, "newpath %.3f %.3f %i 0 360 arc stroke\n",
 	  p[0], p[1], radius );
 }

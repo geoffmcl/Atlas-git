@@ -43,6 +43,9 @@ public:
   static const int OVERLAY_GRIDLINES   = 1 << 4;
   static const int OVERLAY_NAMES       = 1 << 5;
   static const int OVERLAY_IDS         = 1 << 6;
+  static const int OVERLAY_NAVAIDS_VOR  = 1 << 7;
+  static const int OVERLAY_NAVAIDS_NDB  = 1 << 8;
+  static const int OVERLAY_NAVAIDS_FIX  = 1 << 9;
   static const int OVERLAY_ANY_LABEL   = OVERLAY_NAMES | OVERLAY_IDS;
 
   //  Overlays();

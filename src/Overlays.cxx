@@ -290,13 +290,13 @@ void Overlays::draw_navaids( float theta, float alpha,
       switch (n->navtype) {
       case NAV_VOR:
       case NAV_DME:
-	draw_vor(n, p);
+	if (features & OVERLAY_NAVAIDS_VOR) draw_vor(n, p);
 	break;
       case NAV_NDB:
-	draw_ndb(n, p);
+	if (features & OVERLAY_NAVAIDS_NDB) draw_ndb(n, p);
 	break;
       case NAV_FIX:
-	draw_fix(n, p);
+	if (features & OVERLAY_NAVAIDS_FIX) draw_fix(n, p);
 	break;
       }
     }
