@@ -47,13 +47,14 @@
  * Jan. 2005, Removed GLEW dependencies, Erik Hofman
  */
 #include <simgear/compiler.h>
+#include <plib/ul.h>
 
-#ifndef _WIN32
+#ifdef UL_GLX
 #  include <X11/Xlib.h>
 #endif
 #include SG_GL_H
-#ifndef _WIN32
-#  include SG_GLX_H
+#ifdef UL_GLX
+#  include <GL/glx.h>
 #endif
 
 #include <string>
