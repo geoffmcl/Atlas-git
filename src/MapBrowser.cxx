@@ -155,7 +155,7 @@ void MapBrowser::setFlightTrack( FlightTrack *track ) {
 }
 
 void MapBrowser::loadDb() {
-  overlay->load_airports();
+  overlay->load_new_airports();
   overlay->load_navaids();
   overlay->load_fixes();
 }

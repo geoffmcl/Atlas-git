@@ -100,6 +100,7 @@ public:
   inline FlightTrack *getFlightTrack() { return flight_track; }
   inline int getFeatures() { return features; }
   void load_airports();
+  void load_new_airports();
   void load_navaids();
   void load_fixes();
   void drawOverlays();

@@ -22,9 +22,12 @@
 
 #include <stdio.h>
 #include <zlib.h>
+#include <map>
 
 #include "Overlays.hxx"
 #include "Geodesy.hxx"
+
+SG_USING_STD(map);
 
 bool Overlays::airports_loaded = false;
 bool Overlays::navaids_loaded  = false;
@@ -118,7 +121,9 @@ static double wrap_angle(double a_rad) {
 // 'ns' is the prefixes for positive and negative, e.g. "NS" or "EW" or "+-".
 // See also dmshh_format in Atlas.cxx
 static string dms_format(const char ns[2], float angle_rad, float resolution_rad) {
-  int deg, min, sec;
+  int deg = 0;
+  int min = 0;
+  int sec = 0;
   char s[50];
   const char *format;
   
@@ -263,7 +268,7 @@ void Overlays::buildRwyCoords( sgVec2 rwyc, sgVec2 rwyl, sgVec2 rwyw,
 // Draws the labels of all airports in the specified region
 void Overlays::airport_labels(float theta, float alpha,
 			      float dtheta, float dalpha ) {
-  load_airports();
+  load_new_airports();
 
   bool save_shade = output->getShade();
   output->setShade(false);
@@ -477,17 +482,160 @@ void Overlays::draw_fix( NAV *n, sgVec2 p ) {
   if (features & OVERLAY_ANY_LABEL) output->drawText( p, n->name );
 }
 
+/* Loads the new format (Flightgear-0.9.3 onwards) airport 
+   database if it isn't already loaded.  Calls the old format
+   database loader instead if the new format is not found.
+   (if *one* instance of the Overlays class has loaded the db,
+    no other instance will have to load it again, but it's safe
+    to call this function multiple times, since it will just
+    return immediately) */
+void Overlays::load_new_airports() {
+  if(airports_loaded)
+    return;
+
+  char *arpname = new char[strlen(fg_root) + 512];
+  char *rwyname = new char[strlen(fg_root) + 512];
+  char line[256];
+  
+  strcpy( arpname, fg_root );
+  strcpy( rwyname, fg_root );
+  strcat( arpname, "/Airports/basic.dat.gz" );
+  strcat( rwyname, "/Airports/runways.dat.gz" );
+
+  gzFile arp;
+  gzFile rwp;
+
+  arp = gzopen( arpname, "rb" );
+  rwp = gzopen( rwyname, "rb" );
+  if (arp == NULL || rwp == NULL) {
+    fprintf( stderr, "load_new_airports: Couldn't open \"%s\" .\n", (arp ? rwyname : arpname) );
+    delete[] arpname;
+    delete[] rwyname;
+    // Try loading the old format instead
+    fprintf( stderr, "Attempting to load old format airports file instead...\n" );
+    load_airports();
+    return;
+  }
+  
+  // If we get here then the files have opened OK.
+  // We need to index the airports by ID so we can cross reference them with
+  // the runways which are in a separate file not necessarily in the same order
+  map < string, ARP* > arpmap;
+
+  ARP *ap = NULL;
+  while (!gzeof(arp)) {
+    float lat, lon;
+    int elev, name_pos;
+
+    if(ap == NULL) ap = new ARP;
+    
+    gzgets( arp, line, 256 );
+
+    switch (line[0]) {
+    case 'A':
+      if (sscanf( line, "A %4s %f %f %d %*s %n", ap->id, &lat, &lon, &elev, &name_pos ) == 4) {
+	line[ strlen(line)-1 ] = 0;
+	ap->lat = lat * SG_DEGREES_TO_RADIANS;
+	ap->lon = lon * SG_DEGREES_TO_RADIANS;
+
+	strncpy( ap->name, line + name_pos, sizeof(ap->name) );
+	arpmap[ap->id] = ap;
+	ap = NULL;
+      }
+    }
+  }
+  
+  bool line_read = false;
+  bool pos_needed = false;
+  
+  // Now do the runways file
+  char idc[5];
+  while (!gzeof(rwp) || line_read) {
+    float lat, lon;
+    int elev, name_pos;
+
+    if (!line_read) {
+      gzgets( rwp, line, 256 );
+    }
+    
+    switch (line[0]) {
+    case 'A':
+      if (sscanf( line, "A %4s %d %*s %n", idc, &elev, &name_pos ) == 2) {
+	ap = arpmap[idc];
+
+	if(ap == NULL) {
+	  // GRRR - some of the airports are only in the runways file, not the airports file.
+	  // (In fact, the ones I've looked at it's because they're listed as 'S' (seaplane) in basic.dat, but 'A' in runways.dat).
+	  // Create them here and just give them the location of the first runway.
+	  ap = new ARP;
+	  memcpy(ap->id, idc, 5);
+	  pos_needed = true;
+	  strncpy( ap->name, line + name_pos, sizeof(ap->name) );
+	}
+	
+	line_read = false;
+	while (!gzeof(rwp) && !line_read) {
+	  char rwyid[8];
+	  float heading;
+	  float length, width;
+	  
+	  gzgets( rwp, line, 256 );
+	  line_read = true;
+	  
+	  if (sscanf(line, "R %*s %7s %f %f %f %f %f", 
+	  rwyid, &lat, &lon, &heading, &length, &width) == 6) {
+	    RWY *rwy    = new RWY;
+	    rwy->lat    = lat    * SG_DEGREES_TO_RADIANS;
+	    rwy->lon    = lon    * SG_DEGREES_TO_RADIANS;
+	    rwy->hdg    = heading* SG_DEGREES_TO_RADIANS;
+	    rwy->length = (int)(length * 0.3048);   // feet to meters
+	    rwy->width  = (int)(width  * 0.3048);
+	    ap->rwys.push_back( rwy );
+	    if(pos_needed) {
+	      ap->lat = rwy->lat;
+	      ap->lon = rwy->lon;
+	      pos_needed = false;
+	    }
+	    line_read = false;
+	  }
+	  
+	  airports.push_back( ap );
+	  pos_needed = false;  // Just in case pos_needed got set by an airport without a runway.  Shouldn't happen!!
+	}
+	ap = NULL;
+      } else {
+	line_read = false;
+      }
+      break;
+    default:
+      line_read = false;
+      break;
+    }
+
+  }
+  
+  if (ap != NULL)
+    delete ap;
+  
+  gzclose( arp );
+  gzclose( rwp );
+  delete[] arpname;
+  delete[] rwyname;
+
+  airports_loaded = true;
+}
+
 /* Loads the airport database if it isn't already loaded
    (if *one* instance of the Overlays class has loaded the db,
     no other instance will have to load it again, but it's safe
     to call this function multiple times, since it will just
     return immediately) */
 void Overlays::load_airports() {
-  char *arpname = new char[strlen(fg_root) + 512];
-  char line[256];
-
   if (airports_loaded)
     return;
+	
+  char *arpname = new char[strlen(fg_root) + 512];
+  char line[256];
   
   strcpy( arpname, fg_root );
   strcat( arpname, "/Airports/default.apt.gz" );
@@ -497,6 +645,7 @@ void Overlays::load_airports() {
   arp = gzopen( arpname, "rb" );
   if (arp == NULL) {
     fprintf( stderr, "load_airports: Couldn't open \"%s\" .\n", arpname );
+    delete[] arpname;
     return;
   }
 
