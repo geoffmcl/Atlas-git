@@ -66,7 +66,7 @@ public:
   inline int getNumProjections() {
      return projection->NUM_PROJECTIONS;
   }
-   
+  void changeResolution(char *);
 protected:
   void update();
 

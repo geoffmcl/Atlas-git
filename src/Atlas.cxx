@@ -75,6 +75,9 @@ bool softcursor = false;
 char lat_str[80], lon_str[80], alt_str[80], hdg_str[80], spd_str[80];
 
 char fg_root[512] = "";
+char path[512]="";
+char lowrespath[512]="";
+int lowres_avlble;
 
 MapBrowser *map_object;
 FlightTrack *track = NULL;
@@ -429,7 +432,10 @@ static char *coord_format_latlon(float latitude, float longitude, char *buf)
  PUI code (HANDLERS)
 ******************************************************************************/
 void zoom_cb ( puObject *cb )
-{
+{ float new_scale, prev_scale;
+   
+  prev_scale=map_object->getScale();
+  
   if (cb == zoomin) { 
     map_object->setScale( map_object->getScale() / SCALECHANGEFACTOR );
     scalefactor /= SCALECHANGEFACTOR;
@@ -437,7 +443,20 @@ void zoom_cb ( puObject *cb )
     map_object->setScale( map_object->getScale() * SCALECHANGEFACTOR );
     scalefactor *= SCALECHANGEFACTOR;
   }
-  printf("scale: %f\n", map_object->getScale());
+  new_scale=map_object->getScale();
+   
+  printf("scale: %f\n", new_scale);
+  
+  //set map math depending on resolution
+  if (lowres_avlble) {
+     if (new_scale > 1000000 && prev_scale <=1000000) {
+	puts("Switching to low resolution maps");
+	map_object->changeResolution(lowrespath);
+     } else if (new_scale <= 1000000 && prev_scale > 1000000) {
+	puts("Switching to default resolution maps");
+	map_object->changeResolution(path);
+     }
+  }
   glutPostRedisplay();
 }
 
@@ -908,7 +927,6 @@ void print_help() {
 }
 
 int main(int argc, char **argv) {
-  char path[512] = "";
   bool textureFonts = true;
   int width = 800, height = 600;
 
@@ -970,6 +988,18 @@ int main(int argc, char **argv) {
     }
 
     strcat(path, "Atlas/");
+    if (access(path, F_OK)==-1) {
+       printf("\nWarning: path %s doesn't exist. Maps won't be loaded!\n", path);
+    } else {
+       strcpy(lowrespath, path);
+       strcat(lowrespath, "lowres/");
+       if (access(lowrespath, F_OK)==-1) {
+	  printf("\nWarning: path %s doesn't exist. Low resolution maps won't be loaded\n", lowrespath);
+	  lowres_avlble=0;
+       } else {
+	  lowres_avlble=1;
+       }
+    }
   }
 
   latitude  *= SG_DEGREES_TO_RADIANS;

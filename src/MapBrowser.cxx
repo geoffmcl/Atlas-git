@@ -109,6 +109,24 @@ void MapBrowser::setMapPath( char *path ) {
   pathl = strlen( mpath );
 }
 
+void MapBrowser::changeResolution(char *path) {
+  MapTile *tile;
+  list<MapTile*>::iterator i = tiles.end();
+  i--;
+  while (tiles.begin() != tiles.end()) {
+     tile =*i;
+     glDeleteTextures( 1, &tile->texture_handle );
+     tiles.erase( i );
+     tiletable.erase(tile->c);
+     delete tile->texbuf;
+     delete tile;
+     i--;
+  }
+  
+  setMapPath(path);
+  update();
+}
+
 /*
 void MapBrowser::setFGRoot( char *fg_root ) {
   overlay->setFGRoot( fg_root );
@@ -201,10 +219,10 @@ void MapBrowser::update() {
   if (max_lat >  90) max_lat =  90;
   int num_lat = (max_lat - min_lat) + 1, num_lon = (max_lon - min_lon) + 1;
 
-  // remove old tiles
   for (list<MapTile*>::iterator i = tiles.begin(); i != tiles.end(); i++) {
     MapTile *tile = *i;
 
+    // remove old tiles
     if (tile->c.lat < min_lat - CACHE_LIMIT || 
          tile->c.lat > max_lat + CACHE_LIMIT ||
          tile->c.lon < min_lon - CACHE_LIMIT || 
@@ -236,7 +254,7 @@ void MapBrowser::update() {
       scale( xyr[0], xyr[1], &tile->xso, &tile->yso );
     }
   }
-
+  
   // load needed tiles
   for (int i = 0; i < num_lat; i++) {
     for (int j = 0; j < num_lon; j++) {
@@ -262,7 +280,7 @@ void MapBrowser::update() {
                  (c.lon < 0)?'w':'e', abs(c.lon),
                  (c.lat < 0)?'s':'n', abs(c.lat) );         
 
-        //printf("Loading tile %s...", mpath);
+        //printf("Loading tile %s...\n", mpath);
 
         if ( (nt->texbuf = (GLubyte*)loadPng( mpath, &wid, &hei )) != NULL ) {
           glPixelStorei(GL_UNPACK_ALIGNMENT, 3);
@@ -280,7 +298,7 @@ void MapBrowser::update() {
           glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB, wid, hei, 0, GL_RGB, 
                          GL_UNSIGNED_BYTE, nt->texbuf );
         } else {
-          // Tile couldn't be loaded
+          // printf("Tile %s couldn't be loaded\n",mpath);
 	  // texbuf is NULL; texture_handle is undefined.
         }
 
