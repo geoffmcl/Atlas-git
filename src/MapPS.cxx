@@ -151,7 +151,7 @@ int main( int argc, char **argv ) {
     mapobj.createMap( &output, clat, clon, scenerypath, autoscale );
   } else {
     char outname[512];
-    int opathl, spathl;
+    size_t opathl, spathl;
     ulDir *dir1, *dir2;
     ulDirEnt *ent;
 
