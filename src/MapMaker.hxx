@@ -83,14 +83,14 @@ public:
 
   inline char *getFGRoot() { return fg_root; }
   inline char *getAPFilter() { return arp_filter; }
-  inline bool getShade() { return features & DO_SHADE; }
-  inline bool getAirports() { return features & DO_AIRPORTS; }
-  inline bool getVerbose() { return features & DO_VERBOSE; }
-  inline bool getNavaids() { return features & DO_NAVAIDS; }
-  inline bool getNavaidsVOR() { return features & DO_NAVAIDS_VOR; }
-  inline bool getNavaidsNDB() { return features & DO_NAVAIDS_NDB; }
-  inline bool getNavaidsFIX() { return features & DO_NAVAIDS_FIX; }
-  inline bool getNavaidsILS() { return features & DO_NAVAIDS_ILS; }
+  inline bool getShade() { return ( features & DO_SHADE ) != 0; }
+  inline bool getAirports() { return ( features & DO_AIRPORTS ) != 0; }
+  inline bool getVerbose() { return ( features & DO_VERBOSE ) != 0; }
+  inline bool getNavaids() { return ( features & DO_NAVAIDS ) != 0; }
+  inline bool getNavaidsVOR() { return ( features & DO_NAVAIDS_VOR ) != 0; }
+  inline bool getNavaidsNDB() { return ( features & DO_NAVAIDS_NDB ) != 0; }
+  inline bool getNavaidsFIX() { return ( features & DO_NAVAIDS_FIX ) != 0; }
+  inline bool getNavaidsILS() { return ( features & DO_NAVAIDS_ILS ) != 0; }
   inline int getScale() { return scle; }
   inline int getSize() { return size; }
   inline float *getLight() { return light_vector; }
