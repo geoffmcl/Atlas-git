@@ -103,7 +103,7 @@ protected:
   void read_materials(char* filename = NULL);
   
   // Elevation limits for colours
-  static const int MAX_ELEV_LEVELS = 9;
+  static const int MAX_ELEV_LEVELS = 27;
   int number_elev_levels;
   int elev_height[MAX_ELEV_LEVELS]; 
   int elev_colindex[MAX_ELEV_LEVELS];

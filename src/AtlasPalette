@@ -3,7 +3,7 @@
 # Palette section: defines a number of colours
 # consisting of an index and red, green, blue, alpha values
 # Colour 0 will be used as background colour
-Colour 0	0.761 0.839 0.847 1.0 
+Colour 0	0.671 0.737 0.745 1.0 
 Colour 1 	0.647 0.729 0.647 1.0 
 Colour 2	0.859 0.906 0.804 1.0 
 Colour 3	0.753 0.831 0.682 1.0

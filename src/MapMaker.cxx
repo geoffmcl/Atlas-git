@@ -78,7 +78,7 @@ void MapMaker::setFGRoot( char *fg_root ) {
     }
   }
    
-  this->fg_root = new char[strlen(fg_root)];
+  this->fg_root = new char[strlen(fg_root)+1];
   strcpy(this->fg_root, fg_root);
 }
 
@@ -132,15 +132,21 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
   float dtheta, dalpha;
 
   if (autoscale > 0.0f) {
+    // I think this is wrong (PL 010719):
     // set scale to autoscale degrees in meters at this latitude
-    scle = (int)(earth_radius_lat(theta)*2.0f * autoscale *SG_PI / 360.0f);
-    dtheta = autoscale * 0.8f * SG_DEGREES_TO_RADIANS;
-    dalpha = (autoscale * 0.8f + fabs(tan(theta)) * 0.35f) * SG_DEGREES_TO_RADIANS;
-  } else {
+    //scle = (int)(earth_radius_lat(theta)*2.0f * autoscale *SG_PI / 360.0f);
+
+    // this should be better:
+    scle = (int)(rec*2.0f * autoscale *SG_PI / 360.0f);
+
+    // no idea why this magic should be here:
+    //dtheta = autoscale * 0.8f * SG_DEGREES_TO_RADIANS;
+    //dalpha = (autoscale * 0.8f + fabs(tan(theta)) * 0.35f) * SG_DEGREES_TO_RADIANS;
+  } //else {
     lat_ab( scle/2, scle/2, theta, alpha, &dtheta, &dalpha );
     dtheta -= theta;
     dalpha -= alpha;
-  }
+    //  }
 
 //  int sgntheta = (theta < 0.0f) ? 1 : 0, sgnalpha = (alpha < 0.0f) ? 1 : 0;
 //  // Rainer Emrich's improved code for finding map boundaries
