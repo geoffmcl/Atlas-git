@@ -39,7 +39,12 @@
 #include <simgear/compiler.h>
 #include SG_GL_H
 #ifdef UL_GLX
-#  include SG_GLX_H
+#  define GLX_GLXEXT_PROTOTYPES
+#  ifdef __APPLE__
+#    include <OpenGL/glx.h>
+#  else
+#    include <GL/glx.h>
+#  endif
 #elif defined UL_WIN32
 #  include <windows.h>
 #endif
