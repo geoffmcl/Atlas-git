@@ -31,9 +31,9 @@
 const char* MapBrowser::TXF_FONT_NAME = "/Fonts/helvetica_medium.txf";
 
 MapBrowser::MapBrowser(GLfloat left, GLfloat top, GLfloat size, int features,
-                       char *fg_root, bool jpg, bool texturedFonts) :
+                       char *fg_root, bool texturedFonts) :
   view_left(left), view_top(top), view_size(size), clat(0.0f), clon(0.0f),
-  scle(100000), pathl(0), features(features), jpeg(jpg), texturedFonts(texturedFonts)
+  scle(100000), pathl(0), features(features), texturedFonts(texturedFonts)
 {
   mpath[0] = 0;
 
@@ -47,7 +47,7 @@ MapBrowser::MapBrowser(GLfloat left, GLfloat top, GLfloat size, int features,
     font_name = NULL;
   }
 
-  output = new OutputGL( NULL, (int)size, false, texturedFonts, font_name, jpeg );
+  output = new OutputGL( NULL, (int)size, false, texturedFonts, font_name );
   output->setShade(false);
 
   // setup overlays
@@ -96,7 +96,7 @@ void MapBrowser::setSize( GLfloat size ) {
   zoom = view_size / scle;
 
   delete output;
-  output = new OutputGL(NULL, (int)size, false, texturedFonts, font_name, jpeg);
+  output = new OutputGL(NULL, (int)size, false, texturedFonts, font_name);
   overlay->setOutput( output );
   overlay->setScale( zoom );
   output->setShade(false);

@@ -11,9 +11,9 @@ float OutputGL::circle_y[];
 const float OutputGL::BRIGHTNESS = 0.6f;
 
 OutputGL::OutputGL( char *filename, int size, bool smooth_shading, 
-		    bool useTexturedFont, char *fontname, bool jpg ) : 
+		    bool useTexturedFont, char *fontname, bool jpg, int q ) : 
   GfxOutput(filename, size), filename(filename), 
-  useTexturedFont(useTexturedFont), jpeg(jpg)
+  useTexturedFont(useTexturedFont), jpeg(jpg), jpeg_quality(q)
 {
   glViewport( 0, 0, size, size );
   glMatrixMode( GL_PROJECTION );
@@ -94,6 +94,7 @@ void OutputGL::closeOutput() {
     cinfo.in_color_space = JCS_RGB;
 
     jpeg_set_defaults(&cinfo);
+    jpeg_set_quality(&cinfo,jpeg_quality,false);
 
     jpeg_start_compress( &cinfo, TRUE );
 

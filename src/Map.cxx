@@ -78,6 +78,7 @@ bool global = false;
 bool doublebuffer = true, headless = false, create_jpeg = false;
 bool smooth_shade = true, textured_fonts = true;
 int features = MapMaker::DO_SHADE;
+int jpeg_quality = 75;
 MapMaker mapobj;
 
 char outname[512], *scenerypath, *palette;
@@ -121,7 +122,7 @@ void redrawMap() {
       outp = outpp;
     }
     OutputGL output( outp, mapobj.getSize(), smooth_shade, 
-		     textured_fonts, font_name, create_jpeg );
+		     textured_fonts, font_name, create_jpeg, jpeg_quality );
     mapobj.createMap( &output, clat, clon, scenerypath, autoscale );
     output.closeOutput();
     exit(0);
@@ -200,7 +201,7 @@ void redrawMap() {
 	    (clon<0.0f)?'W':'E', clon * SG_RADIANS_TO_DEGREES);
     if(!headless) glutSetWindowTitle(title_buffer);
 
-    OutputGL output(outname, s, smooth_shade, textured_fonts, font_name, create_jpeg);
+    OutputGL output(outname, s, smooth_shade, textured_fonts, font_name, create_jpeg, jpeg_quality);
     mapobj.createMap( &output, clat, clon, fg_scenery[scenery_pos], 1.0f );
     output.closeOutput();
     if (doublebuffer && !headless) {
@@ -289,7 +290,8 @@ void print_help() {
   printf("  --glutfonts             Use GLUT built-in fonts\n");
   printf("  --palette=path          Set the palette file to use\n");
   printf("  --smooth-color          Make smooth color heights\n");
-  printf("  --jpeg                  Create JPEG images\n");
+  printf("  --jpeg                  Create JPEG images with default quality (75)\n");
+  printf("  --jpeg=integer          Create JPEG images with specified quality\n");
 }
 
 bool parse_arg(char* arg) {
@@ -327,6 +329,8 @@ bool parse_arg(char* arg) {
     // do nothing
   } else if ( strcmp(arg, "--singlebuffer") == 0 ) {
     doublebuffer = false;
+  } else if ( sscanf(arg, "--jpeg=%d", &jpeg_quality) == 1 ) {
+    create_jpeg = true;
   } else if ( strcmp(arg, "--jpeg") == 0 ) {
     create_jpeg = true;
   } else if ( strcmp(arg, "--headless") == 0 ) {
