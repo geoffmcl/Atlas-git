@@ -73,7 +73,7 @@ Overlays::Overlays( char *fg_root = NULL, float scale = 1.0f,
   projection= new Projection;
 
   time_params = new SGTime();
-  time_params->update( 0.0, 0.0, 0 );
+  time_params->update( 0.0, 0.0, 0, 0 );
 
   mag = new SGMagVar();
 }
