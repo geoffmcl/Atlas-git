@@ -40,9 +40,16 @@ SGIOChannel *input_channel;
 bool dragmode = false;
 int drag_x, drag_y;
 float scalefactor = 1.0f, mapsize, width, height;
-float latitude  = 33.5f  , copy_lat;
-float longitude = -110.5f, copy_lon;
+
+// P13
+//float latitude  = 33.5f  , copy_lat;
+//float longitude = -110.5f, copy_lon;
+// Bay Area
+float latitude = 37.5f , copy_lat;
+float longitude = -122.25f , copy_lon;
+
 float heading = 0.0f, speed, altitude;
+char icao[256] = "";
 
 bool slaved = false;
 bool network = false;
@@ -593,7 +600,7 @@ void init_gui(bool textureFonts) {
   show_fix = new puButton(curx+124, cury, "FIX");
   show_fix->setSize(60,24);
   show_fix->setCallback(show_cb);
-  show_fix->setValue(1);
+  show_fix->setValue(0);
 
   cury+=25;
 
@@ -910,6 +917,7 @@ void print_help() {
   printf("ATLAS - A map browsing utility for FlightGear\n\nUsage:\n");
   printf("   --lat=x      Start browsing at latitude xx (deg. south i neg.)\n");
   printf("   --lon=x      Start browsing at longitude xx (deg. west i neg.)\n");
+  printf("   --airport=icao Start browsing at an airport specified by ICAO code icao\n");
   printf("   --path=xxx   Set path for map images\n");
   printf("   --fgroot=path  Overrides FG_ROOT environment variable\n");
   printf("   --glutfonts  Use GLUT bitmap fonts (fast for software rendering)\n");
@@ -934,6 +942,11 @@ int main(int argc, char **argv) {
       // do nothing
     } else if ( sscanf(argv[i], "--lon=%f", &longitude) == 1 ) {
       // do nothing
+    } else if ( sscanf(argv[i], "--airport=%s", icao) == 1 ) {
+      // Make sure it's in uppercase only
+      for(int i=0; i<strlen(icao); ++i) {
+	icao[i] = toupper(icao[i]);
+      }
     } else if ( sscanf(argv[i], "--udp=%s", port) == 1) {
       slaved = true;
       network = true;
@@ -1012,8 +1025,8 @@ int main(int argc, char **argv) {
                                Overlays::OVERLAY_NAVAIDS   |
                                Overlays::OVERLAY_NAVAIDS_VOR |
                                Overlays::OVERLAY_NAVAIDS_NDB |
-                               Overlays::OVERLAY_NAVAIDS_FIX |
-                               Overlays::OVERLAY_FIXES     |
+                               //Overlays::OVERLAY_NAVAIDS_FIX |
+                               //Overlays::OVERLAY_FIXES     |
                                Overlays::OVERLAY_GRIDLINES | 
                                Overlays::OVERLAY_NAMES     |
 			       Overlays::OVERLAY_FLIGHTTRACK,
@@ -1045,11 +1058,22 @@ int main(int argc, char **argv) {
   glutKeyboardFunc     ( keyPressed  );
   glutSpecialFunc      ( specPressed );
 
-  map_object->setLocation( latitude, longitude );
   printf("Please wait while loading databases..."); fflush(stdout);
   map_object->loadDb();
   printf("done.\n");
-
+  
+  if(strlen(icao) != 0) {
+    Overlays::ARP* apt = map_object->getOverlays()->findAirportByCode(icao);
+    if(apt) {
+      latitude = apt->lat;
+      longitude = apt->lon;
+    } else {
+      printf("Unable to find airport %s.\n", icao);
+    }
+  }
+  
+  map_object->setLocation( latitude, longitude );
+  
   init_gui(textureFonts);
 
   glutMainLoop();

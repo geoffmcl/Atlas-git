@@ -125,7 +125,10 @@ public:
     float lat, lon, freq, magvar;
   };
 
+  // Find an airport by name
   ARP* findAirport( const char* name );
+  // Find an airport by ICAO code
+  ARP* findAirportByCode( const char* id );
   NAV* findNav    ( const char* name );
   NAV* findNav    ( float lat, float lon, float freq );
 

@@ -843,6 +843,16 @@ Overlays::ARP *Overlays::findAirport( const char *name ) {
   return NULL;
 }
 
+Overlays::ARP *Overlays::findAirportByCode( const char *id ) {
+  for (vector<ARP*>::iterator i = airports.begin(); i < airports.end(); i++) {
+    if ( strcmp( (*i)->id, id ) == 0 ) {
+      return *i;
+    }
+  }
+
+  return NULL;
+}
+
 Overlays::NAV *Overlays::findNav( const char *name ) {
   for (vector<NAV*>::const_iterator i = navaids.begin(); i < navaids.end(); i++) {
     if ( strcmp( (*i)->name, name ) == 0 ) {
