@@ -1066,6 +1066,11 @@ void MapMaker::read_materials(char *fname /* = NULL */) {
 
       break;
 
+    case '\n':
+    case '\r':
+      // Blank line - ignore
+      break;
+      
     default:
       fprintf(stderr, 
               "Syntax error in file \"%s\". Line:\n\t%s\n", filename, line);
