@@ -29,6 +29,8 @@ public:
 
 protected:
   static const float BRIGHTNESS = 0.6f;
+  static const int SUBDIVISIONS = 18;
+  static float circle_x[SUBDIVISIONS], circle_y[SUBDIVISIONS];
 
   fntTexFont *font;
   fntRenderer textRenderer;

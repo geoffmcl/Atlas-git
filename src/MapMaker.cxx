@@ -159,13 +159,12 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
   return 1;
 }
 
-void MapMaker::sub_trifan( vector<int> &tri, vector<float*> &v, 
-			   vector<float*> &n, int index ) {
-
-  int nvert = tri[index++];      // number of vertices in trifan
-  index++;                       // colour is stored here, currently discarded
-  int cvert = tri[index++];      // index of central vertex
-  int vert2 = tri[index++];      // the first vertex of the circumference
+void MapMaker::sub_trifan( list<int> &tri, vector<float*> &v, 
+			   vector<float*> &n ) {
+  list<int>::iterator index = tri.begin();
+  int nvert = *(index++);      // number of vertices in trifan
+  int cvert = *(index++);      // index of central vertex
+  int vert2 = *(index++);      // the first vertex of the circumference
 
   sgVec3 t[3], nrm[3];
   float length2 = 0.6f * scle;
@@ -177,8 +176,8 @@ void MapMaker::sub_trifan( vector<int> &tri, vector<float*> &v,
   sgCopyVec3( nrm[1], n[vert2]);
 
   // now loop over each triangle in the fan
-  for (int i = 2; i < nvert; i++) {
-    vert2 = tri[index++];
+  while ( index != tri.end() ) {
+    vert2 = *(index++);
 
     // get third vertex
     sgCopyVec3( t[2], v[vert2] );
@@ -290,12 +289,10 @@ void MapMaker::sub_trifan( vector<int> &tri, vector<float*> &v,
   }
 }
 
-void MapMaker::draw_trifan( vector<int> &tri, vector<float*> &v, 
-			    vector<float*> &n, int index ) {
-  int startindex = index;
-  int nvert = tri[index++];
-  int col   = tri[index++];
-  int cvert = tri[index++], vert2 = tri[index++];
+void MapMaker::draw_trifan( list<int> &tri, vector<float*> &v, 
+			    vector<float*> &n, int col ) {
+  list<int>::iterator index = tri.begin();
+  int cvert = *(index++), vert2 = *(index++);
 
   sgVec3 t[3], nrm[3];
   sgVec2 p[3];
@@ -307,8 +304,8 @@ void MapMaker::draw_trifan( vector<int> &tri, vector<float*> &v,
   sgSetVec2( p[0], scale(t[0][0], size, zoom), scale(t[0][1], size, zoom) );
   sgSetVec2( p[1], scale(t[1][0], size, zoom), scale(t[1][1], size, zoom) );
 
-  for (int i = 2; i < nvert; i++) {
-    vert2 = tri[index++];
+  while ( index != tri.end() ) {
+    vert2 = *(index++);
 
     sgCopyVec3( t[2], v[vert2] );
     sgCopyVec3( nrm[2], n[vert2] );
@@ -335,7 +332,7 @@ void MapMaker::draw_trifan( vector<int> &tri, vector<float*> &v,
   }
 
   if (col<0) {
-    sub_trifan( tri, v, n, startindex );
+    sub_trifan( tri, v, n );
   }
 }
 
@@ -344,17 +341,16 @@ int MapMaker::process_file( char *tile_name, float x, float y, float z ) {
   float f1, f2, f3;                   // temp. storage
   int scount = 0;
   int i1, i2, material = 16;
+  int verts = 0, normals = 0;
   vector<float*> v;                   // vertices
   vector<float*> n;                   // normals
-  vector<int>    tri;                 /* triangle strips/fans 
-					 (in a rather strange format) */
 
   char lbuffer[4096], mtl[32];       /* will there be longer lines in
 					scenery files? */
 
   // setup some reasonable sizes for vectors
   v.reserve(1024);
-  tri.reserve(1024);
+  n.reserve(1024);
 
   gzFile tf = gzopen( tile_name, "rb" );
 
@@ -401,33 +397,32 @@ int MapMaker::process_file( char *tile_name, float x, float y, float z ) {
       normals++;
     } else if (strncmp(lbuffer, "tf ", 3) == 0) {
       // Triangle fan
-      int tcount = scount;
+      list<int> tri;
       int c = 3;
-
-      scount += 2;
-      tri.push_back( 0 ); tri.push_back( 0 );   // will be filled in later
 
       while ( lbuffer[c] != 0 ) {
 	while (lbuffer[c]==' ') c++;
 	sscanf( lbuffer + c, "%d/%d", &i1, &i2 );
+
+	if (i1 >= verts || i1 >= normals) {
+	  fprintf(stderr, "Tile \"%s\" contains triangle indices out of " \
+		  "bounds.\n", tile_name);
+	  break;
+	}
+
 	tri.push_back( i1 );
-	scount++;
 	while (lbuffer[c] != ' ' && lbuffer[c] != 0) c++;
       }
 
-      tri[tcount] = scount - tcount - 2;        // number of vertices
-      tri[tcount + 1] = material;               // stored for colouring
-
-      draw_trifan( tri, v, n, tcount );
+      draw_trifan( tri, v, n, material );
       polys++;
-
     } else if (sscanf(lbuffer, "# usemtl %s", mtl) == 1) {
       int i;
       for (i = 0; i < 16 && strcmp(mtl, materials[i]) != 0; i++);
       if (i<16) {
 	material = colours[i];
       } else {
-	printf("unknown material = %s\n", mtl);
+	//printf("unknown material = %s\n", mtl);
 	material = colours[2];
       }
     }

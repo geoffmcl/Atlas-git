@@ -106,7 +106,7 @@ protected:
   GfxOutput *output;
 
   /* some info variables */
-  int polys, verts, normals;
+  int polys;
 
   inline int elev2colour( int elev ) {
     int i;
@@ -143,10 +143,9 @@ protected:
     return fabs(sgScalarProductVec3( n, light_vector ));
   }
 
-  void sub_trifan( vector<int> &tri, vector<float*> &v, vector<float*> &n, 
-		   int index );
-  void draw_trifan( vector<int> &tri, vector<float*> &v, vector<float*> &n,
-		    int index );
+  void sub_trifan( list<int> &tri, vector<float*> &v, vector<float*> &n );
+  void draw_trifan( list<int> &tri, vector<float*> &v, vector<float*> &n,
+		    int col );
 
   int process_directory( char *path, int plen, int lat, int lon, 
 			 float x, float y, float z );

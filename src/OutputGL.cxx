@@ -2,6 +2,9 @@
 #include <png.h>
 #include "OutputGL.hxx"
 
+float OutputGL::circle_x[];
+float OutputGL::circle_y[];
+
 OutputGL::OutputGL( char *filename, int size, bool smooth_shading, 
 		    bool useTexturedFont ) : 
   GfxOutput::GfxOutput(filename, size), filename(filename), 
@@ -26,6 +29,11 @@ OutputGL::OutputGL( char *filename, int size, bool smooth_shading,
     textRenderer.setPointSize( 12 );
   } else {
     glutFont = new puFont;
+  }
+
+  for (int i = 0; i < SUBDIVISIONS; i++) {
+    circle_x[i] = cos(2*SG_PI / SUBDIVISIONS * i);
+    circle_y[i] = sin(2*SG_PI / SUBDIVISIONS * i);
   }
 }
 
@@ -156,12 +164,11 @@ void OutputGL::drawQuad( const sgVec2 *p, const sgVec3 *normals ) {
 }
 
 void OutputGL::drawCircle( sgVec2 p, int radius ) {
-  static const int SUBDIVISIONS = 18;
 
-  glBegin(GL_LINE_STRIP);
-  for (int i = 0; i <= SUBDIVISIONS; i++) {
-    glVertex2f( p[0] + cos(2*SG_PI / SUBDIVISIONS * i) * radius,
-		p[1] + sin(2*SG_PI / SUBDIVISIONS * i) * radius );
+  glBegin(GL_LINE_LOOP);
+  for (int i = 0; i < SUBDIVISIONS; i++) {
+    glVertex2f( p[0] + circle_x[i] * radius,
+		p[1] + circle_y[i] * radius );
   }
   glEnd();
 }
