@@ -670,23 +670,35 @@ void redrawMap() {
 
   map_object->draw();
 
-  // Draw aircraft if in slave mode
+  glPushMatrix();
+  glTranslatef( mapsize/2, mapsize/2, 0.0f );
+  glColor3f( 1.0f, 0.0f, 0.0f );
+
+// Draw aircraft if in slave mode
   if (slaved) {
-    glPushMatrix();
-    glTranslatef( mapsize/2, mapsize/2, 0.0f );
     glRotatef( 90.0f - heading, 0.0f, 0.0f, 1.0f);
     glBegin(GL_LINES);
-    glColor3f( 1.0f, 0.0f, 0.0f );
     glVertex2f( 4.0f, 0.0f );
     glVertex2f( -9.0f, 0.0f );
     glVertex2f( 0.0f, -7.0f );  // left wing
     glVertex2f( 0.0f, 7.0f );   // right wing
     glVertex2f( -7.0f, -3.0f );
     glVertex2f( -7.0f, 3.0f );
-    glEnd();
-    glPopMatrix();
+  } else {
+  // Draw Crosshair if slaved==false
+    glBegin(GL_LINES);
+    glVertex2f(0.0f, 0.0f);
+    glVertex2f(0.0f, 20.0f);
+    glVertex2f(0.0f, 0.0f);
+    glVertex2f(0.0f, -20.0f);
+    glVertex2f(0.0f, 0.0f);
+    glVertex2f(20.0f, 0.0f);
+    glVertex2f(0.0f, 0.0f);
+    glVertex2f(-20.0f, 0.0f);
   }
-
+  glEnd(); 
+  glPopMatrix();
+   
   if (!inp_lat->isAcceptingInput()) {
     sprintf( lat_str, "%c%s", 
 	     (latitude<0)?'S':'N', 
