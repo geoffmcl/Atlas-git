@@ -402,8 +402,76 @@ void MapMaker::sub_trifan( const int_list &indices, vector<float*> &v,
   }
 }
 
+void MapMaker::draw_tri( const int_list &indices, vector<float*> &v,
+                         vector<float*> &n, int col) {
+  int_list::const_iterator index = indices.begin();
+  unsigned int pos = 0;
+  // Some btg airport files economize on normals. 
+  bool single_normal = false;
+  if(n.size() < v.size()) single_normal = true;
+  
+  while(indices.size() - pos >= 3) {
+    int vert0 = *(index++), vert1 = *(index++), vert2 = *(index++);
+    // TODO - should add some checking that the returned values of
+    // vert0 -> 2 are not greater than the node array size.
+    
+    sgVec3 t[3], nrm[3];
+    sgVec2 p[3];
+    sgVec4 color[3];
+    
+    sgCopyVec3( t[0], v[vert0] );
+    sgCopyVec3( t[1], v[vert1] );
+    sgCopyVec3( t[2], v[vert2] );
+    sgCopyVec3( nrm[0], (single_normal ? *(n.begin()) : n[vert0]) );
+    sgCopyVec3( nrm[1], (single_normal ? *(n.begin()) : n[vert1]) );
+    sgCopyVec3( nrm[2], (single_normal ? *(n.begin()) : n[vert2]) );
+    sgSetVec2( p[0], scale(t[0][0], size, zoom), scale(t[0][1], size, zoom) );
+    sgSetVec2( p[1], scale(t[1][0], size, zoom), scale(t[1][1], size, zoom) );
+    sgSetVec2( p[2], scale(t[2][0], size, zoom), scale(t[2][1], size, zoom) );
+    
+    bool smooth=false;
+    bool save_shade = output->getShade();
+    
+    if (col == 12 || col == 13) {
+      // do not shade ocean/lake/etc.
+      output->setColor(palette[col]);
+      // DCL - and switch lighting off for water for now (see the Jan 2005 mailing list archives)
+      output->setShade(false);
+    } else {
+      int dcol;
+      if (col>=0) {
+         dcol = col;
+      } else {
+	dcol = elev2colour((int)((t[0][2] + t[1][2] + t[2][2]) / 3.0f));
+	if(features & DO_SMOOTH_COLOR) {
+	  elev2colour_smooth((int)t[0][2], color[0]);
+	  elev2colour_smooth((int)t[1][2], color[1]);
+	  elev2colour_smooth((int)t[2][2], color[2]);
+	  smooth=true;
+        }
+      }
+      output->setColor(palette[dcol]);
+    }
+    
+    if(smooth) {
+      output->drawTriangle( p, nrm, color );
+    } else {
+      output->drawTriangle( p, nrm );
+    }
+    
+    // DCL - restore the original lighting in case we turned it off for water
+    output->setShade(save_shade);
+    
+    pos += 3;
+  }
+}
+
 void MapMaker::draw_trifan( const int_list &indices, vector<float*> &v, 
                             vector<float*> &n, int col ) {
+  // Some btg airport files economize on normals. 
+  bool single_normal = false;
+  if(n.size() < v.size()) single_normal = true;
+  
   int_list::const_iterator index = indices.begin();
   int cvert = *(index++), vert2 = *(index++);
 
@@ -413,8 +481,8 @@ void MapMaker::draw_trifan( const int_list &indices, vector<float*> &v,
 
   sgCopyVec3( t[0], v[cvert] );
   sgCopyVec3( t[1], v[vert2] );
-  sgCopyVec3( nrm[0], n[cvert] );
-  sgCopyVec3( nrm[1], n[vert2] );
+  sgCopyVec3( nrm[0], (single_normal ? *(n.begin()) : n[cvert]) );
+  sgCopyVec3( nrm[1], (single_normal ? *(n.begin()) : n[vert2]) );
   sgSetVec2( p[0], scale(t[0][0], size, zoom), scale(t[0][1], size, zoom) );
   sgSetVec2( p[1], scale(t[1][0], size, zoom), scale(t[1][1], size, zoom) );
 
@@ -424,7 +492,7 @@ void MapMaker::draw_trifan( const int_list &indices, vector<float*> &v,
     vert2 = *(index++);
 
     sgCopyVec3( t[2], v[vert2] );
-    sgCopyVec3( nrm[2], n[vert2] );
+    sgCopyVec3( nrm[2], (single_normal ? *(n.begin()) : n[vert2]) );
     sgSetVec2( p[2], scale(t[2][0], size, zoom), scale(t[2][1], size, zoom) );
 
     if (col == 12 || col == 13) {
@@ -465,8 +533,86 @@ void MapMaker::draw_trifan( const int_list &indices, vector<float*> &v,
     sub_trifan( indices, v, n );
   }
 }
+			    
+void MapMaker::draw_tristrip( const int_list &indices, vector<float*> &v, 
+                            vector<float*> &n, int col ) {
+  // Some btg airport files economize on normals. 
+  bool single_normal = false;
+  if(n.size() < v.size()) single_normal = true;
+  
+  int_list::const_iterator index = indices.begin();
+  int vert0 = *(index++), vert1 = *(index++), vert2;
+
+  sgVec3 t[3], nrm[3];
+  sgVec2 p[3];
+  sgVec4 color[3];
+
+  sgCopyVec3( t[0], v[vert0] );
+  sgCopyVec3( t[1], v[vert1] );
+  sgCopyVec3( nrm[0], (single_normal ? *(n.begin()) : n[vert0]) );
+  sgCopyVec3( nrm[1], (single_normal ? *(n.begin()) : n[vert1]) );
+  sgSetVec2( p[0], scale(t[0][0], size, zoom), scale(t[0][1], size, zoom) );
+  sgSetVec2( p[1], scale(t[1][0], size, zoom), scale(t[1][1], size, zoom) );
+
+  while ( index != indices.end() ) {
+    bool smooth=false;
+    bool save_shade = output->getShade();
+    vert2 = *(index++);
+
+    sgCopyVec3( t[2], v[vert2] );
+    sgCopyVec3( nrm[2], (single_normal ? *(n.begin()) : n[vert2]) );
+    sgSetVec2( p[2], scale(t[2][0], size, zoom), scale(t[2][1], size, zoom) );
+
+    if (col == 12 || col == 13) {
+      // do not shade ocean/lake/etc.
+      output->setColor(palette[col]);
+      // DCL - and switch lighting off for water for now (see the Jan 2005 mailing list archives)
+      output->setShade(false);
+    } else {
+      int dcol;
+      if (col>=0) {
+         dcol = col;
+      } else {
+	dcol = elev2colour((int)((t[0][2] + t[1][2] + t[2][2]) / 3.0f));
+	if(features & DO_SMOOTH_COLOR) {
+	  elev2colour_smooth((int)t[0][2], color[0]);
+	  elev2colour_smooth((int)t[1][2], color[1]);
+	  elev2colour_smooth((int)t[2][2], color[2]);
+	  smooth=true;
+        }
+      }
+      output->setColor(palette[dcol]);
+    }
+
+    if(smooth)
+      output->drawTriangle( p, nrm, color );
+    else
+      output->drawTriangle( p, nrm );
+
+    // This scheme specifies triangles alternately clockwise and anti-clockwise.
+    // Is this OK in openGL?
+    sgCopyVec2( p[1], p[0] );
+    sgCopyVec3( t[1], t[0] );
+    sgCopyVec3( nrm[1], nrm[0] );
+    sgCopyVec2( p[0], p[2] );
+    sgCopyVec3( t[0], t[2] );
+    sgCopyVec3( nrm[0], nrm[2] );
+    
+    // DCL - restore the original lighting in case we turned it off for water
+    output->setShade(save_shade);
+  }
+
+  // DCL - I don't know what sub_trifan is meant to do, so haven't written a sub_tristrip
+  /*
+  if (col < 0 && !(features & DO_SMOOTH_COLOR)) {
+    sub_trifan( indices, v, n );
+  }
+  */
+}
 
 int MapMaker::process_binary_file( char *tile_name, sgVec3 xyz ) {
+  //cout << "tile name = " << tile_name << '\n';
+  
   //float cr;               // reference point (gbs)
   sgVec3 gbs, tmp;
   //int scount = 0;
@@ -528,9 +674,36 @@ int MapMaker::process_binary_file( char *tile_name, sgVec3 xyz ) {
     normals++;
   }
 
+  const group_list tris = tile.get_tris_v();
+  string_list tri_mats = tile.get_tri_materials();
   const group_list fans = tile.get_fans_v();
   string_list fan_mats = tile.get_fan_materials();
+  const group_list strips = tile.get_strips_v();
+  string_list strip_mats = tile.get_strip_materials();
+  
+  // tris
+  i = 0;
+  for ( group_list::const_iterator tri = tris.begin(); 
+	tri != tris.end(); 
+	tri++) {
 
+    const char* mat_name = tri_mats[i].c_str();
+    StrMap::const_iterator mat_it = materials.find( mat_name );
+    if ( mat_it == materials.end() ) {
+      if (getVerbose()) {
+	fprintf( stderr, "Warning: unknown material \"%s\" encountered.\n", 
+		 mat_name );
+      }
+      material = -1;
+    } else {
+      material = (*mat_it).second;
+    }
+
+    draw_tri( *tri, v, n, material );
+    i++;
+  }
+
+  // fans
   i = 0;
   for ( group_list::const_iterator fan = fans.begin(); 
 	fan != fans.end(); 
@@ -551,6 +724,33 @@ int MapMaker::process_binary_file( char *tile_name, sgVec3 xyz ) {
     draw_trifan( *fan, v, n, material );
     i++;
   }
+	
+  // strips
+  i = 0;
+  for ( group_list::const_iterator strip = strips.begin(); 
+	strip != strips.end(); 
+	strip++) {
+
+    const char* mat_name = strip_mats[i].c_str();
+    StrMap::const_iterator mat_it = materials.find( mat_name );
+    if ( mat_it == materials.end() ) {
+      if (getVerbose()) {
+	fprintf( stderr, "Warning: unknown material \"%s\" encountered.\n", 
+		 mat_name );
+      }
+      material = -1;
+    } else {
+      material = (*mat_it).second;
+    }
+
+    draw_tristrip( *strip, v, n, material );
+    i++;
+  }
+	
+  if(0) {
+    cout << "Node_list sizes are nodes: " << wgs84_nodes.size() << " -- normals: " << m_norms.size() << '\n'; 
+    cout << "Group_list sizes are tris: " << tris.size() << " -- fans: " << fans.size() << " -- strips: " << strips.size() << '\n';
+  } 
 
   for (i = 0; i < v.size(); i++) {
     delete[] v[i];
@@ -558,7 +758,7 @@ int MapMaker::process_binary_file( char *tile_name, sgVec3 xyz ) {
   for (i = 0; i < n.size(); i++) {
     delete[] n[i];
   }
-
+  
   return 1;
 }
 

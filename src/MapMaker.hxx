@@ -195,7 +195,11 @@ protected:
 		   vector<float*> &n );
   void draw_trifan( const int_list &indices, 
 		    vector<float*> &v, vector <float*> &n, int col );
-
+  void draw_tri( const int_list &indices, 
+		 vector<float*> &v, vector <float*> &n, int col );
+  void draw_tristrip( const int_list &indices, 
+		      vector<float*> &v, vector <float*> &n, int col );
+		    
   int process_directory( char *path, int plen, int lat, int lon, sgVec3 xyz );
   int process_binary_file( char *tile_name, sgVec3 xyz );
   int process_ascii_file( char *tile_name, sgVec3 xyz );
