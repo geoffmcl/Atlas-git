@@ -28,11 +28,15 @@
                     for output
   2000-04-29        New, cuter, airports
   2004-12-22        DCL: Now reads FG_SCENERY when present.
+  2005-01-16        DCL: Capable of off-screen rendering on modern GLX machines.
 ---------------------------------------------------------------------------*/
+
+// Needs to be included *before* the UL_GLX check!
+#include <plib/ul.h>
 
 #include <GL/gl.h>
 #include <GL/glext.h>
-#ifndef _WIN32
+#ifdef UL_GLX
   #include <GL/glx.h>
 #endif
 #include <GL/glut.h>
@@ -46,7 +50,6 @@
 #include "OutputGL.hxx"
 #include <simgear/compiler.h>
 #include <simgear/misc/sg_path.hxx>
-#include <plib/ul.h>
 #include <vector>
 #include STL_STRING
 
@@ -193,7 +196,7 @@ void redrawMap() {
 
 // Cribbed from FlightGear, with the objects code commented out.
 // The supplied path is appended with 'Terrain' if it exists, not if otherwise.
-// NOTE: MapMaker::setFgRoot() should be called first.
+// NOTE: MapMaker::setFGRoot() should be called first.
 void set_fg_scenery(const string &scenery) {
     SGPath s;
     
@@ -399,7 +402,7 @@ bool InitPbuffer() {
   for(int i=0; i < cnt; ++i) {
 	  glXGetFBConfigAttrib(dpy, cfg[i], GLX_MAX_PBUFFER_WIDTH, &fbw);
 	  glXGetFBConfigAttrib(dpy, cfg[i], GLX_MAX_PBUFFER_HEIGHT, &fbh);
-	  cout << "Checking for fgconfig of size " << mapobj.getSize() << "x" << mapobj.getSize() << " or greater...\n";
+	  cout << "Checking for fbconfig of size " << mapobj.getSize() << "x" << mapobj.getSize() << " or greater...\n";
 	  size_ok = (fbw >= mapobj.getSize() && fbh >= mapobj.getSize());
 	  cout << "Buffer " << i << ": " << fbw << "x" << fbh << "... " << (size_ok ? "OK\n" : "insufficient\n");
 	  if(size_ok) break;
