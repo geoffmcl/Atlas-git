@@ -18,7 +18,7 @@ Atlas_SOURCES = \
 	Overlays.cxx Overlays.hxx
 
 Atlas_LDADD = \
-	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgserial -lsgdebug \
+	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgserial -lsgdebug -lsgbucket\
 	-lplibsg -lplibpu -lplibfnt \
 	$(opengl_LIBS) \
 	-lpng -lz
@@ -33,7 +33,7 @@ Map_SOURCES = \
 
 Map_LDADD = \
 	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgdebug \
-	-lplibsg -lplibpu -lplibfnt \
+	-lplibsg -lplibpu -lplibfnt -lsgbucket \
 	$(opengl_LIBS) \
 	-lpng -lz
 
@@ -47,7 +47,7 @@ MapPS_SOURCES = \
 
 MapPS_LDADD = \
 	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgdebug \
-	-lplibsg -lplibpu \
+	-lplibsg -lplibpu -lsgbucket \
 	$(opengl_LIBS) \
 	-lpng -lz
 

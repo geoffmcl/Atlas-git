@@ -29,6 +29,8 @@
 #include <vector>
 #include <list>
 #include <map>
+#include <simgear/io/sg_binobj.hxx>
+
 #include "Output.hxx"
 #include "Overlays.hxx"
 #include "Geodesy.hxx"
@@ -87,7 +89,7 @@ protected:
       return (strcmp(v1, v2) < 0);
     }
   };
-  typedef std::map<char*, int, WordLess> StrMap;
+  typedef std::map<const char*, int, WordLess> StrMap;
 
   std::vector<float*> palette;
   StrMap materials;
@@ -170,9 +172,10 @@ protected:
     return fabs(sgScalarProductVec3( n, light_vector ));
   }
 
-  void sub_trifan( list<int> &indices, vector<float*> &v, vector<float*> &n );
-  void draw_trifan( list<int> &indices, vector<float*> &v, vector<float*> &n,
-		    int col );
+  void sub_trifan( const int_list &indices, vector<float*> &v, 
+		   vector<float*> &n );
+  void draw_trifan( const int_list &indices, 
+		    vector<float*> &v, vector <float*> &n, int col );
 
   int process_directory( char *path, int plen, int lat, int lon, sgVec3 xyz );
   int process_file( char *tile_name, sgVec3 xyz );
