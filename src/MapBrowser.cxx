@@ -47,7 +47,7 @@ MapBrowser::MapBrowser(GLfloat left, GLfloat top, GLfloat size, int features,
     font_name = NULL;
   }
 
-  output = new OutputGL( NULL, size, false, texturedFonts, font_name );
+  output = new OutputGL( NULL, (int)size, false, texturedFonts, font_name );
   output->setShade(false);
 
   // setup overlays
@@ -133,7 +133,7 @@ void MapBrowser::draw() {
 
   if (textured) {
     glEnable( GL_TEXTURE_2D );
-    GLfloat tilesize = earth_radius_lat(clat) * M_PI / 180.0f * zoom;
+    GLfloat tilesize = earth_radius_lat(clat) * SG_DEGREES_TO_RADIANS * zoom;
 
     for (list<MapTile*>::iterator i = tiles.begin(); i != tiles.end(); i++) {
       MapTile *tile = *i;
@@ -174,10 +174,10 @@ void MapBrowser::update() {
   int sgnlat = (clat < 0.0f) ? 1 : 0;
   int sgnlon = (clon < 0.0f) ? 1 : 0;
   // calculate minimum and maximum latitude/longitude of displayed tiles
-  int min_lat = (int)( (clat - dlat) * 180.0f / M_PI ) - sgnlat;
-  int max_lat = (int)( (clat + dlat) * 180.0f / M_PI ) - sgnlat;
-  int min_lon = (int)( (clon - dlon) * 180.0f / M_PI ) - sgnlon;
-  int max_lon = (int)( (clon + dlon) * 180.0f / M_PI ) - sgnlon;
+  int min_lat = (int)( (clat - dlat) * SG_DEGREES_TO_RADIANS ) - sgnlat;
+  int max_lat = (int)( (clat + dlat) * SG_DEGREES_TO_RADIANS ) - sgnlat;
+  int min_lon = (int)( (clon - dlon) * SG_DEGREES_TO_RADIANS ) - sgnlon;
+  int max_lon = (int)( (clon + dlon) * SG_DEGREES_TO_RADIANS ) - sgnlon;
   int num_lat = (max_lat - min_lat) + 1, num_lon = (max_lon - min_lon) + 1;
 
   // remove old tiles
@@ -230,10 +230,10 @@ void MapBrowser::update() {
          MapTile *nt = new MapTile;
          nt->c.lat = c.lat;
          nt->c.lon = c.lon;
-        tlat = (float) c.lat * M_PI / 180.0f;
-        nt->w.rs = earth_radius_lat(tlat) * cos(tlat) * M_PI / 180.0f;
-        tlat = (float) (c.lat + 1) * M_PI / 180.0f;
-        nt->w.rn = earth_radius_lat(tlat) * cos(tlat) * M_PI / 180.0f;
+        tlat = (float) c.lat * SG_DEGREES_TO_RADIANS;
+        nt->w.rs = earth_radius_lat(tlat) * cos(tlat) * SG_DEGREES_TO_RADIANS;
+        tlat = (float) (c.lat + 1) * SG_DEGREES_TO_RADIANS;
+        nt->w.rn = earth_radius_lat(tlat) * cos(tlat) * SG_DEGREES_TO_RADIANS;
          
          sprintf( mpath+pathl, "%c%03d%c%02d.png", 
                  (c.lon < 0)?'w':'e', abs(c.lon),

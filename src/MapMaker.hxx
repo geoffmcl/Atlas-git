@@ -43,7 +43,7 @@ public:
   static const int DO_ALL_FEAT   = 1+2+4+8+16;
 
   // CONSTRUCTOR
-  MapMaker( char *fg_root = "/usr/local/lib/FlightGear", 
+  MapMaker( char *fg_root = 0, 
 	    char *ap_filter = NULL, 
 	    int features = DO_SHADE | DO_AIRPORTS | DO_NAVAIDS,
 	    int size = 256, int scale = 100000 );

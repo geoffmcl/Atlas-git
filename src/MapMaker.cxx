@@ -374,9 +374,9 @@ void MapMaker::draw_trifan( list<int> &indices, vector<float*> &v,
       } else {
 	dcol = elev2colour((int)((t[0][2] + t[1][2] + t[2][2]) / 3.0f));
 	if(features & DO_SMOOTH_COLOR) {
-	  elev2colour_smooth(t[0][2],color[0]);
-	  elev2colour_smooth(t[1][2],color[1]);
-	  elev2colour_smooth(t[2][2],color[2]);
+	  elev2colour_smooth((int)t[0][2], color[0]);
+	  elev2colour_smooth((int)t[1][2], color[1]);
+	  elev2colour_smooth((int)t[2][2], color[2]);
 	  smooth=true;
         }
       }

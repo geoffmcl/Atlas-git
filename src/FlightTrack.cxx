@@ -43,7 +43,7 @@ void FlightTrack::clear() {
 
 void FlightTrack::addPoint( FlightData *data ) {
   // TOLERANCE is set to 1 arc second
-  static const float TOLERANCE = M_PI / (180.0f * 3600.0f);
+  static const float TOLERANCE = SG_DEGREES_TO_RADIANS / 3600.0f;
 
   float lastlat, lastlon;
 

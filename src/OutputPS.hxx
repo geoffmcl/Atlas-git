@@ -36,14 +36,14 @@ public:
 
   virtual void setColor( const float *rgb );
   virtual void clear( const float *rgb );
-  virtual void drawTriangle( sgVec2 *p, sgVec3 *normals );
-  virtual void drawQuad    ( sgVec2 *p, sgVec3 *normals );
+  virtual void drawTriangle( const sgVec2 *p, const sgVec3 *normals );
+  virtual void drawQuad    ( const sgVec2 *p, const sgVec3 *normals );
   virtual void drawCircle  ( sgVec2 p, int radius );
   virtual void drawLine    ( sgVec2 p1, sgVec2 p2 );
   virtual void drawText    ( sgVec2 p, char *text );
 
 protected:
-  int quadrant( sgVec2 p, bool checkoutside = true );
+  int quadrant( const sgVec2 p, bool checkoutside = true );
 
   FILE *ps_file;
 };

@@ -106,7 +106,7 @@ void OutputPS::clear( const float *rgb ) {
   fprintf( ps_file, "0 -%i %i 0 0 %i 0 0 q\n", size, size, size );
 }
 
-int OutputPS::quadrant(sgVec2 p, bool checkoutside) {
+int OutputPS::quadrant(const sgVec2 p, bool checkoutside) {
   // Written by Christian Mayer (vader@t-online.de)
   //   |
   //   | 2 | 1
@@ -146,7 +146,7 @@ void OutputPS::setColor( const float *rgb ) {
 	   (int)(rgb[0]*255.0f), (int)(rgb[1]*255.0f), (int)(rgb[2]*255.0f) );
 }
 
-void OutputPS::drawTriangle(sgVec2 *p, sgVec3 *normals) {
+void OutputPS::drawTriangle(const sgVec2 *p, const sgVec3 *normals) {
   // do I need to draw that triangle?
   if ((quadrant(p[0]) != 3) && (quadrant(p[1]) != 3) 
       && (quadrant(p[2]) != 3)) {
@@ -170,7 +170,7 @@ void OutputPS::drawTriangle(sgVec2 *p, sgVec3 *normals) {
 /* Draw the PS quad (x1/y1)-(x2/y2)-(x3/x3)-(x4/x4) with the colour (r/g/b) */
 /* in the file ps_file							    */
 /****************************************************************************/
-void OutputPS::drawQuad(sgVec2 *p, sgVec3 *normals) {
+void OutputPS::drawQuad(const sgVec2 *p, const sgVec3 *normals) {
   // do I need to draw that quad?
   if ((quadrant(p[0]) != 3) && (quadrant(p[1]) != 3) && 
       (quadrant(p[2]) != 3) && (quadrant(p[3]) != 3)) {

@@ -147,7 +147,7 @@ bool parse_nmea(char *buf) {
 	    if ( lat_dir == "S" ) {
 		latitude *= -1;
 	    }
-	    latitude *= M_PI / 180.0f;  // convert to radians
+	    latitude *= SG_DEGREES_TO_RADIANS;  // convert to radians
 
 	    // longitude val
 	    end = msg.find(",", begin);
@@ -174,7 +174,7 @@ bool parse_nmea(char *buf) {
 	    if ( lon_dir == "W" ) {
 		longitude *= -1;
 	    }
-	    longitude *= M_PI / 180.0f;  // convert to radians
+	    longitude *= SG_DEGREES_TO_RADIANS;  // convert to radians
 
 	    // speed
 	    end = msg.find(",", begin);
@@ -230,9 +230,9 @@ bool parse_nmea(char *buf) {
 	    if ( lat_dir == "S" ) {
 		latitude *= -1;
 	    }
-	    latitude *= M_PI / 180.0f;  // convert to radians
+	    latitude *= SG_DEGREES_TO_RADIANS;  // convert to radians
 
-	    // cur_fdm_state->set_Latitude( latitude * DEG_TO_RAD );
+	    // cur_fdm_state->set_Latitude( latitude * SG_DEGREES_TO_RADIANS );
 
 	    // longitude val
 	    end = msg.find(",", begin);
@@ -259,9 +259,9 @@ bool parse_nmea(char *buf) {
 	    if ( lon_dir == "W" ) {
 		longitude *= -1;
 	    }
-	    longitude *= M_PI / 180.0f;  // convert to radians
+	    longitude *= SG_DEGREES_TO_RADIANS;  // convert to radians
 
-	    // cur_fdm_state->set_Longitude( longitude * DEG_TO_RAD );
+	    // cur_fdm_state->set_Longitude( longitude * SG_DEGREES_TO_RADIANS );
 
 	    // junk
 	    end = msg.find(",", begin);
@@ -413,9 +413,9 @@ static char *coord_format_latlon(float latitude, float longitude, char *buf)
 
  sprintf(buf,"%c %s   %c %s",
                  latitude > 0 ? 'N' : 'S',
-                 dmshh_format(latitude * 180.0f / M_PI, buf1),
+                 dmshh_format(latitude * SG_RADIANS_TO_DEGREES, buf1),
                  longitude > 0 ? 'E' : 'W',
-                 dmshh_format(longitude * 180.0f / M_PI, buf2)       );
+                 dmshh_format(longitude * SG_RADIANS_TO_DEGREES, buf2)       );
  return buf;
 }
 
@@ -743,9 +743,9 @@ void mouseMotion( int x, int y ) {
     // PUI didn't consume this event
     if (dragmode) {
       latitude  = (copy_lat + (float)(y - drag_y)*scalefactor / 
-		   (float)mapsize * M_PI / 180.0f);
+		   (float)mapsize * SG_DEGREES_TO_RADIANS);
       longitude = (copy_lon + (float)(drag_x - x)*scalefactor / 
-		   (float)mapsize * M_PI / 180.0f);
+		   (float)mapsize * SG_DEGREES_TO_RADIANS);
       map_object->setLocation( latitude, longitude );
     }
   }
@@ -900,8 +900,8 @@ int main(int argc, char **argv) {
     strcat(path, "Atlas/");
   }
 
-  latitude  *= M_PI / 180.0f;
-  longitude *= M_PI / 180.0f;
+  latitude  *= SG_DEGREES_TO_RADIANS;
+  longitude *= SG_DEGREES_TO_RADIANS;
 
   glutInitDisplayMode( GLUT_RGB | GLUT_DEPTH | GLUT_DOUBLE );
   glutInitWindowSize( width, height );

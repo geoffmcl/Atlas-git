@@ -24,6 +24,7 @@
 #define __FLIGHTTRACK_H__
 
 #include <list>
+#include <plib/sg.h>
 
 struct FlightData {
   float lat, lon, alt, hdg, spd;

@@ -30,10 +30,6 @@
 #include <list>
 #include <map>
 
-#ifndef M_PI
-#define M_PI 3.1415926535
-#endif
-
 class MapBrowser {
 public:
   static const int CACHE_LIMIT = 2;
@@ -66,8 +62,8 @@ public:
 protected:
   void update();
 
-  inline float rad( float x ) { return x * M_PI / 180.0f; }
-  inline float deg( float x ) { return x / M_PI * 180.0f; }
+  inline float rad( float x ) { return x * SG_DEGREES_TO_RADIANS; }
+  inline float deg( float x ) { return x * SG_RADIANS_TO_DEGREES; }
 
   inline void scale( float x, float y, GLfloat *cx, GLfloat *cy ) {
     *cx = (view_size / 2 + x * zoom);

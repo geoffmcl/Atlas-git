@@ -73,8 +73,8 @@ void redrawMap() {
 
   if (!global) {
     sprintf(title_buffer, "%c%.1f %c%.1f",
-	    (clat<0.0f)?'S':'N', fabs(clat * 180.0f / M_PI),
-	    (clon<0.0f)?'W':'E', fabs(clon * 180.0f / M_PI));
+	    (clat<0.0f)?'S':'N', fabs(clat * SG_RADIANS_TO_DEGREES),
+	    (clon<0.0f)?'W':'E', fabs(clon * SG_RADIANS_TO_DEGREES));
     glutSetWindowTitle(title_buffer);
 
     OutputGL output( outp, mapobj.getSize(), smooth_shade, 
@@ -123,8 +123,8 @@ void redrawMap() {
 	// have an image for it!
 	lat *= (ns=='n')?1:-1;
 	lon *= (ew=='e')?1:-1;
-	clat = ((float)lat + 0.5f) * M_PI / 180.0f;
-	clon = ((float)lon + 0.5f) * M_PI / 180.0f;
+	clat = ((float)lat + 0.5f) * SG_DEGREES_TO_RADIANS;
+	clon = ((float)lon + 0.5f) * SG_DEGREES_TO_RADIANS;
 	
 	sprintf( outname+opathl, "/%c%03d%c%02d.png", 
 		 (lon<0)?'w':'e', abs(lon), 
@@ -142,8 +142,8 @@ void redrawMap() {
 
    
     sprintf(title_buffer, "%c%.1f %c%.1f",
-	    (clat<0.0f)?'S':'N', clat * 180.0f / M_PI,
-	    (clon<0.0f)?'W':'E', clon * 180.0f / M_PI);
+	    (clat<0.0f)?'S':'N', clat * SG_RADIANS_TO_DEGREES,
+	    (clon<0.0f)?'W':'E', clon * SG_RADIANS_TO_DEGREES);
     glutSetWindowTitle(title_buffer);
 
     OutputGL output(outname, s, smooth_shade, textured_fonts, font_name);
@@ -297,8 +297,8 @@ int main( int argc, char **argv ) {
   mapobj.setFeatures(features);
 
   // convert lat & lon to radians
-  clat *= M_PI / 180.0f;
-  clon *= M_PI / 180.0f;
+  clat *= SG_DEGREES_TO_RADIANS;
+  clon *= SG_DEGREES_TO_RADIANS;
 
   if (global) {
     int s = mapobj.getSize();

@@ -23,8 +23,6 @@
 #include <stdio.h>
 #include <zlib.h>
 
-#include <simgear/misc/fgpath.hxx>
-
 #include "Overlays.hxx"
 #include "Geodesy.hxx"
 

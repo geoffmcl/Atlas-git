@@ -124,8 +124,8 @@ int main( int argc, char **argv ) {
   mapobj.setFeatures(features);
 
   // convert lat & lon to radians
-  clat *= M_PI / 180.0f;
-  clon *= M_PI / 180.0f;
+  clat *= SG_DEGREES_TO_RADIANS;
+  clon *= SG_DEGREES_TO_RADIANS;
 
   if (!global) {
     OutputPS output( outp, mapobj.getSize() );
@@ -166,8 +166,8 @@ int main( int argc, char **argv ) {
 						&ew, &lon, &ns, &lat) == 4) {
 	      lat *= (ns=='n')?1:-1;
 	      lon *= (ew=='e')?1:-1;
-	      clat = ((float)lat + 0.5f) * M_PI / 180.0f;
-	      clon = ((float)lon + 0.5f) * M_PI / 180.0f;
+	      clat = ((float)lat + 0.5f) * SG_DEGREES_TO_RADIANS;
+	      clon = ((float)lon + 0.5f) * SG_DEGREES_TO_RADIANS;
 
 	      sprintf( outname+opathl, "/%c%03d%c%02d.png", 
 		       (lon<0)?'w':'e', abs(lon), (lat<0)?'s':'n', abs(lat) );
