@@ -86,7 +86,7 @@ void Projection::ab_lat( float lat, float lon, float lat_r, float lon_r, sgVec3 
 void Projection::nice_angle_pair( float xaim, float yaim, float *pxnice, float *pynice ) {
   // If each spacing is an integer multiple of the previous, new lines
   // appear but none disappear as you zoom in.
-  const float nice_angles[] = { 180, 90, 45, 15, 5, 1, .5, .25, 5.0/60, 1.0/60 };
+  const float nice_angles[] = { 180.0f, 90.0f, 45.0f, 15.0f, 5.0f, 1.0f, .5f, .25f, 5.0f/60, 1.0f/60 };
 
   int ix, iy;
 
