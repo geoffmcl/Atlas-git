@@ -1,0 +1,6 @@
+New in 0.2.3
+* Support for FlightGear's changed airport data format.
+* Default startup location and display options changed to match FlightGear (Bay Area).
+* --airport=CODE startup option added.
+* Patches to enable compilation with MSVC.
+* Bug fixes.
