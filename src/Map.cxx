@@ -440,6 +440,11 @@ int main( int argc, char **argv ) {
       exit(1);
     }
   }
+
+  if ( ((~rescale_factor + 1) & rescale_factor) != rescale_factor ) {
+    fprintf(stderr, "%s: --aafactor should be a power of 2.\n", argv[0]);
+    exit(1);
+  }
   
   if (!global && (fabs(clat) > 90.0f || fabs(clon) > 180.0f)) {
     fprintf(stderr, 
