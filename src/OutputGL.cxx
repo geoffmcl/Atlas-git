@@ -22,6 +22,7 @@ OutputGL::OutputGL( char *filename, int size, bool smooth_shading,
   glEnable(GL_BLEND);
   glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
 
+  shade = true;
   glEnable(GL_LIGHTING);
   glShadeModel(smooth_shading ? GL_SMOOTH : GL_FLAT);
 
