@@ -3,10 +3,11 @@ dnl working configure script.
 dnl
 dnl $Id$
 
-AC_INIT(src/Atlas.cxx)
+AC_INIT
+AC_CONFIG_SRCDIR([src/Atlas.cxx])
 
 dnl Initialize the automake stuff
-AC_PREREQ(2.13)
+AC_PREREQ(2.52)
 AM_INIT_AUTOMAKE(Atlas, 0.2.1)
 
 dnl Checks for programs.
@@ -104,8 +105,8 @@ if test "x$ac_cv_header_windows_h" != "xyes" ; then
     if test "x$ac_cv_lib_MesaGL_glNewList" = "xyes" ; then
 	AC_CHECK_HEADER(GL/xmesa.h)
 	if test "x$ac_cv_header_GL_xmesa_h" = "xyes"; then
-	    AC_DEFINE( XMESA )
-            AC_DEFINE( FX )
+            AC_DEFINE([XMESA], 1, [Define for Mesa FX mode])
+            AC_DEFINE([FX], 1, [Define for Mesa FX mode])
         fi
     fi
 
@@ -128,7 +129,7 @@ else
     dnl winbloze-isms.  We'll just do this manually for now.
 
     echo Win32 specific hacks...
-    AC_DEFINE(WIN32)
+    AC_DEFINE([WIN32], 1, [Define if building on a Win32 platform])
 
     dnl force a failed check since we will be building under windoze
     AM_CONDITIONAL(ENABLE_XMESA_FX, test "no" = "yes")
@@ -255,8 +256,9 @@ AC_CHECK_FUNCS( ftime gettimeofday timegm memcpy bcopy mktime strstr rand \
 
 AM_CONFIG_HEADER(src/config.h)
 
-AC_OUTPUT( \
+AC_CONFIG_FILES([ \
 	Makefile \
 	src/Makefile \
 	src/data/Makefile
-)
+])
+AC_OUTPUT
