@@ -56,6 +56,28 @@ else
 fi
 AC_SUBST(fgbase_dir)
 
+dnl set the $host variable based on local machine/os
+AC_CANONICAL_HOST
+
+case "${host}" in
+*-*-irix*)
+    if test "$CXX" = "CC"; then
+        AR="CC -ar"
+        ARFLAGS="-o"
+        CXXFLAGS="$CXXFLAGS -I$with_simgear/include/simgear/compatibility"
+    else
+        AR="ar"
+        ARFLAGS="cru"
+    fi
+    ;;
+*)
+    AR="ar"
+    ARFLAGS="cru"
+    ;;
+esac
+AC_SUBST(AR)
+AC_SUBST(ARFLAGS)
+
 dnl extra library and include directories
 EXTRA_DIRS="${SIMGEAR_DIR} ${PLIB_DIR} /usr/local/plib /usr/X11R6"
 

@@ -20,7 +20,7 @@ Atlas_SOURCES = \
 
 Atlas_LDADD = \
 	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgserial -lsgdebug -lsgbucket\
-	-lplibsg -lplibpu -lplibul -lplibfnt -lplibnet \
+	-lsgxml -lplibsg -lplibpu -lplibul -lplibfnt -lplibnet \
 	$(opengl_LIBS) \
 	-lpng -lz -lpthread
 

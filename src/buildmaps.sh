@@ -1,6 +1,6 @@
 #!/bin/sh
 
-ROOT=/usr/local/lib/FlightGear/Scenery
+ROOT=/usr/local/lib/fgfsbase/Scenery
 OUTPUTDIR=./maps
 
 mkdir -p $OUTPUTDIR
