@@ -1,7 +1,8 @@
 #ifndef __OUTPUTGL_H__
 #define __OUTPUTGL_H__
 
-#include <GL/glut.h>
+#include <simgear/compiler.h>
+#include SG_GLUT_H
 #include <plib/fnt.h>
 #include <plib/pu.h>
 #include "Output.hxx"
@@ -9,7 +10,7 @@
 class OutputGL : public GfxOutput {
 public:
   OutputGL( char *filename, int size, bool smooth_shading,
-	    bool useTexturedFont, char *fontname );
+	    bool useTexturedFont, char *fontname, bool jpg );
   ~OutputGL();
 
   virtual void closeOutput();
@@ -39,7 +40,7 @@ protected:
   fntRenderer textRenderer;
   puFont *glutFont;
   char *filename;
-  bool useTexturedFont, shade;
+  bool useTexturedFont, shade, jpeg;
 
   sgVec4 light_vector;
 };

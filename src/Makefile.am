@@ -11,6 +11,7 @@ Atlas_SOURCES = \
 	FlightTrack.hxx FlightTrack.cxx \
 	Geodesy.hxx \
 	LoadPng.cxx LoadPng.hxx \
+	LoadJpg.cxx LoadJpg.hxx \
 	MapBrowser.cxx MapBrowser.hxx \
 	MapMaker.cxx MapMaker.hxx \
 	Output.cxx Output.hxx \
@@ -22,7 +23,7 @@ Atlas_LDADD = \
 	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgserial -lsgdebug -lsgbucket\
 	-lsgxml -lplibsg -lplibpu -lplibul -lplibfnt -lplibnet \
 	$(opengl_LIBS) \
-	-lpng -lz -lpthread
+	-lpng -lz -lpthread -ljpeg
 
 Map_SOURCES = \
 	Map.cxx \
@@ -32,13 +33,15 @@ Map_SOURCES = \
 	OutputGL.cxx OutputGL.hxx \
 	Overlays.cxx Overlays.hxx \
 	Projection.cxx Projection.hxx \
+	RenderTexture.cpp RenderTexture.h \
+	extensions.cxx extensions.hxx \
 	fg_mkdir.cxx fg_mkdir.hxx
 
 Map_LDADD = \
 	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgdebug \
 	-lplibsg -lplibpu -lplibul -lplibfnt -lsgbucket \
 	$(opengl_LIBS) \
-	-lpng -lz
+	-lpng -lz -ljpeg
 
 MapPS_SOURCES = \
 	MapPS.cxx \

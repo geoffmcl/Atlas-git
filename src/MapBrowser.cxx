@@ -26,13 +26,14 @@
 #include "MapBrowser.hxx"
 #include "Geodesy.hxx"
 #include "LoadPng.hxx"
+#include "LoadJpg.hxx"
 
 const char* MapBrowser::TXF_FONT_NAME = "/Fonts/helvetica_medium.txf";
 
 MapBrowser::MapBrowser(GLfloat left, GLfloat top, GLfloat size, int features,
-                       char *fg_root, bool texturedFonts) :
+                       char *fg_root, bool jpg, bool texturedFonts) :
   view_left(left), view_top(top), view_size(size), clat(0.0f), clon(0.0f),
-  scle(100000), pathl(0), features(features), texturedFonts(texturedFonts)
+  scle(100000), pathl(0), features(features), jpeg(jpg), texturedFonts(texturedFonts)
 {
   mpath[0] = 0;
 
@@ -46,7 +47,7 @@ MapBrowser::MapBrowser(GLfloat left, GLfloat top, GLfloat size, int features,
     font_name = NULL;
   }
 
-  output = new OutputGL( NULL, (int)size, false, texturedFonts, font_name );
+  output = new OutputGL( NULL, (int)size, false, texturedFonts, font_name, jpeg );
   output->setShade(false);
 
   // setup overlays
@@ -95,7 +96,7 @@ void MapBrowser::setSize( GLfloat size ) {
   zoom = view_size / scle;
 
   delete output;
-  output = new OutputGL(NULL, (int)size, false, texturedFonts, font_name);
+  output = new OutputGL(NULL, (int)size, false, texturedFonts, font_name, jpeg);
   overlay->setOutput( output );
   overlay->setScale( zoom );
   output->setShade(false);
@@ -282,7 +283,13 @@ void MapBrowser::update() {
 
         //printf("Loading tile %s...\n", mpath);
 
-        if ( (nt->texbuf = (GLubyte*)loadPng( mpath, &wid, &hei )) != NULL ) {
+	if ( (nt->texbuf = (GLubyte*)loadPng( mpath, &wid, &hei )) == NULL ) {
+	  sprintf( mpath+pathl, "%c%03d%c%02d.jpg", 
+		   (c.lon < 0)?'w':'e', abs(c.lon),
+		   (c.lat < 0)?'s':'n', abs(c.lat) );         
+	  nt->texbuf = (GLubyte*)loadJpg( mpath, &wid, &hei );
+	}
+	if ( nt->texbuf != NULL ) {
           glPixelStorei(GL_UNPACK_ALIGNMENT, 3);
           glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
           glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);

@@ -26,7 +26,8 @@
 #include "Overlays.hxx"
 #include "FlightTrack.hxx"
 #include "Projection.hxx"
-#include <GL/gl.h>
+#include <simgear/compiler.h>
+#include SG_GL_H
 #include <math.h>
 #include <list>
 #include <map>
@@ -36,7 +37,7 @@ public:
   static const int CACHE_LIMIT = 2;
   
   MapBrowser( GLfloat x1, GLfloat y1, GLfloat size, int features, 
-              char *fg_root, bool texturedFonts = true );
+              char *fg_root, bool jpeg, bool texturedFonts = true );
   ~MapBrowser();
 
   void setLocation( float lat, float lon );
@@ -117,7 +118,7 @@ protected:
 
   char mpath[512];
   int  pathl, features;
-  bool textured, texturedFonts;
+  bool textured, texturedFonts, jpeg;
   OutputGL *output;
   Overlays *overlay;
   FlightTrack *track;

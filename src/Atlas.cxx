@@ -28,7 +28,8 @@
 
 #include <memory.h>
 #include <stdio.h>
-#include <GL/glut.h>
+#include <simgear/compiler.h>
+#include SG_GLUT_H
 #include <plib/fnt.h>
 #include <plib/pu.h>
 #include <string>

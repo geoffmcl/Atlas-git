@@ -1,5 +1,8 @@
 #include <iostream>
 #include <png.h>
+extern "C" {
+#include <jpeglib.h>
+}
 #include "OutputGL.hxx"
 
 float OutputGL::circle_x[];
@@ -8,9 +11,9 @@ float OutputGL::circle_y[];
 const float OutputGL::BRIGHTNESS = 0.6f;
 
 OutputGL::OutputGL( char *filename, int size, bool smooth_shading, 
-		    bool useTexturedFont, char *fontname ) : 
+		    bool useTexturedFont, char *fontname, bool jpg ) : 
   GfxOutput(filename, size), filename(filename), 
-  useTexturedFont(useTexturedFont)
+  useTexturedFont(useTexturedFont), jpeg(jpg)
 {
   glViewport( 0, 0, size, size );
   glMatrixMode( GL_PROJECTION );
@@ -74,42 +77,76 @@ void OutputGL::closeOutput() {
     return;
   }
 
-  png_structp png_ptr = png_create_write_struct
-    (PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-  if (!png_ptr)
-    return;
+  if ( jpeg ) {
+    jpeg_compress_struct cinfo;
+    memset( &cinfo, 0, sizeof cinfo );
 
-  png_infop info_ptr = png_create_info_struct(png_ptr);
-  if (!info_ptr) {
-    png_destroy_write_struct(&png_ptr,
-			     (png_infopp)NULL);
-    return;
-  }
+    jpeg_error_mgr jerr;
+    memset( &jerr, 0, sizeof jerr );
+    cinfo.err = jpeg_std_error( &jerr );
 
-  if (setjmp(png_ptr->jmpbuf)) {
+    jpeg_create_compress( &cinfo );
+    jpeg_stdio_dest( &cinfo, fp );
+
+    cinfo.image_width = size;
+    cinfo.image_height = size;
+    cinfo.input_components = 3;
+    cinfo.in_color_space = JCS_RGB;
+
+    jpeg_set_defaults(&cinfo);
+
+    jpeg_start_compress( &cinfo, TRUE );
+
+    while ( cinfo.next_scanline < cinfo.image_height ) {
+       unsigned char *buf;
+       if ( 1 ) {
+	  buf = (unsigned char *)&image[ size * ( size - ( cinfo.next_scanline + 1 ) ) * 3 ];
+       } else {
+	  buf = (unsigned char *)&image[ size * cinfo.next_scanline * 3 ];
+       }
+       jpeg_write_scanlines( &cinfo, (JSAMPARRAY)&buf, 1 );
+    }
+
+    jpeg_finish_compress( &cinfo );
+    jpeg_destroy_compress( &cinfo );
+  } else {
+    png_structp png_ptr = png_create_write_struct
+      (PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+    if (!png_ptr)
+      return;
+
+    png_infop info_ptr = png_create_info_struct(png_ptr);
+    if (!info_ptr) {
+      png_destroy_write_struct(&png_ptr,
+			       (png_infopp)NULL);
+      return;
+    }
+
+    if (setjmp(png_ptr->jmpbuf)) {
+      png_destroy_write_struct(&png_ptr, &info_ptr);
+      fclose(fp);
+      return;
+    }
+
+    png_init_io(png_ptr, fp);
+    png_set_IHDR(png_ptr, info_ptr, size, size, 8, PNG_COLOR_TYPE_RGB,
+		 PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT,
+		 PNG_FILTER_TYPE_DEFAULT);
+    png_write_info(png_ptr, info_ptr);
+
+    png_byte **row_pointers = new png_byte*[size];
+    for (int i = 1; i <= size; i++) {
+      row_pointers[i-1] = (png_byte*)(image + size * (size-i) * 3);
+    }
+
+    // actually write the image
+    png_write_image(png_ptr, row_pointers);
+
+    delete[] row_pointers;
+
+    png_write_end(png_ptr, info_ptr);
     png_destroy_write_struct(&png_ptr, &info_ptr);
-    fclose(fp);
-    return;
   }
-
-  png_init_io(png_ptr, fp);
-  png_set_IHDR(png_ptr, info_ptr, size, size, 8, PNG_COLOR_TYPE_RGB,
-	       PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT,
-	       PNG_FILTER_TYPE_DEFAULT);
-  png_write_info(png_ptr, info_ptr);
-
-  png_byte **row_pointers = new png_byte*[size];
-  for (int i = 1; i <= size; i++) {
-    row_pointers[i-1] = (png_byte*)(image + size * (size-i) * 3);
-  }
-
-  // actually write the image
-  png_write_image(png_ptr, row_pointers);
-
-  delete[] row_pointers;
-
-  png_write_end(png_ptr, info_ptr);
-  png_destroy_write_struct(&png_ptr, &info_ptr);
   fclose(fp);
   printf("Written '%s'\n", filename);
 
