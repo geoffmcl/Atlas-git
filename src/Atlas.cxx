@@ -55,7 +55,7 @@ int save_len = 0;
 
 fntTexFont *texfont;
 puFont *font;
-puPopup *interface, *minimized, *info_interface;
+puPopup *main_interface, *minimized, *info_interface;
 puFrame *frame, *info_frame;
 puOneShot *zoomin, *zoomout, *minimize_button, *minimized_button;
 puOneShot *clear_ftrack;
@@ -516,7 +516,7 @@ void showftrack_cb( puObject *cb ) {
 void minimize_cb ( puObject *cb ) {
   (cb, cb);
 
-  interface->hide();
+  main_interface->hide();
   minimized->reveal();
 }
 
@@ -524,7 +524,7 @@ void restore_cb ( puObject *cb ) {
   (cb, cb);
 
   minimized->hide();
-  interface->reveal();
+  main_interface->reveal();
 }
 
 void init_gui(bool textureFonts) {
@@ -547,7 +547,7 @@ void init_gui(bool textureFonts) {
   puSetDefaultFonts(*font, *font);
   puSetDefaultColourScheme(0.4f, 0.4f, 0.8f, 0.6f);
 
-  interface = new puPopup(puxoff,puyoff);
+  main_interface = new puPopup(puxoff,puyoff);
   frame = new puFrame(puxoff,puyoff,puxsiz,puysiz);
 
   curx=30; cury=30;
@@ -629,8 +629,8 @@ void init_gui(bool textureFonts) {
   minimize_button = new puOneShot(curx+165, cury, "X");
   minimize_button->setCallback(minimize_cb);
 
-  interface->close();
-  interface->reveal();
+  main_interface->close();
+  main_interface->reveal();
 
   minimized = new puPopup(20, 20);
   minimized_button = new puOneShot(20, 20, "X");
@@ -844,10 +844,10 @@ void keyPressed( unsigned char key, int x, int y ) {
     case ' ':
       interface_visible = !interface_visible;
       if (interface_visible) {
-	interface->reveal();
+	main_interface->reveal();
 	minimized->hide();
       } else {
-	interface->hide();
+	main_interface->hide();
 	minimized->hide();
       }
       glutPostRedisplay();
