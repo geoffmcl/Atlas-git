@@ -862,6 +862,10 @@ void mouseMotion( int x, int y ) {
 		   (float)mapsize * SG_DEGREES_TO_RADIANS);
       longitude = (copy_lon + (float)(drag_x - x)*scalefactor / 
 		   (float)mapsize * SG_DEGREES_TO_RADIANS);
+      while ( longitude > 180.0f * SG_DEGREES_TO_RADIANS )
+        longitude -= (360.0f * SG_DEGREES_TO_RADIANS);
+      while ( longitude < -180.0f * SG_DEGREES_TO_RADIANS )
+        longitude += (360.0f * SG_DEGREES_TO_RADIANS);
       map_object->setLocation( latitude, longitude );
     }
   }
