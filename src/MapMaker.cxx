@@ -64,7 +64,7 @@ MapMaker::~MapMaker() {
     delete (*it).first;
   }
 
-  for (int i = 0; i < palette.size(); i++) {
+  for (unsigned int i = 0; i < palette.size(); i++) {
     delete palette[i];
   }
 
@@ -91,7 +91,7 @@ void MapMaker::setPalette( char* filename ) {
       delete (*it).first;
     }
     
-    for (int i = 0; i < palette.size(); i++) {
+    for (unsigned int i = 0; i < palette.size(); i++) {
       delete palette[i];
     }
   }
@@ -316,7 +316,6 @@ void MapMaker::sub_trifan( const int_list &indices, vector<float*> &v,
             if (levels[lh][2] != 0.0f) {
               // this line can now be transformed into a polygon
               int ecol = lh + 1;
-              float sh;
 
               sgVec2 quadverts[4];
               sgVec3 quadnorms[4];
@@ -415,10 +414,10 @@ void MapMaker::draw_trifan( const int_list &indices, vector<float*> &v,
 }
 
 int MapMaker::process_binary_file( char *tile_name, sgVec3 xyz ) {
-  float cr;               // reference point (gbs)
+  //float cr;               // reference point (gbs)
   sgVec3 gbs, tmp;
-  int scount = 0;
-  int i1, i2, material = 16;
+  //int scount = 0;
+  int material = 16;
   unsigned int i;
   SGBinObject tile;
 
@@ -446,7 +445,7 @@ int MapMaker::process_binary_file( char *tile_name, sgVec3 xyz ) {
 	node++ ) {
 
     float *nv = new sgVec3;
-    for (int i = 0; i < 3; i++) {
+    for (i = 0; i < 3; i++) {
       tmp[i] = (*node)[i];
     }
     
@@ -468,7 +467,7 @@ int MapMaker::process_binary_file( char *tile_name, sgVec3 xyz ) {
     // Make a new normal
     float *nn = new sgVec3;
     
-    for (int i = 0; i < 3; i++) {
+    for (i = 0; i < 3; i++) {
       nn[i] = (*normal)[i];
     }
     
@@ -511,9 +510,9 @@ int MapMaker::process_binary_file( char *tile_name, sgVec3 xyz ) {
 }
 
 int MapMaker::process_ascii_file( char *tile_name, sgVec3 xyz ) {
-  float cr;               // reference point (gbs)
+  //float cr;               // reference point (gbs)
   sgVec3 gbs, tmp;
-  int scount = 0;
+  //int scount = 0;
   int i1, i2, material = 16;
   int verts = 0, normals = 0;
   vector<float*> v;                   // vertices
@@ -747,7 +746,8 @@ void MapMaker::read_materials(char *fname /* = NULL */) {
   }
 
   char line[256], *token, delimiters[] = " \t", *material;
-  int index, elev_level = 0;
+  unsigned int index;
+  int elev_level = 0;
   float* colour;
   sgVec4 black = { 0.0f, 0.0f, 0.0f, 0.0f };
   fgets(line, 256, fd);

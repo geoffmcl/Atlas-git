@@ -429,6 +429,7 @@ static char *dmshh_format(float degrees, char *buf)
  return buf;
 }
 
+#if 0    // Currently not used.
 static char *coord_format_latlon(float latitude, float longitude, char *buf)
 {
  char buf1[16], buf2[16];
@@ -440,6 +441,7 @@ static char *coord_format_latlon(float latitude, float longitude, char *buf)
                  dmshh_format(longitude * SG_RADIANS_TO_DEGREES, buf2)       );
  return buf;
 }
+#endif
 
 /******************************************************************************
  PUI code (HANDLERS)
@@ -475,7 +477,7 @@ void zoom_cb ( puObject *cb )
 
 void show_cb ( puObject *cb )
 {
-  int feature;
+  int feature = 0;
   if (cb == show_arp) { 
     feature = Overlays::OVERLAY_AIRPORTS;
   } else if (cb == show_vor) {
@@ -492,6 +494,9 @@ void show_cb ( puObject *cb )
     feature = Overlays::OVERLAY_IDS;
   } else if (cb == show_ftrack) {
     feature = Overlays::OVERLAY_FLIGHTTRACK;
+  } else {
+	  printf("Warning: show_cb called with unknown callback\n");
+	  return;
   }
   if (cb->getValue()) {
     map_object->setFeatures( map_object->getFeatures() | feature );
@@ -950,7 +955,7 @@ int main(int argc, char **argv) {
       // do nothing
     } else if ( sscanf(argv[i], "--airport=%s", icao) == 1 ) {
       // Make sure it's in uppercase only
-      for(int i=0; i<strlen(icao); ++i) {
+      for(unsigned int i=0; i<strlen(icao); ++i) {
 	icao[i] = toupper(icao[i]);
       }
     } else if ( sscanf(argv[i], "--udp=%s", port) == 1) {

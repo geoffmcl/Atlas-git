@@ -90,17 +90,17 @@ void Projection::nice_angle_pair( float xaim, float yaim, float *pxnice, float *
 
   int ix, iy;
 
-  for (ix = 1; ix < sizeof(nice_angles)/sizeof(nice_angles[0]) - 1; ix++) {
+  for (ix = 1; (unsigned int)ix < sizeof(nice_angles)/sizeof(nice_angles[0]) - 1; ix++) {
     if (nice_angles[ix] < xaim) break;
   }
 
-  for (iy = 1; iy < sizeof(nice_angles)/sizeof(nice_angles[0]) - 1; iy++) {
+  for (iy = 1; (unsigned int)iy < sizeof(nice_angles)/sizeof(nice_angles[0]) - 1; iy++) {
     if (nice_angles[iy] < yaim) break;
   }
 
   // ix and iy each index the second of two possible angles.
 
-  float xbest, ybest;
+  float xbest = 0.0, ybest = 0.0;
   float prev_lerr = 999;
   for (int x = ix-1; x <= ix; x++) {
     for (int y = iy-1; y <= iy; y++) {
