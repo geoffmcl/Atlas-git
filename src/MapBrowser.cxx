@@ -206,11 +206,10 @@ void MapBrowser::update() {
       c.lon = min_lon + j;
 
       TileTable::iterator t = tiletable.find(c);
-      MapTile *nt = tiletable[c];
 
-      if (t == tiletable.end()) {  // check if the tile has been loaded
+      if ((*t).second == 0) {  // check if the tile has been loaded
 	// Load a new tile
-	nt = new MapTile;
+	MapTile *nt = new MapTile;
 	nt->c.lat = c.lat;
 	nt->c.lon = c.lon;
 	
@@ -218,6 +217,8 @@ void MapBrowser::update() {
 		 (c.lon < 0)?'w':'e', abs(c.lon),
 		 (c.lat < 0)?'s':'n', abs(c.lat) );	     
 
+	//printf("Loading tile %s...", mpath);
+	  
 	if ( (nt->texbuf = (GLubyte*)loadPng( mpath, &wid, &hei )) != NULL ) {
 	  glPixelStorei(GL_UNPACK_ALIGNMENT, 3);
 	  glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
@@ -236,10 +237,12 @@ void MapBrowser::update() {
 	  
 	  
 	  tiles.push_back(nt);
-	  tiletable[nt->c] = nt;
+	  tiletable[nt->c] = nt ;
+	  //printf("ok.\n");
 	} else {
 	  // Tile couldn't be loaded
 	  delete nt;
+	  //printf("failed!\n");
 	}
 
 	float x, y, r;

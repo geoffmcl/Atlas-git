@@ -68,7 +68,7 @@ puInput *inp_lat, *inp_lon;
 bool interface_visible = true, softcursor = false;
 char lat_str[80], lon_str[80], alt_str[80], hdg_str[80], spd_str[80];
 
-MapBrowser *map;
+MapBrowser *map_object;
 FlightTrack *track = NULL;
 
 bool parse_nmea(char *buf) {
@@ -368,10 +368,10 @@ void zoom_cb ( puObject *cb )
   (cb,cb);
 
   if (cb == zoomin) { 
-    map->setScale( map->getScale() / 2 );
+    map_object->setScale( map_object->getScale() / 2 );
     scalefactor /= 2.0f;
   } else {
-    map->setScale( map->getScale() * 2 );
+    map_object->setScale( map_object->getScale() * 2 );
     scalefactor *= 2.0f;
   }
   glutPostRedisplay();
@@ -382,9 +382,9 @@ void show_cb ( puObject *cb )
   (cb,cb);
 
   if (cb == show_arp) { 
-    map->setFeatures( map->getFeatures() ^ Overlays::OVERLAY_AIRPORTS );
+    map_object->setFeatures( map_object->getFeatures() ^ Overlays::OVERLAY_AIRPORTS );
   } else {
-    map->setFeatures( map->getFeatures() ^ Overlays::OVERLAY_NAVAIDS );
+    map_object->setFeatures( map_object->getFeatures() ^ Overlays::OVERLAY_NAVAIDS );
   }
   glutPostRedisplay();
 }
@@ -394,9 +394,9 @@ void labeling_cb ( puObject *cb )
   (cb,cb);
 
   if (cb == show_name) {
-    map->setFeatures( map->getFeatures() ^ Overlays::OVERLAY_NAMES );
+    map_object->setFeatures( map_object->getFeatures() ^ Overlays::OVERLAY_NAMES );
   } else if (cb == show_id) {
-    map->setFeatures( map->getFeatures() ^ Overlays::OVERLAY_IDS );
+    map_object->setFeatures( map_object->getFeatures() ^ Overlays::OVERLAY_IDS );
   }
 
   glutPostRedisplay();
@@ -414,7 +414,7 @@ void position_cb ( puObject *cb ) {
     sscanf(buffer, "%c %d %c %f", &ns, &degrees, &dummy, &minutes);
     latitude = ((ns=='S'||ns=='s')?-1.0f:1.0f) * 
       ((float)degrees + minutes / 60.0f) * SG_DEGREES_TO_RADIANS;
-    map->setLocation(latitude, longitude);
+    map_object->setLocation(latitude, longitude);
 
     glutPostRedisplay();
   } else {
@@ -422,7 +422,7 @@ void position_cb ( puObject *cb ) {
     sscanf(buffer, "%c %d %c %f", &ns, &degrees, &dummy, &minutes);
     longitude = ((ns=='W'||ns=='w')?-1.0f:1.0f) * 
       ((float)degrees + minutes / 60.0f) * SG_DEGREES_TO_RADIANS;
-    map->setLocation(latitude, longitude);
+    map_object->setLocation(latitude, longitude);
 
     glutPostRedisplay();
   }
@@ -441,7 +441,7 @@ void clear_ftrack_cb ( puObject *cb ) {
 void showftrack_cb( puObject *cb ) {
   (cb, cb);
 
-  map->setFeatures( map->getFeatures() ^ Overlays::OVERLAY_FLIGHTTRACK );
+  map_object->setFeatures( map_object->getFeatures() ^ Overlays::OVERLAY_FLIGHTTRACK );
 }
 
 void minimize_cb ( puObject *cb ) {
@@ -556,7 +556,7 @@ void reshapeMap( int _width, int _height ) {
   height = (float)_height ;
   mapsize = (width > height) ? width : height;
 
-  map->setSize( mapsize );
+  map_object->setSize( mapsize );
 }
 
 void redrawMap() {
@@ -574,7 +574,7 @@ void redrawMap() {
     glTranslatef( -(height - width) / 2.0f, 0.0f, 0.0f );
   }
 
-  map->draw();
+  map_object->draw();
 
   // Draw aircraft if in slave mode
   if (slaved) {
@@ -646,7 +646,7 @@ void timer(int value) {
   d->spd = speed;
   track->addPoint(d);
   
-  map->setLocation( latitude, longitude );
+  map_object->setLocation( latitude, longitude );
   
   glutPostRedisplay();
   glutTimerFunc( (int)(update * 1000.0f), timer, value );
@@ -683,7 +683,7 @@ void mouseMotion( int x, int y ) {
 		   (float)mapsize * M_PI / 180.0f);
       longitude = (copy_lon + (float)(drag_x - x)*scalefactor / 
 		   (float)mapsize * M_PI / 180.0f);
-      map->setLocation( latitude, longitude );
+      map_object->setLocation( latitude, longitude );
     }
   }
 
@@ -694,12 +694,12 @@ void keyPressed( unsigned char key, int x, int y ) {
   if (!puKeyboard(key, PU_DOWN)) {
     switch (key) {
     case '+':
-      map->setScale( map->getScale() / 2 );
+      map_object->setScale( map_object->getScale() / 2 );
       scalefactor /= 2.0f;
       glutPostRedisplay();
       break;
     case '-':
-      map->setScale( map->getScale() * 2 );
+      map_object->setScale( map_object->getScale() * 2 );
       scalefactor *= 2.0f;
       glutPostRedisplay();
       break;
@@ -717,22 +717,22 @@ void keyPressed( unsigned char key, int x, int y ) {
       break;
     case 'A':
     case 'a':
-      map->setFeatures( map->getFeatures() ^ Overlays::OVERLAY_AIRPORTS );
+      map_object->setFeatures( map_object->getFeatures() ^ Overlays::OVERLAY_AIRPORTS );
       glutPostRedisplay();
       break;
     case 'N':
     case 'n':
-      map->setFeatures( map->getFeatures() ^ Overlays::OVERLAY_NAVAIDS );
+      map_object->setFeatures( map_object->getFeatures() ^ Overlays::OVERLAY_NAVAIDS );
       glutPostRedisplay();
       break;    
     case 'T':
     case 't':
-      map->setTextured( !map->getTextured() );
+      map_object->setTextured( !map_object->getTextured() );
       glutPostRedisplay();
       break;
     case 'V':
     case 'v':
-      map->setFeatures( map->getFeatures() ^ Overlays::OVERLAY_NAMES );
+      map_object->setFeatures( map_object->getFeatures() ^ Overlays::OVERLAY_NAMES );
       glutPostRedisplay();
       break;
     case ' ':
@@ -841,24 +841,24 @@ int main(int argc, char **argv) {
   glutDisplayFunc( redrawMap );
 
   mapsize = (float)( (width>height)?width:height );
-  map = new MapBrowser( 0.0f, 0.0f, mapsize, 
-			Overlays::OVERLAY_AIRPORTS  | 
-			Overlays::OVERLAY_NAVAIDS   |
-			Overlays::OVERLAY_FIXES     |
-			Overlays::OVERLAY_GRIDLINES | 
-			Overlays::OVERLAY_NAMES     |
-			Overlays::OVERLAY_FLIGHTTRACK,
-			NULL, textureFonts );
-  map->setTextured(true);
-  map->setMapPath(path);
+  map_object = new MapBrowser( 0.0f, 0.0f, mapsize, 
+			       Overlays::OVERLAY_AIRPORTS  | 
+			       Overlays::OVERLAY_NAVAIDS   |
+			       Overlays::OVERLAY_FIXES     |
+			       Overlays::OVERLAY_GRIDLINES | 
+			       Overlays::OVERLAY_NAMES     |
+			       Overlays::OVERLAY_FLIGHTTRACK,
+			       NULL, textureFonts );
+  map_object->setTextured(true);
+  map_object->setMapPath(path);
   if (fg_root[0] != 0)
-    map->setFGRoot(fg_root);
+    map_object->setFGRoot(fg_root);
 
   if (slaved) {
     glutTimerFunc( (int)(update*1000.0f), timer, 0 );
 
     track = new FlightTrack();
-    map->setFlightTrack(track);
+    map_object->setFlightTrack(track);
 
     if ( network ) {
 	input_channel = new SGSocket( "", port, "udp" );
@@ -877,9 +877,9 @@ int main(int argc, char **argv) {
   glutKeyboardFunc     ( keyPressed  );
   glutSpecialFunc      ( specPressed );
 
-  map->setLocation( latitude, longitude );
+  map_object->setLocation( latitude, longitude );
   printf("Please wait while loading databases..."); fflush(stdout);
-  map->loadDb();
+  map_object->loadDb();
   printf("done.\n");
 
   init_gui(textureFonts);

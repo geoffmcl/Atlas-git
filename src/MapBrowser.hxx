@@ -28,7 +28,7 @@
 #include <GL/gl.h>
 #include <math.h>
 #include <list>
-#include <hash_map>
+#include <map>
 
 #ifndef M_PI
 #define M_PI 3.1415926535
@@ -90,19 +90,22 @@ protected:
     GLubyte *texbuf;
   };
 
-  struct TileEq {
+
+  /*
+    struct TileEq {
     bool operator()(const Coord &t1, const Coord &t2) const {
-      return t1.lat == t2.lat && t1.lon == t2.lon;
+    return t1.lat == t2.lat && t1.lon == t2.lon;
+    }
+    };
+  */
+
+  struct TileLess {
+    size_t operator()(const Coord &v1, const Coord &v2) const {
+      return (v1.lat < v2.lat || (v1.lat == v2.lat && v1.lon < v2.lon));
     }
   };
 
-  struct TileHash {
-    size_t operator()(const Coord &t) const {
-      return (t.lat + t.lon*31);
-    }
-  };
-
-  typedef hash_map<Coord, MapTile*, TileHash, TileEq> TileTable;
+  typedef map<Coord, MapTile*, TileLess> TileTable;
 
   list<MapTile*> tiles;
   TileTable tiletable;
