@@ -20,15 +20,30 @@ Colour 13	0.761 0.839 0.847 1.0
 Colour 14	0.439 0.271 0.420 1.0 
 Colour 15	0.975 0.982 0.484 1.0 
 Colour 16	1.000 0.000 0.000 1.0
+Colour 17	0.859 0.851 0.478 1.0
 #
 # Materials definitions: maps a material name to a Colour index
 # in the palette above. -1 indicates that the material should
 # be Coloured by altitude.
 #
+# The elevation levels are defined by materials with names like
+# "Elevation_x" which mean everything with altitude between x and
+# the next elevation level will be coloured with that index.
+# Elevation levels *must* be sorted from lowest to highest.
+#
+Material Elevation_-1		1
+Material Elevation_100		2
+Material Elevation_200		3
+Material Elevation_500		4
+Material Elevation_1000		5
+Material Elevation_1500		6
+Material Elevation_2000		7
+Material Elevation_3000		8
+Material Elevation_100000	9
 Material AirportKeep		9
 Material Concrete		16
 Material Default		-1
-Material Urban			15
+Material Urban			17
 Material Unknown		16
 Material Glacier		-1
 Material Ocean			13

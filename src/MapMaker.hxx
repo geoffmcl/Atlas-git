@@ -93,8 +93,10 @@ protected:
   void read_materials(char* filename = NULL);
   
   // Elevation limits for colours
-  static const int ELEV_LEVELS = 8;
-  static const int elev_height[ELEV_LEVELS]; 
+  static const int MAX_ELEV_LEVELS = 9;
+  int number_elev_levels;
+  int elev_height[MAX_ELEV_LEVELS]; 
+  int elev_colindex[MAX_ELEV_LEVELS];
 
   /* member variables for the run */
   char *fg_root, *arp_filter;
@@ -113,9 +115,9 @@ protected:
 
   inline int elev2colour( int elev ) {
     int i;
-    for (i = 0; i < ELEV_LEVELS && elev >= elev_height[i]; i++);
+    for (i = 0; i < number_elev_levels-1 && elev >= elev_height[i]; i++);
   
-    return 1 + i;
+    return elev_colindex[i];
   }
 
 /****************************************************************************/

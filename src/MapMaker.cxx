@@ -31,9 +31,6 @@
 #include "MapMaker.hxx"
 /*#include <simgear/magvar/magvar.hxx>*/
 
-const int MapMaker::elev_height[ELEV_LEVELS] = {-1, 100, 200, 500, 1000, 1500,
-						2000, 3000};
-
 MapMaker::MapMaker( char *fg_root, char *ap_filter, int features,
 		    int size, int scale ) {
   this->fg_root = NULL;
@@ -47,6 +44,15 @@ MapMaker::MapMaker( char *fg_root, char *ap_filter, int features,
   palette_loaded = false;
 
   setLight( -1, -1, 2 );       // default lighting
+
+  // setup indices for the elevation levels colours
+  // (these might be overridden by read_materials)
+  for (int i = 0; i < MAX_ELEV_LEVELS; i++) {
+    elev_colindex[i] = 1+i;
+  }
+
+  number_elev_levels = 1;
+  elev_height[0] = -1;
 }
 
 MapMaker::~MapMaker() {
@@ -224,10 +230,10 @@ void MapMaker::sub_trifan( list<int> &indices, vector<float*> &v,
       
       int ctimes = 0, max_ctimes = 0;
       int times[3], order[3], oind[3];
-      float levels[ELEV_LEVELS][4];
-      sgVec3 normal[ELEV_LEVELS][2];
+      float levels[MAX_ELEV_LEVELS][4];
+      sgVec3 normal[MAX_ELEV_LEVELS][2];
 
-      for (int k = 0; k < ELEV_LEVELS; k++) { 
+      for (int k = 0; k < number_elev_levels; k++) { 
 	levels[k][0] = 0.0f; levels[k][1] = 0.0f; 
 	levels[k][2] = 0.0f; levels[k][3] = 0.0f;
       }
@@ -564,12 +570,14 @@ void MapMaker::read_materials(char *fname /* = NULL */) {
     return;
   }
 
-  palette.reserve(16);
-
   char line[256], *token, delimiters[] = " \t", *material;
-  int index;
+  int index, elev_level = 0;
   float* colour;
+  sgVec4 black = { 0.0f, 0.0f, 0.0f, 0.0f };
   fgets(line, 256, fd);
+
+  // we might as well reserve space for 32 colours from start
+  palette.reserve(32);
 
   while ( !feof(fd) ) {
     switch (line[0]) {
@@ -586,7 +594,16 @@ void MapMaker::read_materials(char *fname /* = NULL */) {
 	token = strtok(NULL, delimiters);
 	colour[i] = atof(token);
       }
-      palette[index] = colour;
+
+      // make sure we have at least index entries in the palette
+      while (palette.size() < index)
+	palette.push_back(black);
+
+      if ( index < palette.size() ) {
+	palette[index] = colour;
+      } else {
+	palette.push_back(colour);
+      }
 
       break;
 
@@ -603,10 +620,24 @@ void MapMaker::read_materials(char *fname /* = NULL */) {
 
       materials[material] = index;
 
+      int height;
+      if ( sscanf(material, "Elevation_%d", &height) == 1 ) {
+	if (elev_level >= MAX_ELEV_LEVELS) {
+	  fprintf(stderr, "Only %d elevation levels allowed.\n", 
+		  MAX_ELEV_LEVELS);
+	} else {
+	  elev_height  [elev_level] = height;
+	  elev_colindex[elev_level] = index;
+	  elev_level++;
+	  if (elev_level > number_elev_levels) number_elev_levels++;
+	}
+      }
+
       break;
 
     default:
-      printf("Syntax error in file \"%s\". Line:\n\t%s\n", filename, line);
+      fprintf(stderr, 
+	      "Syntax error in file \"%s\". Line:\n\t%s\n", filename, line);
       break;
     }
 
