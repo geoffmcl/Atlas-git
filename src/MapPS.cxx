@@ -39,7 +39,7 @@
 float clat = -100.0f, clon = -100.0f;   // initialize to unreasonable values
 char *outp = "map.eps";                 // output file name
 bool autoscale = false, global = false;
-MapMaker map;
+MapMaker mapobj;
 
 void print_help() {
   printf("MapPS - FlightGear PostScript mapping utility\n\n");
@@ -51,7 +51,7 @@ void print_help() {
   printf("  --autoscale             Automatically set scale to 1x1 degree tile\n");
   printf("  --light=x, y, z         Set light vector for shading\n");
   printf("  --airport-filter=string Display only airports with id beginning 'string'\n");
-  printf("  --output=name           Write output to given file name (default 'map.eps')\n");
+  printf("  --output=name           Write output to given file name (default 'mapobj.eps')\n");
   printf("  --fgroot=path           Overrides FG_ROOT environment variable\n");
   printf("  --disable-airports      Don't show airports\n");
   printf("  --disable-navaids       Don't show navaids\n");
@@ -62,7 +62,7 @@ void print_help() {
 
 int main( int argc, char **argv ) {
   // variables for command line parsing
-  int param, features = map.getFeatures();
+  int param, features = mapobj.getFeatures();
   float x, y, z;
   char cparam[128];
 
@@ -76,17 +76,17 @@ int main( int argc, char **argv ) {
     } else if ( sscanf(argv[arg], "--lon=%f", &clon) == 1 ) {
       // do nothing
     } else if ( sscanf(argv[arg], "--size=%d", &param) == 1 ) {
-      map.setSize( param );
+      mapobj.setSize( param );
     } else if ( sscanf(argv[arg], "--scale=%d", &param) == 1 ) {
-      map.setScale( param * 1000 );
+      mapobj.setScale( param * 1000 );
     } else if ( sscanf(argv[arg], "--light=%f, %f, %f", &x, &y, &z) == 3 ) {
-      map.setLight( x, y, z );
+      mapobj.setLight( x, y, z );
     } else if ( sscanf(argv[arg], "--airport-filter=%s", cparam) == 1 ) {
-      map.setAPFilter( strdup(cparam) );
+      mapobj.setAPFilter( strdup(cparam) );
     } else if ( sscanf(argv[arg], "--output=%s", cparam) == 1 ) {
       outp = strdup(cparam);
     } else if ( sscanf(argv[arg], "--fgroot=%s", cparam) == 1 ) {
-      map.setFGRoot( strdup(cparam) );
+      mapobj.setFGRoot( strdup(cparam) );
     } else if ( strcmp(argv[arg], "--disable-airports" ) == 0 ) {
       features &= ~MapMaker::DO_AIRPORTS;
     } else if ( strcmp(argv[arg], "--disable-navaids" ) == 0 ) {
@@ -121,22 +121,22 @@ int main( int argc, char **argv ) {
     clon = ((int)clon) + 0.5f;
   }
 
-  map.setFeatures(features);
+  mapobj.setFeatures(features);
 
   // convert lat & lon to radians
   clat *= M_PI / 180.0f;
   clon *= M_PI / 180.0f;
 
   if (!global) {
-    OutputPS output( outp, map.getSize() );
-    map.createMap( &output, clat, clon, autoscale );
+    OutputPS output( outp, mapobj.getSize() );
+    mapobj.createMap( &output, clat, clon, autoscale );
   } else {
-    char outname[512], *scenerypath = new char[strlen(map.getFGRoot()) + 256];
+    char outname[512], *scenerypath = new char[strlen(mapobj.getFGRoot()) + 256];
     int opathl, spathl;
     DIR *dir1, *dir2;
     dirent *ent;
 
-    int s = map.getSize();
+    int s = mapobj.getSize();
     if ( (s & (s-1)) != 0 ) {           // Thanks for this cutie, Steve
       printf("%s: WARNING! Size is not a power of two - you will not be"\
 	     "able to use\nthese maps with the Atlas program!\n", argv[0] );
@@ -144,7 +144,7 @@ int main( int argc, char **argv ) {
 
     strcpy(outname, outp);
     opathl = strlen(outname);
-    strcpy( scenerypath, map.getFGRoot() );
+    strcpy( scenerypath, mapobj.getFGRoot() );
     strcat( scenerypath, "/Scenery/" );
     spathl = strlen(scenerypath);
     
@@ -172,8 +172,8 @@ int main( int argc, char **argv ) {
 	      sprintf( outname+opathl, "/%c%03d%c%02d.png", 
 		       (lon<0)?'w':'e', abs(lon), (lat<0)?'s':'n', abs(lat) );
 
-	      OutputPS output( outname, map.getSize() );
-	      map.createMap( &output, clat, clon, true );
+	      OutputPS output( outname, mapobj.getSize() );
+	      mapobj.createMap( &output, clat, clon, true );
 	    }
 	  }
 	}

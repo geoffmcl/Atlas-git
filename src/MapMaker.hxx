@@ -28,6 +28,7 @@
 #include <plib/sg.h>
 #include <vector>
 #include <list>
+#include <map>
 #include "Output.hxx"
 #include "Overlays.hxx"
 #include "Geodesy.hxx"
@@ -79,17 +80,17 @@ public:
 
 protected:
   /* colours and materials */
-  static const char *materials[16];
-  static const float rgb[17][4];
-  
-  // some constants for colours
-  static const int NUM_COLOURS = 17;
-  static const int ARP_LABEL = 14;
-  static const int LEVEL_LINES = 10;
-  
-  // Maps materials to a special colour, -1 means shaded, height dependant
-  static const int colours[16];
+  struct WordLess {
+    bool operator()(const char* v1, const char* v2) const {
+      return (strcmp(v1, v2) < 0);
+    }
+  };
+  typedef std::map<char*, int, WordLess> StrMap;
 
+  std::vector<float*> palette;
+  StrMap materials;
+  void read_materials();
+  
   // Elevation limits for colours
   static const int ELEV_LEVELS = 8;
   static const int elev_height[ELEV_LEVELS]; 

@@ -43,7 +43,7 @@ float clat = -100.0f, clon = -100.0f;   // initialize to unreasonable values
 char *outp = "map.png";                 // output file name
 bool autoscale = false, global = false, doublebuffer = true;
 bool smooth_shade = true, textured_fonts = true;
-MapMaker map;
+MapMaker mapobj;
 
 char outname[512], *scenerypath;
 int opathl, spathl;
@@ -66,7 +66,7 @@ void redrawMap() {
   char font_name[512];
 
   if (textured_fonts) {
-    strcpy( font_name, map.getFGRoot() );
+    strcpy( font_name, mapobj.getFGRoot() );
     strcat( font_name, "/Fonts/helvetica_medium.txf");
   }
 
@@ -76,15 +76,15 @@ void redrawMap() {
 	    (clon<0.0f)?'W':'E', clon * 180.0f / M_PI);
     glutSetWindowTitle(title_buffer);
 
-    OutputGL output( outp, map.getSize(), smooth_shade, 
+    OutputGL output( outp, mapobj.getSize(), smooth_shade, 
 		     textured_fonts, font_name );
-    map.createMap( &output, clat, clon, autoscale );
+    mapobj.createMap( &output, clat, clon, autoscale );
     output.closeOutput();
     exit(0);
   } else {
     char ns, ew;
     int lat, lon;
-    int s = map.getSize();
+    int s = mapobj.getSize();
 
     do {
       while (dir2 == NULL) {
@@ -146,7 +146,7 @@ void redrawMap() {
     glutSetWindowTitle(title_buffer);
 
     OutputGL output(outname, s, smooth_shade, textured_fonts, font_name);
-    map.createMap( &output, clat, clon, true );
+    mapobj.createMap( &output, clat, clon, true );
     output.closeOutput();
     if (doublebuffer) {
       glutSwapBuffers();
@@ -168,7 +168,7 @@ void print_help() {
   printf("  --autoscale             Automatically set scale to 1x1 degree tile\n");
   printf("  --light=x, y, z         Set light vector for shading\n");
   printf("  --airport-filter=string Display only airports with id beginning 'string'\n");
-  printf("  --output=name           Write output to given file name (default 'map.png')\n");
+  printf("  --output=name           Write output to given file name (default 'mapobj.png')\n");
   printf("  --fgroot=path           Overrides FG_ROOT environment variable\n");
   printf("  --enable-airports       Show airports\n");
   printf("  --enable-navaids        Show navaids\n");
@@ -195,17 +195,17 @@ int main( int argc, char **argv ) {
     } else if ( sscanf(argv[arg], "--lon=%f", &clon) == 1 ) {
       // do nothing
     } else if ( sscanf(argv[arg], "--size=%d", &param) == 1 ) {
-      map.setSize( param );
+      mapobj.setSize( param );
     } else if ( sscanf(argv[arg], "--scale=%d", &param) == 1 ) {
-      map.setScale( param * 1000 );
+      mapobj.setScale( param * 1000 );
     } else if ( sscanf(argv[arg], "--light=%f, %f, %f", &x, &y, &z) == 3 ) {
-      map.setLight( x, y, z );
+      mapobj.setLight( x, y, z );
     } else if ( sscanf(argv[arg], "--airport-filter=%s", cparam) == 1 ) {
-      map.setAPFilter( strdup(cparam) );
+      mapobj.setAPFilter( strdup(cparam) );
     } else if ( sscanf(argv[arg], "--output=%s", cparam) == 1 ) {
       outp = strdup(cparam);
     } else if ( sscanf(argv[arg], "--fgroot=%s", cparam) == 1 ) {
-      map.setFGRoot( cparam );
+      mapobj.setFGRoot( cparam );
     } else if ( strcmp(argv[arg], "--enable-airports" ) == 0 ) {
       features |= MapMaker::DO_AIRPORTS;
     } else if ( strcmp(argv[arg], "--enable-navaids" ) == 0 ) {
@@ -250,14 +250,14 @@ int main( int argc, char **argv ) {
     clon = ((int)clon) + 0.5f;
   }
 
-  map.setFeatures(features);
+  mapobj.setFeatures(features);
 
   // convert lat & lon to radians
   clat *= M_PI / 180.0f;
   clon *= M_PI / 180.0f;
 
   if (global) {
-    int s = map.getSize();
+    int s = mapobj.getSize();
 
     if ( (s & (s-1)) != 0 ) {           // Thanks for this cutie, Steve
       fprintf(stderr, "%s: WARNING! Size is not a power of two - you will " \
@@ -265,10 +265,10 @@ int main( int argc, char **argv ) {
 	      "these maps with the Atlas program!\n", argv[0] );
     }
 
-    scenerypath = new char[strlen(map.getFGRoot()) + 256];
+    scenerypath = new char[strlen(mapobj.getFGRoot()) + 256];
     strcpy(outname, outp);
     opathl = strlen(outname);
-    strcpy( scenerypath, map.getFGRoot() );
+    strcpy( scenerypath, mapobj.getFGRoot() );
     strcat( scenerypath, "/Scenery/" );
     spathl = strlen(scenerypath);
     
@@ -287,7 +287,7 @@ int main( int argc, char **argv ) {
   } else {
     glutInitDisplayMode( GLUT_SINGLE | GLUT_RGBA | GLUT_DEPTH );
   }
-  glutInitWindowSize( map.getSize(), map.getSize() );
+  glutInitWindowSize( mapobj.getSize(), mapobj.getSize() );
   glutCreateWindow( "MAP - Please wait while drawing" );
   glutReshapeFunc( reshapeMap );
   glutDisplayFunc( redrawMap );

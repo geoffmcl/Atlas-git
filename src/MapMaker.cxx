@@ -31,37 +31,6 @@
 #include "MapMaker.hxx"
 /*#include <simgear/magvar/magvar.hxx>*/
 
-// From the FG materials file
-// (this ought to be read from that file in some way)
-const char *MapMaker::materials[16] = { "AirportKeep", "Concrete", "Default", 
-					"Urban", "Unknown", "Glacier", "Ocean",
-					"Lake", "IntermittentLake", "DryLake", 
-					"Reservoir", "IntermittentReservoir", 
-					"Stream", "Marsh", "Grass", "Cloud" };
-
-const int MapMaker::colours[16] = { 9, 16, -1, 15, 16, -1, 13, 12, 12, -1, 12, 
-				    12, 12, -1, -1, 16 };
-
-/* These nice colour settings are (almost?) from the original
-   script by Alexei Novikov. */
-const float MapMaker::rgb[17][4] = { {0.761, 0.839, 0.847, 1.0}, 
-				     {0.647, 0.729, 0.647, 1.0}, 
-				     {0.859, 0.906, 0.804, 1.0}, 
-				     {0.753, 0.831, 0.682, 1.0}, 
-				     {0.949, 0.933, 0.757, 1.0}, 
-				     {0.941, 0.871, 0.608, 1.0}, 
-				     {0.878, 0.725, 0.486, 1.0}, 
-				     {0.816, 0.616, 0.443, 1.0}, 
-				     {0.776, 0.529, 0.341, 1.0}, 
-				     {0.824, 0.863, 0.824, 1.0}, 
-				     {0.682, 0.573, 0.369, 1.0}, 
-				     {0.275, 0.275, 0.275, 1.0}, 
-				     {0.761, 0.839, 0.847, 1.0}, 
-				     {0.761, 0.839, 0.847, 1.0}, 
-				     {0.439, 0.271, 0.420, 1.0}, 
-				     {0.975, 0.982, 0.484, 1.0}, 
-				     {1.000, 0.000, 0.000, 1.0} };
-
 const int MapMaker::elev_height[ELEV_LEVELS] = {-1, 100, 200, 500, 1000, 1500,
 						2000, 3000};
 
@@ -77,9 +46,19 @@ MapMaker::MapMaker( char *fg_root, char *ap_filter, int features,
   modified = false;
 
   setLight( -1, -1, 2 );       // default lighting
+
+  read_materials();
 }
 
 MapMaker::~MapMaker() {
+  for (StrMap::iterator it = materials.begin(); it != materials.end(); it++) {
+    delete (*it).first;
+  }
+
+  for (int i = 0; i < palette.size(); i++) {
+    delete palette[i];
+  }
+
   delete fg_root;
 }
 
@@ -101,7 +80,7 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
   this->output = output;
   
   modified = false;
-  output->clear( rgb[0] );
+  output->clear( palette[0] );
 
   // set up coordinate space
   sgVec3 xyz;
@@ -133,7 +112,7 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
   // Rainer Emrich's improved code for finding map boundaries
   int mid_theta = (int)( theta * SG_RADIANS_TO_DEGREES ) - sgntheta;
   int mid_alpha = (int)( alpha * SG_RADIANS_TO_DEGREES ) - sgnalpha;
-  int int_dtheta = (int)( dtheta * SG_RADIANS_TO_DEGREES + 0.5f);
+  int int_dtheta = (int)( dtheta * SG_RADIANS_TO_DEGREES + 0.6f);
   int int_dalpha = (int)( dalpha * SG_RADIANS_TO_DEGREES + 0.5f);
   int max_theta = mid_theta + int_dtheta;
   int min_theta = mid_theta - int_dtheta;
@@ -171,8 +150,9 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
   if (modified) {
     Overlays overlays( fg_root, zoom, size );
     overlays.setOutput( output );
-    overlays.setAirportColor( rgb[ARP_LABEL], rgb[9] );
-    overlays.setNavaidColor( rgb[ARP_LABEL] );
+    overlays.setAirportColor( palette[materials["RunwayOutline"]],
+			      palette[materials["RunwayFill"]] );
+    overlays.setNavaidColor( palette[materials["NavaidLabels"]] );
     overlays.setLocation( theta, alpha );
 
     int features = Overlays::OVERLAY_NAMES | Overlays::OVERLAY_IDS;
@@ -298,7 +278,7 @@ void MapMaker::sub_trifan( list<int> &indices, vector<float*> &v,
 	      sgCopyVec3(quadnorms[2], lnormal);
 	      sgCopyVec3(quadnorms[3], nrm[pmin]);
 
-	      output->setColor(rgb[ecol]);
+	      output->setColor(palette[ecol]);
 	      output->drawQuad(quadverts, quadnorms);
 	    } else {
 	      levels[lh][0] = lx;
@@ -342,7 +322,7 @@ void MapMaker::draw_trifan( list<int> &indices, vector<float*> &v,
 
     if (col == 12 || col == 13) {
       // do not shade ocean/lake/etc.
-      output->setColor(rgb[col]);
+      output->setColor(palette[col]);
     } else {
       int dcol;
       if (col>=0) {
@@ -350,7 +330,7 @@ void MapMaker::draw_trifan( list<int> &indices, vector<float*> &v,
       } else {
 	dcol = elev2colour((int)((t[0][2] + t[1][2] + t[2][2]) / 3.0f));
       }
-      output->setColor(rgb[dcol]);
+      output->setColor(palette[dcol]);
     }
 
     output->drawTriangle( p, nrm );
@@ -374,8 +354,9 @@ int MapMaker::process_file( char *tile_name, sgVec3 xyz ) {
   vector<float*> v;                   // vertices
   vector<float*> n;                   // normals
 
-  char lbuffer[4096], mtl[32];       /* will there be longer lines in
+  char lbuffer[4096];       /* will there be longer lines in
 					scenery files? */
+  char *token, delimiters[] = " \t\n";
 
   // setup some reasonable sizes for vectors
   v.reserve(1024);
@@ -398,63 +379,92 @@ int MapMaker::process_file( char *tile_name, sgVec3 xyz ) {
 
   modified = true;
 
-  while ( (gzgets(tf, lbuffer, 4096) != Z_NULL) ) {      
-    if ( sscanf(lbuffer, "# gbs %f %f %f %f", 
-		&tmp[0], &tmp[1], &tmp[2], &cr) == 4 ) {
-      sgCopyVec3( gbs, tmp );
-    } else if (sscanf(lbuffer, "v %f %f %f", 
-		      &tmp[0], &tmp[1], &tmp[2]) == 3) {
-      // Make a new vertice and translate into map coordinate system
-      float *nv = new sgVec3;
-      sgAddVec3(tmp, gbs);
-      double pr = sgLengthVec3( tmp );
-      ab_xy( tmp, xyz, nv );
-      // nv[2] contains the sea-level z-coordinate - calculate this vertex'
-      // altitude:
-      nv[2] = pr - nv[2];
-      v.push_back( nv );
-      verts++;
-    } else if (sscanf(lbuffer, "vn %f %f %f", 
-		      &tmp[0], &tmp[1], &tmp[2]) == 3) {
-      // Make a new normal
-      float *nn = new sgVec3;
-      sgCopyVec3( nn, tmp );
-      n.push_back( nn );
-      normals++;
-    } else if (strncmp(lbuffer, "tf ", 3) == 0) {
-      // Triangle fan
-      list<int> vertex_indices;
-      int c = 3;
-      while ( lbuffer[c] != 0 ) {
-	while (lbuffer[c]==' ') c++;
-	sscanf( lbuffer + c, "%d/%d", &i1, &i2 );
+  while ( (gzgets(tf, lbuffer, 4096) != Z_NULL) ) {
+    switch (lbuffer[0]) {
+    case '#': {
+      token = strtok(lbuffer+1, delimiters);
 
-	if (i1 >= verts || i1 >= normals) {
-	  fprintf(stderr, "Tile \"%s\" contains triangle indices out of " \
-		  "bounds.\n", tile_name);
-	  vertex_indices.clear();
-	  break;
+      if ( strcmp(token, "gbs") == 0 ) {
+	for (int i = 0; i < 3; i++) {
+	  token = strtok(NULL, delimiters);
+	  gbs[i] = atof(token);
 	}
-
-	vertex_indices.push_back( i1 );
-	while (lbuffer[c] != ' ' && lbuffer[c] != 0) c++;
-      }
-
-      if ( !vertex_indices.empty() ) {
-	draw_trifan( vertex_indices, v, n, material );
-	polys++;
-      }
-    } else if (sscanf(lbuffer, "# usemtl %s", mtl) == 1) {
-      int i;
-      for (i = 0; i < 16 && strcmp(mtl, materials[i]) != 0; i++);
-      if (i<16) {
-	material = colours[i];
-      } else {
-	//printf("unknown material = %s\n", mtl);
-	material = colours[2];
+      } else if ( strcmp(token, "usemtl") == 0 ) {
+	token = strtok(NULL, delimiters);
+	StrMap::iterator mat_it = materials.find(token);
+	
+	if (mat_it == materials.end()) {
+	  material = -1;  // unknown material
+	} else {
+	  material = (*mat_it).second;
+	}
       }
     }
+    break;
+
+    case 'v': {
+      if (lbuffer[1] == 'n') {
+	// Make a new normal
+	float *nn = new sgVec3;
+
+	token = strtok(lbuffer+2, delimiters);
+	for (int i = 0; i < 3; i++) {
+	  nn[i] = atof(token);
+	  token = strtok(NULL, delimiters);
+	}
+
+	n.push_back( nn );
+	normals++;
+      } else if (lbuffer[1] == ' ') {
+	float *nv = new sgVec3;
+	token = strtok(lbuffer+2, delimiters);
+	for (int i = 0; i < 3; i++) {
+	  tmp[i] = atof(token);
+	  token = strtok(NULL, delimiters);
+	}
+
+	sgAddVec3(tmp, gbs);
+	double pr = sgLengthVec3( tmp );
+	ab_xy( tmp, xyz, nv );
+	// nv[2] contains the sea-level z-coordinate - calculate this vertex'
+	// altitude:
+	nv[2] = pr - nv[2];
+	v.push_back( nv );
+	verts++;
+      }
+    }
+    break;
+
+    case 't': {
+      if (strncmp(lbuffer, "tf ", 3) == 0) {
+	// Triangle fan
+	list<int> vertex_indices;
+
+	token = strtok(lbuffer+2, " /");
+	while ( token != NULL ) {
+	  i1 = atoi(token);
+	  token = strtok(NULL, delimiters);
+	  i2 = atoi(token);
+
+	  if (i1 >= verts || i1 >= normals) {
+	    fprintf(stderr, "Tile \"%s\" contains triangle indices out of " \
+		    "bounds.\n", tile_name);
+	    vertex_indices.clear();
+	    break;
+	  }
+	  
+	  vertex_indices.push_back( i1 );
+	  token = strtok(NULL, " /");
+	}
 	
+	if ( !vertex_indices.empty() ) {
+	  draw_trifan( vertex_indices, v, n, material );
+	  polys++;
+	}
+      }
+    }
+    break;
+    }	
   }
 
   gzclose( tf );
@@ -512,3 +522,69 @@ int MapMaker::process_directory( char *path, int plen, int lat, int lon,
   return 1;
 }
 
+void MapMaker::read_materials() {
+  char* fgroot = getFGRoot();
+  char* filename = new char[strlen(fgroot) + 32];
+  strcpy(filename, fgroot);
+  strcat(filename, "/AtlasPalette");
+
+  FILE *fd = fopen(filename, "r");
+  if (fd == NULL) {
+    fprintf(stderr, "Could not read palette from file \"%s\".\n" \
+	    "Perhaps you forgot to copy it from Atlas/src/AtlasPalette\n" \
+	    "to your FlightGear root-directory?\n", filename);
+    return;
+  }
+
+  palette.reserve(16);
+
+  char line[256], *token, delimiters[] = " \t", *material;
+  int index;
+  float* colour;
+  fgets(line, 256, fd);
+
+  while ( !feof(fd) ) {
+    switch (line[0]) {
+    case '#':       // comment, ignore
+      break;
+    case 'C':
+    case 'c':
+      token = strtok(line, delimiters); // "Colour"
+      token = strtok(NULL, delimiters); // index
+      index = atoi(token);
+
+      colour = new sgVec4;
+      for (int i = 0; i < 4; i++) {
+	token = strtok(NULL, delimiters);
+	colour[i] = atof(token);
+      }
+      palette[index] = colour;
+
+      break;
+
+    case 'M':
+    case 'm':
+      token = strtok(line, delimiters); // "Material"
+
+      token = strtok(NULL, delimiters); // material name
+      material = new char[strlen(token)+1];
+      strcpy(material, token);
+
+      token = strtok(NULL, delimiters); // index
+      index = atoi(token);
+
+      materials[material] = index;
+
+      break;
+
+    default:
+      printf("Syntax error in file \"%s\". Line:\n\t%s\n", filename, line);
+      break;
+    }
+
+    fgets(line, 256, fd);
+  }
+
+  fclose(fd);
+  delete filename;
+}
