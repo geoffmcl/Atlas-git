@@ -516,7 +516,6 @@ int main( int argc, char **argv ) {
     }
     
     // Check that the path to store the images exists
-    cout << "outp = " << outp << '\n';
     dir1 = ulOpenDir(outp);
     if(NULL == dir1) {
       fg_mkdir((const char*)outp);
