@@ -32,19 +32,10 @@ const float rpol = 6356752.314;      // earth radius, polar   (?)
   (translated more or less directly from Alexei Novikovs perl original)
 *************************************************************************/
 
+//Returns Earth radius at a given latitude (Ellipsoide equation with two equal axis)
 inline float earth_radius_lat( float lat ) {
   return 1.0f / sqrt( cos(lat)/rec  * cos(lat)/rec +
 		      sin(lat)/rpol * sin(lat)/rpol );
-}
-
-inline float earth_radius_xy( sgVec3 v ) {
-  float xy = sqrt( v[0]*v[0] + v[1]*v[1] );
-  float r =  sqrt( xy*xy     + v[2]*v[2] );
-  float s_lat = v[2] / r;
-  float c_lat = xy / r;
-
-  return 1.0f / sqrt( c_lat/rec   * c_lat/rec +
-		      s_lat/rpol + s_lat/rpol );
 }
 
 inline void ab_xy( sgVec3 xyz, sgVec3 ref, sgVec3 dst) {
@@ -52,7 +43,7 @@ inline void ab_xy( sgVec3 xyz, sgVec3 ref, sgVec3 dst) {
   float r  = sqrt( xy*xy           + xyz[2]*xyz[2] );
   float s_lat = xyz[2] / r;
   float c_lat = xy / r;
-  
+
   dst[2] = 1.0f / sqrt( c_lat/rec  * c_lat/rec +
 			s_lat/rpol * s_lat/rpol );
 
@@ -64,7 +55,10 @@ inline void ab_xy( sgVec3 xyz, sgVec3 ref, sgVec3 dst) {
 
 inline void ab_lat( float lat, float lon, float lat_r, float lon_r,
 		    sgVec3 dst ) {
-  dst[2] = earth_radius_lat( lat );
+/*  dst[2] = rec;
+  dst[0] = dst[2] * (lon-lon_r);
+  dst[1] = dst[2] * (lat-lat_r); Playing with projections -- molv */
+  dst[2] = earth_radius_lat( lat_r );
   dst[0] = dst[2] * cos(lat)*(lon-lon_r);   // even Alexei wasn't sure here :-)
   dst[1] = dst[2] * (lat-lat_r);
 }
@@ -96,7 +90,7 @@ inline void lat_ab( float a, float b, float lat_r, float lon_r,
 
   float r = earth_radius_lat( lat_r );
   *lat = lat_r + b / r;
-  geod_geoc( *lat, &s, &c );
+  geod_geoc( lat_r, &s, &c );
   *lon = lon_r + a/(c*r);
 }
 
