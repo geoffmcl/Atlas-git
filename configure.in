@@ -6,7 +6,7 @@ dnl $Id$
 AC_INIT(src/Atlas.cxx)
 
 dnl Initialize the automake stuff
-AM_INIT_AUTOMAKE(Atlas, 0.0.0)
+AM_INIT_AUTOMAKE(Atlas, 0.1.0)
 
 dnl Checks for programs.
 AC_PROG_MAKE_SET

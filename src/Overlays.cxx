@@ -356,7 +356,7 @@ void Overlays::draw_vor( NAV *n, sgVec2 p ) {
   //output->drawLine(p, p2);
 
   // if this nav is selected, draw radial
-  if ( fabs( n->freq - nav1_freq ) < FG_EPSILON ) {
+  if ( fabs( n->freq - nav1_freq ) < SG_EPSILON ) {
       sgVec2 end;
       sgSetVec2( end,
 		 p[0] + sin(nav1_rad + n->magvar) * 500,
@@ -369,7 +369,7 @@ void Overlays::draw_vor( NAV *n, sgVec2 p ) {
       output->setColor( static_vor_to_color );
       output->drawLine(p, end);
   }
-  if ( fabs( n->freq - nav2_freq ) < FG_EPSILON ) {
+  if ( fabs( n->freq - nav2_freq ) < SG_EPSILON ) {
       sgVec2 end;
       sgSetVec2( end,
 		 p[0] + sin(nav2_rad + n->magvar) * 500,
@@ -556,14 +556,14 @@ void Overlays::load_navaids() {
 
 	n->lat *= SG_DEGREES_TO_RADIANS;
 	n->lon *= SG_DEGREES_TO_RADIANS;
-	elev *= FEET_TO_METER;
+	elev = (int) ( elev * SG_FEET_TO_METER );
 
 	if ( strcmp( sMagVar, "XXX" ) == 0 ) {
 	    // no magvar specified, calculate our own
 	    n->magvar = sgGetMagVar(n->lon, n->lat, elev, time_params->getJD());
 	} else {
-	    n->magvar = ( (sMagVar[0] - '0') * 10 + (sMagVar[1] - '0') );
-	    n->magvar *= DEG_TO_RAD;
+	    n->magvar = ( (sMagVar[0] - '0') * 10.0f + (sMagVar[1] - '0') );
+	    n->magvar *= SG_DEGREES_TO_RADIANS;
 	    if ( sMagVar[2] == 'W' ) {
 		n->magvar = -n->magvar;
 	    }
@@ -621,4 +621,43 @@ void Overlays::load_fixes() {
   delete navname;
   gzclose(fix);
   fixes_loaded = true;
+}
+
+Overlays::ARP *Overlays::findAirport( const char *name ) {
+  for (ARP **i = airports.begin(); i < airports.end(); i++) {
+    if ( strcmp( (*i)->name, name ) == 0 ) {
+      return *i;
+    }
+  }
+
+  return NULL;
+}
+
+Overlays::NAV *Overlays::findNav( const char *name ) {
+  for (NAV **i = navaids.begin(); i < navaids.end(); i++) {
+    if ( strcmp( (*i)->name, name ) == 0 ) {
+      return *i;
+    }
+  }
+
+  return NULL;
+}
+
+Overlays::NAV *Overlays::findNav( float lat, float lon, float freq ) {
+  NAV   *closest = NULL;
+  float closest_dist = 1e12f;
+
+  for (NAV **i = navaids.begin(); i < navaids.end(); i++) {
+    if ( fabs(freq - (*i)->freq) < 0.01f ) {
+      // ugly distance metric -- could (should?) be replaced by
+      // great circle distance, but works ok for now
+      float dist = fabs(lat - (*i)->lat) + fabs(lon - (*i)->lon);
+      if (dist < closest_dist) {
+	closest_dist = dist;
+	closest = *i;
+      }
+    }
+  }
+
+  return closest;
 }

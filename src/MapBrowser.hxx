@@ -57,7 +57,8 @@ public:
   inline float getSize()  { return view_size; }
   inline int getFeatures() { return features; }
   inline bool getTextured() { return textured; }
-  inline FlightTrack* getFlightTrack() { return track; }
+  inline FlightTrack* getFlightTrack() { return track;   }
+  inline Overlays*    getOverlays()    { return overlay; }
 
   void loadDb();
   void draw();

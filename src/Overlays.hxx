@@ -98,7 +98,6 @@ public:
   void load_fixes();
   void drawOverlays();
 
-protected:
   // Aiport & Navaid databases
   struct RWY {
     float lat, lon, hdg;
@@ -118,6 +117,12 @@ protected:
     NavType navtype;
     float lat, lon, freq, magvar;
   };
+
+  ARP* findAirport( const char* name );
+  NAV* findNav    ( const char* name );
+  NAV* findNav    ( float lat, float lon, float freq );
+
+protected:
 
   static vector<ARP*> airports;
   static vector<NAV*> navaids;

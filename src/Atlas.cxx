@@ -74,7 +74,7 @@ MapBrowser *map_object;
 FlightTrack *track = NULL;
 
 bool parse_nmea(char *buf) {
-    cout << "parsing atlas message = " << buf << endl;
+  //  cout << "parsing nmea message = " << buf << endl;
 
     string msg = buf;
     //msg = msg.substr( 0, length );
@@ -364,9 +364,11 @@ bool parse_nmea(char *buf) {
 	    cout << "  adf_freq = " << adf_freq_str << endl;
 
 	    nav1_freq = atof( nav1_freq_str.c_str() );
-	    nav1_rad =  atof( nav1_rad_str.c_str() ) * DEG_TO_RAD;
+	    nav1_rad =  atof( nav1_rad_str.c_str() ) * 
+	      SGD_DEGREES_TO_RADIANS;
 	    nav2_freq = atof( nav2_freq_str.c_str() );
-	    nav2_rad =  atof( nav2_rad_str.c_str() ) * DEG_TO_RAD;
+	    nav2_rad =  atof( nav2_rad_str.c_str() ) * 
+	      SGD_DEGREES_TO_RADIANS;
 	    adf_freq =  atof( adf_freq_str.c_str() );
 	}
 
