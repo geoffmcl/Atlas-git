@@ -77,8 +77,8 @@ int main( int argc, char **argv ) {
       // do nothing
     } else if ( sscanf(argv[arg], "--size=%d", &param) == 1 ) {
       mapobj.setSize( param );
-    } else if ( sscanf(argv[arg], "--scale=%d", &param) == 1 ) {
-      mapobj.setScale( param * 1000 );
+    } else if ( sscanf(argv[arg], "--scale=%f", &x) == 1 ) {
+      mapobj.setScale( (int)(x * 1000.0f) );
     } else if ( sscanf(argv[arg], "--light=%f, %f, %f", &x, &y, &z) == 3 ) {
       mapobj.setLight( x, y, z );
     } else if ( sscanf(argv[arg], "--airport-filter=%s", cparam) == 1 ) {
