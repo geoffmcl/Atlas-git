@@ -29,7 +29,8 @@
 #include "Geodesy.hxx"
 
 bool Overlays::airports_loaded = false;
-bool Overlays::navaids_loaded = false;
+bool Overlays::navaids_loaded  = false;
+bool Overlays::fixes_loaded    = false;
 vector<Overlays::ARP*> Overlays::airports;
 vector<Overlays::NAV*> Overlays::navaids;
 
@@ -261,6 +262,7 @@ void Overlays::airport_labels(float theta, float alpha,
 void Overlays::draw_navaids( float theta, float alpha, 
 			     float dtheta, float dalpha ) {
   load_navaids();
+  load_fixes();
 
   bool save_shade = output->getShade();
   output->setShade(false);
@@ -284,6 +286,9 @@ void Overlays::draw_navaids( float theta, float alpha,
 	break;
       case NAV_NDB:
 	draw_ndb(n, p);
+	break;
+      case NAV_FIX:
+	draw_fix(n, p);
 	break;
       }
     }
@@ -346,6 +351,27 @@ void Overlays::draw_vor( NAV *n, sgVec2 p ) {
   if (features & OVERLAY_IDS) output->drawText( p, n->id );
   p[1] += 10;
   if (features & OVERLAY_ANY_LABEL) output->drawText( p, freqbuf );
+}
+
+void Overlays::draw_fix( NAV *n, sgVec2 p ) {
+  static const float SIZE = 10.0f;
+  static const sgVec2 side1 = {SIZE/2 , -SIZE/1.41};
+  static const sgVec2 side2 = {-SIZE  , 0.0f};
+  static const sgVec2 side3 = {SIZE/2 , SIZE/1.41};
+
+  output->setColor( nav_color );
+  sgVec2 c1, c2;
+  sgCopyVec2(c1, p);
+  c1[0] -= SIZE / 2; c1[1] += SIZE / 2;
+  sgAddVec2(c2, c1, side1);
+  output->drawLine(c1, c2);
+  sgAddVec2(c1, c2, side2);
+  output->drawLine(c2, c1);
+  sgAddVec2(c2, c1, side3);
+  output->drawLine(c1, c2);
+
+  p[0] += SIZE/2; p[1] -= 4;
+  if (features & OVERLAY_ANY_LABEL) output->drawText( p, n->name );
 }
 
 /* Loads the airport database if it isn't already loaded
@@ -501,6 +527,48 @@ void Overlays::load_navaids() {
       n = NULL;
     }
   }
-  
+
+  gzclose(nav);
+  delete navname;
+ 
   navaids_loaded = true;
+}
+
+void Overlays::load_fixes() {
+  char *navname = new char[strlen(fg_root) + 512];
+  char line[256];
+
+  if (fixes_loaded)
+    return;
+  
+  strcpy( navname, fg_root );
+  strcat( navname, "/Navaids/default.fix.gz" );
+
+  gzFile fix;
+
+  fix = gzopen( navname, "rb" );
+  if (fix == NULL) {
+    fprintf( stderr, "load_fixes: Couldn't open \"%s\" .\n", navname );
+    return;
+  }
+
+  NAV *n = NULL;
+  while (!gzeof(fix)) {
+    if (n == NULL)
+      n = new NAV;
+    
+    gzgets( fix, line, 256 );
+    if ( sscanf(line, "%s %f %f", &n->name, &n->lat, &n->lon) == 3 ) {
+      strcpy(n->id, n->name);
+      n->navtype = NAV_FIX;
+      n->lat *= SG_DEGREES_TO_RADIANS;
+      n->lon *= SG_DEGREES_TO_RADIANS;
+      navaids.push_back(n);
+      n = NULL;
+    }
+  }
+
+  delete navname;
+  gzclose(fix);
+  fixes_loaded = true;
 }

@@ -44,7 +44,7 @@ public:
   MapMaker( char *fg_root = "/usr/local/lib/FlightGear", 
 	    char *ap_filter = NULL, 
 	    int features = DO_SHADE | DO_AIRPORTS | DO_NAVAIDS,
-	    int size = 512, int scale = 100000 );
+	    int size = 256, int scale = 100000 );
 
   inline void setFGRoot( char *path ) { fg_root = path; }
   inline void setAPFilter( char *filter ) { arp_filter = filter; }

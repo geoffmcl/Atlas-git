@@ -360,6 +360,7 @@ int MapMaker::process_file( char *tile_name, float x, float y, float z ) {
 
   if (tf == NULL) {
     fprintf( stderr, "process_file: Couldn't open \"%s\".\n", tile_name );
+    exit(1);
     return 0;
   }
 
@@ -372,9 +373,7 @@ int MapMaker::process_file( char *tile_name, float x, float y, float z ) {
 
   modified = true;
 
-  while (!gzeof(tf)) {
-    gzgets( tf, lbuffer, 4096 );
-        
+  while ( (gzgets(tf, lbuffer, 4096) != Z_NULL) ) {      
     if ( sscanf(lbuffer, "# gbs %f %f %f %f", &cx, &cy, &cz, &cr) == 4 ) {
       /* do nothing */
     } else if (sscanf(lbuffer, "v %f %f %f", &f1, &f2, &f3) == 3) {
@@ -437,8 +436,12 @@ int MapMaker::process_file( char *tile_name, float x, float y, float z ) {
 
   gzclose( tf );
 
-  for (unsigned int i = 0; i < v.size(); i++) {
+  unsigned int i;
+  for (i = 0; i < v.size(); i++) {
     delete v[i];
+  }
+  for (i = 0; i < n.size(); i++) {
+    delete n[i];
   }
 
   return 1;

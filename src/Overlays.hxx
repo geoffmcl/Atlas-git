@@ -38,10 +38,11 @@ class Overlays {
 public:
   static const int OVERLAY_AIRPORTS    = 1 << 0;
   static const int OVERLAY_NAVAIDS     = 1 << 1;
-  static const int OVERLAY_FLIGHTTRACK = 1 << 2;
-  static const int OVERLAY_GRIDLINES   = 1 << 3;
-  static const int OVERLAY_NAMES       = 1 << 4;
-  static const int OVERLAY_IDS         = 1 << 5;
+  static const int OVERLAY_FIXES       = 1 << 2;
+  static const int OVERLAY_FLIGHTTRACK = 1 << 3;
+  static const int OVERLAY_GRIDLINES   = 1 << 4;
+  static const int OVERLAY_NAMES       = 1 << 5;
+  static const int OVERLAY_IDS         = 1 << 6;
   static const int OVERLAY_ANY_LABEL   = OVERLAY_NAMES | OVERLAY_IDS;
 
   //  Overlays();
@@ -88,6 +89,7 @@ public:
 
   void load_airports();
   void load_navaids();
+  void load_fixes();
   void drawOverlays();
 
 protected:
@@ -103,17 +105,17 @@ protected:
     list<RWY*> rwys;
   };
 
-  enum NavType { NAV_VOR, NAV_DME, NAV_NDB };
+  enum NavType { NAV_VOR, NAV_DME, NAV_NDB, NAV_FIX };
 
   struct NAV {
-    char name[64], id[5];
+    char name[64], id[6];
     NavType navtype;
     float lat, lon, freq, magvar;
   };
 
   static vector<ARP*> airports;
   static vector<NAV*> navaids;
-  static bool airports_loaded, navaids_loaded;
+  static bool airports_loaded, navaids_loaded, fixes_loaded;
   static const float dummy_normals[][3];
 
   void airport_labels(float theta, float alpha, 
@@ -124,6 +126,7 @@ protected:
 		    float dtheta, float dalpha);
   void draw_ndb( NAV *n, sgVec2 p );
   void draw_vor( NAV *n, sgVec2 p );
+  void draw_fix( NAV *n, sgVec2 p );
   void draw_flighttrack();
   void draw_gridlines( float dtheta, float dalpha, float spacing );
 

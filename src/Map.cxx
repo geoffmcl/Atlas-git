@@ -163,8 +163,8 @@ void print_help() {
   printf("  --airport-filter=string Display only airports with id beginning 'string'\n");
   printf("  --output=name           Write output to given file name (default 'map.png')\n");
   printf("  --fgroot=path           Overrides FG_ROOT environment variable\n");
-  printf("  --disable-airports      Don't show airports\n");
-  printf("  --disable-navaids       Don't show navaids\n");
+  printf("  --enable-airports       Show airports\n");
+  printf("  --enable-navaids        Show navaids\n");
   printf("  --flat-shading          Don't do nice shading of the terrain\n");
   printf("  --atlas=path            Create maps of all scenery, and store them in path\n");
   printf("  --verbose               Display information during processing\n");
@@ -174,7 +174,7 @@ void print_help() {
 
 int main( int argc, char **argv ) {
   // variables for command line parsing
-  int param, features = map.getFeatures();
+  int param, features = MapMaker::DO_SHADE;
   float x, y, z;
   char cparam[128];
 
@@ -199,10 +199,10 @@ int main( int argc, char **argv ) {
       outp = strdup(cparam);
     } else if ( sscanf(argv[arg], "--fgroot=%s", cparam) == 1 ) {
       map.setFGRoot( strdup(cparam) );
-    } else if ( strcmp(argv[arg], "--disable-airports" ) == 0 ) {
-      features &= ~MapMaker::DO_AIRPORTS;
-    } else if ( strcmp(argv[arg], "--disable-navaids" ) == 0 ) {
-      features &= ~MapMaker::DO_NAVAIDS;
+    } else if ( strcmp(argv[arg], "--enable-airports" ) == 0 ) {
+      features &= MapMaker::DO_AIRPORTS;
+    } else if ( strcmp(argv[arg], "--enable-navaids" ) == 0 ) {
+      features &= MapMaker::DO_NAVAIDS;
     } else if ( strcmp(argv[arg], "--flat-shading" ) == 0 ) {
       smooth_shade = false;
     } else if ( strcmp(argv[arg], "--autoscale") == 0 ) {
@@ -219,6 +219,10 @@ int main( int argc, char **argv ) {
     } else if ( strcmp(argv[arg], "--help") == 0 ) {
       print_help();
       exit(0);
+    } else if ( strcmp(argv[arg], "--disable-airports" ) == 0 ) {
+      // Do nothing - only for backwards compatibility
+    } else if ( strcmp(argv[arg], "--disable-navaids" ) == 0 ) {
+      // Do nothing - only for backwards compatibility
     } else {
       fprintf(stderr, "%s: unknown argument '%s'.\n", argv[0], argv[arg]);
       print_help();

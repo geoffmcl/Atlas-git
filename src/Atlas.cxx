@@ -842,10 +842,11 @@ int main(int argc, char **argv) {
 
   mapsize = (float)( (width>height)?width:height );
   map = new MapBrowser( 0.0f, 0.0f, mapsize, 
-			Overlays::OVERLAY_AIRPORTS | 
-			Overlays::OVERLAY_NAVAIDS |
+			Overlays::OVERLAY_AIRPORTS  | 
+			Overlays::OVERLAY_NAVAIDS   |
+			Overlays::OVERLAY_FIXES     |
 			Overlays::OVERLAY_GRIDLINES | 
-			Overlays::OVERLAY_NAMES |
+			Overlays::OVERLAY_NAMES     |
 			Overlays::OVERLAY_FLIGHTTRACK,
 			NULL, textureFonts );
   map->setTextured(true);
