@@ -2,7 +2,8 @@
 #include <png.h>
 #include "OutputGL.hxx"
 
-OutputGL::OutputGL( char *filename, int size, bool useTexturedFont ) : 
+OutputGL::OutputGL( char *filename, int size, bool smooth_shading, 
+		    bool useTexturedFont ) : 
   GfxOutput::GfxOutput(filename, size), filename(filename), 
   useTexturedFont(useTexturedFont)
 {
@@ -15,6 +16,9 @@ OutputGL::OutputGL( char *filename, int size, bool useTexturedFont ) :
 
   glEnable(GL_BLEND);
   glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
+
+  glEnable(GL_LIGHTING);
+  glShadeModel(smooth_shading?GL_SMOOTH:GL_FLAT);
 
   if (useTexturedFont) {
     font = new fntTexFont( "data/helvetica_medium.txf" );
@@ -98,8 +102,32 @@ void OutputGL::closeOutput() {
   return;           
 }
 
+void OutputGL::setShade( bool shade ) {
+  if (shade) {
+    glEnable( GL_LIGHTING );
+  } else {
+    glDisable( GL_LIGHTING );
+  }
+
+  this->shade = shade;
+}
+
+bool OutputGL::getShade() {
+  return shade;
+}
+
+void OutputGL::setLightVector( sgVec3 light ) {
+  GLfloat white[] = {BRIGHTNESS, BRIGHTNESS, BRIGHTNESS, 1.0f};
+
+  sgCopyVec3( light_vector, light );
+  glLightfv( GL_LIGHT0, GL_AMBIENT, white );
+  glLightfv( GL_LIGHT0, GL_DIFFUSE, white );
+  glEnable( GL_LIGHT0 );
+}
+
 void OutputGL::setColor( const float *rgba ) {
-  glColor4fv(rgba);
+  glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, rgba);
+  glColor4fv( rgba );
 }
 
 void OutputGL::clear( const float *rgb ) {
@@ -107,20 +135,20 @@ void OutputGL::clear( const float *rgb ) {
   glClear(GL_COLOR_BUFFER_BIT);
 }
 
-void OutputGL::drawTriangle( sgVec2 *p ) {
+void OutputGL::drawTriangle( const sgVec2 *p, const sgVec3 *normals ) {
   glBegin(GL_TRIANGLES);
-  glVertex2fv( p[0] );
-  glVertex2fv( p[1] );
-  glVertex2fv( p[2]);
+  glNormal3fv( normals[0] ); glVertex2fv( p[0] );
+  glNormal3fv( normals[1] ); glVertex2fv( p[1] );
+  glNormal3fv( normals[2] ); glVertex2fv( p[2]);
   glEnd();
 }
 
-void OutputGL::drawQuad( sgVec2 *p ) {
+void OutputGL::drawQuad( const sgVec2 *p, const sgVec3 *normals ) {
   glBegin(GL_QUADS);
-  glVertex2fv( p[0] );
-  glVertex2fv( p[1] );
-  glVertex2fv( p[2] );
-  glVertex2fv( p[3] );
+  glNormal3fv( normals[0] ); glVertex2fv( p[0] );
+  glNormal3fv( normals[1] ); glVertex2fv( p[1] );
+  glNormal3fv( normals[2] ); glVertex2fv( p[2] );
+  glNormal3fv( normals[3] ); glVertex2fv( p[3] );
   glEnd();
 }
 

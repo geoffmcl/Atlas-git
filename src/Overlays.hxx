@@ -114,7 +114,7 @@ protected:
   static vector<ARP*> airports;
   static vector<NAV*> navaids;
   static bool airports_loaded, navaids_loaded;
-
+  static const float dummy_normals[][3];
 
   void airport_labels(float theta, float alpha, 
 		      float dtheta, float dalpha);

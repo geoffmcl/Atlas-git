@@ -42,6 +42,7 @@
 float clat = -100.0f, clon = -100.0f;   // initialize to unreasonable values
 char *outp = "map.png";                 // output file name
 bool autoscale = false, global = false, doublebuffer = true;
+bool smooth_shade = true;
 MapMaker map;
 
 char outname[512], *scenerypath;
@@ -69,7 +70,7 @@ void redrawMap() {
 	    (clon<0.0f)?'W':'E', clon * 180.0f / M_PI);
     glutSetWindowTitle(title_buffer);
 
-    OutputGL output( outp, map.getSize() );
+    OutputGL output( outp, map.getSize(), smooth_shade );
     map.createMap( &output, clat, clon, autoscale );
     output.closeOutput();
     exit(0);
@@ -137,7 +138,7 @@ void redrawMap() {
 	    (clon<0.0f)?'W':'E', clon * 180.0f / M_PI);
     glutSetWindowTitle(title_buffer);
 
-    OutputGL output(outname, s);
+    OutputGL output(outname, s, smooth_shade);
     map.createMap( &output, clat, clon, true );
     output.closeOutput();
     if (doublebuffer) {
@@ -164,7 +165,7 @@ void print_help() {
   printf("  --fgroot=path           Overrides FG_ROOT environment variable\n");
   printf("  --disable-airports      Don't show airports\n");
   printf("  --disable-navaids       Don't show navaids\n");
-  printf("  --disable-shading       Don't do nice shading of the terrain\n");
+  printf("  --flat-shading          Don't do nice shading of the terrain\n");
   printf("  --atlas=path            Create maps of all scenery, and store them in path\n");
   printf("  --verbose               Display information during processing\n");
   printf("  --singlebuffer          Use single buffered display.\n\n");
@@ -201,8 +202,8 @@ int main( int argc, char **argv ) {
       features &= ~MapMaker::DO_AIRPORTS;
     } else if ( strcmp(argv[arg], "--disable-navaids" ) == 0 ) {
       features &= ~MapMaker::DO_NAVAIDS;
-    } else if ( strcmp(argv[arg], "--disable-shading" ) == 0 ) {
-      features &= ~MapMaker::DO_SHADE;
+    } else if ( strcmp(argv[arg], "--flat-shading" ) == 0 ) {
+      smooth_shade = false;
     } else if ( strcmp(argv[arg], "--autoscale") == 0 ) {
       autoscale = true;
     } else if ( strcmp(argv[arg], "--singlebuffer") == 0 ) {

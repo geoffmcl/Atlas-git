@@ -95,6 +95,13 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
   // set up coordinate space
   float x, y, z, r_e;
   xyz_lat( theta, alpha, &x, &y, &z, &r_e );
+  sgMat4 rotation_matrix;
+  sgMakeRotMat4(rotation_matrix, 
+		alpha * SG_RADIANS_TO_DEGREES,
+		0.0f,
+		theta * SG_RADIANS_TO_DEGREES);
+  sgXformVec3(light_vector, rotation_matrix);
+  output->setLightVector( light_vector );
 
   // calculate which tiles we will have to load
   float dtheta, dalpha;
@@ -158,19 +165,22 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
   return 1;
 }
 
-void MapMaker::sub_trifan( vector<int> &tri, vector<float*> &v, int index ) {
+void MapMaker::sub_trifan( vector<int> &tri, vector<float*> &v, 
+			   vector<float*> &n, int index ) {
 
   int nvert = tri[index++];      // number of vertices in trifan
   index++;                       // colour is stored here, currently discarded
   int cvert = tri[index++];      // index of central vertex
   int vert2 = tri[index++];      // the first vertex of the circumference
 
-  sgVec3 t[3];
+  sgVec3 t[3], nrm[3];
   float length2 = 0.6f * scle;
 
   // get the two first vertices
   sgCopyVec3( t[0], v[cvert]);
   sgCopyVec3( t[1], v[vert2]);
+  sgCopyVec3( nrm[0], n[cvert]);
+  sgCopyVec3( nrm[1], n[vert2]);
 
   // now loop over each triangle in the fan
   for (int i = 2; i < nvert; i++) {
@@ -178,6 +188,7 @@ void MapMaker::sub_trifan( vector<int> &tri, vector<float*> &v, int index ) {
 
     // get third vertex
     sgCopyVec3( t[2], v[vert2] );
+    sgCopyVec3( nrm[2], n[vert2] );
     
     // check wether this triangle is visible (?)
     if (fabs(t[0][0]) < length2 || fabs(t[0][1]) < length2 ||
@@ -187,6 +198,8 @@ void MapMaker::sub_trifan( vector<int> &tri, vector<float*> &v, int index ) {
       int ctimes = 0, max_ctimes = 0;
       int times[3], order[3], oind[3];
       float levels[ELEV_LEVELS][4];
+      sgVec3 normal[ELEV_LEVELS][2];
+
       for (int k = 0; k < ELEV_LEVELS; k++) { 
 	levels[k][0] = 0.0f; levels[k][1] = 0.0f; 
 	levels[k][2] = 0.0f; levels[k][3] = 0.0f;
@@ -203,8 +216,9 @@ void MapMaker::sub_trifan( vector<int> &tri, vector<float*> &v, int index ) {
 	if (ctimes > 0) {
 	  float lx, ly;
 	  int lh;
-	  level_triangle( (float*)&t[j], (float*)&t[next], ctimes, 
-			  &lx, &ly, &lh );
+	  sgVec3 dummy_normal;
+	  level_triangle( (float*)&t[j], (float*)&t[next], nrm[j], nrm[next], 
+			  ctimes, &lx, &ly, dummy_normal, &lh );
 
 	  order[j] = elev_height[lh];
 	  if (ctimes > max_ctimes) max_ctimes = ctimes;
@@ -234,8 +248,9 @@ void MapMaker::sub_trifan( vector<int> &tri, vector<float*> &v, int index ) {
 	  for (int k = times[idx]; k > 0; k--) {
 	    float lx, ly;
 	    int lh;
-	    level_triangle( (float*)&t[idx], (float*)&t[next], k,
-			    &lx, &ly, &lh );
+	    sgVec3 lnormal;
+	    level_triangle( (float*)&t[idx], (float*)&t[next], 
+			    nrm[idx], nrm[next], k, &lx, &ly, lnormal, &lh );
 	    int pmin = (t[idx][2] < t[next][2]) ? idx : next;
 	    
 	    if (levels[lh][2] != 0.0f) {
@@ -243,16 +258,8 @@ void MapMaker::sub_trifan( vector<int> &tri, vector<float*> &v, int index ) {
 	      int ecol = lh + 1;
 	      float sh;
 
-	      if (getShade()) {
-		sh = shade(t);
-	      } else
-		sh = 1.0f;
-
-	      float quadcol[4] = { rgb[ecol][0] * sh, 
-				   rgb[ecol][1] * sh,
-				   rgb[ecol][2] * sh, 
-				   1.0f };
 	      sgVec2 quadverts[4];
+	      sgVec3 quadnorms[4];
 	      sgSetVec2( quadverts[0], 
 			 scale(levels[lh][2], size, zoom), 
 			 scale(levels[lh][3], size, zoom) );
@@ -264,14 +271,20 @@ void MapMaker::sub_trifan( vector<int> &tri, vector<float*> &v, int index ) {
 	      sgSetVec2( quadverts[3],
 			 scale(t[pmin][0], size, zoom), 
 			 scale(t[pmin][1], size, zoom) );
+	      sgCopyVec3(quadnorms[0], normal[lh][1]);
+	      sgCopyVec3(quadnorms[1], normal[lh][0]);
+	      sgCopyVec3(quadnorms[2], lnormal);
+	      sgCopyVec3(quadnorms[3], nrm[pmin]);
 
-	      output->setColor(quadcol);
-	      output->drawQuad(quadverts);
+	      output->setColor(rgb[ecol]);
+	      output->drawQuad(quadverts, quadnorms);
 	    } else {
 	      levels[lh][0] = lx;
 	      levels[lh][1] = ly;
 	      levels[lh][2] = t[pmin][0];
 	      levels[lh][3] = t[pmin][1];
+	      sgCopyVec3(normal[lh][0], lnormal);
+	      sgCopyVec3(normal[lh][1], nrm[pmin]);
 	    }
 	  }
 	} 
@@ -279,20 +292,24 @@ void MapMaker::sub_trifan( vector<int> &tri, vector<float*> &v, int index ) {
     }
 
     sgCopyVec3( t[1], t[2] );
+    sgCopyVec3( nrm[1], nrm[2] );
   }
 }
 
-void MapMaker::draw_trifan( vector<int> &tri, vector<float*> &v, int index ) {
+void MapMaker::draw_trifan( vector<int> &tri, vector<float*> &v, 
+			    vector<float*> &n, int index ) {
   int startindex = index;
   int nvert = tri[index++];
   int col   = tri[index++];
   int cvert = tri[index++], vert2 = tri[index++];
 
-  sgVec3 t[3];
+  sgVec3 t[3], nrm[3];
   sgVec2 p[3];
 
   sgCopyVec3( t[0], v[cvert] );
   sgCopyVec3( t[1], v[vert2] );
+  sgCopyVec3( nrm[0], n[cvert] );
+  sgCopyVec3( nrm[1], n[vert2] );
   sgSetVec2( p[0], scale(t[0][0], size, zoom), scale(t[0][1], size, zoom) );
   sgSetVec2( p[1], scale(t[1][0], size, zoom), scale(t[1][1], size, zoom) );
 
@@ -300,6 +317,7 @@ void MapMaker::draw_trifan( vector<int> &tri, vector<float*> &v, int index ) {
     vert2 = tri[index++];
 
     sgCopyVec3( t[2], v[vert2] );
+    sgCopyVec3( nrm[2], n[vert2] );
     sgSetVec2( p[2], scale(t[2][0], size, zoom), scale(t[2][1], size, zoom) );
 
     if (col == 12 || col == 13) {
@@ -312,27 +330,18 @@ void MapMaker::draw_trifan( vector<int> &tri, vector<float*> &v, int index ) {
       } else {
 	dcol = elev2colour((int)((t[0][2] + t[1][2] + t[2][2]) / 3.0f));
       }
-      if (getShade()) {
-	float sh = shade(t); 
-	
-	float tcol[4] = {rgb[dcol][0] * sh,
-			 rgb[dcol][1] * sh,
-			 rgb[dcol][2] * sh,
-			 1.0f};
-	output->setColor(tcol);
-      } else {
-	output->setColor(rgb[dcol]);
-      }
+      output->setColor(rgb[dcol]);
     }
 
-    output->drawTriangle( p );
+    output->drawTriangle( p, nrm );
 
     sgCopyVec2( p[1], p[2] );
     sgCopyVec3( t[1], t[2] );
+    sgCopyVec3( nrm[1], nrm[2] );
   }
 
   if (col<0) {
-    sub_trifan( tri, v, startindex );
+    sub_trifan( tri, v, n, startindex );
   }
 }
 
@@ -342,6 +351,7 @@ int MapMaker::process_file( char *tile_name, float x, float y, float z ) {
   int scount = 0;
   int i1, i2, material = 16;
   vector<float*> v;                   // vertices
+  vector<float*> n;                   // normals
   vector<int>    tri;                 /* triangle strips/fans 
 					 (in a rather strange format) */
 
@@ -390,6 +400,12 @@ int MapMaker::process_file( char *tile_name, float x, float y, float z ) {
 					     this latitude */
       v.push_back( nv );
       verts++;
+    } else if (sscanf(lbuffer, "vn %f %f %f", &f1, &f2, &f3) == 3) {
+      // Make a new normal
+      float *nn = new sgVec3;
+      sgSetVec3( nn, f1, f2, f3 );
+      n.push_back( nn );
+      normals++;
     } else if (strncmp(lbuffer, "tf ", 3) == 0) {
       // Triangle fan
       int tcount = scount;
@@ -409,7 +425,7 @@ int MapMaker::process_file( char *tile_name, float x, float y, float z ) {
       tri[tcount] = scount - tcount - 2;        // number of vertices
       tri[tcount + 1] = material;               // stored for colouring
 
-      draw_trifan( tri, v, tcount );
+      draw_trifan( tri, v, n, tcount );
       polys++;
 
     } else if (sscanf(lbuffer, "# usemtl %s", mtl) == 1) {

@@ -27,17 +27,20 @@
 
 class GfxOutput {
 public:
-  GfxOutput( char *filename, int size );
+  GfxOutput( char *filename, int size, bool smooth_shading = true );
   virtual ~GfxOutput();
 
   inline bool isOpen() { return open; }
   inline int getSize() { return size; }
   virtual void closeOutput();
 
+  virtual void setShade( bool shade );
+  virtual bool getShade();
+  virtual void setLightVector( sgVec3 light );
   virtual void setColor( const float *rgb );
   virtual void clear( const float *rgb );
-  virtual void drawTriangle( sgVec2 *p );
-  virtual void drawQuad    ( sgVec2 *p );
+  virtual void drawTriangle( const sgVec2 *vertices, const sgVec3 *normals );
+  virtual void drawQuad    ( const sgVec2 *vertices, const sgVec3 *normals );
   virtual void drawCircle  ( sgVec2 p, int radius );
   virtual void drawLine    ( sgVec2 p1, sgVec2 p2 );
   virtual void drawText    ( sgVec2 p, char *text );

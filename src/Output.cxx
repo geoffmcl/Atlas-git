@@ -24,7 +24,8 @@
 #include <stdlib.h>
 #include "Output.hxx"
 
-GfxOutput::GfxOutput( char *filename, int size ) : size(size) {
+GfxOutput::GfxOutput( char *filename, int size, bool smooth_shading ) 
+  : size(size) {
   if (filename == NULL) {
     open = false;
   } else {
@@ -35,10 +36,13 @@ GfxOutput::GfxOutput( char *filename, int size ) : size(size) {
 GfxOutput::~GfxOutput() {}
 
 void GfxOutput::closeOutput() {}
+void GfxOutput::setShade( bool shade ) {}
+bool GfxOutput::getShade() { return false; }
+void GfxOutput::setLightVector( sgVec3 light ) {}
 void GfxOutput::setColor( const float *rgb ) {}
 void GfxOutput::clear( const float *rgb ) {}
-void GfxOutput::drawTriangle( sgVec2 *p ) {}
-void GfxOutput::drawQuad    ( sgVec2 *p ) {}
+void GfxOutput::drawTriangle( const sgVec2 *p, const sgVec3 *normals ) {}
+void GfxOutput::drawQuad    ( const sgVec2 *p, const sgVec3 *normals ) {}
 void GfxOutput::drawCircle  ( sgVec2 p, int radius ) {}
 void GfxOutput::drawLine    ( sgVec2 p1, sgVec2 p2 ) {}
 void GfxOutput::drawText    ( sgVec2 p, char *text ) {}

@@ -1,6 +1,6 @@
 #include "OutputPS.hxx"
 
-OutputPS::OutputPS( char *filename, int size ) :
+OutputPS::OutputPS( char *filename, int size, bool smooth_shading ) :
   GfxOutput::GfxOutput( filename, size ) {
   ps_file = fopen( filename, "wb" );
   
@@ -146,7 +146,7 @@ void OutputPS::setColor( const float *rgb ) {
 	   (int)(rgb[0]*255.0f), (int)(rgb[1]*255.0f), (int)(rgb[2]*255.0f) );
 }
 
-void OutputPS::drawTriangle(sgVec2 *p) {
+void OutputPS::drawTriangle(sgVec2 *p, sgVec3 *normals) {
   // do I need to draw that triangle?
   if ((quadrant(p[0]) != 3) && (quadrant(p[1]) != 3) 
       && (quadrant(p[2]) != 3)) {
@@ -170,7 +170,7 @@ void OutputPS::drawTriangle(sgVec2 *p) {
 /* Draw the PS quad (x1/y1)-(x2/y2)-(x3/x3)-(x4/x4) with the colour (r/g/b) */
 /* in the file ps_file							    */
 /****************************************************************************/
-void OutputPS::drawQuad(sgVec2 *p) {
+void OutputPS::drawQuad(sgVec2 *p, sgVec3 *normals) {
   // do I need to draw that quad?
   if ((quadrant(p[0]) != 3) && (quadrant(p[1]) != 3) && 
       (quadrant(p[2]) != 3) && (quadrant(p[3]) != 3)) {

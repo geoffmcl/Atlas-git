@@ -39,6 +39,11 @@ const float Overlays::navaid_color[4]   = {0.439, 0.271, 0.420, 0.7};
 const float Overlays::grid_color[4]     = {0.639, 0.371, 0.620, 0.3};
 const float Overlays::track_color[4]    = {0.071, 0.243, 0.427, 0.5};
 
+const float Overlays::dummy_normals[][3] = {{0.0f, 0.0f, 0.0f},
+					    {0.0f, 0.0f, 0.0f},
+					    {0.0f, 0.0f, 0.0f},
+					    {0.0f, 0.0f, 0.0f}};
+
 Overlays::Overlays( char *fg_root = NULL, float scale = 1.0f,
 		    float width = 512.0f ) :
   scale(scale) {
@@ -185,6 +190,9 @@ void Overlays::airport_labels(float theta, float alpha,
 			      float dtheta, float dalpha ) {
   load_airports();
 
+  bool save_shade = output->getShade();
+  output->setShade(false);
+
   for (ARP **i = airports.begin(); i < airports.end(); i++) {
     ARP *ap = *i;
     float cx, cy, r;
@@ -237,20 +245,25 @@ void Overlays::airport_labels(float theta, float alpha,
 
       output->setColor( arp_color1 );
       for (unsigned int k = 0; k < ap->rwys.size(); k++) {
-	output->drawQuad( outlines + k*4 );
+	output->drawQuad( outlines + k*4, dummy_normals );
       }
       output->setColor( arp_color2 );
       for (unsigned int k = 0; k < ap->rwys.size(); k++) {
-	output->drawQuad( insides + k*4 );
+	output->drawQuad( insides + k*4, dummy_normals );
       }
     }
   }
+
+  output->setShade(save_shade);
 }
 
 // Draws all navaids in the specified region
 void Overlays::draw_navaids( float theta, float alpha, 
 			     float dtheta, float dalpha ) {
   load_navaids();
+
+  bool save_shade = output->getShade();
+  output->setShade(false);
 
   for (NAV **i = navaids.begin(); i != navaids.end(); i++) {
     NAV *n = *i;
@@ -275,6 +288,8 @@ void Overlays::draw_navaids( float theta, float alpha,
       }
     }
   }
+
+  output->setShade(save_shade);
 }
 
 // Draw one specified NDB

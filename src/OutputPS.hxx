@@ -29,15 +29,15 @@
 
 class OutputPS : public GfxOutput {
 public:
-  OutputPS( char *filename, int size );
+  OutputPS( char *filename, int size, bool smooth_shading = true );
   virtual ~OutputPS();
 
   virtual void closeOutput();
 
   virtual void setColor( const float *rgb );
   virtual void clear( const float *rgb );
-  virtual void drawTriangle( sgVec2 *p );
-  virtual void drawQuad    ( sgVec2 *p );
+  virtual void drawTriangle( sgVec2 *p, sgVec3 *normals );
+  virtual void drawQuad    ( sgVec2 *p, sgVec3 *normals );
   virtual void drawCircle  ( sgVec2 p, int radius );
   virtual void drawLine    ( sgVec2 p1, sgVec2 p2 );
   virtual void drawText    ( sgVec2 p, char *text );

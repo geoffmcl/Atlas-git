@@ -106,7 +106,7 @@ protected:
   GfxOutput *output;
 
   /* some info variables */
-  int polys, verts;
+  int polys, verts, normals;
 
   inline int elev2colour( int elev ) {
     int i;
@@ -116,8 +116,8 @@ protected:
   }
 
 /****************************************************************************/
-  inline void level_triangle( sgVec3 u, sgVec3 v, int k, 
-			      float *x, float *y, int *h ) {
+  inline void level_triangle( sgVec3 u, sgVec3 v, sgVec3 un, sgVec3 vn, int k, 
+			      float *x, float *y, sgVec3 n, int *h ) {
     float min = (u[2] < v[2]) ? u[2] : v[2];
 
     int j = elev2colour( (int)min )-1;
@@ -125,6 +125,10 @@ protected:
     float t = ((float)elev_height[*h] - u[2]) / (v[2] - u[2]);
     *x = u[0] + t * (v[0] - u[0]);
     *y = u[1] + t * (v[1] - u[1]);
+    // n = un + t*(vn-un)
+    sgSubVec3(n, vn, un);
+    sgScaleVec3(n, t);
+    sgAddVec3(n, un);
   }
 
   inline float shade( sgVec3 *t ) {
@@ -139,8 +143,10 @@ protected:
     return fabs(sgScalarProductVec3( n, light_vector ));
   }
 
-  void sub_trifan( vector<int> &tri, vector<float*> &v, int index );
-  void draw_trifan( vector<int> &tri, vector<float*> &v, int index );
+  void sub_trifan( vector<int> &tri, vector<float*> &v, vector<float*> &n, 
+		   int index );
+  void draw_trifan( vector<int> &tri, vector<float*> &v, vector<float*> &n,
+		    int index );
 
   int process_directory( char *path, int plen, int lat, int lon, 
 			 float x, float y, float z );
