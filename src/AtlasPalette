@@ -70,7 +70,7 @@ Material BuiltUpCover		15
 Material Road                   20
 Material Freeway                20
 Material Railroad               21
-# These three last are *not optional* and *must* be declared,
+# These six last are *not optional* and *must* be declared,
 # otherwise Map will crash when drawing runways/navaids
 Material RunwayOutline		14
 Material RunwayFill		9
