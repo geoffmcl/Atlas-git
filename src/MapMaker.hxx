@@ -45,8 +45,9 @@ public:
 	    char *ap_filter = NULL, 
 	    int features = DO_SHADE | DO_AIRPORTS | DO_NAVAIDS,
 	    int size = 256, int scale = 100000 );
+  ~MapMaker();
 
-  inline void setFGRoot( char *path ) { fg_root = path; }
+  void setFGRoot( char *path );
   inline void setAPFilter( char *filter ) { arp_filter = filter; }
   inline void setFeatures( int features) { this->features = features; }
   inline void setScale( int scale = 100000 ) { scle = scale; }

@@ -63,6 +63,12 @@ void reshapeMap( int width, int height ) {
 
 void redrawMap() {
   char title_buffer[256];
+  char font_name[512];
+
+  if (textured_fonts) {
+    strcpy( font_name, map.getFGRoot() );
+    strcat( font_name, "/Fonts/helvetica_medium.txf");
+  }
 
   if (!global) {
     sprintf(title_buffer, "%c%.1f %c%.1f",
@@ -70,7 +76,8 @@ void redrawMap() {
 	    (clon<0.0f)?'W':'E', clon * 180.0f / M_PI);
     glutSetWindowTitle(title_buffer);
 
-    OutputGL output( outp, map.getSize(), smooth_shade, textured_fonts );
+    OutputGL output( outp, map.getSize(), smooth_shade, 
+		     textured_fonts, font_name );
     map.createMap( &output, clat, clon, autoscale );
     output.closeOutput();
     exit(0);
@@ -138,7 +145,7 @@ void redrawMap() {
 	    (clon<0.0f)?'W':'E', clon * 180.0f / M_PI);
     glutSetWindowTitle(title_buffer);
 
-    OutputGL output(outname, s, smooth_shade, textured_fonts);
+    OutputGL output(outname, s, smooth_shade, textured_fonts, font_name);
     map.createMap( &output, clat, clon, true );
     output.closeOutput();
     if (doublebuffer) {
@@ -198,7 +205,7 @@ int main( int argc, char **argv ) {
     } else if ( sscanf(argv[arg], "--output=%s", cparam) == 1 ) {
       outp = strdup(cparam);
     } else if ( sscanf(argv[arg], "--fgroot=%s", cparam) == 1 ) {
-      map.setFGRoot( strdup(cparam) );
+      map.setFGRoot( cparam );
     } else if ( strcmp(argv[arg], "--enable-airports" ) == 0 ) {
       features |= MapMaker::DO_AIRPORTS;
     } else if ( strcmp(argv[arg], "--enable-navaids" ) == 0 ) {
@@ -289,3 +296,4 @@ int main( int argc, char **argv ) {
 
   return 0;
 }
+

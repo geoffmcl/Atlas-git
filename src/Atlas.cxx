@@ -68,6 +68,8 @@ puInput *inp_lat, *inp_lon;
 bool interface_visible = true, softcursor = false;
 char lat_str[80], lon_str[80], alt_str[80], hdg_str[80], spd_str[80];
 
+char fg_root[512] = "";
+
 MapBrowser *map_object;
 FlightTrack *track = NULL;
 
@@ -462,7 +464,11 @@ void init_gui(bool textureFonts) {
   puInit();
 
   if (textureFonts) {
-    texfont = new fntTexFont( "data/helvetica_medium.txf" );
+    char font_name[512];
+    strcpy( font_name, fg_root );
+    strcat( font_name, "/Fonts/helvetica_medium.txf" );
+
+    texfont = new fntTexFont( font_name );
     font = new puFont( texfont, 16.0f );
   } else {
     font = new puFont();
@@ -773,7 +779,7 @@ void print_help() {
 }
 
 int main(int argc, char **argv) {
-  char path[512] = "", fg_root[512] = "";
+  char path[512] = "";
   bool textureFonts = true;
   int width = 800, height = 600;
 
@@ -817,7 +823,14 @@ int main(int argc, char **argv) {
     }
   }
 
-  //printf(" udp = %s  serial = %s  baud = %s\n", port, device, baud );
+  if (fg_root[0] == 0) {
+    char *env = getenv("FG_ROOT");
+    if (env == NULL) {
+      strcpy(fg_root, "/usr/local/lib/FlightGear");
+    } else {
+      strcpy(fg_root, env);
+    }
+  }
 
   if (path[0] == 0) {
     if (fg_root[0] != 0) {
@@ -848,11 +861,10 @@ int main(int argc, char **argv) {
 			       Overlays::OVERLAY_GRIDLINES | 
 			       Overlays::OVERLAY_NAMES     |
 			       Overlays::OVERLAY_FLIGHTTRACK,
-			       NULL, textureFonts );
+			       fg_root[0] == 0 ? NULL : fg_root, 
+			       textureFonts );
   map_object->setTextured(true);
   map_object->setMapPath(path);
-  if (fg_root[0] != 0)
-    map_object->setFGRoot(fg_root);
 
   if (slaved) {
     glutTimerFunc( (int)(update*1000.0f), timer, 0 );

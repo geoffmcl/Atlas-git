@@ -27,24 +27,27 @@
 #include "Geodesy.hxx"
 #include "LoadPng.hxx"
 
+const char* MapBrowser::TXF_FONT_NAME = "/Fonts/helvetica_medium.txf";
+
 MapBrowser::MapBrowser(GLfloat left, GLfloat top, GLfloat size, int features,
-		       char *fg_root, bool texturedFonts) {
-  view_left = left;
-  view_top  = top;
-  view_size = size;
-
-  clat  = 0.0f;
-  clon  = 0.0f;
-
+		       char *fg_root, bool texturedFonts) :
+  view_left(left), view_top(top), view_size(size), features(features), 
+  texturedFonts(texturedFonts), clat(0.0f), clon(0.0f), pathl(0),
+  scle(100000)
+{
   mpath[0] = 0;
-  pathl = 0;
 
-  scle = 100000;
   zoom = view_size / scle;
-  this->features = features;
-  this->texturedFonts = texturedFonts;
 
-  output = new OutputGL( NULL, size, false, texturedFonts );
+  if (texturedFonts) {
+    font_name = new char[strlen(fg_root) + strlen(TXF_FONT_NAME) + 1];
+    strcpy(font_name, fg_root);
+    strcat(font_name, TXF_FONT_NAME);
+  } else {
+    font_name = NULL;
+  }
+
+  output = new OutputGL( NULL, size, false, texturedFonts, font_name );
   output->setShade(false);
 
   // setup overlays
@@ -57,6 +60,7 @@ MapBrowser::MapBrowser(GLfloat left, GLfloat top, GLfloat size, int features,
 }
 
 MapBrowser::~MapBrowser() {
+  delete font_name;
   delete output;
   delete overlay;
 }
@@ -84,7 +88,7 @@ void MapBrowser::setSize( GLfloat size ) {
   zoom = view_size / scle;
 
   delete output;
-  output = new OutputGL(NULL, (int)size, false, texturedFonts);
+  output = new OutputGL(NULL, (int)size, false, texturedFonts, font_name);
   overlay->setOutput( output );
   overlay->setScale( zoom );
   output->setShade(false);
@@ -97,9 +101,11 @@ void MapBrowser::setMapPath( char *path ) {
   pathl = strlen( mpath );
 }
 
+/*
 void MapBrowser::setFGRoot( char *fg_root ) {
   overlay->setFGRoot( fg_root );
 }
+*/
 
 void MapBrowser::setFeatures( int features ) {
   this->features = features;

@@ -6,7 +6,7 @@ float OutputGL::circle_x[];
 float OutputGL::circle_y[];
 
 OutputGL::OutputGL( char *filename, int size, bool smooth_shading, 
-		    bool useTexturedFont ) : 
+		    bool useTexturedFont, char *fontname ) : 
   GfxOutput::GfxOutput(filename, size), filename(filename), 
   useTexturedFont(useTexturedFont)
 {
@@ -21,10 +21,10 @@ OutputGL::OutputGL( char *filename, int size, bool smooth_shading,
   glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
 
   glEnable(GL_LIGHTING);
-  glShadeModel(smooth_shading?GL_SMOOTH:GL_FLAT);
+  glShadeModel(smooth_shading ? GL_SMOOTH : GL_FLAT);
 
   if (useTexturedFont) {
-    font = new fntTexFont( "data/helvetica_medium.txf" );
+    font = new fntTexFont( fontname );
     textRenderer.setFont( font );
     textRenderer.setPointSize( 12 );
   } else {

@@ -67,7 +67,8 @@ const int MapMaker::elev_height[ELEV_LEVELS] = {-1, 100, 200, 500, 1000, 1500,
 
 MapMaker::MapMaker( char *fg_root, char *ap_filter, int features,
 		    int size, int scale ) {
-  this->fg_root = fg_root;
+  this->fg_root = NULL;
+  setFGRoot(fg_root);
   arp_filter = ap_filter;
   this->features = features;
   this->size = size;
@@ -76,6 +77,23 @@ MapMaker::MapMaker( char *fg_root, char *ap_filter, int features,
   modified = false;
 
   setLight( -1, -1, 2 );       // default lighting
+}
+
+MapMaker::~MapMaker() {
+  delete fg_root;
+}
+
+void MapMaker::setFGRoot( char *fg_root ) {
+  delete this->fg_root;
+  if (fg_root == NULL) {
+    fg_root = getenv("FG_ROOT");
+    if (fg_root == NULL) {
+      fg_root = "/usr/local/lib/FlightGear";
+    }
+  }
+   
+  this->fg_root = new char[strlen(fg_root)];
+  strcpy(this->fg_root, fg_root);
 }
 
 int MapMaker::createMap(GfxOutput *output,float theta, float alpha, 
@@ -112,16 +130,15 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
   }
 
   int sgntheta = (theta < 0.0f) ? 1 : 0, sgnalpha = (alpha < 0.0f) ? 1 : 0;
-  int min_theta = (int)( (theta - dtheta) * SG_RADIANS_TO_DEGREES ) - sgntheta;
-  int max_theta = (int)( (theta + dtheta) * SG_RADIANS_TO_DEGREES ) - sgntheta;
-  int min_alpha = (int)( (alpha - dalpha) * SG_RADIANS_TO_DEGREES ) - sgnalpha;
-  int max_alpha = (int)( (alpha + dalpha) * SG_RADIANS_TO_DEGREES ) - sgnalpha;
-
-  // Quick & dirty fix from Rainer Emrich (thanks!)
-  if(max_alpha == 1) min_alpha = -1;
-  if(min_alpha == -2) max_alpha = 0;
-  if(max_theta == 1) min_theta = -1;
-  if(min_theta == -2) max_theta = 0;
+  // Rainer Emrich's improved code for finding map boundaries
+  int mid_theta = (int)( theta * SG_RADIANS_TO_DEGREES ) - sgntheta;
+  int mid_alpha = (int)( alpha * SG_RADIANS_TO_DEGREES ) - sgnalpha;
+  int int_dtheta = (int)( dtheta * SG_RADIANS_TO_DEGREES + 0.5f);
+  int int_dalpha = (int)( dalpha * SG_RADIANS_TO_DEGREES + 0.5f);
+  int max_theta = mid_theta + int_dtheta;
+  int min_theta = mid_theta - int_dtheta;
+  int max_alpha = mid_alpha + int_dalpha;
+  int min_alpha = mid_alpha - int_dalpha;
   
   zoom = (float)size / (float)scle;
 
@@ -139,7 +156,13 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
  
   for (int k = min_theta; k <= max_theta; k++) {
     for (int l = min_alpha; l <= max_alpha; l++) {
-      process_directory( subdir, slen, k, l, xyz );
+      if (l > 179) {
+	process_directory( subdir, slen, k, l - 360, xyz );
+      } else if (l < -180) {
+	process_directory( subdir, slen, k, l + 360, xyz );
+      } else {
+	process_directory( subdir, slen, k, l, xyz );
+      }
     }
   }
 
@@ -369,7 +392,7 @@ int MapMaker::process_file( char *tile_name, sgVec3 xyz ) {
   // read the first line
   gzgets( tf, lbuffer, 4096 );
   if ( strncmp(lbuffer, "# FGFS Scenery", 14) != 0 ) {
-    // fprintf( stderr, "not a scenery file, line = '%s'\n", lbuffer);
+    gzclose(tf);
     return 0;
   }
 
@@ -409,6 +432,7 @@ int MapMaker::process_file( char *tile_name, sgVec3 xyz ) {
 	if (i1 >= verts || i1 >= normals) {
 	  fprintf(stderr, "Tile \"%s\" contains triangle indices out of " \
 		  "bounds.\n", tile_name);
+	  vertex_indices.clear();
 	  break;
 	}
 
@@ -416,8 +440,10 @@ int MapMaker::process_file( char *tile_name, sgVec3 xyz ) {
 	while (lbuffer[c] != ' ' && lbuffer[c] != 0) c++;
       }
 
-      draw_trifan( vertex_indices, v, n, material );
-      polys++;
+      if ( !vertex_indices.empty() ) {
+	draw_trifan( vertex_indices, v, n, material );
+	polys++;
+      }
     } else if (sscanf(lbuffer, "# usemtl %s", mtl) == 1) {
       int i;
       for (i = 0; i < 16 && strcmp(mtl, materials[i]) != 0; i++);

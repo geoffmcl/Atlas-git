@@ -8,8 +8,8 @@
 
 class OutputGL : public GfxOutput {
 public:
-  OutputGL( char *filename, int size, bool smooth_shading = true,
-	    bool useTexturedFont = true );
+  OutputGL( char *filename, int size, bool smooth_shading,
+	    bool useTexturedFont, char *fontname );
   ~OutputGL();
 
   virtual void closeOutput();

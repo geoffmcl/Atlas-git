@@ -39,14 +39,14 @@ public:
   static const int CACHE_LIMIT = 2;
 
   MapBrowser( GLfloat x1, GLfloat y1, GLfloat size, int features, 
-	      char *fg_root = NULL, bool texturedFonts = true );
+	      char *fg_root, bool texturedFonts = true );
   ~MapBrowser();
 
   void setLocation( float lat, float lon );
   void setScale( float scale );
   void setSize( GLfloat size );
   void setMapPath( char *path );
-  void setFGRoot( char *fg_root );
+  //void setFGRoot( char *fg_root );
   void setFeatures( int features );
   void setTextured( bool texture = true );
   void setFlightTrack( FlightTrack *track );
@@ -73,6 +73,10 @@ protected:
     *cy = (view_size / 2 + y * zoom);
   }
 
+  static const char* TXF_FONT_NAME;
+
+  char* font_name;
+
   // viewport
   GLfloat view_left, view_top, view_size;
 
@@ -89,15 +93,6 @@ protected:
     GLfloat x, y;
     GLubyte *texbuf;
   };
-
-
-  /*
-    struct TileEq {
-    bool operator()(const Coord &t1, const Coord &t2) const {
-    return t1.lat == t2.lat && t1.lon == t2.lon;
-    }
-    };
-  */
 
   struct TileLess {
     size_t operator()(const Coord &v1, const Coord &v2) const {
