@@ -421,7 +421,7 @@ bool InitPbuffer() {
     GLX_PRESERVED_CONTENTS, True,
     0
   };
-  GLXPbufferSGIX pBuffer = glXCreatePbuffer(dpy, cfg[0], attrlist);
+  GLXPbuffer pBuffer = glXCreatePbuffer(dpy, cfg[0], attrlist);
   GLXContext cx = glXCreateNewContext(dpy, cfg[0], GLX_RGBA_TYPE, 0, GL_TRUE);
   bool cur_ok = glXMakeContextCurrent(dpy, pBuffer, pBuffer, cx);
   if(cur_ok) {
