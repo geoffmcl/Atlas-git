@@ -773,7 +773,7 @@ void print_help() {
 }
 
 int main(int argc, char **argv) {
-  char path[512] = "./", fg_root[512] = "\0";
+  char path[512] = "", fg_root[512] = "";
   bool textureFonts = true;
   int width = 800, height = 600;
 
@@ -820,9 +820,14 @@ int main(int argc, char **argv) {
   //printf(" udp = %s  serial = %s  baud = %s\n", port, device, baud );
 
   if (path[0] == 0) {
-    print_help();
-    fprintf( stderr, "%s: No map path given - try using --path=xxx.\n", argv[0] );
-    return 1;
+    if (fg_root[0] != 0) {
+      strcpy(path, fg_root);
+      strcat(path, "/");
+    } else {
+      strcpy(path, "/usr/local/lib/FlightGear/");
+    }
+
+    strcat(path, "Atlas/");
   }
 
   latitude  *= M_PI / 180.0f;

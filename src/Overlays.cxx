@@ -201,7 +201,7 @@ void Overlays::airport_labels(float theta, float alpha,
 	p[0] += 10; p[1] -= 5;
 	if (features & OVERLAY_IDS) output->drawText( p, ap->id );
 	p[1] += 10;
-	if (features & OVERLAY_NAMES) output->drawText( p, ap->name+4 );
+	if (features & OVERLAY_NAMES) output->drawText( p, ap->name );
 	p[0] -= 10; p[1] -= 5;
       }
 
@@ -356,48 +356,47 @@ void Overlays::load_airports() {
     return;
   }
 
-  gzgets( arp, line, 256 );
+  bool line_read = false;
 
-  while (!gzeof(arp)) {
+  while (!gzeof(arp) || line_read) {
     ARP *ap;
     char id[8], *name;
     float lat, lon;
     int elev;
 
-    int lineread = 0;
+    if (!line_read) {
+      gzgets( arp, line, 256 );
+    }
 
-    if (line[0] == 'A') {
+    switch (line[0]) {
+    case 'A':
       if (sscanf( line, "A %s %f %f %d", id, &lat, &lon, &elev ) == 4) {
 	ap = new ARP;
 	  
 	line[ strlen(line)-1 ] = 0;
-	name = strstr( line, "CCY" );
-
 	ap->lat = lat * SG_DEGREES_TO_RADIANS;
 	ap->lon = lon * SG_DEGREES_TO_RADIANS;
 
-	if (name != NULL) {
-	  int wordcount = 0, len = 0;
-	  while (wordcount < 4 && name[len] != 0) {
-	    if (name[len] == ' ') wordcount++;
-	    len++;
-	  }
-	  strncpy( ap->name, name, len );
-	  ap->name[len] = 0;
-	} else
-	  ap->name[0] = 0;
+	name = line + 40;   // this is the start of the name column
+	int wordcount = 0, len = 0;
+	while (wordcount < 4 && name[len] != 0) {
+	  if (name[len] == ' ') wordcount++;
+	  len++;
+	}
+	strncpy( ap->name, name, len );
+	ap->name[len] = 0;
 
 	strcpy( ap->id, id );
 
-	line[0] = 'R'; // ouch, ugly hack
-	while (!gzeof(arp) && line[0] == 'R') {
+	line_read = false;
+	while (!gzeof(arp) && !line_read) {
 	  char rwyid[8];
 	  float heading;
 	  float length, width;
-
+	  
 	  gzgets( arp, line, 256 );
-	  lineread = 1;
-
+	  line_read = true;
+	  
 	  if (sscanf(line, "R %s %f %f %f %f %f", 
 		     rwyid, &lat, &lon, &heading, &length, &width) == 6) {
 	    RWY *rwy    = new RWY;
@@ -407,23 +406,20 @@ void Overlays::load_airports() {
 	    rwy->length = (int)(length * 0.3048);   // feet to meters
 	    rwy->width  = (int)(width  * 0.3048);
 	    ap->rwys.push_back( rwy );
+	    line_read = false;
 	  }
 	}
 
 	airports.push_back( ap );
-
-
       } else {
-	// skip all non 'A' records!       line[0] = 'R'; // ouch, ugly hack
-	while (!gzeof(arp) && line[0] == 'R' ) {
-	  gzgets( arp, line, 256 );
-	  lineread = 1;
-	}
+	line_read = false;
       }
+      break;
+    default:
+      line_read = false;
+      break;
     }
-    
-    if (!lineread)
-      gzgets( arp, line, 256 );
+
   }
   
   gzclose( arp );
