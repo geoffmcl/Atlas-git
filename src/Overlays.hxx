@@ -72,6 +72,12 @@ public:
   inline void setNavaidColor( const float *color ) {
     memcpy( nav_color, color, sizeof(float)*4 );
   }
+  inline void setVorToColor( const float *color ) {
+    memcpy( vor_to_color, color, sizeof(float)*4 );
+  }
+  inline void setVorFromColor( const float *color ) {
+    memcpy( vor_from_color, color, sizeof(float)*4 );
+  }
   inline void setGridColor( const float *color ) {
     memcpy( grd_color, color, sizeof(float)*4 );
   }
@@ -139,16 +145,25 @@ protected:
   static const float airport_color1[4]; 
   static const float airport_color2[4];
   static const float navaid_color[4];
+  static const float static_vor_to_color[4];
+  static const float static_vor_from_color[4];
   static const float grid_color[4];
   static const float track_color[4];
   float arp_color1[4]; 
   float arp_color2[4];
   float nav_color[4]; 
+  float vor_to_color[4]; 
+  float vor_from_color[4]; 
   float grd_color[4];
   float trk_color[4];
 
   SGTime *time_params;
   SGMagVar *mag;
 };
+
+// nav radios (global hack)
+extern float nav1_freq, nav1_rad;
+extern float nav2_freq, nav2_rad;
+extern float adf_freq;
 
 #endif        // __OVERLAYS_H__

@@ -21,6 +21,8 @@ Colour 14	0.439 0.271 0.420 1.0
 Colour 15	0.975 0.982 0.484 1.0 
 Colour 16	1.000 0.000 0.000 1.0
 Colour 17	0.859 0.851 0.478 1.0
+Colour 18	0.800 0.200 0.200 1.0
+Colour 19	0.200 0.800 0.200 1.0
 #
 # Materials definitions: maps a material name to a Colour index
 # in the palette above. -1 indicates that the material should
@@ -62,3 +64,5 @@ Material BuiltUpCover		15
 Material RunwayOutline		14
 Material RunwayFill		9
 Material NavaidLabels		14
+Material VorToLine		18
+Material VorFromLine		19

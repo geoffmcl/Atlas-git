@@ -193,6 +193,8 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
     overlays.setAirportColor( palette[materials["RunwayOutline"]],
                               palette[materials["RunwayFill"]] );
     overlays.setNavaidColor( palette[materials["NavaidLabels"]] );
+    overlays.setVorToColor( palette[materials["VorToLine"]] );
+    overlays.setVorFromColor( palette[materials["VorFromLine"]] );
     overlays.setLocation( theta, alpha );
 
     int features = Overlays::OVERLAY_NAMES | Overlays::OVERLAY_IDS;

@@ -37,6 +37,8 @@ vector<Overlays::NAV*> Overlays::navaids;
 const float Overlays::airport_color1[4] = {0.439, 0.271, 0.420, 0.7}; 
 const float Overlays::airport_color2[4] = {0.824, 0.863, 0.824, 0.7};
 const float Overlays::navaid_color[4]   = {0.439, 0.271, 0.420, 0.7}; 
+const float Overlays::static_vor_to_color[4]   = {0.200, 0.800, 0.200, 0.7}; 
+const float Overlays::static_vor_from_color[4] = {0.800, 0.200, 0.200, 0.7}; 
 const float Overlays::grid_color[4]     = {0.639, 0.371, 0.620, 0.3};
 const float Overlays::track_color[4]    = {0.071, 0.243, 0.427, 0.5};
 
@@ -44,6 +46,13 @@ const float Overlays::dummy_normals[][3] = {{0.0f, 0.0f, 0.0f},
 					    {0.0f, 0.0f, 0.0f},
 					    {0.0f, 0.0f, 0.0f},
 					    {0.0f, 0.0f, 0.0f}};
+
+
+// nav radios (global hack)
+float nav1_freq, nav1_rad;
+float nav2_freq, nav2_rad;
+float adf_freq;
+
 
 Overlays::Overlays( char *fg_root = NULL, float scale = 1.0f,
 		    float width = 512.0f ) :
@@ -58,6 +67,8 @@ Overlays::Overlays( char *fg_root = NULL, float scale = 1.0f,
   
   setAirportColor( airport_color1, airport_color2 );
   setNavaidColor( navaid_color );
+  setVorToColor( static_vor_to_color );
+  setVorFromColor( static_vor_to_color );
   setGridColor( grid_color );
   setTrackColor( track_color );
   flight_track = new FlightTrack;
@@ -344,6 +355,35 @@ void Overlays::draw_vor( NAV *n, sgVec2 p ) {
   //     p[0] + cos(n->magvar)*RADIUS, p[1] + sin(n->magvar)*RADIUS );
   //output->drawLine(p, p2);
 
+  // if this nav is selected, draw radial
+  if ( fabs( n->freq - nav1_freq ) < FG_EPSILON ) {
+      sgVec2 end;
+      sgSetVec2( end,
+		 p[0] + sin(nav1_rad + n->magvar) * 500,
+		 p[1] + cos(nav1_rad + n->magvar) * 500 );
+      output->setColor( static_vor_from_color );
+      output->drawLine(p, end);
+      sgSetVec2( end,
+		 p[0] - sin(nav1_rad + n->magvar) * 500,
+		 p[1] - cos(nav1_rad + n->magvar) * 500 );
+      output->setColor( static_vor_to_color );
+      output->drawLine(p, end);
+  }
+  if ( fabs( n->freq - nav2_freq ) < FG_EPSILON ) {
+      sgVec2 end;
+      sgSetVec2( end,
+		 p[0] + sin(nav2_rad + n->magvar) * 500,
+		 p[1] + cos(nav2_rad + n->magvar) * 500 );
+      output->setColor( static_vor_from_color );
+      output->drawLine(p, end);
+      sgSetVec2( end,
+		 p[0] - sin(nav2_rad + n->magvar) * 500,
+		 p[1] - cos(nav2_rad + n->magvar) * 500 );
+      output->setColor( static_vor_to_color );
+      output->drawLine(p, end);
+  }
+
+  output->setColor( nav_color );
   p[0] -= RADIUS+25; p[1] -= 10;
   if (features & OVERLAY_NAMES) output->drawText( p, n->name );
   p[1] += 10;
@@ -354,22 +394,21 @@ void Overlays::draw_vor( NAV *n, sgVec2 p ) {
 
 void Overlays::draw_fix( NAV *n, sgVec2 p ) {
   static const float SIZE = 10.0f;
-  static const sgVec2 side1 = {SIZE/2 , -SIZE/1.41};
-  static const sgVec2 side2 = {-SIZE  , 0.0f};
-  static const sgVec2 side3 = {SIZE/2 , SIZE/1.41};
+  static const sgVec2 offset1 = {-SIZE*0.5, -SIZE*0.25};
+  static const sgVec2 offset2 = { SIZE*0.5, -SIZE*0.25};
+  static const sgVec2 offset3 = { 0, sqrt( 5 * SIZE*SIZE / 16 )};
 
   output->setColor( nav_color );
-  sgVec2 c1, c2;
-  sgCopyVec2(c1, p);
-  c1[0] -= SIZE / 2; c1[1] += SIZE / 2;
-  sgAddVec2(c2, c1, side1);
+  sgVec2 c1, c2, c3;
+  sgAddVec2(c1, p, offset1);
+  sgAddVec2(c2, p, offset2);
+  sgAddVec2(c3, p, offset3);
+  
   output->drawLine(c1, c2);
-  sgAddVec2(c1, c2, side2);
-  output->drawLine(c2, c1);
-  sgAddVec2(c2, c1, side3);
-  output->drawLine(c1, c2);
+  output->drawLine(c2, c3);
+  output->drawLine(c3, c1);
 
-  p[0] += SIZE/2; p[1] -= 4;
+  p[0] += SIZE/2 + 2; p[1] -= 3;
   if (features & OVERLAY_ANY_LABEL) output->drawText( p, n->name );
 }
 
@@ -495,6 +534,7 @@ void Overlays::load_navaids() {
   NAV *n = NULL;
   while (!gzeof(nav)) {
     char cDummy, cNavtype;
+    char sMagVar[10];
     int elev, iDummy;
 
     if (n == NULL)
@@ -502,28 +542,39 @@ void Overlays::load_navaids() {
     
     gzgets( nav, line, 256 );
     
-    if ( sscanf(line, "%c %f %f %d %f %d %c %s",
+    if ( sscanf(line, "%c %f %f %d %f %d %c %s %s",
 		&cNavtype, &n->lat, &n->lon, &elev, &n->freq, &iDummy,
-		&cDummy, n->id) == 8 ) {
-      switch (cNavtype) {
-      case 'V': n->navtype = NAV_VOR; break;
-      case 'D': n->navtype = NAV_DME; break;
-      case 'N': n->navtype = NAV_NDB; break;
-      }
+		&cDummy, n->id, sMagVar) == 9 ) {
+	switch (cNavtype) {
+	case 'V': n->navtype = NAV_VOR; break;
+	case 'D': n->navtype = NAV_DME; break;
+	case 'N': n->navtype = NAV_NDB; break;
+	}
 
-      n->lat *= SG_DEGREES_TO_RADIANS;
-      n->lon *= SG_DEGREES_TO_RADIANS;
+	// cout << "lat = " << n->lat << " lon = " << n->lon << " elev = " 
+	//      << elev << " JD = " << time_params->getJD() << endl;
 
-      mag->update( n->lat, n->lon, elev, time_params->getJD() );
-      // n->magvar = SGMagVar( n->lat, n->lon, elev, 
-      //		    yymmdd_to_julian_days(2000, 05, 22), magdummy );
-      n->magvar = mag->get_magvar() * DEG_TO_RAD;
-      // printf("magvar = %.2f\n", n->magvar);
+	n->lat *= DEG_TO_RAD;
+	n->lon *= DEG_TO_RAD;
+	elev *= FEET_TO_METER;
 
-      strcpy(n->name, line+55);  // 51?
+	if ( strcmp( sMagVar, "XXX" ) == 0 ) {
+	    // no magvar specified, calculate our own
+	    n->magvar = sgGetMagVar(n->lon, n->lat, elev, time_params->getJD());
+	} else {
+	    n->magvar = ( (sMagVar[0] - '0') * 10 + (sMagVar[1] - '0') );
+	    n->magvar *= DEG_TO_RAD;
+	    if ( sMagVar[2] == 'E' ) {
+		n->magvar = -n->magvar;
+	    }
+	}
+	// cout << "navid = " << n->id << " magvar = " << n->magvar * RAD_TO_DEG
+	//      << endl;
 
-      navaids.push_back(n);
-      n = NULL;
+	strcpy(n->name, line+55);  // 51?
+
+	navaids.push_back(n);
+	n = NULL;
     }
   }
 

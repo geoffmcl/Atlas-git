@@ -74,249 +74,304 @@ MapBrowser *map_object;
 FlightTrack *track = NULL;
 
 bool parse_nmea(char *buf) {
-    cout << "parsing nmea message = " << buf << endl;
+    cout << "parsing atlas message = " << buf << endl;
 
-  string msg = buf;
-  //msg = msg.substr( 0, length );
+    string msg = buf;
+    //msg = msg.substr( 0, length );
 
-  string::size_type begin_line, end_line, begin, end;
-  begin_line = begin = 0;
+    string::size_type begin_line, end_line, begin, end;
+    begin_line = begin = 0;
 
-  // extract out each line
-  end_line = msg.find("\n", begin_line);
-  while ( end_line != string::npos ) {
-    string line = msg.substr(begin_line, end_line - begin_line);
-    begin_line = end_line + 1;
+    // extract out each line
+    end_line = msg.find("\n", begin_line);
+    while ( end_line != string::npos ) {
+	string line = msg.substr(begin_line, end_line - begin_line);
+	begin_line = end_line + 1;
 
-    // leading character
-    string start = msg.substr(begin, 1);
-    ++begin;
+	// leading character
+	string start = msg.substr(begin, 1);
+	++begin;
 
 	// sentence
-    end = msg.find(",", begin);
-    if ( end == string::npos ) {
-      return false;
-    }
+	end = msg.find(",", begin);
+	if ( end == string::npos ) {
+	    return false;
+	}
     
-    string sentence = msg.substr(begin, end - begin);
-    begin = end + 1;
+	string sentence = msg.substr(begin, end - begin);
+	begin = end + 1;
 
-    double lon_deg, lon_min, lat_deg, lat_min;
+	double lon_deg, lon_min, lat_deg, lat_min;
 
-    if ( sentence == "GPRMC" ) {
-      // time
-      end = msg.find(",", begin);
-      if ( end == string::npos ) {
-	return false;
-      }
+	if ( sentence == "GPRMC" ) {
+	    // time
+	    end = msg.find(",", begin);
+	    if ( end == string::npos ) {
+		return false;
+	    }
     
-      string utc = msg.substr(begin, end - begin);
-      begin = end + 1;
-
-      // junk
-      end = msg.find(",", begin);
-      if ( end == string::npos ) {
-	return false;
-      }
-    
-      string junk = msg.substr(begin, end - begin);
-      begin = end + 1;
-
-      // latitude val
-      end = msg.find(",", begin);
-      if ( end == string::npos ) {
-	return false;
-      }
-    
-      string lat_str = msg.substr(begin, end - begin);
-      begin = end + 1;
-
-      lat_deg = atof( lat_str.substr(0, 2).c_str() );
-      lat_min = atof( lat_str.substr(2).c_str() );
-
-      // latitude dir
-      end = msg.find(",", begin);
-      if ( end == string::npos ) {
-	return false;
-      }
-    
-      string lat_dir = msg.substr(begin, end - begin);
-      begin = end + 1;
-
-      latitude = lat_deg + ( lat_min / 60.0 );
-      if ( lat_dir == "S" ) {
-	latitude *= -1;
-      }
-      latitude *= M_PI / 180.0f;  // convert to radians
-
-      // longitude val
-      end = msg.find(",", begin);
-      if ( end == string::npos ) {
-	return false;
-      }
-    
-      string lon_str = msg.substr(begin, end - begin);
-      begin = end + 1;
-
-      lon_deg = atof( lon_str.substr(0, 3).c_str() );
-      lon_min = atof( lon_str.substr(3).c_str() );
-
-      // longitude dir
-      end = msg.find(",", begin);
-      if ( end == string::npos ) {
-	return false;
-      }
-    
-      string lon_dir = msg.substr(begin, end - begin);
-      begin = end + 1;
-
-      longitude = lon_deg + ( lon_min / 60.0 );
-      if ( lon_dir == "W" ) {
-	longitude *= -1;
-      }
-      longitude *= M_PI / 180.0f;  // convert to radians
-
-      // speed
-      end = msg.find(",", begin);
-      if ( end == string::npos ) {
-	return false;
-      }
-    
-      string speed_str = msg.substr(begin, end - begin);
-      begin = end + 1;
-      speed = atof( speed_str.c_str() );
-
-	    // heading
-      end = msg.find(",", begin);
-      if ( end == string::npos ) {
-	return false;
-      }
-    
-      string hdg_str = msg.substr(begin, end - begin);
-      begin = end + 1;
-      heading = atof( hdg_str.c_str() );
-    } else if ( sentence == "GPGGA" ) {
-      // time
-      end = msg.find(",", begin);
-      if ( end == string::npos ) {
-	return false;
-      }
-    
-      string utc = msg.substr(begin, end - begin);
-      begin = end + 1;
-
-      // latitude val
-      end = msg.find(",", begin);
-      if ( end == string::npos ) {
-	return false;
-      }
-    
-      string lat_str = msg.substr(begin, end - begin);
-      begin = end + 1;
-
-      lat_deg = atof( lat_str.substr(0, 2).c_str() );
-      lat_min = atof( lat_str.substr(2).c_str() );
-
-      // latitude dir
-      end = msg.find(",", begin);
-      if ( end == string::npos ) {
-	return false;
-      }
-    
-      string lat_dir = msg.substr(begin, end - begin);
-      begin = end + 1;
-
-      latitude = lat_deg + ( lat_min / 60.0 );
-      if ( lat_dir == "S" ) {
-	latitude *= -1;
-      }
-      latitude *= M_PI / 180.0f;  // convert to radians
-
-      // cur_fdm_state->set_Latitude( latitude * DEG_TO_RAD );
-
-	    // longitude val
-      end = msg.find(",", begin);
-      if ( end == string::npos ) {
-	return false;
-      }
-    
-      string lon_str = msg.substr(begin, end - begin);
-      begin = end + 1;
-
-      lon_deg = atof( lon_str.substr(0, 3).c_str() );
-      lon_min = atof( lon_str.substr(3).c_str() );
-
-      // longitude dir
-      end = msg.find(",", begin);
-      if ( end == string::npos ) {
-	return false;
-      }
-    
-      string lon_dir = msg.substr(begin, end - begin);
-      begin = end + 1;
-
-      longitude = lon_deg + ( lon_min / 60.0 );
-      if ( lon_dir == "W" ) {
-	longitude *= -1;
-      }
-      longitude *= M_PI / 180.0f;  // convert to radians
-
-      // cur_fdm_state->set_Longitude( longitude * DEG_TO_RAD );
+	    string utc = msg.substr(begin, end - begin);
+	    begin = end + 1;
 
 	    // junk
-      end = msg.find(",", begin);
-      if ( end == string::npos ) {
-	return false;
-      }
-    
-      string junk = msg.substr(begin, end - begin);
-      begin = end + 1;
+	    end = msg.find(",", begin);
+	    if ( end == string::npos ) {
+		return false;
+	    }
 
-      // junk
-      end = msg.find(",", begin);
-      if ( end == string::npos ) {
-	return false;
-      }
-    
-      junk = msg.substr(begin, end - begin);
-      begin = end + 1;
+	    string junk = msg.substr(begin, end - begin);
+	    begin = end + 1;
 
-      // junk
-      end = msg.find(",", begin);
-      if ( end == string::npos ) {
-	return false;
-      }
+	    // latitude val
+	    end = msg.find(",", begin);
+	    if ( end == string::npos ) {
+		return false;
+	    }
     
-      junk = msg.substr(begin, end - begin);
-      begin = end + 1;
+	    string lat_str = msg.substr(begin, end - begin);
+	    begin = end + 1;
 
-      // altitude
-      end = msg.find(",", begin);
-      if ( end == string::npos ) {
-	return false;
-      }
+	    lat_deg = atof( lat_str.substr(0, 2).c_str() );
+	    lat_min = atof( lat_str.substr(2).c_str() );
+
+	    // latitude dir
+	    end = msg.find(",", begin);
+	    if ( end == string::npos ) {
+		return false;
+	    }
     
-      string alt_str = msg.substr(begin, end - begin);
-      altitude = atof( alt_str.c_str() );
-      begin = end + 1;
+	    string lat_dir = msg.substr(begin, end - begin);
+	    begin = end + 1;
 
+	    latitude = lat_deg + ( lat_min / 60.0 );
+	    if ( lat_dir == "S" ) {
+		latitude *= -1;
+	    }
+	    latitude *= M_PI / 180.0f;  // convert to radians
+
+	    // longitude val
+	    end = msg.find(",", begin);
+	    if ( end == string::npos ) {
+		return false;
+	    }
+    
+	    string lon_str = msg.substr(begin, end - begin);
+	    begin = end + 1;
+
+	    lon_deg = atof( lon_str.substr(0, 3).c_str() );
+	    lon_min = atof( lon_str.substr(3).c_str() );
+
+	    // longitude dir
+	    end = msg.find(",", begin);
+	    if ( end == string::npos ) {
+		return false;
+	    }
+    
+	    string lon_dir = msg.substr(begin, end - begin);
+	    begin = end + 1;
+
+	    longitude = lon_deg + ( lon_min / 60.0 );
+	    if ( lon_dir == "W" ) {
+		longitude *= -1;
+	    }
+	    longitude *= M_PI / 180.0f;  // convert to radians
+
+	    // speed
+	    end = msg.find(",", begin);
+	    if ( end == string::npos ) {
+		return false;
+	    }
+    
+	    string speed_str = msg.substr(begin, end - begin);
+	    begin = end + 1;
+	    speed = atof( speed_str.c_str() );
+
+	    // heading
+	    end = msg.find(",", begin);
+	    if ( end == string::npos ) {
+		return false;
+	    }
+    
+	    string hdg_str = msg.substr(begin, end - begin);
+	    begin = end + 1;
+	    heading = atof( hdg_str.c_str() );
+	} else if ( sentence == "GPGGA" ) {
+	    // time
+	    end = msg.find(",", begin);
+	    if ( end == string::npos ) {
+		return false;
+	    }
+    
+	    string utc = msg.substr(begin, end - begin);
+	    begin = end + 1;
+
+	    // latitude val
+	    end = msg.find(",", begin);
+	    if ( end == string::npos ) {
+		return false;
+	    }
+    
+	    string lat_str = msg.substr(begin, end - begin);
+	    begin = end + 1;
+
+	    lat_deg = atof( lat_str.substr(0, 2).c_str() );
+	    lat_min = atof( lat_str.substr(2).c_str() );
+
+	    // latitude dir
+	    end = msg.find(",", begin);
+	    if ( end == string::npos ) {
+		return false;
+	    }
+    
+	    string lat_dir = msg.substr(begin, end - begin);
+	    begin = end + 1;
+
+	    latitude = lat_deg + ( lat_min / 60.0 );
+	    if ( lat_dir == "S" ) {
+		latitude *= -1;
+	    }
+	    latitude *= M_PI / 180.0f;  // convert to radians
+
+	    // cur_fdm_state->set_Latitude( latitude * DEG_TO_RAD );
+
+	    // longitude val
+	    end = msg.find(",", begin);
+	    if ( end == string::npos ) {
+		return false;
+	    }
+    
+	    string lon_str = msg.substr(begin, end - begin);
+	    begin = end + 1;
+
+	    lon_deg = atof( lon_str.substr(0, 3).c_str() );
+	    lon_min = atof( lon_str.substr(3).c_str() );
+
+	    // longitude dir
+	    end = msg.find(",", begin);
+	    if ( end == string::npos ) {
+		return false;
+	    }
+    
+	    string lon_dir = msg.substr(begin, end - begin);
+	    begin = end + 1;
+
+	    longitude = lon_deg + ( lon_min / 60.0 );
+	    if ( lon_dir == "W" ) {
+		longitude *= -1;
+	    }
+	    longitude *= M_PI / 180.0f;  // convert to radians
+
+	    // cur_fdm_state->set_Longitude( longitude * DEG_TO_RAD );
+
+	    // junk
+	    end = msg.find(",", begin);
+	    if ( end == string::npos ) {
+		return false;
+	    }
+    
+	    string junk = msg.substr(begin, end - begin);
+	    begin = end + 1;
+
+	    // junk
+	    end = msg.find(",", begin);
+	    if ( end == string::npos ) {
+		return false;
+	    }
+    
+	    junk = msg.substr(begin, end - begin);
+	    begin = end + 1;
+
+	    // junk
+	    end = msg.find(",", begin);
+	    if ( end == string::npos ) {
+		return false;
+	    }
+    
+	    junk = msg.substr(begin, end - begin);
+	    begin = end + 1;
+
+	    // altitude
+	    end = msg.find(",", begin);
+	    if ( end == string::npos ) {
+		return false;
+	    }
+    
+	    string alt_str = msg.substr(begin, end - begin);
+	    altitude = atof( alt_str.c_str() );
+	    begin = end + 1;
+	    
 	    // altitude units
-      end = msg.find(",", begin);
-      if ( end == string::npos ) {
-	return false;
-      }
+	    end = msg.find(",", begin);
+	    if ( end == string::npos ) {
+		return false;
+	    }
     
-      string alt_units = msg.substr(begin, end - begin);
-      begin = end + 1;
+	    string alt_units = msg.substr(begin, end - begin);
+	    begin = end + 1;
 
-      if ( alt_units != "F" ) {
-	altitude *= 3.28;
-      }
+	    if ( alt_units != "F" ) {
+		altitude *= 3.28;
+	    }
+	} else if ( sentence == "PATLA" ) {
+	    // nav1 freq
+	    end = msg.find(",", begin);
+	    if ( end == string::npos ) {
+		return false;
+	    }
+    
+	    string nav1_freq_str = msg.substr(begin, end - begin);
+	    begin = end + 1;
+	    cout << "  nav1_freq = " << nav1_freq_str << endl;
 
-    }
+	    // nav1 selected radial
+	    end = msg.find(",", begin);
+	    if ( end == string::npos ) {
+		return false;
+	    }
+    
+	    string nav1_rad_str = msg.substr(begin, end - begin);
+	    begin = end + 1;
+	    cout << "  nav1_rad = " << nav1_rad_str << endl;
 
-    begin = begin_line;
-    end_line = msg.find("\n", begin_line);
+	    // nav2 freq
+	    end = msg.find(",", begin);
+	    if ( end == string::npos ) {
+		return false;
+	    }
+    
+	    string nav2_freq_str = msg.substr(begin, end - begin);
+	    begin = end + 1;
+	    cout << "  nav2_freq = " << nav2_freq_str << endl;
+
+	    // nav2 selected radial
+	    end = msg.find(",", begin);
+	    if ( end == string::npos ) {
+		return false;
+	    }
+    
+	    string nav2_rad_str = msg.substr(begin, end - begin);
+	    begin = end + 1;
+	    cout << "  nav2_rad = " << nav2_rad_str << endl;
+
+	    // adf freq
+	    end = msg.find("*", begin);
+	    if ( end == string::npos ) {
+		return false;
+	    }
+    
+	    string adf_freq_str = msg.substr(begin, end - begin);
+	    begin = end + 1;
+	    cout << "  adf_freq = " << adf_freq_str << endl;
+
+	    nav1_freq = atof( nav1_freq_str.c_str() );
+	    nav1_rad =  atof( nav1_rad_str.c_str() ) * DEG_TO_RAD;
+	    nav2_freq = atof( nav2_freq_str.c_str() );
+	    nav2_rad =  atof( nav2_rad_str.c_str() ) * DEG_TO_RAD;
+	    adf_freq =  atof( adf_freq_str.c_str() );
+	}
+
+	begin = begin_line;
+	end_line = msg.find("\n", begin_line);
 
   }
   
