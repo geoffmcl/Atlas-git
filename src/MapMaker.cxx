@@ -115,6 +115,12 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
   int max_theta = (int)( (theta + dtheta) * SG_RADIANS_TO_DEGREES ) - sgntheta;
   int min_alpha = (int)( (alpha - dalpha) * SG_RADIANS_TO_DEGREES ) - sgnalpha;
   int max_alpha = (int)( (alpha + dalpha) * SG_RADIANS_TO_DEGREES ) - sgnalpha;
+
+  // Quick & dirty fix from Rainer Emrich (thanks!)
+  if(max_alpha == 1) min_alpha = -1;
+  if(min_alpha == -2) max_alpha = 0;
+  if(max_theta == 1) min_theta = -1;
+  if(min_theta == -2) max_theta = 0;
   
   zoom = (float)size / (float)scle;
 
@@ -183,7 +189,7 @@ void MapMaker::sub_trifan( list<int> &tri, vector<float*> &v,
     sgCopyVec3( t[2], v[vert2] );
     sgCopyVec3( nrm[2], n[vert2] );
     
-    // check wether this triangle is visible (?)
+    // check whether this triangle is visible (?)
     if (fabs(t[0][0]) < length2 || fabs(t[0][1]) < length2 ||
 	fabs(t[1][0]) < length2 || fabs(t[1][1]) < length2 ||
 	fabs(t[2][0]) < length2 || fabs(t[2][1]) < length2) {
@@ -331,7 +337,7 @@ void MapMaker::draw_trifan( list<int> &tri, vector<float*> &v,
     sgCopyVec3( nrm[1], nrm[2] );
   }
 
-  if (col<0) {
+  if (col < 0) {
     sub_trifan( tri, v, n );
   }
 }
@@ -442,26 +448,27 @@ int MapMaker::process_file( char *tile_name, float x, float y, float z ) {
   return 1;
 }
 
-// path must by 'FG_ROOT/Scenery/' - more will be appended
+// path must be 'FG_ROOT/Scenery/' - more will be appended
 // plen is path length
 int MapMaker::process_directory( char *path, int plen, int lat, int lon, 
 				 float x, float y, float z ) {
   int sgnk = (lat < 0) ? 1 : 0, sgnl = (lon < 0) ? 1 : 0;
-  
+
   int llen = sprintf( path + plen, "%c%03d%c%02d/%c%03d%c%02d", 
-		      ew(lon / 10 * 10), abs((lon+sgnl) / 10 * 10) + sgnl*10, 
-		      ns(lat / 10 * 10), abs((lat+sgnk) / 10 * 10) + sgnk*10,
+		      ew(lon), abs((lon+sgnl) / 10 * 10) + sgnl*10, 
+		      ns(lat), abs((lat+sgnk) / 10 * 10) + sgnk*10,
 		      ew(lon), abs(lon), ns(lat), abs(lat) );
 
   DIR *dir;
   dirent *ent;
 
-  if ((dir = opendir(path)) == NULL) {
-    return 0;
-  }
-
   if (getVerbose()) 
     printf("%s:  ", path + plen);
+
+  if ((dir = opendir(path)) == NULL) {
+    if (getVerbose()) printf("\n");
+    return 0;
+  }
 
   path[plen + llen] = '/';  
   while ((ent = readdir(dir)) != NULL) {
