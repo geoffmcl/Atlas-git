@@ -45,6 +45,7 @@ public:
 protected:
   int quadrant( const sgVec2 p, bool checkoutside = true );
 
+  char *filename;
   FILE *ps_file;
 };
 

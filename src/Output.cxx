@@ -25,7 +25,7 @@
 #include "Output.hxx"
 
 GfxOutput::GfxOutput( char *filename, int size, bool smooth_shading ) 
-  : size(size) {
+  : size(size), fragment_size(size), posx(0), posy(0) {
   if (filename == NULL) {
     open = false;
   } else {

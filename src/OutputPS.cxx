@@ -1,7 +1,7 @@
 #include "OutputPS.hxx"
 
 OutputPS::OutputPS( char *filename, int size, bool smooth_shading ) :
-  GfxOutput( filename, size ) {
+  GfxOutput( filename, size ), filename(filename) {
   ps_file = fopen( filename, "wb" );
   
   //write some (E)PS infos
@@ -97,6 +97,7 @@ void OutputPS::closeOutput() {
   fprintf( ps_file, "%%%%Trailer\n" );
   fprintf( ps_file, "%%%%EOF\n\n" );
   fclose( ps_file );
+  printf("Written '%s'\n", filename);
 }
 
 void OutputPS::clear( const float *rgb ) {

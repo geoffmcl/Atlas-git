@@ -39,7 +39,7 @@
 // Appends a path separator to a directory path if not present.
 // Calling function MUST ENSURE that there is space allocated for the potential strcat.
 void NormalisePath(char* dpath) {
-  int dlen = strlen(dpath);
+  size_t dlen = strlen(dpath);
   #if defined( macintosh )
   if(dpath[dlen-1] != ':') {
     dpath[dlen] = ':';
@@ -71,6 +71,7 @@ MapMaker::MapMaker( char *fg_root, char *ap_filter, int features,
   arp_filter = ap_filter;
   this->features = features;
   this->size = size;
+  this->device_size = size;
   scle = scale;
 
   modified = false;
@@ -135,132 +136,159 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
     return 0;
   }
 
-  output->clear( palette[0] );
+  int nb_frag = size / device_size;
+  if ( nb_frag * device_size < size )
+    nb_frag += 1;
+  nb_frag *= nb_frag;
+  if ( nb_frag > 1 ) {
+    printf("________________________________\r");
+  }
 
-  // set up coordinate space
-  sgVec3 xyz;
-  float r_e;
-  xyz_lat( theta, alpha, xyz, &r_e );
-  sgMat4 rotation_matrix;
-  sgMakeRotMat4(rotation_matrix, 
-                 alpha * SG_RADIANS_TO_DEGREES,
-                 0.0f,
-                 90.0f - theta * SG_RADIANS_TO_DEGREES);
-  sgCopyVec3(light_vector, map_light);
-  sgXformVec3(light_vector, rotation_matrix);
-  output->setLightVector( light_vector );
-  
-  // Draw a quad spanning the full area and the same as the clear color
-  // to avoid corruption from the pixel read not reading areas we don't
-  // explicitly draw to on some platforms.
-  bool save_shade = output->getShade();
-  output->setShade(false);
-  output->setColor(palette[12]);
-  sgVec2 baseQuad[4];
-  sgSetVec2(baseQuad[0], 0.0, 0.0);
-  sgSetVec2(baseQuad[1], 0.0, (float)size);
-  sgSetVec2(baseQuad[2], (float)size, (float)size);
-  sgSetVec2(baseQuad[3], (float)size, 0.0);
-  output->drawQuad(&baseQuad[0], simple_normals);
-  output->setShade(save_shade);
+  int i = 0, j = 0;
+  for (int x = 0; x < size; x += device_size) {
+    for (int y = 0; y < size; y += device_size) {
+      output->openFragment(x,y,device_size);
+      output->clear( palette[0] );
 
-  // calculate which tiles we will have to load
-  float dtheta, dalpha;
+      // set up coordinate space
+      sgVec3 xyz;
+      float r_e;
+      xyz_lat( theta, alpha, xyz, &r_e );
+      sgMat4 rotation_matrix;
+      sgMakeRotMat4(rotation_matrix, 
+                    alpha * SG_RADIANS_TO_DEGREES,
+                    0.0f,
+                    90.0f - theta * SG_RADIANS_TO_DEGREES);
+      sgCopyVec3(light_vector, map_light);
+      sgXformVec3(light_vector, rotation_matrix);
+      output->setLightVector( light_vector );
+      
+      // Draw a quad spanning the full area and the same as the clear color
+      // to avoid corruption from the pixel read not reading areas we don't
+      // explicitly draw to on some platforms.
+      bool save_shade = output->getShade();
+      output->setShade(false);
+      output->setColor(palette[12]);
+      sgVec2 baseQuad[4];
+      sgSetVec2(baseQuad[0], 0.0, 0.0);
+      sgSetVec2(baseQuad[1], 0.0, (float)size);
+      sgSetVec2(baseQuad[2], (float)size, (float)size);
+      sgSetVec2(baseQuad[3], (float)size, 0.0);
+      output->drawQuad(&baseQuad[0], simple_normals);
+      output->setShade(save_shade);
 
-  if (autoscale > 0.0f) {
-    // I think this is wrong (PL 010719):
-    // set scale to autoscale degrees in meters at this latitude
-    //scle = (int)(earth_radius_lat(theta)*2.0f * autoscale *SG_PI / 360.0f);
+      // calculate which tiles we will have to load
+      float dtheta, dalpha;
 
-    // this should be better:
-    scle = (int)(rec*2.0f * autoscale *SG_PI / 360.0f);
+      if (autoscale > 0.0f) {
+        // I think this is wrong (PL 010719):
+        // set scale to autoscale degrees in meters at this latitude
+        //scle = (int)(earth_radius_lat(theta)*2.0f * autoscale *SG_PI / 360.0f);
 
-    // no idea why this magic should be here:
-    //dtheta = autoscale * 0.8f * SG_DEGREES_TO_RADIANS;
-    //dalpha = (autoscale * 0.8f + fabs(tan(theta)) * 0.35f) * SG_DEGREES_TO_RADIANS;
-  } //else {
-    lat_ab( scle/2, scle/2, theta, alpha, &dtheta, &dalpha );
-    dtheta -= theta;
-    dalpha -= alpha;
-    //  }
+        // this should be better:
+        scle = (int)(rec*2.0f * autoscale *SG_PI / 360.0f);
 
-//  int sgntheta = (theta < 0.0f) ? 1 : 0, sgnalpha = (alpha < 0.0f) ? 1 : 0;
-//  // Rainer Emrich's improved code for finding map boundaries
-//  int mid_theta = (int)( theta * SG_RADIANS_TO_DEGREES + 0.0001) - sgntheta;
-//  int mid_alpha = (int)( alpha * SG_RADIANS_TO_DEGREES + 0.0001) - sgnalpha;
-//  int int_dtheta = (int)( dtheta * SG_RADIANS_TO_DEGREES + 0.6f);
-//  int int_dalpha = (int)( dalpha * SG_RADIANS_TO_DEGREES + 0.6f);
-//  int max_theta = mid_theta + int_dtheta;
-//  int min_theta = mid_theta - int_dtheta;
-//  int max_alpha = mid_alpha + int_dalpha;
-//  int min_alpha = mid_alpha - int_dalpha;
-  int max_theta = (int)floor((theta + dtheta) * SG_RADIANS_TO_DEGREES);
-  int min_theta = (int)floor((theta - dtheta) * SG_RADIANS_TO_DEGREES);
-  int max_alpha = (int)floor((alpha + dalpha) * SG_RADIANS_TO_DEGREES);
-  int min_alpha = (int)floor((alpha - dalpha) * SG_RADIANS_TO_DEGREES);
-  if( max_theta > 90 ) max_alpha=90;
-  if( min_theta < -90 ) min_alpha=-90;
-  if( max_alpha > 360 ) max_alpha=360;
-  if( min_alpha < -360 ) min_alpha=-360;
-  
-  zoom = (float)size / (float)scle;
+        // no idea why this magic should be here:
+        //dtheta = autoscale * 0.8f * SG_DEGREES_TO_RADIANS;
+        //dalpha = (autoscale * 0.8f + fabs(tan(theta)) * 0.35f) * SG_DEGREES_TO_RADIANS;
+      } //else {
+        lat_ab( scle/2, scle/2, theta, alpha, &dtheta, &dalpha );
+        dtheta -= theta;
+        dalpha -= alpha;
+        //  }
 
-  // UG! - process_directory modifies the passed char* and wants the result next time
-  char *subdir = new char[strlen(fg_root) + 512];  // 512 should be *very* safe (too safe?)
-  strcpy(subdir, dirpath.c_str());
-  int slen = strlen(subdir);
-  // Now we need to make sure that the supplied directory ends in a path separator.
-  NormalisePath(subdir);
-  
-  slen = strlen(subdir);  // Need to update it since process_directory relys on it.
-  
-  if (getVerbose());
-    //printf("Map area: lat %c%d / %c%d, lon %c%d / %c%d.\n", 
-    //   ns(min_theta), abs(min_theta), ns(max_theta), abs(max_theta), 
-    //   ew(min_alpha), abs(min_alpha), ew(max_alpha), abs(max_alpha) );
- 
-  for (int k = min_theta; k <= max_theta; k++) {
-    for (int l = min_alpha; l <= max_alpha; l++) {
-      if (l > 179) {
-         process_directory( subdir, slen, k, l - 360, xyz );
-      } else if (l < -180) {
-         process_directory( subdir, slen, k, l + 360, xyz );
-      } else {
-         process_directory( subdir, slen, k, l, xyz );
+//    int sgntheta = (theta < 0.0f) ? 1 : 0, sgnalpha = (alpha < 0.0f) ? 1 : 0;
+//    // Rainer Emrich's improved code for finding map boundaries
+//    int mid_theta = (int)( theta * SG_RADIANS_TO_DEGREES + 0.0001) - sgntheta;
+//    int mid_alpha = (int)( alpha * SG_RADIANS_TO_DEGREES + 0.0001) - sgnalpha;
+//    int int_dtheta = (int)( dtheta * SG_RADIANS_TO_DEGREES + 0.6f);
+//    int int_dalpha = (int)( dalpha * SG_RADIANS_TO_DEGREES + 0.6f);
+//    int max_theta = mid_theta + int_dtheta;
+//    int min_theta = mid_theta - int_dtheta;
+//    int max_alpha = mid_alpha + int_dalpha;
+//    int min_alpha = mid_alpha - int_dalpha;
+      int max_theta = (int)floor((theta + dtheta) * SG_RADIANS_TO_DEGREES);
+      int min_theta = (int)floor((theta - dtheta) * SG_RADIANS_TO_DEGREES);
+      int max_alpha = (int)floor((alpha + dalpha) * SG_RADIANS_TO_DEGREES);
+      int min_alpha = (int)floor((alpha - dalpha) * SG_RADIANS_TO_DEGREES);
+      if( max_theta > 90 ) max_alpha=90;
+      if( min_theta < -90 ) min_alpha=-90;
+      if( max_alpha > 360 ) max_alpha=360;
+      if( min_alpha < -360 ) min_alpha=-360;
+      
+      zoom = (float)size / (float)scle;
+
+      // UG! - process_directory modifies the passed char* and wants the result next time
+      char *subdir = new char[strlen(fg_root) + 512];  // 512 should be *very* safe (too safe?)
+      strcpy(subdir, dirpath.c_str());
+      size_t slen = strlen(subdir);
+      // Now we need to make sure that the supplied directory ends in a path separator.
+      NormalisePath(subdir);
+      
+      slen = strlen(subdir);  // Need to update it since process_directory relys on it.
+      
+      //if (getVerbose())
+        //printf("Map area: lat %c%d / %c%d, lon %c%d / %c%d.\n", 
+        //   ns(min_theta), abs(min_theta), ns(max_theta), abs(max_theta), 
+        //   ew(min_alpha), abs(min_alpha), ew(max_alpha), abs(max_alpha) );
+     
+      for (int k = min_theta; k <= max_theta; k++) {
+        for (int l = min_alpha; l <= max_alpha; l++) {
+          if (l > 179) {
+            process_directory( subdir, slen, k, l - 360, xyz );
+          } else if (l < -180) {
+            process_directory( subdir, slen, k, l + 360, xyz );
+          } else {
+            process_directory( subdir, slen, k, l, xyz );
+          }
+        }
+      }
+
+      delete[] subdir;
+
+      if (modified) {
+        Overlays overlays( fg_root, zoom, size );
+        overlays.setOutput( output );
+        overlays.setAirportColor( palette[materials["RunwayOutline"]],
+                                  palette[materials["RunwayFill"]] );
+        overlays.setNavaidColor( palette[materials["NavaidLabels"]] );
+        overlays.setVorToColor( palette[materials["VorToLine"]] );
+        overlays.setVorFromColor( palette[materials["VorFromLine"]] );
+        overlays.setIlsColor( palette[materials["IlsLoc"]] );
+        overlays.setLocation( theta, alpha );
+
+        int features = Overlays::OVERLAY_NAMES | Overlays::OVERLAY_IDS;
+        if (getAirports()) features += Overlays::OVERLAY_AIRPORTS;
+        if (getNavaids()) {
+          features += Overlays::OVERLAY_NAVAIDS;
+          if (getNavaidsVOR()) features += Overlays::OVERLAY_NAVAIDS_VOR;
+          if (getNavaidsNDB()) features += Overlays::OVERLAY_NAVAIDS_NDB;
+          if (getNavaidsFIX()) features += Overlays::OVERLAY_NAVAIDS_FIX;
+          if (getNavaidsILS()) features += Overlays::OVERLAY_NAVAIDS_ILS;
+        }
+        overlays.setFeatures(features);
+
+        overlays.drawOverlays();
+      } else if (getVerbose()) {
+        printf("Nothing to draw - no output written.\n");
+      }
+
+      output->closeFragment();
+      ++i;
+      if ( nb_frag > 32 ) {
+        if ( i > nb_frag ) {
+          printf(".");
+          i -= nb_frag;
+        }
+      } else if ( nb_frag > 1 ) {
+        while ( j < i * 32 / nb_frag ) {
+          printf(".");
+          j++;
+        }
       }
     }
   }
-
-  delete[] subdir;
-
-  if (modified) {
-    Overlays overlays( fg_root, zoom, size );
-    overlays.setOutput( output );
-    overlays.setAirportColor( palette[materials["RunwayOutline"]],
-                              palette[materials["RunwayFill"]] );
-    overlays.setNavaidColor( palette[materials["NavaidLabels"]] );
-    overlays.setVorToColor( palette[materials["VorToLine"]] );
-    overlays.setVorFromColor( palette[materials["VorFromLine"]] );
-    overlays.setIlsColor( palette[materials["IlsLoc"]] );
-    overlays.setLocation( theta, alpha );
-
-    int features = Overlays::OVERLAY_NAMES | Overlays::OVERLAY_IDS;
-    if (getAirports()) features += Overlays::OVERLAY_AIRPORTS;
-    if (getNavaids()) {
-      features += Overlays::OVERLAY_NAVAIDS;
-      if (getNavaidsVOR()) features += Overlays::OVERLAY_NAVAIDS_VOR;
-      if (getNavaidsNDB()) features += Overlays::OVERLAY_NAVAIDS_NDB;
-      if (getNavaidsFIX()) features += Overlays::OVERLAY_NAVAIDS_FIX;
-      if (getNavaidsILS()) features += Overlays::OVERLAY_NAVAIDS_ILS;
-    }
-    overlays.setFeatures(features);
-
-    overlays.drawOverlays();
-  } else if (getVerbose()) {
-    printf("Nothing to draw - no output written.\n");
-  }
-
-  output->closeOutput();
+  printf("\r");
   return 1;
 }
 
@@ -917,7 +945,7 @@ int MapMaker::process_ascii_file( char *tile_name, sgVec3 xyz ) {
 
 // path must be to the base of the 10x10/1x1 tile tree - more will be appended.
 // plen is path length
-int MapMaker::process_directory( char *path, int plen, int lat, int lon, 
+int MapMaker::process_directory( char *path, size_t plen, int lat, int lon, 
                                  sgVec3 xyz ) {
   int sgnk = (lat < 0) ? 1 : 0, sgnl = (lon < 0) ? 1 : 0;
   

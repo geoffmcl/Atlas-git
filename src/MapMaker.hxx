@@ -72,6 +72,7 @@ public:
   inline void setFeatures( int features) { this->features = features; }
   inline void setScale( int scale = 100000 ) { scle = scale; }
   inline void setSize( int size = 512 ) { this->size = size; }
+  inline void setDeviceSize( int size = 512 ) { this->device_size = size; }
   inline void setLight( sgVec3 light ) { 
     sgCopyVec3( map_light, light ); 
     sgNormaliseVec3( map_light );
@@ -93,6 +94,7 @@ public:
   inline bool getNavaidsILS() { return ( features & DO_NAVAIDS_ILS ) != 0; }
   inline int getScale() { return scle; }
   inline int getSize() { return size; }
+  inline int getDeviceSize() { return device_size; }
   inline float *getLight() { return light_vector; }
   inline int getFeatures() { return features; }
 
@@ -119,7 +121,7 @@ protected:
   char *fg_root, *arp_filter;
 
   int features;
-  int  size, scle;
+  int  size, scle, device_size;
   float zoom;          // size / scale
 
   bool modified, palette_loaded;
@@ -195,7 +197,7 @@ protected:
   void draw_tristrip( const int_list &indices, 
 		      vector<float*> &v, vector <float*> &n, int col );
 		    
-  int process_directory( char *path, int plen, int lat, int lon, sgVec3 xyz );
+  int process_directory( char *path, size_t plen, int lat, int lon, sgVec3 xyz );
   int process_binary_file( char *tile_name, sgVec3 xyz );
   int process_ascii_file( char *tile_name, sgVec3 xyz );
   

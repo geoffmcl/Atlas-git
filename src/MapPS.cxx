@@ -27,19 +27,33 @@
   2000-03-06        Following Norman Vine's advice, map now uses OpenGL
                     for output
   2000-04-29        New, cuter, airports
+  2005-02-26        --fg-scenery option
 ---------------------------------------------------------------------------*/
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 #include "MapMaker.hxx"
 #include "OutputPS.hxx"
 #include <plib/ul.h>
+#include "Scenery.hxx"
+
+SG_USING_STD(vector);
+SG_USING_STD(string);
+
+typedef vector<string> string_list;
 
 float clat = -100.0f, clon = -100.0f;   // initialize to unreasonable values
 char *outp = "map.eps";                 // output file name
 bool autoscale = false, global = false;
 MapMaker mapobj;
+
+char *scenerypath;
+string raw_scenery_path = "";
+string_list fg_scenery;
+unsigned int scenery_pos;
+unsigned int max_path_length = 0;
 
 void print_help() {
   printf("MapPS - FlightGear PostScript mapping utility\n\n");
@@ -53,6 +67,7 @@ void print_help() {
   printf("  --airport-filter=string Display only airports with id beginning 'string'\n");
   printf("  --output=name           Write output to given file name (default 'mapobj.eps')\n");
   printf("  --fg-root=path          Overrides FG_ROOT environment variable\n");
+  printf("  --fg-scenery=path       Overrides FG_SCENERY environment variable\n");
   printf("  --disable-airports      Don't show airports\n");
   printf("  --disable-navaids       Don't show navaids\n");
   printf("  --only-navaids=which    Which navaids (vor,ndb,fix) to show, e.g. \"vor,ndb\"\n");                   
@@ -88,6 +103,8 @@ int main( int argc, char **argv ) {
       outp = strdup(cparam);
     } else if ( sscanf(argv[arg], "--fg-root=%s", cparam) == 1 ) {
       mapobj.setFGRoot( strdup(cparam) );
+    } else if ( strncmp(argv[arg], "--fg-scenery=", 13 ) == 0 ) {
+      raw_scenery_path = argv[arg] + 13;
     } else if ( strcmp(argv[arg], "--disable-airports" ) == 0 ) {
       features &= ~MapMaker::DO_AIRPORTS;
     } else if ( strcmp(argv[arg], "--disable-navaids" ) == 0 ) {
@@ -126,8 +143,18 @@ int main( int argc, char **argv ) {
     clat = ((int)clat) + 0.5f;
     clon = ((int)clon) + 0.5f;
   }
+  
+  set_fg_scenery(raw_scenery_path);
+  if(fg_scenery.size()) {
+    scenerypath = new char[max_path_length + 256];
+    scenery_pos = 0;
+  } else {
+    cout << "No scenery paths could be found.  You need to set either a valid FG_ROOT and/or FG_SCENERY variable, or specify a valid --fg-root and/or --fg-scenery on the command line.\n";
+    exit(-1);
+  }
 
   mapobj.setFeatures(features);
+  mapobj.setDeviceSize( mapobj.getSize() );
 
   // convert lat & lon to radians
   clat *= SG_DEGREES_TO_RADIANS;
@@ -149,58 +176,108 @@ int main( int argc, char **argv ) {
   if (!global) {
     OutputPS output( outp, mapobj.getSize() );
     mapobj.createMap( &output, clat, clon, scenerypath, autoscale );
+    output.closeOutput();
   } else {
-    char outname[512];
-    size_t opathl, spathl;
-    ulDir *dir1, *dir2;
-    ulDirEnt *ent;
-
+    char ns, ew;
+    int lat, lon;
     int s = mapobj.getSize();
-    if ( (s & (s-1)) != 0 ) {           // Thanks for this cutie, Steve
-      printf("%s: WARNING! Size is not a power of two - you will not be"\
-	     "able to use\nthese maps with the Atlas program!\n", argv[0] );
-    }
+    ulDir *dir1 = NULL, *dir2 = NULL;
+    ulDirEnt *ent = NULL;
+    size_t opathl, spathl;
+    char outname[512];
 
+    scenery_pos = 0;
+    dir1 = ulOpenDir(fg_scenery[0].c_str());
+    strcpy(scenerypath, fg_scenery[0].c_str());
+    NormalisePath(scenerypath);
+    spathl = strlen(scenerypath);
+    if(dir1 == NULL) {
+      printf("Unable to open directory \"%s\"\\n", scenerypath);
+    }
+   
     strcpy(outname, outp);
     opathl = strlen(outname);
-    spathl = strlen(scenerypath);
-    
-    if ( (dir1 = ulOpenDir(scenerypath)) == NULL ) {
-      fprintf( stderr, "%s: Couldn't open directory \"%s\".\n", 
-	       argv[0], scenerypath );
-      return 1;
-    }
 
-    while ( (ent = ulReadDir(dir1)) != NULL ) {
-      if (ent->d_name[0] != '.') {
-	strcpy( scenerypath+spathl, ent->d_name );
-	if ( (dir2 = ulOpenDir(scenerypath)) != NULL ) {
-
-	  while ( (ent = ulReadDir(dir2)) != NULL ) {
-	    char ns, ew;
-	    int lat, lon;
-	    if (ent->d_name[0] != '.' && sscanf(ent->d_name, "%c%d%c%d",
-						&ew, &lon, &ns, &lat) == 4) {
-	      lat *= (ns=='n')?1:-1;
-	      lon *= (ew=='e')?1:-1;
-	      clat = ((float)lat + 0.5f) * SG_DEGREES_TO_RADIANS;
-	      clon = ((float)lon + 0.5f) * SG_DEGREES_TO_RADIANS;
-
-	      sprintf( outname+opathl, "/%c%03d%c%02d.png", 
-		       (lon<0)?'w':'e', abs(lon), (lat<0)?'s':'n', abs(lat) );
-
-	      OutputPS output( outname, mapobj.getSize() );
-	      mapobj.createMap( &output, clat, clon, workingpath, true );
+    while(1) {
+      do {
+        while (dir2 == NULL) {
+	  while(dir1 == NULL) {
+	    ++scenery_pos;
+	    if(scenery_pos >= fg_scenery.size()) {
+	      delete[] scenerypath;
+	      exit(0);  // Ought to flag whether at least one path read OK before exiting OK.
+	    }
+	    dir1 = ulOpenDir(fg_scenery[scenery_pos].c_str());
+	    strcpy(scenerypath, fg_scenery[scenery_pos].c_str());
+	    NormalisePath(scenerypath);
+	    spathl = strlen(scenerypath);
+	    if(dir1 == NULL) {
+	      printf("Unable to open directory \"%s\"\\n", scenerypath);
 	    }
 	  }
-	}
+          bool exit = false;
+	  do {
+	    ent = ulReadDir(dir1);
 
-	ulCloseDir(dir2);
-      }
+	    if (ent != NULL) {
+	      exit = (ent->d_name[0] != '.' &&
+		      sscanf(ent->d_name, "%c%d%c%d",
+			    &ew, &lon, &ns, &lat) == 4 &&
+                      strlen(ent->d_name) == 7);
+	    } else {
+	      exit = true;
+	    }
+          } while (!exit);
+          if (ent != NULL) {
+	    strcpy( scenerypath+spathl, ent->d_name );
+	    dir2 = ulOpenDir(scenerypath);
+	  } else {
+	    ulCloseDir(dir1);
+	    dir1 = NULL;
+	  }
+        }
+        
+        bool exit = false;
+        do {
+	  ent = ulReadDir(dir2);
+
+	  if (ent != NULL) {
+	    exit = (ent->d_name[0] != '.' &&
+		    sscanf(ent->d_name, "%c%d%c%d",
+			  &ew, &lon, &ns, &lat) == 4 &&
+                    strlen(ent->d_name) == 7);
+	  } else {
+	    exit = true;
+	  }
+        } while (!exit);
+
+        if (ent == NULL) {
+	  ulCloseDir(dir2);
+	  dir2 = NULL;
+        } else {
+	  // we have found a scenery directory - let's check if we already
+	  // have an image for it!
+	  lat *= (ns=='n')?1:-1;
+	  lon *= (ew=='e')?1:-1;
+	  clat = ((float)lat + 0.5f) * SG_DEGREES_TO_RADIANS;
+	  clon = ((float)lon + 0.5f) * SG_DEGREES_TO_RADIANS;
+  	
+	  sprintf( outname+opathl, "/%c%03d%c%02d.eps", 
+		  (lon<0)?'w':'e', abs(lon), 
+		  (lat<0)?'s':'n', abs(lat) );
+
+	  struct stat filestat;
+	  if ( stat(outname, &filestat) == 0 ) {
+	    // the file already exists, so skip it!
+	    ent = NULL;
+	  }
+        }
+      } while (ent == NULL);
+
+      OutputPS output( outname, mapobj.getSize() );
+      mapobj.createMap( &output, clat, clon, fg_scenery[scenery_pos], 1.0f );
+      output.closeOutput();
     }
-
-    ulCloseDir(dir1);
-    delete scenerypath;
   }
 
   return 0;

@@ -7,12 +7,18 @@
 #include <plib/pu.h>
 #include "Output.hxx"
 
+#include <vector>
+using std::vector;
+
 class OutputGL : public GfxOutput {
 public:
   OutputGL( char *filename, int size, bool smooth_shading,
-	    bool useTexturedFont, char *fontname, bool jpg = false, int q = 75, int r = 1 );
+	    bool useTexturedFont, char *fontname, bool jpg = false,
+            int q = 75, int r = 1 );
   ~OutputGL();
 
+  virtual void openFragment( int x, int y, int size );
+  virtual void closeFragment();
   virtual void closeOutput();
 
   virtual void setShade( bool shade );
@@ -42,6 +48,7 @@ protected:
   char *filename;
   bool useTexturedFont, shade, jpeg;
   int jpeg_quality, rescale;
+  GLubyte * image;
 
   sgVec4 light_vector;
 };

@@ -32,6 +32,8 @@ public:
 
   inline bool isOpen() { return open; }
   inline int getSize() { return size; }
+  virtual void openFragment( int x, int y, int size ) {}
+  virtual void closeFragment() {}
   virtual void closeOutput();
 
   virtual void setShade( bool shade );
@@ -52,7 +54,8 @@ public:
 
 protected:
   bool open;
-  int size;
+  int size, fragment_size;
+  int posx, posy;
 };
 
 #endif

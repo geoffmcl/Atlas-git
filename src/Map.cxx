@@ -31,6 +31,8 @@
   2005-01-16        DCL: Capable of off-screen rendering on modern GLX machines.
   2005-01-30        Switched to cross-platform render-texture code for off-screen
                     rendering, plus jpg support (submitted by Fred Bouvier).
+  2005-02-26        FB: Arbitrary size by tiling.
+                    Move fg_set_scenery to a specific file.
 ---------------------------------------------------------------------------*/
 
 // Needs to be included *before* the UL_GLX check!
@@ -61,6 +63,7 @@
 #include <simgear/misc/sg_path.hxx>
 #include "extensions.hxx"
 #include "RenderTexture.h"
+#include "Scenery.hxx"
 #include <vector>
 #include STL_STRING
 
@@ -88,8 +91,8 @@ string_list fg_scenery;
 unsigned int scenery_pos;
 unsigned int max_path_length = 0;
 int opathl, spathl;
-ulDir *dir1, *dir2 = NULL;
-ulDirEnt *ent;
+ulDir *dir1 = NULL, *dir2 = NULL;
+ulDirEnt *ent = NULL;
 RenderTexture *rt2 = 0;
 
 /*****************************************************************************/
@@ -167,7 +170,8 @@ void redrawMap() {
 	if (ent != NULL) {
 	  exit = (ent->d_name[0] != '.' &&
 		  sscanf(ent->d_name, "%c%d%c%d",
-			 &ew, &lon, &ns, &lat) == 4);
+			 &ew, &lon, &ns, &lat) == 4 &&
+                  strlen(ent->d_name) == 7);
 	} else {
 	  exit = true;
 	}
@@ -197,12 +201,15 @@ void redrawMap() {
       }
     } while (ent == NULL);
     
-    sprintf(title_buffer, "%c%.1f %c%.1f",
-	    (clat<0.0f)?'S':'N', clat * SG_RADIANS_TO_DEGREES,
-	    (clon<0.0f)?'W':'E', clon * SG_RADIANS_TO_DEGREES);
-    if(!headless) glutSetWindowTitle(title_buffer);
+    if (!headless) {
+      sprintf(title_buffer, "%c%.1f %c%.1f",
+	      (clat<0.0f)?'S':'N', clat * SG_RADIANS_TO_DEGREES,
+	      (clon<0.0f)?'W':'E', clon * SG_RADIANS_TO_DEGREES);
+      glutSetWindowTitle(title_buffer);
+    }
 
-    OutputGL output(outname, s, smooth_shade, textured_fonts, font_name, create_jpeg, jpeg_quality, rescale_factor);
+    OutputGL output(outname, s, smooth_shade, textured_fonts, font_name,
+                    create_jpeg, jpeg_quality, rescale_factor);
     mapobj.createMap( &output, clat, clon, fg_scenery[scenery_pos], 1.0f );
     output.closeOutput();
     if (doublebuffer && !headless) {
@@ -211,59 +218,6 @@ void redrawMap() {
 
     if(!headless) glutPostRedisplay();
   }
-}
-
-/*****************************************************************************/
-
-// Cribbed from FlightGear, with the objects code commented out.
-// The supplied path is appended with 'Terrain' if it exists, not if otherwise.
-// NOTE: MapMaker::setFGRoot() should be called first.
-void set_fg_scenery(const string &scenery) {
-    SGPath s;
-    
-    char* fg_root = mapobj.getFGRoot();
-    if (scenery.empty() && fg_root != NULL) {
-        s.set( fg_root );
-        s.append( "Scenery" );
-    } else {
-        s.set( scenery );
-    }
-    
-    string_list path_list = sgPathSplit( s.str() );
-    fg_scenery.clear();
-    
-    for (unsigned i = 0; i < path_list.size(); i++) {
-
-        max_path_length = ( path_list[i].size() > max_path_length ? path_list[i].size() : max_path_length );
-        ulDir *d = ulOpenDir( path_list[i].c_str() );
-        if (d == NULL)
-            continue;
-        ulCloseDir( d );
-
-        //SGPath pt( path_list[i], po( path_list[i] );
-	SGPath pt( path_list[i] );
-        pt.append("Terrain");
-        //po.append("Objects");
-
-        ulDir *td = ulOpenDir( pt.c_str() );
-        //ulDir *od = ulOpenDir( po.c_str() );
-
-        //if (td == NULL && od == NULL)
-	if(td == NULL) { // ie. it doen't exist with Terrain appended - push back the original
-            fg_scenery.push_back( path_list[i] );
-        } else {
-            if (td != NULL) {
-                fg_scenery.push_back( pt.str() );
-                ulCloseDir( td );
-            }
-	    /*
-            if (od != NULL) {
-                fg_scenery.push_back( po.str() );
-                ulCloseDir( od );
-            }
-	    */
-        }
-    }
 }
 
 /*****************************************************************************/
@@ -371,18 +325,30 @@ bool ContinueIfNoHeadless() {
   return((c == 'n' || c == 'N') ? false : true);
 }
 
-bool InitPbuffer() {
+bool InitPbuffer( int &tex_size ) {
     rt2 = new RenderTexture(); 
     rt2->Reset("rgb tex2D");
-    if (!rt2->Initialize(mapobj.getSize(), mapobj.getSize()))
+    tex_size = mapobj.getSize();
+    bool cur_ok;
+    fprintf(stderr, "Trying size %d : ", tex_size );
+    while (!(cur_ok = rt2->Initialize(tex_size, tex_size)) && tex_size > 1)
+    {
+        tex_size >>= 1;
+        fprintf(stderr, "Trying size %d : ", tex_size );
+    }
+    if ( !cur_ok )
     {
         fprintf(stderr, "RenderTexture Initialization failed!\n");
+    }
+    else
+    {
+        fprintf(stderr, "Ok\n");
     }
 
     // for shadow mapping we still have to bind it and set the correct 
     // texture parameters using the SGI_shadow or ARB_shadow extension
     // setup the rendering context for the RenderTexture
-    bool cur_ok = rt2->BeginCapture();
+    cur_ok = cur_ok && rt2->BeginCapture();
     if ( !cur_ok )
     {
         delete rt2;
@@ -441,7 +407,7 @@ int main( int argc, char **argv ) {
     }
   }
 
-  if ( ((~rescale_factor + 1) & rescale_factor) != rescale_factor ) {
+  if ( rescale_factor & ( rescale_factor-1 ) ) {
     fprintf(stderr, "%s: --aafactor should be a power of 2.\n", argv[0]);
     exit(1);
   }
@@ -546,9 +512,10 @@ int main( int argc, char **argv ) {
   glutInitWindowSize( 400, 1 );
   glutCreateWindow( "MAP - Please wait while drawing" );
   
-
+  int tex_size = 0;
   if(headless) {
-    headless = InitPbuffer();
+    headless = InitPbuffer( tex_size );
+    mapobj.setDeviceSize( tex_size );
     if(headless) {
       while(1) {
 	redrawMap();
@@ -556,7 +523,9 @@ int main( int argc, char **argv ) {
       exit(0);
     }
   }
-  glutReshapeWindow( mapobj.getSize(), mapobj.getSize() );
+  if ( mapobj.getSize() > 1024 )
+      mapobj.setDeviceSize( 1024 );
+  glutReshapeWindow( mapobj.getDeviceSize(), mapobj.getDeviceSize() );
 
   glutReshapeFunc( reshapeMap );
   glutDisplayFunc( redrawMap );

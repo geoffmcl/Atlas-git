@@ -33,6 +33,7 @@ Map_SOURCES = \
 	Overlays.cxx Overlays.hxx \
 	Projection.cxx Projection.hxx \
 	RenderTexture.cpp RenderTexture.h \
+	Scenery.cxx Scenery.hxx \
 	extensions.cxx extensions.hxx \
 	fg_mkdir.cxx fg_mkdir.hxx
 
@@ -49,7 +50,8 @@ MapPS_SOURCES = \
 	Output.cxx Output.hxx \
 	OutputPS.cxx OutputPS.hxx \
 	Overlays.cxx Overlays.hxx \
-	Projection.cxx Projection.hxx
+	Projection.cxx Projection.hxx \
+	Scenery.cxx Scenery.hxx \
 
 MapPS_LDADD = \
 	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgdebug \

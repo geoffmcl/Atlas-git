@@ -15,13 +15,6 @@ OutputGL::OutputGL( char *filename, int size, bool smooth_shading,
   GfxOutput(filename, size), filename(filename), 
   useTexturedFont(useTexturedFont), jpeg(jpg), jpeg_quality(q), rescale(r)
 {
-  glViewport( 0, 0, size, size );
-  glMatrixMode( GL_PROJECTION );
-  glLoadIdentity();
-  glOrtho( 0.0f, (GLfloat)size, 0.0f, (GLfloat)size, -1.0f, 1.0f );
-  glMatrixMode( GL_MODELVIEW );
-  glLoadIdentity();
-
   glEnable(GL_BLEND);
   glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
 
@@ -44,10 +37,12 @@ OutputGL::OutputGL( char *filename, int size, bool smooth_shading,
     circle_x[i] = cos(2*SG_PI / SUBDIVISIONS * i);
     circle_y[i] = sin(2*SG_PI / SUBDIVISIONS * i);
   }
+
+  image = new GLubyte[size*size*3];
 }
 
 OutputGL::~OutputGL() {
-  closeOutput();
+  delete [] image;
 
   if (useTexturedFont) {
     delete font;
@@ -56,20 +51,56 @@ OutputGL::~OutputGL() {
   }
 }
 
+void OutputGL::openFragment( int x, int y, int s )
+{
+  fragment_size = s;
+  posx = x;
+  posy = y;
+
+  if ( s == 0 )
+      s = size;
+  glViewport( 0, 0, s, s );
+  glMatrixMode( GL_PROJECTION );
+  glLoadIdentity();
+  glOrtho( x, x+s, y, y+s, -1.0f, 1.0f );
+  glMatrixMode( GL_MODELVIEW );
+  glLoadIdentity();
+}
+
+void OutputGL::closeFragment() {
+  if (!open)
+    return;
+
+  GLubyte *subimage = new GLubyte[fragment_size*fragment_size*3];
+  if (!subimage)
+    return;
+
+  // grab screen
+  glFinish();
+  glReadPixels(0, 0, fragment_size, fragment_size,
+	       GL_RGB, GL_UNSIGNED_BYTE, subimage);
+
+  int sx = fragment_size,
+      sy = fragment_size;
+  if ( posx + sx > size )
+    sx = size - posx;
+  if ( posy + sy > size )
+    sy = size - posy;
+  for ( int i = 0; i < sx; ++i ) {
+    for ( int j = 0; j < sy; ++j ) {
+      image[(( j+posy ) * size + ( i+posx )) * 3] = subimage[(j * fragment_size + i) * 3];
+      image[(( j+posy ) * size + ( i+posx )) * 3 + 1] = subimage[(j * fragment_size + i) * 3 + 1];
+      image[(( j+posy ) * size + ( i+posx )) * 3 + 2] = subimage[(j * fragment_size + i) * 3 + 2];
+    }
+  }
+  delete [] subimage;
+}
+
 void OutputGL::closeOutput() {
   if (!open)
     return;
 
   open = false;
-
-  GLubyte *image = new GLubyte[size*size*3];
-  if (!image)
-    return;
-
-  // grab screen
-  glFinish();
-  glReadPixels(0, 0, size, size,
-	       GL_RGB, GL_UNSIGNED_BYTE, image);
 
   int scale = rescale;
   int current_size = size;
@@ -178,10 +209,6 @@ void OutputGL::closeOutput() {
   }
   fclose(fp);
   printf("Written '%s'\n", filename);
-
-  delete[] image;
-
-  return;           
 }
 
 void OutputGL::setShade( bool shade ) {
