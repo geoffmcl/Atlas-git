@@ -1004,20 +1004,20 @@ int main(int argc, char **argv) {
     } else {
       strcpy(path, FGBASE_DIR);
     }
-
     strcat(path, "Atlas/");
-    if (access(path, F_OK)==-1) {
-       printf("\nWarning: path %s doesn't exist. Maps won't be loaded!\n", path);
-    } else {
-       strcpy(lowrespath, path);
-       strcat(lowrespath, "lowres/");
-       if (access(lowrespath, F_OK)==-1) {
-	  printf("\nWarning: path %s doesn't exist. Low resolution maps won't be loaded\n", lowrespath);
-	  lowres_avlble=0;
-       } else {
-	  lowres_avlble=1;
-       }
-    }
+  }  
+    
+  if (access(path, F_OK)==-1) {
+     printf("\nWarning: path %s doesn't exist. Maps won't be loaded!\n", path);
+  } else {
+     strcpy(lowrespath, path);
+     strcat(lowrespath, "lowres/");
+     if (access(lowrespath, F_OK)==-1) {
+	printf("\nWarning: path %s doesn't exist. Low resolution maps won't be loaded\n", lowrespath);
+	lowres_avlble=0;
+     } else {
+	lowres_avlble=1;
+     }
   }
 
   latitude  *= SG_DEGREES_TO_RADIANS;
