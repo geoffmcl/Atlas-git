@@ -139,17 +139,26 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
     dalpha -= alpha;
   }
 
-  int sgntheta = (theta < 0.0f) ? 1 : 0, sgnalpha = (alpha < 0.0f) ? 1 : 0;
+  //int sgntheta = (theta < 0.0f) ? 1 : 0, sgnalpha = (alpha < 0.0f) ? 1 : 0;
   // Rainer Emrich's improved code for finding map boundaries
-  int mid_theta = (int)( theta * SG_RADIANS_TO_DEGREES ) - sgntheta;
-  int mid_alpha = (int)( alpha * SG_RADIANS_TO_DEGREES ) - sgnalpha;
-  int int_dtheta = (int)( dtheta * SG_RADIANS_TO_DEGREES + 0.6f);
-  int int_dalpha = (int)( dalpha * SG_RADIANS_TO_DEGREES + 0.5f);
-  int max_theta = mid_theta + int_dtheta;
-  int min_theta = mid_theta - int_dtheta;
-  int max_alpha = mid_alpha + int_dalpha;
-  int min_alpha = mid_alpha - int_dalpha;
-  
+  //int mid_theta = (int)( theta * SG_RADIANS_TO_DEGREES ) - sgntheta;
+  //int mid_alpha = (int)( alpha * SG_RADIANS_TO_DEGREES ) - sgnalpha;
+  //int int_dtheta = (int)( dtheta * SG_RADIANS_TO_DEGREES + 0.6f);
+  //int int_dalpha = (int)( dalpha * SG_RADIANS_TO_DEGREES + 0.5f);
+  //int max_theta = mid_theta + int_dtheta;
+  //int min_theta = mid_theta - int_dtheta;
+  //int max_alpha = mid_alpha + int_dalpha;
+  //int min_alpha = mid_alpha - int_dalpha;
+
+  int max_theta = (int)floor((theta + dtheta) * SG_RADIANS_TO_DEGREES);
+  int min_theta = (int)floor((theta - dtheta) * SG_RADIANS_TO_DEGREES);
+  int max_alpha = (int)floor((alpha + dalpha) * SG_RADIANS_TO_DEGREES);
+  int min_alpha = (int)floor((alpha - dalpha) * SG_RADIANS_TO_DEGREES);
+  if( max_theta > 90 ) max_alpha=90;
+  if( min_theta < -90 ) min_alpha=-90;
+  if( max_alpha > 360 ) max_alpha=360;
+  if( min_alpha < -360 ) min_alpha=-360;
+
   zoom = (float)size / (float)scle;
 
   // load the tiles and do actual drawing
@@ -336,6 +345,7 @@ void MapMaker::draw_trifan( list<int> &indices, vector<float*> &v,
 
   sgVec3 t[3], nrm[3];
   sgVec2 p[3];
+  sgVec4 color[3];
 
   sgCopyVec3( t[0], v[cvert] );
   sgCopyVec3( t[1], v[vert2] );
@@ -345,6 +355,7 @@ void MapMaker::draw_trifan( list<int> &indices, vector<float*> &v,
   sgSetVec2( p[1], scale(t[1][0], size, zoom), scale(t[1][1], size, zoom) );
 
   while ( index != indices.end() ) {
+    bool smooth=false;
     vert2 = *(index++);
 
     sgCopyVec3( t[2], v[vert2] );
@@ -360,18 +371,27 @@ void MapMaker::draw_trifan( list<int> &indices, vector<float*> &v,
 	dcol = col;
       } else {
 	dcol = elev2colour((int)((t[0][2] + t[1][2] + t[2][2]) / 3.0f));
+	if(features & DO_SMOOTH_COLOR) {
+	  elev2colour_smooth(t[0][2],color[0]);
+	  elev2colour_smooth(t[1][2],color[1]);
+	  elev2colour_smooth(t[2][2],color[2]);
+	  smooth=true;
+        }
       }
       output->setColor(palette[dcol]);
     }
 
-    output->drawTriangle( p, nrm );
+    if(smooth)
+      output->drawTriangle( p, nrm, color );
+    else
+      output->drawTriangle( p, nrm );
 
     sgCopyVec2( p[1], p[2] );
     sgCopyVec3( t[1], t[2] );
     sgCopyVec3( nrm[1], nrm[2] );
   }
 
-  if (col < 0) {
+  if (col < 0 && !(features & DO_SMOOTH_COLOR)) {
     sub_trifan( indices, v, n );
   }
 }

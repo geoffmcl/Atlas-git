@@ -179,6 +179,7 @@ void print_help() {
   printf("  --singlebuffer          Use single buffered display.\n");
   printf("  --glutfonts             Use GLUT built-in fonts.\n");
   printf("  --palette=path          Set the palette file to use.\n");
+  printf("  --smooth-color          Make smooth color heights\n");
 }
 
 bool parse_arg(char* arg) {
@@ -221,6 +222,8 @@ bool parse_arg(char* arg) {
     textured_fonts = false;
   } else if ( strcmp(arg, "--verbose") == 0 ) {
     features |= MapMaker::DO_VERBOSE;
+  } else if ( strcmp(arg, "--smooth-color") == 0 ) {
+    features |= MapMaker::DO_SMOOTH_COLOR;
   } else if ( strcmp(arg, "--help") == 0 ) {
     print_help();
     exit(0);

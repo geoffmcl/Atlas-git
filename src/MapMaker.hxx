@@ -35,11 +35,12 @@
 
 class MapMaker {
 public:
-  static const int DO_SHADE      = 1;
-  static const int DO_AIRPORTS   = 2;
-  static const int DO_NAVAIDS    = 4;
-  static const int DO_VERBOSE    = 8;
-  static const int DO_ALL_FEAT   = 1+2+4+8;
+  static const int DO_SHADE        =  1;
+  static const int DO_AIRPORTS     =  2;
+  static const int DO_NAVAIDS      =  4;
+  static const int DO_VERBOSE      =  8;
+  static const int DO_SMOOTH_COLOR = 16; 
+  static const int DO_ALL_FEAT   = 1+2+4+8+16;
 
   // CONSTRUCTOR
   MapMaker( char *fg_root = "/usr/local/lib/FlightGear", 
@@ -118,6 +119,27 @@ protected:
     for (i = 0; i < number_elev_levels-1 && elev >= elev_height[i]; i++);
   
     return elev_colindex[i];
+  }
+
+# define APPROX(Ca,Cb,X,D) ((Cb-Ca)/D*X+Ca)
+  inline void elev2colour_smooth( int elev, float color[4] ) {
+    int i,j;
+    for (i = 0; i < number_elev_levels-1 && elev > elev_height[i]; i++);
+    for (j = number_elev_levels-1; j > 0 && elev <= elev_height[j]; j--);
+    if(i==j){
+      color[0]=palette[elev_colindex[j]][0];
+      color[1]=palette[elev_colindex[j]][1];
+      color[2]=palette[elev_colindex[j]][2];
+      color[3]=palette[elev_colindex[j]][3];
+    } else {
+      float diver=(float)(elev_height[i] - elev_height[j]);
+      float pom=(float)(elev - elev_height[j]);
+      color[0]=APPROX(palette[elev_colindex[j]][0],palette[elev_colindex[i]][0],pom,diver);
+      color[1]=APPROX(palette[elev_colindex[j]][1],palette[elev_colindex[i]][1],pom,diver);
+      color[2]=APPROX(palette[elev_colindex[j]][2],palette[elev_colindex[i]][2],pom,diver);
+      color[3]=APPROX(palette[elev_colindex[j]][3],palette[elev_colindex[i]][3],pom,diver);    
+    }
+    return;
   }
 
 /****************************************************************************/
