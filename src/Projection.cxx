@@ -28,7 +28,8 @@
 #include "Geodesy.hxx"
 
 static const char *names[]={"Sanson-Flamsteed",
-                            "Equidistant Cylindrical (Equatorial)"};
+                            "Equidistant Cylindrical (Equatorial)",
+			    "Equidistant Cylindrical (Local)"};
 
 Projection::Projection() {
    setSystem(SANSON_FLAMSTEED);
@@ -42,6 +43,7 @@ void Projection::setSystem(int id) {
    
    switch (sysid) {
     case CYL_EQUIDISTANT_EQ:
+    case CYL_EQUIDISTANT_LOCAL:
       systemclass=CYLINDRICAL;
       break;
     default:
@@ -67,6 +69,11 @@ void Projection::ab_lat( float lat, float lon, float lat_r, float lon_r, sgVec3 
         dst[0] = dst[2] * (lon-lon_r);
         dst[1] = dst[2] * (lat-lat_r);
         break;
+    case CYL_EQUIDISTANT_LOCAL:
+       dst[2] = earth_radius_lat(lat_r);
+       dst[0] = dst[2] * cos(lat_r)*(lon-lon_r);
+       dst[1] = dst[2] * (lat-lat_r);
+       break;
    }
 }
 

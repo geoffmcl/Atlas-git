@@ -28,10 +28,11 @@ class Projection {
    
  public:
    //Projection systems
+#define MAX_NUM_PROJECTIONS 3
    static const int SANSON_FLAMSTEED=0;
    static const int CYL_EQUIDISTANT_EQ=1;
-   static const int NUM_PROJECTIONS=2;
-#define MAX_NUM_PROJECTIONS 32
+   static const int CYL_EQUIDISTANT_LOCAL=2;
+   static const int NUM_PROJECTIONS=MAX_NUM_PROJECTIONS;
    
    Projection();
    ~Projection();
