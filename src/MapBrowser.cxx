@@ -111,16 +111,17 @@ void MapBrowser::setMapPath( char *path ) {
 
 void MapBrowser::changeResolution(char *path) {
   MapTile *tile;
-  list<MapTile*>::iterator i = tiles.end();
+  list<MapTile*>::iterator i = tiles.end(),
+                           itmp;
   i--;
   while (tiles.begin() != tiles.end()) {
      tile =*i;
      glDeleteTextures( 1, &tile->texture_handle );
-     tiles.erase( i );
+     itmp = i--;
+     tiles.erase( itmp );
      tiletable.erase(tile->c);
      delete tile->texbuf;
      delete tile;
-     i--;
   }
   
   setMapPath(path);
