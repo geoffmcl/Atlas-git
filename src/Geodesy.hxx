@@ -25,7 +25,7 @@
 
 /* equatorial and polar earth radius */
 const float rec  = 6378137;          // earth radius, equator (?)
-const float rpol = 6356752.314;      // earth radius, polar   (?)
+const float rpol = 6356752.314f;      // earth radius, polar   (?)
 
 /************************************************************************
   some trigonometric helper functions 
