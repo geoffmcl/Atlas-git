@@ -451,8 +451,8 @@ int MapMaker::process_directory( char *path, int plen, int lat, int lon,
   int sgnk = (lat < 0) ? 1 : 0, sgnl = (lon < 0) ? 1 : 0;
   
   int llen = sprintf( path + plen, "%c%03d%c%02d/%c%03d%c%02d", 
-		      ew(lon / 10 * 10), abs(lon / 10 * 10) + sgnl * 10, 
-		      ns(lat / 10 * 10), abs(lat / 10 * 10) + sgnk * 10,
+		      ew(lon / 10 * 10), abs((lon+sgnl) / 10 * 10) + sgnl*10, 
+		      ns(lat / 10 * 10), abs((lat+sgnk) / 10 * 10) + sgnk*10,
 		      ew(lon), abs(lon), ns(lat), abs(lat) );
 
   DIR *dir;

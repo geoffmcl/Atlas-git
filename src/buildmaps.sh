@@ -1,6 +1,6 @@
 #!/bin/sh
 
-ROOT=/home/curt/FlightGear/Scenery
+ROOT=/usr/local/lib/FlightGear/Scenery
 OUTPUTDIR=./maps
 
 mkdir -p $OUTPUTDIR
@@ -28,13 +28,13 @@ for i in ${ROOT}/${CHUNK}/*; do
     if [ -f ${TMP1}.png ]; then
 	echo "${TMP1}.png exits, skipping"
     else
-        echo ./Map --fgroot=/home/curt/FlightGear --verbose \
+        echo ./Map --verbose \
 	    --lat=${LAT} --lon=${SIGN}${LON} \
 	    --autoscale --disable-airports --disable-navaids \
 	    --size=256 --disable-airports --disable-navaids \
 	    --output=${OUTPUTDIR}/${TMP1}.png
 
-        ./Map --fgroot=/home/curt/FlightGear --verbose \
+        ./Map --verbose \
 	    --lat=${LAT} --lon=${SIGN}${LON} --autoscale \
 	    --size=256 --disable-airports --disable-navaids \
 	    --output=${OUTPUTDIR}/${TMP1}.png
