@@ -43,6 +43,8 @@ void GfxOutput::setColor( const float *rgb ) {}
 void GfxOutput::clear( const float *rgb ) {}
 void GfxOutput::drawTriangle( const sgVec2 *p, const sgVec3 *normals ) {}
 void GfxOutput::drawQuad    ( const sgVec2 *p, const sgVec3 *normals ) {}
+void GfxOutput::drawTriangle( const sgVec2 *vertices, const sgVec3 *normals, const sgVec4 *colors ) { drawTriangle( vertices, normals); }
+void GfxOutput::drawQuad    ( const sgVec2 *vertices, const sgVec3 *normals, const sgVec4 *colors ) { drawQuad( vertices, normals); }
 void GfxOutput::drawCircle  ( sgVec2 p, int radius ) {}
 void GfxOutput::drawLine    ( sgVec2 p1, sgVec2 p2 ) {}
 void GfxOutput::drawText    ( sgVec2 p, char *text ) {}

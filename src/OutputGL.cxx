@@ -23,6 +23,9 @@ OutputGL::OutputGL( char *filename, int size, bool smooth_shading,
   glEnable(GL_LIGHTING);
   glShadeModel(smooth_shading ? GL_SMOOTH : GL_FLAT);
 
+  glEnable(GL_COLOR_MATERIAL);
+  glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
+
   if (useTexturedFont) {
     font = new fntTexFont( fontname );
     textRenderer.setFont( font );
@@ -154,12 +157,29 @@ void OutputGL::drawTriangle( const sgVec2 *p, const sgVec3 *normals ) {
   glEnd();
 }
 
+void OutputGL::drawTriangle( const sgVec2 *p, const sgVec3 *normals, const sgVec4 *color ) {
+  glBegin(GL_TRIANGLES);
+    glColor4fv( color[0] );glNormal3fv( normals[0] ); glVertex2fv( p[0] );
+    glColor4fv( color[1] );glNormal3fv( normals[1] ); glVertex2fv( p[1] );
+    glColor4fv( color[2] );glNormal3fv( normals[2] ); glVertex2fv( p[2]);
+  glEnd();
+}
+
 void OutputGL::drawQuad( const sgVec2 *p, const sgVec3 *normals ) {
   glBegin(GL_QUADS);
   glNormal3fv( normals[0] ); glVertex2fv( p[0] );
   glNormal3fv( normals[1] ); glVertex2fv( p[1] );
   glNormal3fv( normals[2] ); glVertex2fv( p[2] );
   glNormal3fv( normals[3] ); glVertex2fv( p[3] );
+  glEnd();
+}
+
+void OutputGL::drawQuad( const sgVec2 *p, const sgVec3 *normals, const sgVec4 *color ) {
+  glBegin(GL_QUADS);
+    glColor4fv( color[0] );glNormal3fv( normals[0] ); glVertex2fv( p[0] );
+    glColor4fv( color[1] );glNormal3fv( normals[1] ); glVertex2fv( p[1] );
+    glColor4fv( color[2] );glNormal3fv( normals[2] ); glVertex2fv( p[2] );
+    glColor4fv( color[3] );glNormal3fv( normals[3] ); glVertex2fv( p[3] );
   glEnd();
 }
 

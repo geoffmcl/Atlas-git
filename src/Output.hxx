@@ -41,6 +41,8 @@ public:
   virtual void clear( const float *rgb );
   virtual void drawTriangle( const sgVec2 *vertices, const sgVec3 *normals );
   virtual void drawQuad    ( const sgVec2 *vertices, const sgVec3 *normals );
+  virtual void drawTriangle( const sgVec2 *vertices, const sgVec3 *normals, const sgVec4 *colors );
+  virtual void drawQuad    ( const sgVec2 *vertices, const sgVec3 *normals, const sgVec4 *colors );
   virtual void drawCircle  ( sgVec2 p, int radius );
   virtual void drawLine    ( sgVec2 p1, sgVec2 p2 );
   virtual void drawText    ( sgVec2 p, char *text );
