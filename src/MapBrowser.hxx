@@ -106,7 +106,7 @@ protected:
   };
 
   struct TileLess {
-    size_t operator()(const Coord &v1, const Coord &v2) const {
+    bool operator()(const Coord &v1, const Coord &v2) const {
       return (v1.lat < v2.lat || (v1.lat == v2.lat && v1.lon < v2.lon));
     }
   };
