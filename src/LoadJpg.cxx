@@ -29,8 +29,6 @@ extern "C" {
 
 // reads
 char *loadJpg( char *filename, int *width, int *height ) {
-  char *header[8];
-
   FILE *fp = fopen(filename, "rb");
   if (!fp) {
     //fprintf(stderr, "loadPng: Unable to open file \"%s\".\n", filename);
