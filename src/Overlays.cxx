@@ -78,14 +78,13 @@ Overlays::Overlays( char *fg_root = NULL, float scale = 1.0f,
 }
 
 void Overlays::drawOverlays() {
-  const float GRIDC = 0.5f * SG_DEGREES_TO_RADIANS / 125.0f;
-
   float dtheta, dalpha;
 
   lat_ab( size / scale / 2.0f, size / scale / 2.0f, lat, lon, 
 	  &dtheta, &dalpha );
   dtheta -= lat;
   dalpha -= lon;
+  if (dalpha > SG_PI/2) dalpha = SG_PI/2;
 
   if (features & OVERLAY_AIRPORTS) {
     airport_labels(lat, lon, dtheta, dalpha );
@@ -96,8 +95,8 @@ void Overlays::drawOverlays() {
   }
 
   if (features & OVERLAY_GRIDLINES) {
-    draw_gridlines( dtheta * 1.5f, dalpha * 1.5f, 
-		    rint(1.0f / scale) * GRIDC );
+    draw_gridlines( dtheta * 1.5f, dalpha * 1.5f,
+                   dtheta * 200 / (size/2) );  // Aim for 200 pixels spacing
   }
 
   if (features & OVERLAY_FLIGHTTRACK) {
@@ -105,9 +104,96 @@ void Overlays::drawOverlays() {
   }
 }
 
+// Shift an angle (radians) by multiples of 2PI into the range [-PI, PI).
+static double wrap_angle(double a_rad) {
+    double y = fmod(a_rad, SGD_2PI);  /* range (-2PI, 2PI) */
+    if      (y < -SGD_PI) y += SGD_2PI;
+    else if (y >= SGD_PI) y -= SGD_2PI;
+    return y;
+}
+
+// Convert an angle to degrees and possibly minutes and possibly seconds,
+// according to the given resolution.
+// 'ns' is the prefixes for positive and negative, e.g. "NS" or "EW" or "+-".
+// See also dmshh_format in Atlas.cxx
+static string dms_format(const char ns[2], float angle_rad, float resolution_rad) {
+  int deg, min, sec;
+  char s[50];
+  const char *format;
+  
+  if (angle_rad < -resolution_rad/4)
+    ns++;
+  if (angle_rad < 0)
+    angle_rad = -angle_rad;
+
+  // Must do the rounding exactly once, at the displayed resolution.
+  if (resolution_rad > 0.9f * SG_DEGREES_TO_RADIANS) {
+    deg = (int)rint(angle_rad * SG_RADIANS_TO_DEGREES);
+    format = "%c%02d*";
+  } else if (resolution_rad > 0.9f / 60 * SG_DEGREES_TO_RADIANS) {
+    min = (int)rint(angle_rad * SG_RADIANS_TO_DEGREES * 60);
+    deg = min / 60;
+    format = "%c%02d*%02d'";
+  } else {
+    sec = (int)rint(angle_rad * SG_RADIANS_TO_DEGREES * 60 * 60);
+    min = sec / 60;
+    deg = min / 60;
+    format = "%c%02d*%02d'%02d\"";
+  }
+  sprintf(s, format, *ns, deg, min % 60, sec % 60);
+  return string(s);
+}
+
+// Pick nice angles close to xaim and yaim. Prefer a pair with similar
+// relationships to their respective aims, to make the grid fairly square.
+static void nice_angle_pair( float xaim, float yaim, float *pxnice, float *pynice ) {
+  // If each spacing is an integer multiple of the previous, new lines
+  // appear but none disappear as you zoom in.
+  const float nice_angles[] = { 180, 90, 45, 15, 5, 1, .5, .25, 5.0/60, 1.0/60 };
+
+  int ix, iy;
+
+  for (ix = 1; ix < sizeof(nice_angles)/sizeof(nice_angles[0]) - 1; ix++) {
+    if (nice_angles[ix] < xaim) break;
+  }
+
+  for (iy = 1; iy < sizeof(nice_angles)/sizeof(nice_angles[0]) - 1; iy++) {
+    if (nice_angles[iy] < yaim) break;
+  }
+
+  // ix and iy each index the second of two possible angles.
+
+  float xbest, ybest;
+  float prev_lerr = 999;
+  for (int x = ix-1; x <= ix; x++) {
+    for (int y = iy-1; y <= iy; y++) {
+      float xlerr = log(nice_angles[x]) - log(xaim);
+      float ylerr = log(nice_angles[y]) - log(yaim);
+      float lerr = max(fabs(xlerr - ylerr), max(fabs(xlerr), fabs(ylerr)));
+      if (lerr < prev_lerr) {
+        prev_lerr = lerr;
+        xbest = nice_angles[x];
+        ybest = nice_angles[y];
+      }
+    }
+  }
+  *pxnice = xbest;
+  *pynice = ybest;
+}
+
+// Draw grid lines in latitude range lat-dtheta to lat+dtheta radians,
+// longitude range lon-dalpha to lon+dalpha.
+// 'spacing' is the desired approximate latitude interval in radians.
 void Overlays::draw_gridlines( float dtheta, float dalpha, float spacing ) {
   // Divide gridlines into 10' steps
   const float STEP = 10.0f / 60.0f * SG_DEGREES_TO_RADIANS;
+
+  float grid_theta, grid_alpha;
+  nice_angle_pair(spacing * SG_RADIANS_TO_DEGREES,
+		  spacing * SG_RADIANS_TO_DEGREES * dalpha / dtheta,
+		  &grid_theta, &grid_alpha);
+  grid_theta *= SG_DEGREES_TO_RADIANS;
+  grid_alpha *= SG_DEGREES_TO_RADIANS;
 
   sgVec3 xyr;
   sgVec2 p1, p2;
@@ -117,27 +203,27 @@ void Overlays::draw_gridlines( float dtheta, float dalpha, float spacing ) {
   output->setColor(grd_color);
 
   // draw line labels
-  for (float glon = rint((lon - dalpha) / spacing) * spacing; 
-       glon <= lon + dalpha; glon += spacing) {
-	  for (float glat = rint(lat - dtheta / spacing) * spacing; 
-	       glat <= lat + dtheta; glat += spacing) {
-		      ab_lat( glat, glon, lat, lon, xyr );
-		      sgSetVec2( p1, ::scale(xyr[0], output->getSize(), scale), 
-				 ::scale(xyr[1], output->getSize(), scale) );
-			sprintf(lable_buffer, "%c%.1f %c%.1f",
-			    (glat<0.0f)?'S':'N', fabs(glat * SG_RADIANS_TO_DEGREES),
-			    (glon<0.0f)?'W':'E', fabs(glon * SG_RADIANS_TO_DEGREES));
-			output->drawText( p1, lable_buffer);
-	  }
+  for (float glon = rint((lon - dalpha) / grid_alpha) * grid_alpha; 
+       glon <= lon + dalpha; glon += grid_alpha) {
+    for (float glat = rint(max(lat - dtheta, -SG_PI/2 + grid_theta) / grid_theta) * grid_theta; 
+	 glat <= min(lat + dtheta, SG_PI/2 - grid_theta/2); glat += grid_theta) {
+      ab_lat( glat, glon, lat, lon, xyr );
+      sgSetVec2( p1, ::scale(xyr[0], output->getSize(), scale), 
+		 ::scale(xyr[1], output->getSize(), scale) );
+      string label =
+	dms_format("NS", glat, grid_theta) + ' ' +
+	dms_format("EW", wrap_angle(glon), grid_alpha);
+      output->drawText( p1, (char *)label.c_str() );
+    }
   }
 
   // draw north-south parallel lines
-  for (float glon = rint((lon - dalpha) / spacing) * spacing; 
-       glon <= lon + dalpha; glon += spacing) {
+  for (float glon = rint((lon - dalpha) / grid_alpha) * grid_alpha; 
+       glon <= lon + dalpha; glon += grid_alpha) {
     first = true;
 
-    for (float glat = lat - dtheta; glat <= lat + dtheta; glat += STEP) {
-      ab_lat( glat, glon, lat, lon, xyr );
+    for (float glat = max(lat - dtheta, -SG_PI/2); glat <= lat + dtheta + STEP; glat += STEP) {
+      ab_lat( min(glat, SG_PI/2), glon, lat, lon, xyr );
       sgSetVec2( p1, ::scale(xyr[0], output->getSize(), scale), 
 		 ::scale(xyr[1], output->getSize(), scale) );
 
@@ -152,11 +238,11 @@ void Overlays::draw_gridlines( float dtheta, float dalpha, float spacing ) {
   }
 
   // draw east-west parallel lines
-  for (float glat = rint(lat - dtheta / spacing) * spacing; 
-       glat <= lat + dtheta; glat += spacing) {
+  for (float glat = rint(max(lat - dtheta, -SG_PI/2 + grid_theta) / grid_theta) * grid_theta; 
+       glat <= min(lat + dtheta, SG_PI/2 - grid_theta/2); glat += grid_theta) {
     first = true;
 
-    for (float glon = lon - dalpha; glon <= lon + dalpha; glon += STEP) {
+    for (float glon = lon - dalpha; glon <= lon + dalpha + STEP; glon += STEP) {
       ab_lat( glat, glon, lat, lon, xyr );
       sgSetVec2( p1, ::scale(xyr[0], output->getSize(), scale), 
 		 ::scale(xyr[1], output->getSize(), scale) );
@@ -222,7 +308,7 @@ void Overlays::airport_labels(float theta, float alpha,
     ARP *ap = *i;
     sgVec3 xyr;
 
-    if (fabs(ap->lat - theta) < dtheta && fabs(ap->lon - alpha) < dalpha) {
+    if (fabs(ap->lat - theta) < dtheta && fabs(wrap_angle(ap->lon - alpha)) < dalpha) {
       ab_lat( ap->lat, ap->lon, theta, alpha, xyr );
       sgVec2 p;
 
@@ -297,7 +383,7 @@ void Overlays::draw_navaids( float theta, float alpha,
     sgVec3 xyr;
     sgVec2 p;
 
-    if (fabs(n->lat - theta) < dtheta && fabs(n->lon - alpha) < dalpha) {
+    if (fabs(n->lat - theta) < dtheta && fabs(wrap_angle(n->lon - alpha)) < dalpha) {
       ab_lat( n->lat, n->lon, theta, alpha, xyr );
 
       sgSetVec2( p,  ::scale(xyr[0], output->getSize(), scale), 
@@ -451,35 +537,26 @@ void Overlays::load_airports() {
 
   bool line_read = false;
 
+  ARP *ap = NULL;
   while (!gzeof(arp) || line_read) {
-    ARP *ap;
-    char id[8], *name;
     float lat, lon;
-    int elev;
+    int elev, name_pos;
 
+    if (ap == NULL)
+      ap = new ARP;
+    
     if (!line_read) {
       gzgets( arp, line, 256 );
     }
 
     switch (line[0]) {
     case 'A':
-      if (sscanf( line, "A %s %f %f %d", id, &lat, &lon, &elev ) == 4) {
-	ap = new ARP;
-	  
+      if (sscanf( line, "A %4s %f %f %d %*s %n", ap->id, &lat, &lon, &elev, &name_pos ) == 4) {
 	line[ strlen(line)-1 ] = 0;
 	ap->lat = lat * SG_DEGREES_TO_RADIANS;
 	ap->lon = lon * SG_DEGREES_TO_RADIANS;
 
-	name = line + 40;   // this is the start of the name column
-	int wordcount = 0, len = 0;
-	while (wordcount < 4 && name[len] != 0) {
-	  if (name[len] == ' ') wordcount++;
-	  len++;
-	}
-	strncpy( ap->name, name, len );
-	ap->name[len] = 0;
-
-	strcpy( ap->id, id );
+	strncpy( ap->name, line + name_pos, sizeof(ap->name) );
 
 	line_read = false;
 	while (!gzeof(arp) && !line_read) {
@@ -490,7 +567,7 @@ void Overlays::load_airports() {
 	  gzgets( arp, line, 256 );
 	  line_read = true;
 	  
-	  if (sscanf(line, "R %s %f %f %f %f %f", 
+	  if (sscanf(line, "R %7s %f %f %f %f %f", 
 		     rwyid, &lat, &lon, &heading, &length, &width) == 6) {
 	    RWY *rwy    = new RWY;
 	    rwy->lat    = lat    * SG_DEGREES_TO_RADIANS;
@@ -504,6 +581,7 @@ void Overlays::load_airports() {
 	}
 
 	airports.push_back( ap );
+	ap = NULL;
       } else {
 	line_read = false;
       }
@@ -514,6 +592,8 @@ void Overlays::load_airports() {
     }
 
   }
+  if (ap != NULL)
+    delete ap;
   
   gzclose( arp );
   delete[] arpname;
@@ -591,6 +671,8 @@ void Overlays::load_navaids() {
 	n = NULL;
     }
   }
+  if (n != NULL)
+    delete n;
 
   gzclose(nav);
   delete navname;
@@ -665,7 +747,7 @@ Overlays::NAV *Overlays::findNav( float lat, float lon, float freq ) {
     if ( fabs(freq - (*i)->freq) < 0.01f ) {
       // ugly distance metric -- could (should?) be replaced by
       // great circle distance, but works ok for now
-      float dist = fabs(lat - (*i)->lat) + fabs(lon - (*i)->lon);
+      float dist = fabs(lat - (*i)->lat) + fabs(wrap_angle(lon - (*i)->lon));
       if (dist < closest_dist) {
 	closest_dist = dist;
 	closest = *i;

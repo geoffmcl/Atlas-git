@@ -145,21 +145,23 @@ void MapBrowser::draw() {
 
     for (list<MapTile*>::iterator i = tiles.begin(); i != tiles.end(); i++) {
       MapTile *tile = *i;
-      GLfloat dxs = tile->w.rs*zoom / tilesize / 2.0f;
-      GLfloat dxn = tile->w.rn*zoom / tilesize / 2.0f;
+      if ( tile->texbuf != NULL ) {
+	GLfloat dxs = tile->w.rs*zoom / tilesize / 2.0f;
+	GLfloat dxn = tile->w.rn*zoom / tilesize / 2.0f;
 
-      glBindTexture(GL_TEXTURE_2D, tile->texture_handle);
+	glBindTexture(GL_TEXTURE_2D, tile->texture_handle);
     
-      glBegin(GL_QUADS);
-      glTexCoord2f(0.5f-dxs, 1.0f); 
-      glVertex2f(tile->xsw, tile->ysw );
-      glTexCoord2f(0.5f+dxs, 1.0f); 
-      glVertex2f(tile->xso, tile->yso );
-      glTexCoord2f(0.5f+dxn, 0.0f); 
-      glVertex2f(tile->xno, tile->yno );
-      glTexCoord2f(0.5f-dxn, 0.0f); 
-      glVertex2f(tile->xnw, tile->ynw );
-      glEnd();
+	glBegin(GL_QUADS);
+	glTexCoord2f(0.5f-dxs, 1.0f); 
+	glVertex2f(tile->xsw, tile->ysw );
+	glTexCoord2f(0.5f+dxs, 1.0f); 
+	glVertex2f(tile->xso, tile->yso );
+	glTexCoord2f(0.5f+dxn, 0.0f); 
+	glVertex2f(tile->xno, tile->yno );
+	glTexCoord2f(0.5f-dxn, 0.0f); 
+	glVertex2f(tile->xnw, tile->ynw );
+	glEnd();
+      }
     }
 
     glDisable( GL_TEXTURE_2D );
@@ -178,6 +180,7 @@ void MapBrowser::update() {
   lat_ab( scle/2, scle/2, clat, clon, &dlat, &dlon );
   dlat -= clat;
   dlon -= clon;
+  if (dlon > SG_PI/2) dlon = SG_PI/2;
 
   int sgnlat = (clat < 0.0f) ? 1 : 0;
   int sgnlon = (clon < 0.0f) ? 1 : 0;
@@ -186,6 +189,8 @@ void MapBrowser::update() {
   int max_lat = (int)( (clat + dlat) * SG_RADIANS_TO_DEGREES ) - sgnlat;
   int min_lon = (int)( (clon - dlon) * SG_RADIANS_TO_DEGREES ) - sgnlon;
   int max_lon = (int)( (clon + dlon) * SG_RADIANS_TO_DEGREES ) - sgnlon;
+  if (min_lat < -90) min_lat = -90;
+  if (max_lat >  90) max_lat =  90;
   int num_lat = (max_lat - min_lat) + 1, num_lon = (max_lon - min_lon) + 1;
 
   // remove old tiles
@@ -198,7 +203,9 @@ void MapBrowser::update() {
          tile->c.lon > max_lon + CACHE_LIMIT) {
  
       list<MapTile*>::iterator tmp = i; tmp++;
-      glDeleteTextures( 1, &tile->texture_handle );
+      if ( tile->texbuf != NULL ) {
+        glDeleteTextures( 1, &tile->texture_handle );
+      }
       tiles.erase( i );
       tiletable.erase( tile->c );
       delete tile->texbuf;
@@ -234,22 +241,22 @@ void MapBrowser::update() {
       TileTable::iterator t = tiletable.find(c);
 
       if ( t == tiletable.end() ) {  // check if the tile has been loaded
-         // Load a new tile
-         MapTile *nt = new MapTile;
-         nt->c.lat = c.lat;
-         nt->c.lon = c.lon;
+        // Load a new tile
+        MapTile *nt = new MapTile;
+        nt->c.lat = c.lat;
+        nt->c.lon = c.lon;
         tlat = (float) c.lat * SG_DEGREES_TO_RADIANS;
         nt->w.rs = earth_radius_lat(tlat) * cos(tlat) * SG_DEGREES_TO_RADIANS;
         tlat = (float) (c.lat + 1) * SG_DEGREES_TO_RADIANS;
         nt->w.rn = earth_radius_lat(tlat) * cos(tlat) * SG_DEGREES_TO_RADIANS;
-         
-         sprintf( mpath+pathl, "%c%03d%c%02d.png", 
+
+        sprintf( mpath+pathl, "%c%03d%c%02d.png", 
                  (c.lon < 0)?'w':'e', abs(c.lon),
                  (c.lat < 0)?'s':'n', abs(c.lat) );         
 
-         //printf("Loading tile %s...", mpath);
-          
-         if ( (nt->texbuf = (GLubyte*)loadPng( mpath, &wid, &hei )) != NULL ) {
+        //printf("Loading tile %s...", mpath);
+
+        if ( (nt->texbuf = (GLubyte*)loadPng( mpath, &wid, &hei )) != NULL ) {
           glPixelStorei(GL_UNPACK_ALIGNMENT, 3);
           glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
           glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
@@ -264,32 +271,28 @@ void MapBrowser::update() {
           glTexEnvf( GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE );
           glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB, wid, hei, 0, GL_RGB, 
                          GL_UNSIGNED_BYTE, nt->texbuf );
-          
-          
-          tiles.push_back(nt);
-          tiletable[nt->c] = nt ;
-          //printf("ok.\n");
-         } else {
+        } else {
           // Tile couldn't be loaded
-          delete nt;
-          //printf("failed!\n");
-         }
+	  // texbuf is NULL; texture_handle is undefined.
+        }
 
-         sgVec3 xyr;
-         ab_lat( rad((float) nt->c.lat), rad((float) nt->c.lon), clat, clon, 
-                 xyr );
-         scale( xyr[0], xyr[1], &nt->xsw, &nt->ysw );
-         ab_lat( rad(nt->c.lat+1.0f), rad((float) nt->c.lon), clat, clon, 
-                 xyr );
-         scale( xyr[0], xyr[1], &nt->xnw, &nt->ynw );
-         ab_lat( rad(nt->c.lat+1.0f), rad(nt->c.lon+1.0f), clat, clon, 
-                 xyr );
-         scale( xyr[0], xyr[1], &nt->xno, &nt->yno );
-         ab_lat( rad((float) nt->c.lat), rad(nt->c.lon+1.0f), clat, clon, 
-                 xyr );
-         scale( xyr[0], xyr[1], &nt->xso, &nt->yso );
+	sgVec3 xyr;
+	ab_lat( rad((float) nt->c.lat), rad((float) nt->c.lon), clat, clon, 
+		xyr );
+	scale( xyr[0], xyr[1], &nt->xsw, &nt->ysw );
+	ab_lat( rad(nt->c.lat+1.0f), rad((float) nt->c.lon), clat, clon, 
+		xyr );
+	scale( xyr[0], xyr[1], &nt->xnw, &nt->ynw );
+	ab_lat( rad(nt->c.lat+1.0f), rad(nt->c.lon+1.0f), clat, clon, 
+		xyr );
+	scale( xyr[0], xyr[1], &nt->xno, &nt->yno );
+	ab_lat( rad((float) nt->c.lat), rad(nt->c.lon+1.0f), clat, clon, 
+		xyr );
+	scale( xyr[0], xyr[1], &nt->xso, &nt->yso );
+
+	tiles.push_back(nt);
+	tiletable[nt->c] = nt ;
       }
     }
   }
-
 }

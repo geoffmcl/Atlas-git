@@ -165,21 +165,21 @@ void print_help() {
   printf("Usage:\n");
   printf("  --lat=xx.xx             Start at latitude xx.xx (deg., south is neg.)\n");
   printf("  --lon=xx.xx             Start at longitude xx.xx (deg., west is neg.)\n");
-  printf("  --size=pixels           Create map of size pixels*pixels (default 512)\n");
+  printf("  --size=pixels           Create map of size pixels*pixels (default 256)\n");
   printf("  --scale=x               Kilometers from top to bottom of map (default 100)\n"); 
   printf("  --autoscale             Automatically set scale to 1x1 degree tile\n");
   printf("  --light=x, y, z         Set light vector for shading\n");
   printf("  --airport-filter=string Display only airports with id beginning 'string'\n");
-  printf("  --output=name           Write output to given file name (default 'mapobj.png')\n");
+  printf("  --output=name           Write output to given file name (default 'map.png')\n");
   printf("  --fgroot=path           Overrides FG_ROOT environment variable\n");
   printf("  --enable-airports       Show airports\n");
   printf("  --enable-navaids        Show navaids\n");
   printf("  --flat-shading          Don't do nice shading of the terrain\n");
   printf("  --atlas=path            Create maps of all scenery, and store them in path\n");
   printf("  --verbose               Display information during processing\n");
-  printf("  --singlebuffer          Use single buffered display.\n");
-  printf("  --glutfonts             Use GLUT built-in fonts.\n");
-  printf("  --palette=path          Set the palette file to use.\n");
+  printf("  --singlebuffer          Use single buffered display\n");
+  printf("  --glutfonts             Use GLUT built-in fonts\n");
+  printf("  --palette=path          Set the palette file to use\n");
   printf("  --smooth-color          Make smooth color heights\n");
 }
 

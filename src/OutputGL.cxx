@@ -67,6 +67,7 @@ void OutputGL::closeOutput() {
 
   FILE *fp = fopen(filename, "wb");
   if (!fp) {
+    printf("OutputGL::closeOutput: can't create '%s'\n", filename);
     return;
   }
 
@@ -107,6 +108,7 @@ void OutputGL::closeOutput() {
   png_write_end(png_ptr, info_ptr);
   png_destroy_write_struct(&png_ptr, &info_ptr);
   fclose(fp);
+  printf("Written '%s'\n", filename);
 
   delete image;
 

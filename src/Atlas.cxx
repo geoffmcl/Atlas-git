@@ -33,9 +33,11 @@
 #include "Overlays.hxx"
 #include "FlightTrack.hxx"
 
+#define SCALECHANGEFACTOR 1.3f
+
 SGIOChannel *input_channel;
 
-bool dragmode = false, display = false;
+bool dragmode = false;
 int drag_x, drag_y;
 float scalefactor = 1.0f, mapsize, width, height;
 float latitude  = 33.5f  , copy_lat;
@@ -66,7 +68,7 @@ puText *labeling, *txt_lat, *txt_lon;
 puText *txt_info_lat, *txt_info_lon, *txt_info_alt;
 puText *txt_info_hdg, *txt_info_spd;
 puInput *inp_lat, *inp_lon;
-bool interface_visible = true, softcursor = false;
+bool softcursor = false;
 char lat_str[80], lon_str[80], alt_str[80], hdg_str[80], spd_str[80];
 
 char fg_root[512] = "";
@@ -425,76 +427,65 @@ static char *coord_format_latlon(float latitude, float longitude, char *buf)
 ******************************************************************************/
 void zoom_cb ( puObject *cb )
 {
-  (cb,cb);
-
   if (cb == zoomin) { 
-    map_object->setScale( map_object->getScale() / 2 );
-    scalefactor /= 2.0f;
+    map_object->setScale( map_object->getScale() / SCALECHANGEFACTOR );
+    scalefactor /= SCALECHANGEFACTOR;
   } else {
-    map_object->setScale( map_object->getScale() * 2 );
-    scalefactor *= 2.0f;
+    map_object->setScale( map_object->getScale() * SCALECHANGEFACTOR );
+    scalefactor *= SCALECHANGEFACTOR;
   }
   glutPostRedisplay();
 }
 
 void show_cb ( puObject *cb )
 {
-  (cb,cb);
-
+  int feature;
   if (cb == show_arp) { 
-    map_object->setFeatures( map_object->getFeatures() ^ Overlays::OVERLAY_AIRPORTS );
+    feature = Overlays::OVERLAY_AIRPORTS;
   } else if (cb == show_vor) {
-    map_object->setFeatures( map_object->getFeatures() ^
-                             Overlays::OVERLAY_NAVAIDS_VOR );
+    feature = Overlays::OVERLAY_NAVAIDS_VOR;
   } else if (cb == show_ndb) {
-    map_object->setFeatures( map_object->getFeatures() ^
-                             Overlays::OVERLAY_NAVAIDS_NDB );
+    feature = Overlays::OVERLAY_NAVAIDS_NDB;
   } else if (cb == show_fix) {
-    map_object->setFeatures( map_object->getFeatures() ^
-                             Overlays::OVERLAY_NAVAIDS_FIX );
-  } else {
-    map_object->toggleFeaturesAllNavaids();
-  }
-  glutPostRedisplay();
-}
-
-void labeling_cb ( puObject *cb )
-{
-  (cb,cb);
-
-  if (cb == show_name) {
-    map_object->setFeatures( map_object->getFeatures() ^ Overlays::OVERLAY_NAMES );
+    feature = Overlays::OVERLAY_NAVAIDS_FIX;
+  } else if (cb == show_nav) {
+    feature = Overlays::OVERLAY_NAVAIDS;
+  } else if (cb == show_name) {
+    feature = Overlays::OVERLAY_NAMES;
   } else if (cb == show_id) {
-    map_object->setFeatures( map_object->getFeatures() ^ Overlays::OVERLAY_IDS );
+    feature = Overlays::OVERLAY_IDS;
+  } else if (cb == show_ftrack) {
+    feature = Overlays::OVERLAY_FLIGHTTRACK;
   }
-
+  if (cb->getValue()) {
+    map_object->setFeatures( map_object->getFeatures() | feature );
+  } else {
+    map_object->setFeatures( map_object->getFeatures() & ~feature );
+  }
   glutPostRedisplay();
 }
 
 void position_cb ( puObject *cb ) {
-  (cb, cb);
+  char *buffer;
+  cb->getValue(&buffer);
 
-  char ns, dummy, *buffer;
-  int degrees;
-  float minutes;
+  char ns, deg_ch, min_ch = ' ', sec_ch = ' ';
+  float degrees = 0, minutes = 0, seconds = 0;
 
+  // Free-format entry: "N51", "N50.99*", "N50*59 24.1", etc.
+  int n_items = sscanf(buffer, " %c %f%c %f%c %f%c",
+    &ns, &degrees, &deg_ch, &minutes, &min_ch, &seconds, &sec_ch);
+  if (n_items < 2) return;
+  // if (!strchr(" m'", min_ch) || !strchr(" s\"", sec_ch)) return;
+  float angle = (degrees + minutes / 60 + seconds / 3600) *
+    SG_DEGREES_TO_RADIANS;
   if (cb == inp_lat) {
-    inp_lat->getValue(&buffer);
-    sscanf(buffer, "%c %d %c %f", &ns, &degrees, &dummy, &minutes);
-    latitude = ((ns=='S'||ns=='s')?-1.0f:1.0f) * 
-      ((float)degrees + minutes / 60.0f) * SG_DEGREES_TO_RADIANS;
-    map_object->setLocation(latitude, longitude);
-
-    glutPostRedisplay();
+    latitude = ((ns=='S'||ns=='s')?-1.0f:1.0f) * angle;
   } else {
-    inp_lon->getValue(&buffer);
-    sscanf(buffer, "%c %d %c %f", &ns, &degrees, &dummy, &minutes);
-    longitude = ((ns=='W'||ns=='w')?-1.0f:1.0f) * 
-      ((float)degrees + minutes / 60.0f) * SG_DEGREES_TO_RADIANS;
-    map_object->setLocation(latitude, longitude);
-
-    glutPostRedisplay();
+    longitude = ((ns=='W'||ns=='w')?-1.0f:1.0f) * angle;
   }
+  map_object->setLocation(latitude, longitude);
+  glutPostRedisplay();
 }
 
 void clear_ftrack_cb ( puObject *cb ) {
@@ -505,12 +496,6 @@ void clear_ftrack_cb ( puObject *cb ) {
   }
 
   glutPostRedisplay();
-}
-
-void showftrack_cb( puObject *cb ) {
-  (cb, cb);
-
-  map_object->setFeatures( map_object->getFeatures() ^ Overlays::OVERLAY_FLIGHTTRACK );
 }
 
 void minimize_cb ( puObject *cb ) {
@@ -532,7 +517,7 @@ void init_gui(bool textureFonts) {
 
   int curx,cury;
 
-  int puxoff=20,puyoff=20,puxsiz=220,puysiz=400;
+  int puxoff=20,puyoff=20,puxsiz=205,puysiz=380;
 
   if (textureFonts) {
     char font_name[512];
@@ -548,14 +533,16 @@ void init_gui(bool textureFonts) {
   puSetDefaultColourScheme(0.4f, 0.4f, 0.8f, 0.6f);
 
   main_interface = new puPopup(puxoff,puyoff);
-  frame = new puFrame(puxoff,puyoff,puxsiz,puysiz);
+  frame = new puFrame(puxoff,puyoff,puxoff+puxsiz,puyoff+puysiz);
 
-  curx=30; cury=30;
+  curx=puxoff+10; cury=puyoff+10;
 
   zoomin = new puOneShot(curx, cury, "Zoom In");
   zoomin->setCallback(zoom_cb);
-  zoomout = new puOneShot(curx+80, cury, "Zoom Out");
+  zoomin->setSize(90, 24);
+  zoomout = new puOneShot(curx+95, cury, "Zoom Out");
   zoomout->setCallback(zoom_cb);
+  zoomout->setSize(90, 24);
 
   cury+=35;
   
@@ -591,11 +578,11 @@ void init_gui(bool textureFonts) {
   labeling = new puText(curx,cury+20);
   labeling->setLabel("Labeling:");
   show_name = new puButton(curx, cury, "Name");
-  show_id   = new puButton(curx+100, cury, "Id");
+  show_id   = new puButton(curx+95, cury, "Id");
   show_name ->setSize(90, 24);
   show_id   ->setSize(90, 24);
-  show_name ->setCallback(labeling_cb);
-  show_id   ->setCallback(labeling_cb);
+  show_name ->setCallback(show_cb);
+  show_id   ->setCallback(show_cb);
   show_name->setValue(1);
 
   cury+=55;
@@ -604,8 +591,8 @@ void init_gui(bool textureFonts) {
   txt_lat->setLabel("Latitude:");
   txt_lon = new puText(curx, cury+20);
   txt_lon->setLabel("Longitude:");
-  inp_lat = new puInput(curx, cury+50, curx+180, cury+74);
-  inp_lon = new puInput(curx, cury, curx+180, cury+24);
+  inp_lat = new puInput(curx, cury+50, curx+185, cury+74);
+  inp_lon = new puInput(curx, cury, curx+185, cury+24);
   inp_lat->setValue(lat_str);
   inp_lon->setValue(lon_str);
   inp_lat->setCallback(position_cb);
@@ -616,17 +603,18 @@ void init_gui(bool textureFonts) {
   cury+=104;
   if (slaved) {
     show_ftrack  = new puButton(curx, cury, "Show Flight Track");
-    clear_ftrack = new puOneShot(curx, cury+20, "Clear Flight Track");
+    clear_ftrack = new puOneShot(curx, cury+25, "Clear Flight Track");
     show_ftrack  -> setSize(185, 24);
     clear_ftrack -> setSize(185, 24);
     show_ftrack  -> setValue(1);
-    show_ftrack  -> setCallback( showftrack_cb );
+    show_ftrack  -> setCallback( show_cb );
     clear_ftrack -> setCallback( clear_ftrack_cb );
   }
 
-  cury=puyoff+puysiz-48;
+  cury=puyoff+puysiz-10;
 
-  minimize_button = new puOneShot(curx+165, cury, "X");
+  minimize_button = new puOneShot(curx+185-20, cury-24, "X");
+  minimize_button->setSize(20, 24);
   minimize_button->setCallback(minimize_cb);
 
   main_interface->close();
@@ -751,7 +739,7 @@ void timer(int value) {
   d->hdg = heading;
   d->spd = speed;
   track->addPoint(d);
-  
+
   map_object->setLocation( latitude, longitude );
   
   glutPostRedisplay();
@@ -800,20 +788,15 @@ void keyPressed( unsigned char key, int x, int y ) {
   if (!puKeyboard(key, PU_DOWN)) {
     switch (key) {
     case '+':
-      map_object->setScale( map_object->getScale() / 2 );
-      scalefactor /= 2.0f;
-      glutPostRedisplay();
+      zoom_cb(zoomin);
       break;
     case '-':
-      map_object->setScale( map_object->getScale() * 2 );
-      scalefactor *= 2.0f;
-      glutPostRedisplay();
+      zoom_cb(zoomout);
       break;
     case 'D':
     case 'd':
       if (slaved) {
-	display = !display;
-	if (display) {
+	if (!info_interface->isVisible()) {
 	  info_interface->reveal();
 	} else {
 	  info_interface->hide();
@@ -823,13 +806,13 @@ void keyPressed( unsigned char key, int x, int y ) {
       break;
     case 'A':
     case 'a':
-      map_object->setFeatures( map_object->getFeatures() ^ Overlays::OVERLAY_AIRPORTS );
-      glutPostRedisplay();
+      show_arp->setValue(!show_arp->getValue());
+      show_cb(show_arp);
       break;
     case 'N':
     case 'n':
-      map_object->toggleFeaturesAllNavaids();
-      glutPostRedisplay();
+      show_nav->setValue(!show_nav->getValue());
+      show_cb(show_nav);
       break;    
     case 'T':
     case 't':
@@ -838,12 +821,11 @@ void keyPressed( unsigned char key, int x, int y ) {
       break;
     case 'V':
     case 'v':
-      map_object->setFeatures( map_object->getFeatures() ^ Overlays::OVERLAY_NAMES );
-      glutPostRedisplay();
+      show_name->setValue(!show_name->getValue());
+      show_cb(show_name);
       break;
     case ' ':
-      interface_visible = !interface_visible;
-      if (interface_visible) {
+      if (!main_interface->isVisible()) {
 	main_interface->reveal();
 	minimized->hide();
       } else {

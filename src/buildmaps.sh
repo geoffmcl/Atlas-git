@@ -29,8 +29,7 @@ for i in ${ROOT}/${CHUNK}/*; do
 	echo "${TMP1}.png exits, skipping"
     else
         echo ./Map --verbose \
-	    --lat=${LAT} --lon=${SIGN}${LON} \
-	    --autoscale --disable-airports --disable-navaids \
+	    --lat=${LAT} --lon=${SIGN}${LON} --autoscale \
 	    --size=256 --disable-airports --disable-navaids \
 	    --output=${OUTPUTDIR}/${TMP1}.png
 
