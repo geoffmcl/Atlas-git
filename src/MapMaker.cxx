@@ -35,6 +35,30 @@
 #include "MapMaker.hxx"
 /*#include <simgear/magvar/magvar.hxx>*/
 
+// Utility function that I needed to put somewhere - this probably isn't the best place for it.
+// Appends a path separator to a directory path if not present.
+// Calling function MUST ENSURE that there is space allocated for the potential strcat.
+void NormalisePath(char* dpath) {
+  int dlen = strlen(dpath);
+  #if defined( macintosh )
+  if(dpath[dlen-1] != ':') {
+    dpath[dlen] = ':';
+    dpath[dlen+1] = '\0';
+  }
+  #elseif (defined(WIN32) && !defined(__CYGWIN__))
+  if(dpath[dlen-1] != '\\' && dpath[dlen-1] != '/') {
+    dpath[dlen] = '\\';
+    dpath[dlen+1] = '\0';
+  }
+  #else
+  if(dpath[dlen-1] != '/') {
+    //strcat(dpath, '/');
+    dpath[dlen] = '/';
+    dpath[dlen+1] = '\0';
+  }
+  #endif
+}
+
 MapMaker::MapMaker( char *fg_root, char *ap_filter, int features,
                     int size, int scale ) {
   this->fg_root = NULL;
@@ -102,7 +126,7 @@ void MapMaker::setPalette( char* filename ) {
 }
 
 int MapMaker::createMap(GfxOutput *output,float theta, float alpha, 
-                         float autoscale) {
+                        string dirpath, float autoscale) {
   this->output = output;
   
   modified = false;
@@ -171,13 +195,15 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
   
   zoom = (float)size / (float)scle;
 
-  // load the tiles and do actual drawing
-  char *subdir = new char[strlen(fg_root) + 512];  /* 512 should be *very* 
-                                                      safe (too safe?) */
-  strcpy( subdir, fg_root );
-  strcat( subdir, "/Scenery/" );
-  int slen = strlen( subdir );       // index to where we should append
-
+  // UG! - process_directory modifies the passed char* and wants the result next time
+  char *subdir = new char[strlen(fg_root) + 512];  // 512 should be *very* safe (too safe?)
+  strcpy(subdir, dirpath.c_str());
+  int slen = strlen(subdir);
+  // Now we need to make sure that the supplied directory ends in a path separator.
+  NormalisePath(subdir);
+  
+  slen = strlen(subdir);  // Need to update it since process_directory relys on it.
+  
   if (getVerbose());
     //printf("Map area: lat %c%d / %c%d, lon %c%d / %c%d.\n", 
     //   ns(min_theta), abs(min_theta), ns(max_theta), abs(max_theta), 
@@ -674,11 +700,13 @@ int MapMaker::process_ascii_file( char *tile_name, sgVec3 xyz ) {
 }
 
 
-// path must be 'FG_ROOT/Scenery/' - more will be appended
+// path must be to the base of the 10x10/1x1 tile tree - more will be appended.
 // plen is path length
 int MapMaker::process_directory( char *path, int plen, int lat, int lon, 
                                  sgVec3 xyz ) {
   int sgnk = (lat < 0) ? 1 : 0, sgnl = (lon < 0) ? 1 : 0;
+  
+  //printf("process_directory: path = %s, lat = %i, lon = %i\n", path, lat, lon);
 
   int llen = sprintf( path + plen, "%c%03d%c%02d/%c%03d%c%02d", 
                       ew(lon), abs((lon+sgnl) / 10 * 10) + sgnl*10, 

@@ -27,19 +27,28 @@
   2000-03-06        Following Norman Vine's advice, map now uses OpenGL
                     for output
   2000-04-29        New, cuter, airports
+  2004-12-22        DCL: Now reads FG_SCENERY when present.
 ---------------------------------------------------------------------------*/
 
 #include <GL/glut.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
 #include <sys/stat.h>
 #ifndef _MSC_VER
 #  include <unistd.h>
 #endif
 #include "MapMaker.hxx"
 #include "OutputGL.hxx"
+#include <simgear/compiler.h>
+#include <simgear/misc/sg_path.hxx>
 #include <plib/ul.h>
+#include <vector>
+#include STL_STRING
+
+SG_USING_STD(vector);
+SG_USING_STD(string);
+
+typedef vector<string> string_list;
 
 float clat = -100.0f, clon = -100.0f;   // initialize to unreasonable values
 float autoscale = 0.0f;                 // 0.0f == no autoscale
@@ -50,6 +59,9 @@ int features = MapMaker::DO_SHADE;
 MapMaker mapobj;
 
 char outname[512], *scenerypath, *palette;
+string raw_scenery_path = "", default_scenery_path;  // default_scenery_path is a temporary hack - don't rely on it remaining.
+string_list fg_scenery;
+unsigned int scenery_pos;
 int opathl, spathl;
 ulDir *dir1, *dir2 = NULL;
 ulDirEnt *ent;
@@ -82,16 +94,30 @@ void redrawMap() {
 
     OutputGL output( outp, mapobj.getSize(), smooth_shade, 
 		     textured_fonts, font_name );
-    mapobj.createMap( &output, clat, clon, autoscale );
+    mapobj.createMap( &output, clat, clon, default_scenery_path, autoscale );
     output.closeOutput();
     exit(0);
   } else {
     char ns, ew;
     int lat, lon;
     int s = mapobj.getSize();
-
+  
     do {
       while (dir2 == NULL) {
+	while(dir1 == NULL) {
+	  ++scenery_pos;
+	  if(scenery_pos >= fg_scenery.size()) {
+	    delete[] scenerypath;
+	    exit(0);  // Ought to flag whether at least one path read OK before exiting OK.
+	  }
+	  dir1 = ulOpenDir(fg_scenery[scenery_pos].c_str());
+	  strcpy(scenerypath, fg_scenery[scenery_pos].c_str());
+	  NormalisePath(scenerypath);
+	  spathl = strlen(scenerypath);
+	  if(dir1 == NULL) {
+	    printf("Unable to open directory \"%s\"\\n", scenerypath);
+	  }
+	}
 	do {
 	  ent = ulReadDir(dir1);
 	} while (ent != NULL && ent->d_name[0] == '.');
@@ -100,8 +126,7 @@ void redrawMap() {
 	  dir2 = ulOpenDir(scenerypath);
 	} else {
 	  ulCloseDir(dir1);
-	  delete[] scenerypath;
-	  exit(0); // done reading top directory
+	  dir1 = NULL;
 	}
       }
       
@@ -137,20 +162,17 @@ void redrawMap() {
 	if ( stat(outname, &filestat) == 0 ) {
 	  // the file already exists, so skip it!
 	  ent = NULL;
-	}
-	  
+	}  
       }
-
     } while (ent == NULL);
-
-   
+    
     sprintf(title_buffer, "%c%.1f %c%.1f",
 	    (clat<0.0f)?'S':'N', clat * SG_RADIANS_TO_DEGREES,
 	    (clon<0.0f)?'W':'E', clon * SG_RADIANS_TO_DEGREES);
     glutSetWindowTitle(title_buffer);
 
     OutputGL output(outname, s, smooth_shade, textured_fonts, font_name);
-    mapobj.createMap( &output, clat, clon, 1.0f );
+    mapobj.createMap( &output, clat, clon, fg_scenery[scenery_pos], 1.0f );
     output.closeOutput();
     if (doublebuffer) {
       glutSwapBuffers();
@@ -158,6 +180,58 @@ void redrawMap() {
 
     glutPostRedisplay();
   }
+}
+
+/*****************************************************************************/
+
+// Cribbed from FlightGear, with the objects code commented out.
+// The supplied path is appended with 'Terrain' if it exists, not if otherwise.
+// NOTE: MapMaker::setFgRoot() should be called first.
+void set_fg_scenery(const string &scenery) {
+    SGPath s;
+    
+    char* fg_root = mapobj.getFGRoot();
+    if (scenery.empty() && fg_root != NULL) {
+        s.set( fg_root );
+        s.append( "Scenery" );
+    } else {
+        s.set( scenery );
+    }
+    
+    string_list path_list = sgPathSplit( s.str() );
+    fg_scenery.clear();
+    
+    for (unsigned i = 0; i < path_list.size(); i++) {
+
+        ulDir *d = ulOpenDir( path_list[i].c_str() );
+        if (d == NULL)
+            continue;
+        ulCloseDir( d );
+
+        //SGPath pt( path_list[i], po( path_list[i] );
+	SGPath pt( path_list[i] );
+        pt.append("Terrain");
+        //po.append("Objects");
+
+        ulDir *td = ulOpenDir( pt.c_str() );
+        //ulDir *od = ulOpenDir( po.c_str() );
+
+        //if (td == NULL && od == NULL)
+	if(td == NULL) { // ie. it doen't exist with Terrain appended - push back the original
+            fg_scenery.push_back( path_list[i] );
+        } else {
+            if (td != NULL) {
+                fg_scenery.push_back( pt.str() );
+                ulCloseDir( td );
+            }
+	    /*
+            if (od != NULL) {
+                fg_scenery.push_back( po.str() );
+                ulCloseDir( od );
+            }
+	    */
+        }
+    }
 }
 
 /*****************************************************************************/
@@ -173,7 +247,8 @@ void print_help() {
   printf("  --light=x, y, z         Set light vector for shading\n");
   printf("  --airport-filter=string Display only airports with id beginning 'string'\n");
   printf("  --output=name           Write output to given file name (default 'map.png')\n");
-  printf("  --fgroot=path           Overrides FG_ROOT environment variable\n");
+  printf("  --fg-root=path          Overrides FG_ROOT environment variable\n");
+  printf("  --fg-scenery=path       Overrides FG_SCENERY environment variable\n");
   printf("  --enable-airports       Show airports\n");
   printf("  --enable-navaids        Show navaids\n");
   printf("  --flat-shading          Don't do nice shading of the terrain\n");
@@ -204,8 +279,10 @@ bool parse_arg(char* arg) {
     mapobj.setAPFilter( strdup(cparam) );
   } else if ( sscanf(arg, "--output=%s", cparam) == 1 ) {
     outp = strdup(cparam);
-  } else if ( sscanf(arg, "--fgroot=%s", cparam) == 1 ) {
+  } else if ( sscanf(arg, "--fg-root=%s", cparam) == 1 ) {
     mapobj.setFGRoot( cparam );
+  } else if ( strncmp(arg, "--fg-scenery=", 13 ) == 0 ) {
+    raw_scenery_path = arg + 13;
   } else if ( strcmp(arg, "--enable-airports" ) == 0 ) {
     features |= MapMaker::DO_AIRPORTS;
   } else if ( strcmp(arg, "--enable-navaids" ) == 0 ) {
@@ -246,6 +323,11 @@ bool parse_arg(char* arg) {
 int main( int argc, char **argv ) {
   if (argc == 0)
     print_help();
+  
+  // Read the FG_SCENERY env variable before processing .atlasmaprc and command args,
+  // so that we can override it if necessary.
+  char* scenedirs = getenv("FG_SCENERY");
+  if(scenedirs != NULL) raw_scenery_path = scenedirs;
 
   // process ~/.atlasmaprc
   char* homedir = getenv("HOME"), *rcpath;
@@ -293,7 +375,13 @@ int main( int argc, char **argv ) {
     print_help();
     exit(1);
   }
-
+  
+  // DCL: default_scenery_path is a temporary hack - don't count on it remaining.
+  default_scenery_path = mapobj.getFGRoot();
+  default_scenery_path += "/Scenery/Terrain/";
+  
+  set_fg_scenery(raw_scenery_path);
+  
   mapobj.setFeatures(features);
 
   // convert lat & lon to radians
@@ -309,18 +397,19 @@ int main( int argc, char **argv ) {
 	      "these maps with the Atlas program!\n", argv[0] );
     }
 
+    
     scenerypath = new char[strlen(mapobj.getFGRoot()) + 256];
+    scenery_pos = 0;
+    dir1 = ulOpenDir(fg_scenery[0].c_str());
+    strcpy(scenerypath, fg_scenery[0].c_str());
+    NormalisePath(scenerypath);
+    spathl = strlen(scenerypath);
+    if(dir1 == NULL) {
+      printf("Unable to open directory \"%s\"\\n", scenerypath);
+    }
+   
     strcpy(outname, outp);
     opathl = strlen(outname);
-    strcpy( scenerypath, mapobj.getFGRoot() );
-    strcat( scenerypath, "/Scenery/" );
-    spathl = strlen(scenerypath);
-    
-    if ( (dir1 = ulOpenDir(scenerypath)) == NULL ) {
-      fprintf( stderr, "%s: Couldn't open directory \"%s\".\n", 
-	       argv[0], scenerypath );
-      return 1;
-    }
   }
 
   // now initialize GLUT

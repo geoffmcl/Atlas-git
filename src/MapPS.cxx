@@ -52,7 +52,7 @@ void print_help() {
   printf("  --light=x, y, z         Set light vector for shading\n");
   printf("  --airport-filter=string Display only airports with id beginning 'string'\n");
   printf("  --output=name           Write output to given file name (default 'mapobj.eps')\n");
-  printf("  --fgroot=path           Overrides FG_ROOT environment variable\n");
+  printf("  --fg-root=path          Overrides FG_ROOT environment variable\n");
   printf("  --disable-airports      Don't show airports\n");
   printf("  --disable-navaids       Don't show navaids\n");
   printf("  --only-navaids=which    Which navaids (vor,ndb,fix) to show, e.g. \"vor,ndb\"\n");                   
@@ -86,7 +86,7 @@ int main( int argc, char **argv ) {
       mapobj.setAPFilter( strdup(cparam) );
     } else if ( sscanf(argv[arg], "--output=%s", cparam) == 1 ) {
       outp = strdup(cparam);
-    } else if ( sscanf(argv[arg], "--fgroot=%s", cparam) == 1 ) {
+    } else if ( sscanf(argv[arg], "--fg-root=%s", cparam) == 1 ) {
       mapobj.setFGRoot( strdup(cparam) );
     } else if ( strcmp(argv[arg], "--disable-airports" ) == 0 ) {
       features &= ~MapMaker::DO_AIRPORTS;
@@ -138,12 +138,18 @@ int main( int argc, char **argv ) {
   //   frequencies
 
   nav1_freq=nav2_freq=-1000.;
+  
+  char *scenerypath = new char[strlen(mapobj.getFGRoot()) + 256];
+  char *workingpath = new char[strlen(mapobj.getFGRoot()) + 256];
+  strcpy( scenerypath, mapobj.getFGRoot() );
+  strcat( scenerypath, "/Scenery/Terrain/" );
+  strcpy( workingpath, scenerypath );
 
   if (!global) {
     OutputPS output( outp, mapobj.getSize() );
-    mapobj.createMap( &output, clat, clon, autoscale );
+    mapobj.createMap( &output, clat, clon, scenerypath, autoscale );
   } else {
-    char outname[512], *scenerypath = new char[strlen(mapobj.getFGRoot()) + 256];
+    char outname[512];
     int opathl, spathl;
     ulDir *dir1, *dir2;
     ulDirEnt *ent;
@@ -156,8 +162,6 @@ int main( int argc, char **argv ) {
 
     strcpy(outname, outp);
     opathl = strlen(outname);
-    strcpy( scenerypath, mapobj.getFGRoot() );
-    strcat( scenerypath, "/Scenery/" );
     spathl = strlen(scenerypath);
     
     if ( (dir1 = ulOpenDir(scenerypath)) == NULL ) {
@@ -185,7 +189,7 @@ int main( int argc, char **argv ) {
 		       (lon<0)?'w':'e', abs(lon), (lat<0)?'s':'n', abs(lat) );
 
 	      OutputPS output( outname, mapobj.getSize() );
-	      mapobj.createMap( &output, clat, clon, true );
+	      mapobj.createMap( &output, clat, clon, workingpath, true );
 	    }
 	  }
 	}

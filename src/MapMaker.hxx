@@ -25,15 +25,25 @@
   2000-02-06      MapMaker now draws in an OpenGL context
 ---------------------------------------------------------------------------*/
 
+#include <simgear/compiler.h>
+#include <simgear/io/sg_binobj.hxx>
 #include <plib/sg.h>
 #include <vector>
 #include <list>
 #include <map>
-#include <simgear/io/sg_binobj.hxx>
+#include STL_STRING
 
 #include "Output.hxx"
 #include "Overlays.hxx"
 #include "Geodesy.hxx"
+
+SG_USING_STD(vector);
+SG_USING_STD(string);
+
+// Utility function that I needed to put somewhere - this probably isn't the best place for it.
+// Appends a path separator to a directory path if not present.
+// Calling function MUST ENSURE that there is space allocated for the potential strcat.
+void NormalisePath(char* dpath);
 
 class MapMaker {
 public:
@@ -85,7 +95,7 @@ public:
   inline int getFeatures() { return features; }
 
   int createMap(GfxOutput *output, float theta, float alpha, 
-		float autoscale = 0.0f);
+		string dirpath, float autoscale = 0.0f);
   int drawOverlays(GfxOutput *output, float theta, float alpha, 
 		bool do_square = false, bool flipy = false );
 
@@ -98,7 +108,7 @@ protected:
   };
   typedef std::map<const char*, int, WordLess> StrMap;
 
-  std::vector<float*> palette;
+  vector<float*> palette;
   StrMap materials;
   void read_materials(char* filename = NULL);
   
