@@ -325,17 +325,32 @@ bool ContinueIfNoHeadless() {
   return((c == 'n' || c == 'N') ? false : true);
 }
 
+#ifdef UL_GLX
+int mapXerrorHandler( Display *d, XErrorEvent * ) {
+  return 0;
+}
+#endif
+
 bool InitPbuffer( int &tex_size ) {
     rt2 = new RenderTexture(); 
     rt2->Reset("rgb tex2D");
     tex_size = mapobj.getSize();
     bool cur_ok;
+#ifdef UL_GLX
+    XSetErrorHandler( mapXerrorHandler );
+#endif
     fprintf(stderr, "Trying size %d : ", tex_size );
     while (!(cur_ok = rt2->Initialize(tex_size, tex_size)) && tex_size > 1)
     {
+#ifdef UL_GLX
+	fprintf( stderr, "Error\n" );
+#endif
         tex_size >>= 1;
         fprintf(stderr, "Trying size %d : ", tex_size );
     }
+#ifdef UL_GLX
+    XSetErrorHandler( NULL );
+#endif
     if ( !cur_ok )
     {
         fprintf(stderr, "RenderTexture Initialization failed!\n");
