@@ -51,7 +51,7 @@ MapPS_SOURCES = \
 	OutputPS.cxx OutputPS.hxx \
 	Overlays.cxx Overlays.hxx \
 	Projection.cxx Projection.hxx \
-	Scenery.cxx Scenery.hxx \
+	Scenery.cxx Scenery.hxx
 
 MapPS_LDADD = \
 	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgdebug \
