@@ -193,8 +193,8 @@ bool parse_arg(char* arg) {
     // do nothing
   } else if ( sscanf(arg, "--size=%d", &param) == 1 ) {
     mapobj.setSize( param );
-  } else if ( sscanf(arg, "--scale=%d", &param) == 1 ) {
-    mapobj.setScale( param * 1000 );
+  } else if ( sscanf(arg, "--scale=%f", &x) == 1 ) {
+    mapobj.setScale( (int)(x * 1000.0f) );
   } else if ( sscanf(arg, "--light=%f, %f, %f", &x, &y, &z) == 3 ) {
     mapobj.setLight( x, y, z );
   } else if ( sscanf(arg, "--airport-filter=%s", cparam) == 1 ) {
