@@ -293,8 +293,8 @@ void Overlays::airport_labels(float theta, float alpha,
 	p[0] -= 10; p[1] -= 5;
       }
 
-      sgVec2 outlines[ap->rwys.size()*4];
-      sgVec2 insides[ap->rwys.size()*4];
+      sgVec2 *outlines = new sgVec2[ap->rwys.size()*4];
+      sgVec2 *insides = new sgVec2[ap->rwys.size()*4];
       int oc = 0, ic = 0;
       for (list<RWY*>::const_iterator j = ap->rwys.begin(); j != ap->rwys.end();
 	   j++) {
@@ -332,6 +332,9 @@ void Overlays::airport_labels(float theta, float alpha,
       for (k = 0; k < ap->rwys.size(); k++) {
 	output->drawQuad( insides + k*4, dummy_normals );
       }
+      
+      delete[] insides;
+      delete[] outlines;
     }
   }
 
