@@ -199,6 +199,9 @@ void Overlays::draw_gridlines( float dtheta, float dalpha, float spacing ) {
   grid_theta *= SG_DEGREES_TO_RADIANS;
   grid_alpha *= SG_DEGREES_TO_RADIANS;
 
+  if ( grid_theta == 0.f || grid_alpha == 0.f )
+    return;
+
   sgVec3 xyr;
   sgVec2 p1, p2;
   bool first;
