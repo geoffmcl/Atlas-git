@@ -39,7 +39,9 @@
 #include <simgear/compiler.h>
 #include SG_GL_H
 #ifdef UL_GLX
-  #include SG_GLX_H
+#  include SG_GLX_H
+#elif defined UL_WIN32
+#  include <windows.h>
 #endif
 #include SG_GLUT_H
 #include <stdlib.h>
@@ -52,7 +54,7 @@
 #include "OutputGL.hxx"
 #include "fg_mkdir.hxx"
 #include <simgear/misc/sg_path.hxx>
-#include <simgear/screen/extensions.hxx>
+#include "extensions.hxx"
 #include "RenderTexture.h"
 #include <vector>
 #include STL_STRING
