@@ -162,13 +162,13 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
   // Draw a quad spanning the full area and the same as the clear color
   // to avoid corruption from the pixel read not reading areas we don't
   // explicitly draw to on some platforms.
-  output->setColor(palette[0]);  // Use the water colour instead - clear colour is very slightly different
-  sgVec2 *baseQuad = new sgVec2[4];
+  output->setColor(palette[12]);
+  sgVec2 baseQuad[4];
   sgSetVec2(baseQuad[0], 0.0, 0.0);
   sgSetVec2(baseQuad[1], 0.0, (float)size);
   sgSetVec2(baseQuad[2], (float)size, (float)size);
   sgSetVec2(baseQuad[3], (float)size, 0.0);
-  output->drawQuad(baseQuad, simple_normals);
+  output->drawQuad(&baseQuad[0], simple_normals);
 
   // calculate which tiles we will have to load
   float dtheta, dalpha;
