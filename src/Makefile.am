@@ -1,6 +1,6 @@
 SUBDIRS = data
 
-EXTRA_DIST = buildmaps.sh
+EXTRA_DIST = buildmaps.sh AtlasPalette
 
 bin_PROGRAMS = Atlas Map MapPS
 
@@ -21,7 +21,7 @@ Atlas_LDADD = \
 	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgserial -lsgdebug -lsgbucket\
 	-lplibsg -lplibpu -lplibfnt \
 	$(opengl_LIBS) \
-	-lpng -lz
+	-lpng -lz -lpthread
 
 Map_SOURCES = \
 	Map.cxx \
