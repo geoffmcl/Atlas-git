@@ -19,8 +19,30 @@ AC_PROG_LN_S
 dnl Check for MS Windows environment
 AC_CHECK_HEADER(windows.h)
 
+dnl Specify the plib location
+AC_ARG_WITH(plib, [  --with-plib=prefix      specify the prefix path to plib])
+
+if test "x$with_plib" != "x" ; then
+    echo "Plib prefix path is $with_plib"
+	PLIB_DIR="$with_plib"
+else
+    echo "Plib not specified"
+	PLIB_DIR=
+fi
+
+dnl Specify the simgear location
+AC_ARG_WITH(simgear, [  --with-simgear=prefix   specify the prefix path to simgear])
+
+if test "x$with_simgear" != "x" ; then
+    echo "SimGear prefix path is $with_simgear"
+    SIMGEAR_DIR="$with_simgear"
+else 
+    echo "Simgear not specified"
+    SIMGEAR_DIR=
+fi
+
 dnl extra library and include directories
-EXTRA_DIRS="/usr/local /usr/local/plib /usr/X11R6"
+EXTRA_DIRS="${SIMGEAR_DIR} ${PLIB_DIR} /usr/local /usr/local/plib /usr/X11R6"
 
 if test -d /opt/X11R6 ; then
      EXTRA_DIRS="$EXTRA_DIRS /opt/X11R6"
