@@ -43,9 +43,10 @@ float clat = -100.0f, clon = -100.0f;   // initialize to unreasonable values
 char *outp = "map.png";                 // output file name
 bool autoscale = false, global = false, doublebuffer = true;
 bool smooth_shade = true, textured_fonts = true;
+int features = MapMaker::DO_SHADE;
 MapMaker mapobj;
 
-char outname[512], *scenerypath;
+char outname[512], *scenerypath, *palette;
 int opathl, spathl;
 DIR *dir1, *dir2 = NULL;
 dirent *ent;
@@ -72,8 +73,8 @@ void redrawMap() {
 
   if (!global) {
     sprintf(title_buffer, "%c%.1f %c%.1f",
-	    (clat<0.0f)?'S':'N', clat * 180.0f / M_PI,
-	    (clon<0.0f)?'W':'E', clon * 180.0f / M_PI);
+	    (clat<0.0f)?'S':'N', fabs(clat * 180.0f / M_PI),
+	    (clon<0.0f)?'W':'E', fabs(clon * 180.0f / M_PI));
     glutSetWindowTitle(title_buffer);
 
     OutputGL output( outp, mapobj.getSize(), smooth_shade, 
@@ -175,67 +176,107 @@ void print_help() {
   printf("  --flat-shading          Don't do nice shading of the terrain\n");
   printf("  --atlas=path            Create maps of all scenery, and store them in path\n");
   printf("  --verbose               Display information during processing\n");
-  printf("  --singlebuffer          Use single buffered display.\n\n");
+  printf("  --singlebuffer          Use single buffered display.\n");
   printf("  --glutfonts             Use GLUT built-in fonts.\n");
+  printf("  --palette=path          Set the palette file to use.\n");
+}
+
+bool parse_arg(char* arg) {
+  int param;
+  char cparam[128];
+  float x, y, z;
+
+  if ( sscanf(arg, "--lat=%f", &clat) == 1) {
+    // do nothing
+  } else if ( sscanf(arg, "--lon=%f", &clon) == 1 ) {
+    // do nothing
+  } else if ( sscanf(arg, "--size=%d", &param) == 1 ) {
+    mapobj.setSize( param );
+  } else if ( sscanf(arg, "--scale=%d", &param) == 1 ) {
+    mapobj.setScale( param * 1000 );
+  } else if ( sscanf(arg, "--light=%f, %f, %f", &x, &y, &z) == 3 ) {
+    mapobj.setLight( x, y, z );
+  } else if ( sscanf(arg, "--airport-filter=%s", cparam) == 1 ) {
+    mapobj.setAPFilter( strdup(cparam) );
+  } else if ( sscanf(arg, "--output=%s", cparam) == 1 ) {
+    outp = strdup(cparam);
+  } else if ( sscanf(arg, "--fgroot=%s", cparam) == 1 ) {
+    mapobj.setFGRoot( cparam );
+  } else if ( strcmp(arg, "--enable-airports" ) == 0 ) {
+    features |= MapMaker::DO_AIRPORTS;
+  } else if ( strcmp(arg, "--enable-navaids" ) == 0 ) {
+    features |= MapMaker::DO_NAVAIDS;
+  } else if ( strcmp(arg, "--flat-shading" ) == 0 ) {
+    smooth_shade = false;
+  } else if ( strcmp(arg, "--autoscale") == 0 ) {
+    autoscale = true;
+  } else if ( strcmp(arg, "--singlebuffer") == 0 ) {
+    doublebuffer = false;
+  } else if ( sscanf(arg, "--atlas=%s", cparam) == 1 ) {
+    global = true;
+    outp = strdup( cparam );
+  } else if ( sscanf(arg, "--palette=%s", cparam) == 1 ) {
+    mapobj.setPalette(cparam);
+  } else if ( strcmp(arg, "--glutfonts") == 0 ) {
+    textured_fonts = false;
+  } else if ( strcmp(arg, "--verbose") == 0 ) {
+    features |= MapMaker::DO_VERBOSE;
+  } else if ( strcmp(arg, "--help") == 0 ) {
+    print_help();
+    exit(0);
+  } else if ( strcmp(arg, "--disable-airports" ) == 0 ) {
+    // Do nothing - only for backwards compatibility
+  } else if ( strcmp(arg, "--disable-navaids" ) == 0 ) {
+    // Do nothing - only for backwards compatibility
+  } else {
+    return false;
+  }
+
+  return true;
 }
 
 int main( int argc, char **argv ) {
-  // variables for command line parsing
-  int param, features = MapMaker::DO_SHADE;
-  float x, y, z;
-  char cparam[128];
-
   if (argc == 0)
     print_help();
 
+  // process ~/.atlasmaprc
+  char* homedir = getenv("HOME"), *rcpath;
+  const char atlasmaprc[] = ".atlasmaprc";
+  if (homedir != NULL) {
+    rcpath = new char[strlen(homedir) + strlen(atlasmaprc) + 2];
+    strcpy(rcpath, homedir);
+    strcat(rcpath, "/");
+    strcat(rcpath, atlasmaprc);
+  } else {
+    rcpath = new char[strlen(atlasmaprc) + 1];
+    strcpy(rcpath, atlasmaprc);
+  }
+
+  FILE* rc = fopen(rcpath, "r");
+
+  if (rc != NULL) {
+    char line[256];
+    fgets(line, 256, rc);
+    while (!feof(rc)) {
+      line[strlen(line) - 1] = '\0';
+      if (!parse_arg(line)) {
+	fprintf(stderr, "%s: unknown argument \"%s\" in file \"%s\"\n",
+		argv[0], line, rcpath);
+      }
+      fgets(line, 256,rc);
+    }
+    fclose(rc);
+  }
+
+  delete rcpath;
+
   // process command line arguments
   for (int arg = 1; arg < argc; arg++) {
-    if ( sscanf(argv[arg], "--lat=%f", &clat) == 1) {
-      // do nothing
-    } else if ( sscanf(argv[arg], "--lon=%f", &clon) == 1 ) {
-      // do nothing
-    } else if ( sscanf(argv[arg], "--size=%d", &param) == 1 ) {
-      mapobj.setSize( param );
-    } else if ( sscanf(argv[arg], "--scale=%d", &param) == 1 ) {
-      mapobj.setScale( param * 1000 );
-    } else if ( sscanf(argv[arg], "--light=%f, %f, %f", &x, &y, &z) == 3 ) {
-      mapobj.setLight( x, y, z );
-    } else if ( sscanf(argv[arg], "--airport-filter=%s", cparam) == 1 ) {
-      mapobj.setAPFilter( strdup(cparam) );
-    } else if ( sscanf(argv[arg], "--output=%s", cparam) == 1 ) {
-      outp = strdup(cparam);
-    } else if ( sscanf(argv[arg], "--fgroot=%s", cparam) == 1 ) {
-      mapobj.setFGRoot( cparam );
-    } else if ( strcmp(argv[arg], "--enable-airports" ) == 0 ) {
-      features |= MapMaker::DO_AIRPORTS;
-    } else if ( strcmp(argv[arg], "--enable-navaids" ) == 0 ) {
-      features |= MapMaker::DO_NAVAIDS;
-    } else if ( strcmp(argv[arg], "--flat-shading" ) == 0 ) {
-      smooth_shade = false;
-    } else if ( strcmp(argv[arg], "--autoscale") == 0 ) {
-      autoscale = true;
-    } else if ( strcmp(argv[arg], "--singlebuffer") == 0 ) {
-      doublebuffer = false;
-    } else if ( sscanf(argv[arg], "--atlas=%s", cparam) == 1 ) {
-      global = true;
-      outp = strdup( cparam );
-    } else if ( strcmp(argv[arg], "--glutfonts") == 0 ) {
-      textured_fonts = false;
-    } else if ( strcmp(argv[arg], "--verbose") == 0 ) {
-      features |= MapMaker::DO_VERBOSE;
-    } else if ( strcmp(argv[arg], "--help") == 0 ) {
-      print_help();
-      exit(0);
-    } else if ( strcmp(argv[arg], "--disable-airports" ) == 0 ) {
-      // Do nothing - only for backwards compatibility
-    } else if ( strcmp(argv[arg], "--disable-navaids" ) == 0 ) {
-      // Do nothing - only for backwards compatibility
-    } else {
+    if (!parse_arg(argv[arg])) {
       fprintf(stderr, "%s: unknown argument '%s'.\n", argv[0], argv[arg]);
       print_help();
       exit(1);
     }
-
   }
   
   if (!global && (fabs(clat) > 90.0f || fabs(clon) > 180.0f)) {

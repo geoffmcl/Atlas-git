@@ -44,10 +44,9 @@ MapMaker::MapMaker( char *fg_root, char *ap_filter, int features,
   scle = scale;
 
   modified = false;
+  palette_loaded = false;
 
   setLight( -1, -1, 2 );       // default lighting
-
-  read_materials();
 }
 
 MapMaker::~MapMaker() {
@@ -75,11 +74,37 @@ void MapMaker::setFGRoot( char *fg_root ) {
   strcpy(this->fg_root, fg_root);
 }
 
+void MapMaker::setPalette( char* filename ) {
+  if (palette_loaded) {
+    for (StrMap::iterator it = materials.begin(); it != materials.end(); 
+	 it++) {
+      delete (*it).first;
+    }
+    
+    for (int i = 0; i < palette.size(); i++) {
+      delete palette[i];
+    }
+  }
+
+  palette_loaded = false;
+
+  read_materials(filename);
+}
+
 int MapMaker::createMap(GfxOutput *output,float theta, float alpha, 
 			bool do_square) {
   this->output = output;
   
   modified = false;
+
+  if (!palette_loaded)
+    read_materials();
+
+  if (!palette_loaded) {
+    fprintf(stderr, "No palette loaded.\n");
+    return 0;
+  }
+
   output->clear( palette[0] );
 
   // set up coordinate space
@@ -522,17 +547,20 @@ int MapMaker::process_directory( char *path, int plen, int lat, int lon,
   return 1;
 }
 
-void MapMaker::read_materials() {
-  char* fgroot = getFGRoot();
-  char* filename = new char[strlen(fgroot) + 32];
-  strcpy(filename, fgroot);
-  strcat(filename, "/AtlasPalette");
+void MapMaker::read_materials(char *fname /* = NULL */) {
+  char *filename;
+  if (fname == NULL) {
+    char* fgroot = getFGRoot();
+    filename = new char[strlen(fgroot) + 32];
+    strcpy(filename, fgroot);
+    strcat(filename, "/AtlasPalette");
+  } else {
+    filename = fname;
+  }
 
   FILE *fd = fopen(filename, "r");
   if (fd == NULL) {
-    fprintf(stderr, "Could not read palette from file \"%s\".\n" \
-	    "Perhaps you forgot to copy it from Atlas/src/AtlasPalette\n" \
-	    "to your FlightGear root-directory?\n", filename);
+    fprintf(stderr, "Could not read palette from file \"%s\".\n", filename);
     return;
   }
 
@@ -586,5 +614,9 @@ void MapMaker::read_materials() {
   }
 
   fclose(fd);
-  delete filename;
+
+  if (fname == NULL)
+    delete filename;
+
+  palette_loaded = true;
 }

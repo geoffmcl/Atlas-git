@@ -49,6 +49,7 @@ public:
   ~MapMaker();
 
   void setFGRoot( char *path );
+  void setPalette( char *path );
   inline void setAPFilter( char *filter ) { arp_filter = filter; }
   inline void setFeatures( int features) { this->features = features; }
   inline void setScale( int scale = 100000 ) { scle = scale; }
@@ -89,7 +90,7 @@ protected:
 
   std::vector<float*> palette;
   StrMap materials;
-  void read_materials();
+  void read_materials(char* filename = NULL);
   
   // Elevation limits for colours
   static const int ELEV_LEVELS = 8;
@@ -102,7 +103,7 @@ protected:
   int  size, scle;
   float zoom;          // size / scale
 
-  bool modified;
+  bool modified, palette_loaded;
 
   sgVec3 map_light, light_vector;
   GfxOutput *output;
