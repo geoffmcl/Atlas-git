@@ -554,8 +554,8 @@ void Overlays::load_navaids() {
 	// cout << "lat = " << n->lat << " lon = " << n->lon << " elev = " 
 	//      << elev << " JD = " << time_params->getJD() << endl;
 
-	n->lat *= DEG_TO_RAD;
-	n->lon *= DEG_TO_RAD;
+	n->lat *= SG_DEGREES_TO_RADIANS;
+	n->lon *= SG_DEGREES_TO_RADIANS;
 	elev *= FEET_TO_METER;
 
 	if ( strcmp( sMagVar, "XXX" ) == 0 ) {
@@ -564,7 +564,7 @@ void Overlays::load_navaids() {
 	} else {
 	    n->magvar = ( (sMagVar[0] - '0') * 10 + (sMagVar[1] - '0') );
 	    n->magvar *= DEG_TO_RAD;
-	    if ( sMagVar[2] == 'E' ) {
+	    if ( sMagVar[2] == 'W' ) {
 		n->magvar = -n->magvar;
 	    }
 	}
