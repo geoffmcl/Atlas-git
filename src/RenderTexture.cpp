@@ -263,7 +263,7 @@ void PrintExtensionError( char* strMsg, ... )
     char strBuffer[512];
     va_list args;
     va_start(args, strMsg);
-#ifdef _WIN32
+#if defined _WIN32 && !defined __CYGWIN__
     _vsnprintf( strBuffer, 512, strMsg, args );
 #else
     vsnprintf( strBuffer, 512, strMsg, args );
@@ -303,7 +303,7 @@ bool RenderTexture::Initialize(int width, int height,
     if (_bInitialized)
         _Invalidate();
 
-#if _WIN32
+#ifdef _WIN32
     // Get the current context.
     HDC hdc = wglGetCurrentDC();
     if (NULL == hdc)
@@ -591,7 +591,7 @@ bool RenderTexture::_Invalidate()
         glDeleteTextures(1, &_iDepthTextureID);
     }
     
-#if _WIN32
+#ifdef _WIN32
     if ( _hPBuffer )
     {
         // Check if we are currently rendering in the pbuffer
@@ -684,7 +684,7 @@ bool RenderTexture::Reset(const char *strMode, ...)
     va_list args;
     char strBuffer[256];
     va_start(args,strMode);
-#ifdef _WIN32
+#if defined _WIN32 && !defined __CYGWIN__
     _vsnprintf( strBuffer, 256, strMode, args );
 #else
     vsnprintf( strBuffer, 256, strMode, args );
@@ -962,7 +962,7 @@ bool RenderTexture::BindBuffer( int iBuffer )
     {
         glBindTexture(_iTextureTarget, _iTextureID);
         
-#if _WIN32
+#ifdef _WIN32
         if (RT_RENDER_TO_TEXTURE == _eUpdateMode && _bIsTexture &&
             (!_bIsBufferBound || _iCurrentBoundBuffer != iBuffer))
         {
