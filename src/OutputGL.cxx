@@ -11,9 +11,9 @@ float OutputGL::circle_y[];
 const float OutputGL::BRIGHTNESS = 0.6f;
 
 OutputGL::OutputGL( char *filename, int size, bool smooth_shading, 
-		    bool useTexturedFont, char *fontname, bool jpg, int q ) : 
+		    bool useTexturedFont, char *fontname, bool jpg, int q, int r ) : 
   GfxOutput(filename, size), filename(filename), 
-  useTexturedFont(useTexturedFont), jpeg(jpg), jpeg_quality(q)
+  useTexturedFont(useTexturedFont), jpeg(jpg), jpeg_quality(q), rescale(r)
 {
   glViewport( 0, 0, size, size );
   glMatrixMode( GL_PROJECTION );
@@ -71,6 +71,34 @@ void OutputGL::closeOutput() {
   glReadPixels(0, 0, size, size,
 	       GL_RGB, GL_UNSIGNED_BYTE, image);
 
+  int scale = rescale;
+  int current_size = size;
+  while ( scale && ( scale & 1 ) == 0 ) {
+    int new_size = current_size / 2;
+    GLubyte *buffer = new GLubyte[new_size*new_size*3];
+    for ( int x2 = 0; x2 < new_size; ++x2 ) {
+      for ( int y2 = 0; y2 < new_size; ++y2 ) {
+        for ( int c = 0; c < 3; ++c ) {
+          int x1 = x2 + x2;
+          int x1_1 = x1 + 1;
+          int y1 = y2 + y2;
+          int y1_1 = y1 + 1;
+
+          int t1 = image[ (y1   * current_size + x1  ) * 3 + c ];
+          int t2 = image[ (y1_1 * current_size + x1  ) * 3 + c ];
+          int t3 = image[ (y1   * current_size + x1_1) * 3 + c ];
+          int t4 = image[ (y1_1 * current_size + x1_1) * 3 + c ];
+
+          buffer[ (y2 * new_size + x2) * 3 + c ] = ( t1 + t2 + t3 + t4 ) / 4 ;
+        }
+      }
+    }
+    scale >>= 1;
+    current_size = new_size;
+    delete[] image;
+    image = buffer;
+  }
+
   FILE *fp = fopen(filename, "wb");
   if (!fp) {
     printf("OutputGL::closeOutput: can't create '%s'\n", filename);
@@ -88,8 +116,8 @@ void OutputGL::closeOutput() {
     jpeg_create_compress( &cinfo );
     jpeg_stdio_dest( &cinfo, fp );
 
-    cinfo.image_width = size;
-    cinfo.image_height = size;
+    cinfo.image_width = current_size;
+    cinfo.image_height = current_size;
     cinfo.input_components = 3;
     cinfo.in_color_space = JCS_RGB;
 
@@ -101,9 +129,9 @@ void OutputGL::closeOutput() {
     while ( cinfo.next_scanline < cinfo.image_height ) {
        unsigned char *buf;
        if ( 1 ) {
-	  buf = (unsigned char *)&image[ size * ( size - ( cinfo.next_scanline + 1 ) ) * 3 ];
+	  buf = (unsigned char *)&image[ current_size * ( current_size - ( cinfo.next_scanline + 1 ) ) * 3 ];
        } else {
-	  buf = (unsigned char *)&image[ size * cinfo.next_scanline * 3 ];
+	  buf = (unsigned char *)&image[ current_size * cinfo.next_scanline * 3 ];
        }
        jpeg_write_scanlines( &cinfo, (JSAMPARRAY)&buf, 1 );
     }
@@ -130,14 +158,14 @@ void OutputGL::closeOutput() {
     }
 
     png_init_io(png_ptr, fp);
-    png_set_IHDR(png_ptr, info_ptr, size, size, 8, PNG_COLOR_TYPE_RGB,
+    png_set_IHDR(png_ptr, info_ptr, current_size, current_size, 8, PNG_COLOR_TYPE_RGB,
 		 PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT,
 		 PNG_FILTER_TYPE_DEFAULT);
     png_write_info(png_ptr, info_ptr);
 
-    png_byte **row_pointers = new png_byte*[size];
-    for (int i = 1; i <= size; i++) {
-      row_pointers[i-1] = (png_byte*)(image + size * (size-i) * 3);
+    png_byte **row_pointers = new png_byte*[current_size];
+    for (int i = 1; i <= current_size; i++) {
+      row_pointers[i-1] = (png_byte*)(image + current_size * (current_size-i) * 3);
     }
 
     // actually write the image

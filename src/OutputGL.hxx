@@ -10,7 +10,7 @@
 class OutputGL : public GfxOutput {
 public:
   OutputGL( char *filename, int size, bool smooth_shading,
-	    bool useTexturedFont, char *fontname, bool jpg = false, int q = 75 );
+	    bool useTexturedFont, char *fontname, bool jpg = false, int q = 75, int r = 1 );
   ~OutputGL();
 
   virtual void closeOutput();
@@ -41,7 +41,7 @@ protected:
   puFont *glutFont;
   char *filename;
   bool useTexturedFont, shade, jpeg;
-  int jpeg_quality;
+  int jpeg_quality, rescale;
 
   sgVec4 light_vector;
 };
