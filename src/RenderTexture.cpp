@@ -47,6 +47,7 @@
 
 #include <simgear/compiler.h>
 #include SG_GL_H
+#include <plib/ul.h>
 #ifdef UL_GLX
 #  define GLX_GLXEXT_PROTOTYPES
 #  ifdef __APPLE__
