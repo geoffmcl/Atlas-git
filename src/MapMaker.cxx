@@ -66,7 +66,7 @@ const float MapMaker::rgb[17][4] = { {0.761, 0.839, 0.847, 1.0},
 				     {0.761, 0.839, 0.847, 1.0}, 
 				     {0.761, 0.839, 0.847, 1.0}, 
 				     {0.439, 0.271, 0.420, 1.0}, 
-				     {0.925, 0.882, 0.384, 1.0}, 
+				     {0.975, 0.982, 0.484, 1.0}, 
 				     {1.000, 0.000, 0.000, 1.0} };
 
 const int MapMaker::elev_height[ELEV_LEVELS] = {-1, 100, 200, 500, 1000, 1500,
@@ -144,11 +144,12 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
     overlays.setNavaidColor( rgb[ARP_LABEL] );
     overlays.setLocation( theta, alpha );
 
-    int features = 0;
+    int features = Overlays::OVERLAY_NAMES | Overlays::OVERLAY_IDS;
     if (getAirports()) features += Overlays::OVERLAY_AIRPORTS;
     if (getNavaids()) features += Overlays::OVERLAY_NAVAIDS;    
+    overlays.setFeatures(features);
 
-    overlays.drawOverlays( features );
+    overlays.drawOverlays();
   } else if (getVerbose()) {
     printf("Nothing to draw - no output written.\n");
   }
@@ -301,19 +302,23 @@ void MapMaker::draw_trifan( vector<int> &tri, vector<float*> &v, int index ) {
     sgCopyVec3( t[2], v[vert2] );
     sgSetVec2( p[2], scale(t[2][0], size, zoom), scale(t[2][1], size, zoom) );
 
-    if (col>=0)
-      output->setColor( rgb[col] );
-    else {
-      // colour depending on elevation
-      int dcol = elev2colour((int)((t[0][2] + t[1][2] + t[2][2]) / 3.0f));
-
+    if (col == 12 || col == 13) {
+      // do not shade ocean/lake/etc.
+      output->setColor(rgb[col]);
+    } else {
+      int dcol;
+      if (col>=0) {
+	dcol = col;
+      } else {
+	dcol = elev2colour((int)((t[0][2] + t[1][2] + t[2][2]) / 3.0f));
+      }
       if (getShade()) {
 	float sh = shade(t); 
 	
 	float tcol[4] = {rgb[dcol][0] * sh,
 			 rgb[dcol][1] * sh,
 			 rgb[dcol][2] * sh,
-	                 1.0f};
+			 1.0f};
 	output->setColor(tcol);
       } else {
 	output->setColor(rgb[dcol]);

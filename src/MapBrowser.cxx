@@ -108,6 +108,7 @@ void MapBrowser::setFGRoot( char *fg_root ) {
 
 void MapBrowser::setFeatures( int features ) {
   this->features = features;
+  overlay->setFeatures(features);
 }
 
 void MapBrowser::setTextured( bool textured ) {
@@ -152,7 +153,7 @@ void MapBrowser::draw() {
   }
 
   glEnable(GL_BLEND);
-  overlay->drawOverlays( features );
+  overlay->drawOverlays();
 }
 
 void MapBrowser::update() {

@@ -60,7 +60,7 @@ Overlays::Overlays( char *fg_root = NULL, float scale = 1.0f,
   mag = new SGMagVar();
 }
 
-void Overlays::drawOverlays( int features ) {
+void Overlays::drawOverlays() {
   const float GRIDC = 2;
 
   float dtheta, dalpha;
@@ -71,11 +71,11 @@ void Overlays::drawOverlays( int features ) {
   dalpha -= lon;
 
   if (features & OVERLAY_AIRPORTS) {
-    airport_labels( features & OVERLAY_NAMES, lat, lon, dtheta, dalpha );
+    airport_labels(lat, lon, dtheta, dalpha );
   }
 
   if (features & OVERLAY_NAVAIDS) {
-    draw_navaids( features & OVERLAY_NAMES, lat, lon, dtheta, dalpha );
+    draw_navaids(lat, lon, dtheta, dalpha );
   }
 
   if (features & OVERLAY_GRIDLINES) {
@@ -179,7 +179,7 @@ void Overlays::buildRwyCoords( sgVec2 rwyc, sgVec2 rwyl, sgVec2 rwyw,
 }
 
 // Draws the labels of all airports in the specified region
-void Overlays::airport_labels(bool draw_names, float theta, float alpha,
+void Overlays::airport_labels(float theta, float alpha,
 			      float dtheta, float dalpha ) {
   load_airports();
 
@@ -195,14 +195,12 @@ void Overlays::airport_labels(bool draw_names, float theta, float alpha,
 		 ::scale(cy, output->getSize(), scale) );
 	    
       if (ap->name[0] != 0) {
-	if (draw_names) {
-	  output->setColor( arp_color1 );
-	  p[0] += 10; p[1] -= 5;
-	  output->drawText( p, ap->id );
-	  p[1] += 10;
-	  output->drawText( p, ap->name+4 );
-	  p[0] -= 10; p[1] -= 5;
-	}
+	output->setColor( arp_color1 );
+	p[0] += 10; p[1] -= 5;
+	if (features & OVERLAY_IDS) output->drawText( p, ap->id );
+	p[1] += 10;
+	if (features & OVERLAY_NAMES) output->drawText( p, ap->name+4 );
+	p[0] -= 10; p[1] -= 5;
       }
 
       sgVec2 outlines[ap->rwys.size()*4];
@@ -248,7 +246,7 @@ void Overlays::airport_labels(bool draw_names, float theta, float alpha,
 }
 
 // Draws all navaids in the specified region
-void Overlays::draw_navaids( bool draw_names, float theta, float alpha, 
+void Overlays::draw_navaids( float theta, float alpha, 
 			     float dtheta, float dalpha ) {
   load_navaids();
 
@@ -267,10 +265,10 @@ void Overlays::draw_navaids( bool draw_names, float theta, float alpha,
       switch (n->navtype) {
       case NAV_VOR:
       case NAV_DME:
-	draw_vor( draw_names, n, p);
+	draw_vor(n, p);
 	break;
       case NAV_NDB:
-	draw_ndb( draw_names, n, p);
+	draw_ndb(n, p);
 	break;
       }
     }
@@ -278,7 +276,7 @@ void Overlays::draw_navaids( bool draw_names, float theta, float alpha,
 }
 
 // Draw one specified NDB
-void Overlays::draw_ndb( bool draw_names, NAV *n, sgVec2 p ) {
+void Overlays::draw_ndb( NAV *n, sgVec2 p ) {
   static const int RADIUS = 10;
   char freqbuf[8];
   sprintf( freqbuf, "%.0f", n->freq );
@@ -286,16 +284,16 @@ void Overlays::draw_ndb( bool draw_names, NAV *n, sgVec2 p ) {
   output->setColor( nav_color );
   output->drawCircle( p, RADIUS );
 
-  if (draw_names) {
-    p[0] -= RADIUS+25; p[1] -= 5;
-    output->drawText( p, n->id );
-    p[1] += 10;
-    output->drawText( p, freqbuf );
-  }
+  p[0] -= RADIUS+25; p[1] -= 10;
+  if (features & OVERLAY_NAMES) output->drawText( p, n->name );
+  p[1] += 10;
+  if (features & OVERLAY_IDS) output->drawText( p, n->id );
+  p[1] += 10;
+  if (features & OVERLAY_ANY_LABEL) output->drawText( p, freqbuf );
 }
 
 // Draw one specified VOR
-void Overlays::draw_vor( bool draw_names, NAV *n, sgVec2 p ) {
+void Overlays::draw_vor( NAV *n, sgVec2 p ) {
   static const int SUBDIVISIONS = 12;
   static const int RADIUS = 15;
 
@@ -325,12 +323,12 @@ void Overlays::draw_vor( bool draw_names, NAV *n, sgVec2 p ) {
   //     p[0] + cos(n->magvar)*RADIUS, p[1] + sin(n->magvar)*RADIUS );
   //output->drawLine(p, p2);
 
-  if (draw_names) {
-    p[0] -= RADIUS+25; p[1] -= 5;
-    output->drawText( p, n->id );
-    p[0] -= 24; p[1] += 10;
-    output->drawText( p, freqbuf );
-  }
+  p[0] -= RADIUS+25; p[1] -= 10;
+  if (features & OVERLAY_NAMES) output->drawText( p, n->name );
+  p[1] += 10;
+  if (features & OVERLAY_IDS) output->drawText( p, n->id );
+  p[1] += 10;
+  if (features & OVERLAY_ANY_LABEL) output->drawText( p, freqbuf );
 }
 
 /* Loads the airport database if it isn't already loaded
@@ -408,10 +406,11 @@ void Overlays::load_airports() {
 	    rwy->width  = (int)(width  * 0.3048);
 	    ap->rwys.push_back( rwy );
 	  }
-
-	  airports.push_back( ap );
-
 	}
+
+	airports.push_back( ap );
+
+
       } else {
 	// skip all non 'A' records!       line[0] = 'R'; // ouch, ugly hack
 	while (!gzeof(arp) && line[0] == 'R' ) {
@@ -483,7 +482,7 @@ void Overlays::load_navaids() {
       n->magvar = mag->get_magvar() * DEG_TO_RAD;
       // printf("magvar = %.2f\n", n->magvar);
 
-      strcpy(n->name, line+51);
+      strcpy(n->name, line+55);  // 51?
 
       navaids.push_back(n);
       n = NULL;

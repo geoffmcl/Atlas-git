@@ -41,6 +41,8 @@ public:
   static const int OVERLAY_FLIGHTTRACK = 1 << 2;
   static const int OVERLAY_GRIDLINES   = 1 << 3;
   static const int OVERLAY_NAMES       = 1 << 4;
+  static const int OVERLAY_IDS         = 1 << 5;
+  static const int OVERLAY_ANY_LABEL   = OVERLAY_NAMES | OVERLAY_IDS;
 
   //  Overlays();
   Overlays( char *fg_root = NULL, float scale = 1.0f,
@@ -73,12 +75,17 @@ public:
     memcpy( grd_color, color, sizeof(float)*4 );
   }
 
+  inline void setFeatures(int features) {
+    this->features = features;
+  }
+
   inline float getScale() { return scale; }
   inline FlightTrack *getFlightTrack() { return flight_track; }
+  inline int getFeatures() { return features; }
 
   void load_airports();
   void load_navaids();
-  void drawOverlays( int features );
+  void drawOverlays();
 
 protected:
   // Aiport & Navaid databases
@@ -106,17 +113,18 @@ protected:
   static bool airports_loaded, navaids_loaded;
 
 
-  void airport_labels(bool draw_names, float theta, float alpha, 
+  void airport_labels(float theta, float alpha, 
 		      float dtheta, float dalpha);
   void buildRwyCoords( sgVec2 rwyc, sgVec2 rwyl, sgVec2 rwyw, sgVec2 *points );
 
-  void draw_navaids(bool draw_names, float theta, float alpha, 
+  void draw_navaids(float theta, float alpha, 
 		    float dtheta, float dalpha);
-  void draw_ndb( bool draw_names, NAV *n, sgVec2 p );
-  void draw_vor( bool draw_names, NAV *n, sgVec2 p );
+  void draw_ndb( NAV *n, sgVec2 p );
+  void draw_vor( NAV *n, sgVec2 p );
   void draw_flighttrack();
   void draw_gridlines( float dtheta, float dalpha, float spacing );
 
+  int features;
   float scale, lat, lon, size;
   char *fg_root;
   GfxOutput *output;

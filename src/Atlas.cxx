@@ -54,10 +54,10 @@ int save_len = 0;
 
 fntTexFont *texfont;
 puFont *font;
-puPopup *interface;
+puPopup *interface, *minimized;
 puFrame *frame;
-puOneShot *zoomin, *zoomout;
-puButton *show_arp, *show_nav, *show_name, *show_id, *show_none;
+puOneShot *zoomin, *zoomout, *minimize_button, *minimized_button;
+puButton *show_arp, *show_nav, *show_name, *show_id;
 puText *labeling, *txt_lat, *txt_lon;
 puInput *inp_lat, *inp_lon;
 bool interface_visible = true, softcursor = false;
@@ -387,18 +387,10 @@ void labeling_cb ( puObject *cb )
 {
   (cb,cb);
 
-  show_name ->setValue(0);
-  show_id   ->setValue(0);
-  show_none ->setValue(0);
-
   if (cb == show_name) {
-    map->setFeatures( map->getFeatures() | Overlays::OVERLAY_NAMES );
-    show_name->setValue(1);
+    map->setFeatures( map->getFeatures() ^ Overlays::OVERLAY_NAMES );
   } else if (cb == show_id) {
-    show_id->setValue(1);
-  } else if (cb == show_none) {
-    map->setFeatures( map->getFeatures() & ~Overlays::OVERLAY_NAMES );
-    show_none->setValue(1);
+    map->setFeatures( map->getFeatures() ^ Overlays::OVERLAY_IDS );
   }
 
   glutPostRedisplay();
@@ -428,6 +420,20 @@ void position_cb ( puObject *cb ) {
 
     glutPostRedisplay();
   }
+}
+
+void minimize_cb ( puObject *cb ) {
+  (cb, cb);
+
+  interface->hide();
+  minimized->reveal();
+}
+
+void restore_cb ( puObject *cb ) {
+  (cb, cb);
+
+  minimized->hide();
+  interface->reveal();
 }
 
 void init_gui(bool textureFonts) {
@@ -463,14 +469,11 @@ void init_gui(bool textureFonts) {
   labeling = new puText(30, 145);
   labeling->setLabel("Labeling:");
   show_name = new puButton(30, 125, "Name");
-  show_id   = new puButton(90, 125, "Id");
-  show_none = new puButton(153, 125, "None");
-  show_name ->setSize(60, 24);
-  show_id   ->setSize(60, 24);
-  show_none ->setSize(60, 24);
+  show_id   = new puButton(120, 125, "Id");
+  show_name ->setSize(90, 24);
+  show_id   ->setSize(90, 24);
   show_name ->setCallback(labeling_cb);
   show_id   ->setCallback(labeling_cb);
-  show_none ->setCallback(labeling_cb);
   show_name->setValue(1);
 
   txt_lat = new puText(30, 250);
@@ -486,8 +489,16 @@ void init_gui(bool textureFonts) {
   inp_lat->setStyle(PUSTYLE_BEVELLED);
   inp_lon->setStyle(PUSTYLE_BEVELLED);
 
+  minimize_button = new puOneShot(195, 370, "X");
+  minimize_button->setCallback(minimize_cb);
+
   interface->close();
   interface->reveal();
+
+  minimized = new puPopup(20, 20);
+  minimized_button = new puOneShot(20, 20, "X");
+  minimized_button->setCallback(restore_cb);
+  minimized->close();
 
   if (softcursor) {
     puShowCursor();
@@ -655,12 +666,20 @@ void keyPressed( unsigned char key, int x, int y ) {
       interface_visible = !interface_visible;
       if (interface_visible) {
 	interface->reveal();
+	minimized->hide();
       } else {
 	interface->hide();
+	minimized->hide();
       }
       glutPostRedisplay();
     }
   } else {
+    glutPostRedisplay();
+  }
+}
+
+void specPressed(int key, int x, int y) {
+  if (puKeyboard(key + PU_KEY_GLUT_SPECIAL_OFFSET, PU_DOWN )) {
     glutPostRedisplay();
   }
 }
@@ -671,13 +690,13 @@ void print_help() {
   printf("   --lat=x      Start browsing at latitude xx (deg. south i neg.)\n");
   printf("   --lon=x      Start browsing at longitude xx (deg. west i neg.)\n");
   printf("   --path=xxx   Set path for map images\n");
+  printf("   --fgroot=path  Overrides FG_ROOT environment variable\n");
   printf("   --glutfonts  Use GLUT bitmap fonts (fast for software rendering)\n");
   printf("   --geometry=[width]x[height] Set initial window size\n");
   printf("   --softcursor Draw mouse cursor using OpenGL (for fullscreen Voodoo cards)\n\n");
   printf("   --udp=x      Input read from UDP socket at specified port (defaults to 5500)\n");
   printf("   --serial=dev Input read from serial port with specified device\n");
   printf("   --baud=x     Set serial port baud rate (defaults to 4800)\n");
-  printf("   --fgroot=path  Overrides FG_ROOT environment variable\n");
 }
 
 int main(int argc, char **argv) {
@@ -772,8 +791,9 @@ int main(int argc, char **argv) {
 
   glutMotionFunc       ( mouseMotion );
   glutPassiveMotionFunc( mouseMotion );
-  glutMouseFunc        ( mouseClick );
-  glutKeyboardFunc     ( keyPressed );
+  glutMouseFunc        ( mouseClick  );
+  glutKeyboardFunc     ( keyPressed  );
+  glutSpecialFunc      ( specPressed );
 
   map->setLocation( latitude, longitude );
   printf("Please wait while loading databases..."); fflush(stdout);
