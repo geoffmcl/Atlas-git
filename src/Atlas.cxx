@@ -505,13 +505,13 @@ void init_gui(bool textureFonts) {
   minimized->close();
 
   if (slaved) {
-    info_interface = new puPopup(460, 20);
-    info_frame = new puFrame(460, 20, 620, 120);
-    txt_info_spd = new puText(470, 30);
-    txt_info_hdg = new puText(470, 45);
-    txt_info_alt = new puText(470, 60);
-    txt_info_lon = new puText(470, 75);
-    txt_info_lat = new puText(470, 90);
+    info_interface = new puPopup(260, 20);
+    info_frame = new puFrame(260, 20, 420, 120);
+    txt_info_spd = new puText(270, 30);
+    txt_info_hdg = new puText(270, 45);
+    txt_info_alt = new puText(270, 60);
+    txt_info_lon = new puText(270, 75);
+    txt_info_lat = new puText(270, 90);
     info_interface->close();
     info_interface->reveal();
   }
@@ -571,7 +571,7 @@ void redrawMap() {
 
   if (slaved) {
     sprintf( hdg_str, "HDG: %.0f*", heading);    
-    sprintf( alt_str, "ALT: %.0f' MSL", altitude);
+    sprintf( alt_str, "ALT: %.0f ft MSL", altitude);
     sprintf( spd_str, "SPD: %.0f KIAS", speed);
     txt_info_lat->setLabel(lat_str);
     txt_info_lon->setLabel(lon_str);
