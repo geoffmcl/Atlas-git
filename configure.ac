@@ -87,12 +87,31 @@ AC_SUBST(AR)
 AC_SUBST(ARFLAGS)
 
 dnl extra library and include directories
-EXTRA_DIRS="${SIMGEAR_DIR} ${PLIB_DIR} /usr/local/plib /usr/X11R6"
+EXTRA_DIRS="${SIMGEAR_DIR} ${PLIB_DIR} /usr/local/plib"
 
-if test -d /opt/X11R6 ; then
-     EXTRA_DIRS="$EXTRA_DIRS /opt/X11R6"
-fi
+dnl Determine an extra directories to add to include/lib search paths
+case "${host}" in
+*-apple-darwin* | *-*-mingw32*)
+    echo no EXTRA_DIRS for $host
+    ;;
 
+*-*-cygwin*)
+    if test -d /usr/local ; then
+        EXTRA_DIRS="${EXTRA_DIRS} /usr/local"
+    fi
+    ;;
+
+*)
+    if test -d /usr/X11R6 ; then
+        EXTRA_DIR1="/usr/X11R6"
+    fi
+    if test -d /opt/X11R6 ; then
+        EXTRA_DIR2="/opt/X11R6"
+    fi
+    EXTRA_DIRS="${EXTRA_DIRS} $EXTRA_DIR1 $EXTRA_DIR2 /usr/local/"
+    ;;
+
+esac
 wi_EXTRA_DIRS(no, ${EXTRA_DIRS})
 
 dnl Using AM_CONDITIONAL is a step out of the protected little 
@@ -105,8 +124,18 @@ dnl includes, compile alternative source files, etc.
 dnl Enable serial support on Unix type systems
 AM_CONDITIONAL(ENABLE_UNIX_SERIAL, true)
 
-dnl Check for X11 (fancy)
-AC_PATH_XTRA
+dnl X11 might be installed on Mac OS X or cygwin/mingwin, we don't want
+dnl to use it if it is.
+case "${host}" in
+*-apple-darwin* | *-*-cygwin* | *-*-mingw32*)
+    echo no fancy X11 check
+    ;;
+
+*)
+    AC_PATH_XTRA
+    ;;
+
+esac
 
 dnl Checks for libraries.
 
@@ -116,20 +145,21 @@ AC_CHECK_LIB(m, cos)
 
 base_LIBS="$LIBS"
 
-AC_CHECK_LIB(socket, socket)
-AC_CHECK_LIB(X11, XCreateWindow)
-AC_CHECK_LIB(Xext, XShmCreateImage)
-AC_CHECK_LIB(Xi, XGetExtensionVersion)
-AC_CHECK_LIB(ICE, IceOpenConnection)
-AC_CHECK_LIB(SM, SmcOpenConnection)
-AC_CHECK_LIB(Xt, XtMalloc)
-AC_CHECK_LIB(Xmu, XmuLookupStandardColormap)
 AC_CHECK_LIB(pthread, pthread_exit)
 
 dnl check for OpenGL related libraries
 
 if test "x$ac_cv_header_windows_h" != "xyes" ; then
     dnl Reasonable stuff for non-windoze variants ... :-)
+
+    AC_CHECK_LIB(socket, socket)
+    AC_CHECK_LIB(X11, XCreateWindow)
+    AC_CHECK_LIB(Xext, XShmCreateImage)
+    AC_CHECK_LIB(Xi, XGetExtensionVersion)
+    AC_CHECK_LIB(ICE, IceOpenConnection)
+    AC_CHECK_LIB(SM, SmcOpenConnection)
+    AC_CHECK_LIB(Xt, XtMalloc)
+    AC_CHECK_LIB(Xmu, XmuLookupStandardColormap)
 
     AC_CHECK_LIB(GLcore, glNewList)
     if test "x$ac_cv_lib_GLcore_glNewList" = "xno" ; then
