@@ -13,7 +13,6 @@ Atlas_SOURCES = \
 	LoadPng.cxx LoadPng.hxx \
 	LoadJpg.cxx LoadJpg.hxx \
 	MapBrowser.cxx MapBrowser.hxx \
-	MapMaker.cxx MapMaker.hxx \
 	Output.cxx Output.hxx \
 	OutputGL.cxx OutputGL.hxx \
 	Overlays.cxx Overlays.hxx \
