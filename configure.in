@@ -6,7 +6,7 @@ dnl $Id$
 AC_INIT(src/Atlas.cxx)
 
 dnl Initialize the automake stuff
-AM_INIT_AUTOMAKE(Atlas, 0.1.0)
+AM_INIT_AUTOMAKE(Atlas, 0.2.1)
 
 dnl Checks for programs.
 AC_PROG_MAKE_SET
@@ -79,6 +79,7 @@ AC_CHECK_LIB(ICE, IceOpenConnection)
 AC_CHECK_LIB(SM, SmcOpenConnection)
 AC_CHECK_LIB(Xt, XtMalloc)
 AC_CHECK_LIB(Xmu, XmuLookupStandardColormap)
+AC_CHECK_LIB(pthread, pthread_exit)
 
 dnl check for OpenGL related libraries
 
