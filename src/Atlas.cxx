@@ -780,7 +780,7 @@ void redrawMap() {
   }
 
   if (slaved) {
-    sprintf( hdg_str, "HDG: %.0f*", heading);    
+    sprintf( hdg_str, "HDG: %.0f*", heading < 0.0 ? heading + 360.0 : heading);    
     sprintf( alt_str, "ALT: %.0f ft MSL", altitude);
     sprintf( spd_str, "SPD: %.0f KIAS", speed);
     txt_info_lat->setLabel(lat_str);
@@ -947,7 +947,8 @@ int main(int argc, char **argv) {
 
   // parse arguments
   for (int i = 1; i < argc; i++) {
-    if ( sscanf(argv[i], "--path=%s", path) == 1 ) {
+    if ( strncmp(argv[i], "--path=", 7) == 0 ) {
+      strcpy( path, argv[i]+7 );
       strcat( path, "/" );
     } else if ( sscanf(argv[i], "--lat=%f", &latitude)  == 1 ) {
       // do nothing
@@ -970,8 +971,8 @@ int main(int argc, char **argv) {
       // do nothing
     } else if ( sscanf(argv[i], "--update=%f", &update) == 1) {
       // do nothing
-    } else if ( sscanf(argv[i], "--fgroot=%s", fg_root) == 1 ) {
-      // do nothing
+    } else if ( strncmp(argv[i], "--fgroot=", 9) == 0 ) {
+      strcpy( fg_root, argv[i]+9 );
     } else if ( strcmp(argv[i], "--glutfonts") == 0 ) {
       textureFonts = false;
     } else if ( strcmp(argv[i], "--softcursor") == 0 ) {
