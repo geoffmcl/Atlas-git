@@ -88,7 +88,6 @@ AC_SUBST(ARFLAGS)
 
 dnl extra library and include directories
 EXTRA_DIRS="${SIMGEAR_DIR} ${PLIB_DIR} /usr/local/plib /usr/X11R6"
-echo "------ prefix $prefix ------"
 
 if test -d /opt/X11R6 ; then
      EXTRA_DIRS="$EXTRA_DIRS /opt/X11R6"
