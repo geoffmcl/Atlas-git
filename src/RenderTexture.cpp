@@ -51,7 +51,7 @@
 #ifdef UL_GLX
 #  define GLX_GLXEXT_PROTOTYPES
 #  ifdef __APPLE__
-#    include <OpenGL/glx.h>
+#    include <AGL/agl.h>
 #  else
 #    include <GL/glx.h>
 #  endif
@@ -126,6 +126,7 @@ RenderTexture::RenderTexture(const char *strMode)
     _hPBuffer(NULL),
     _hPreviousDC(0),
     _hPreviousContext(0),
+#elif defined( __APPLE__ )
 #else
     _pDisplay(NULL),
     _hGLContext(NULL),
@@ -149,6 +150,7 @@ RenderTexture::RenderTexture(const char *strMode)
     
     _pbufferAttribs.push_back(WGL_PBUFFER_LARGEST_ARB);
     _pbufferAttribs.push_back(true);
+#elif defined( __APPLE__ )
 #else
     _pbufferAttribs.push_back(GLX_RENDER_TYPE_SGIX);
     _pbufferAttribs.push_back(GLX_RGBA_BIT_SGIX);
@@ -443,6 +445,7 @@ bool RenderTexture::Initialize(int width, int height,
     fprintf(stderr, "\n");
 #endif
 
+#elif defined( __APPLE__ )
 #else // !_WIN32
     _pDisplay = glXGetCurrentDisplay();
     GLXContext context = glXGetCurrentContext();
@@ -524,6 +527,7 @@ bool RenderTexture::Initialize(int width, int height,
         _wglGetLastError();
         return false;
     }
+#elif defined( __APPLE__ )
 #else
     _hPreviousContext = glXGetCurrentContext();
     _hPreviousDrawable = glXGetCurrentDrawable();
@@ -548,6 +552,7 @@ bool RenderTexture::Initialize(int width, int height,
         _wglGetLastError();
         return false;
     }
+#elif defined( __APPLE__ )
 #else
     if (False == glXMakeCurrent(_pDisplay, 
                                 _hPreviousDrawable, _hPreviousContext))
@@ -599,6 +604,7 @@ bool RenderTexture::_Invalidate()
         _hPBuffer = 0;
         return true;
     }
+#elif defined( __APPLE__ )
 #else
     if ( _hPBuffer )
     {
@@ -669,6 +675,7 @@ bool RenderTexture::Reset(const char *strMode, ...)
     
     _pbufferAttribs.push_back(WGL_PBUFFER_LARGEST_ARB);
     _pbufferAttribs.push_back(true);
+#elif defined( __APPLE__ )
 #else
     _pbufferAttribs.push_back(GLX_RENDER_TYPE_SGIX);
     _pbufferAttribs.push_back(GLX_RGBA_BIT_SGIX);
@@ -738,6 +745,7 @@ bool RenderTexture::Resize(int iWidth, int iHeight)
         _hPBuffer = 0;
         return true;
     }
+#elif defined( __APPLE__ )
 #else
     if ( _hPBuffer )
     {
@@ -780,6 +788,7 @@ bool RenderTexture::BeginCapture()
     _hPreviousContext = wglGetCurrentContext();
     if (NULL == _hPreviousContext)
         _wglGetLastError();
+#elif defined( __APPLE__ )
 #else
     _hPreviousContext = glXGetCurrentContext();
     _hPreviousDrawable = glXGetCurrentDrawable();
@@ -817,6 +826,7 @@ bool RenderTexture::EndCapture()
         _wglGetLastError();
         return false;
     }
+#elif defined( __APPLE__ )
 #else
     if (False == glXMakeCurrent(_pDisplay, _hPreviousDrawable, 
                                 _hPreviousContext))
@@ -886,6 +896,7 @@ bool RenderTexture::BeginCapture(RenderTexture* current)
     _hPreviousContext = current->_hPreviousContext;
     if (NULL == _hPreviousContext)
         _wglGetLastError();
+#elif defined( __APPLE__ )
 #else
     _hPreviousContext = current->_hPreviousContext;
     _hPreviousDrawable = current->_hPreviousDrawable;
@@ -1069,6 +1080,13 @@ void RenderTexture::_ParseModeString(const char *modeString,
             pfAttribs.push_back(bitVec[1]);
             pfAttribs.push_back(WGL_BLUE_BITS_ARB);
             pfAttribs.push_back(bitVec[2]);
+#elif defined( __APPLE__ )
+            pfAttribs.push_back(AGL_RED_SIZE);
+            pfAttribs.push_back(bitVec[0]);
+            pfAttribs.push_back(AGL_GREEN_SIZE);
+            pfAttribs.push_back(bitVec[1]);
+            pfAttribs.push_back(AGL_BLUE_SIZE);
+            pfAttribs.push_back(bitVec[2]);
 #else
 # ifndef sgi
             pfAttribs.push_back(GLX_RED_SIZE);
@@ -1112,6 +1130,15 @@ void RenderTexture::_ParseModeString(const char *modeString,
             pfAttribs.push_back(bitVec[2]);
             pfAttribs.push_back(WGL_ALPHA_BITS_ARB);
             pfAttribs.push_back(bitVec[3]);
+#elif defined( __APPLE__ )
+            pfAttribs.push_back(AGL_RED_SIZE);
+            pfAttribs.push_back(bitVec[0]);
+            pfAttribs.push_back(AGL_GREEN_SIZE);
+            pfAttribs.push_back(bitVec[1]);
+            pfAttribs.push_back(AGL_BLUE_SIZE);
+            pfAttribs.push_back(bitVec[2]);
+            pfAttribs.push_back(AGL_ALPHA_SIZE);
+            pfAttribs.push_back(bitVec[3]);
 #else
 # ifndef sgi
             pfAttribs.push_back(GLX_RED_SIZE);
@@ -1143,6 +1170,9 @@ void RenderTexture::_ParseModeString(const char *modeString,
 #ifdef _WIN32
             pfAttribs.push_back(WGL_RED_BITS_ARB);
             pfAttribs.push_back(bitVec[0]);
+#elif defined( __APPLE__ )
+            pfAttribs.push_back(AGL_RED_SIZE);
+            pfAttribs.push_back(bitVec[0]);
 #else
             pfAttribs.push_back(GLX_RED_SIZE);
             pfAttribs.push_back(bitVec[0]);
@@ -1173,6 +1203,11 @@ void RenderTexture::_ParseModeString(const char *modeString,
             pfAttribs.push_back(bitVec[0]);
             pfAttribs.push_back(WGL_GREEN_BITS_ARB);
             pfAttribs.push_back(bitVec[1]);
+#elif defined( __APPLE__ )
+            pfAttribs.push_back(AGL_RED_SIZE);
+            pfAttribs.push_back(bitVec[0]);
+            pfAttribs.push_back(AGL_GREEN_SIZE);
+            pfAttribs.push_back(bitVec[1]);
 #else
             pfAttribs.push_back(GLX_RED_SIZE);
             pfAttribs.push_back(bitVec[0]);
@@ -1202,6 +1237,8 @@ void RenderTexture::_ParseModeString(const char *modeString,
             bHasStencil = true;
 #ifdef _WIN32
             pfAttribs.push_back(WGL_STENCIL_BITS_ARB);
+#elif defined( __APPLE__ )
+            pfAttribs.push_back(AGL_STENCIL_SIZE);
 #else
             pfAttribs.push_back(GLX_STENCIL_SIZE);
 #endif
@@ -1219,6 +1256,11 @@ void RenderTexture::_ParseModeString(const char *modeString,
             pfAttribs.push_back(1);
             pfAttribs.push_back(WGL_SAMPLES_ARB);
             pfAttribs.push_back(strtol(kv.second.c_str(), 0, 10));
+#elif defined( __APPLE__ )
+            pfAttribs.push_back(AGL_SAMPLE_BUFFERS_ARB);
+            pfAttribs.push_back(1);
+            pfAttribs.push_back(AGL_SAMPLES_ARB);
+            pfAttribs.push_back(strtol(kv.second.c_str(), 0, 10));
 #else
 	    pfAttribs.push_back(GL_SAMPLE_BUFFERS_ARB);
 	    pfAttribs.push_back(1);
@@ -1234,6 +1276,9 @@ void RenderTexture::_ParseModeString(const char *modeString,
 #ifdef _WIN32
             pfAttribs.push_back(WGL_DOUBLE_BUFFER_ARB);
             pfAttribs.push_back(true);
+#elif defined( __APPLE__ )
+            pfAttribs.push_back(AGL_DOUBLEBUFFER);
+            pfAttribs.push_back(True);
 #else
             pfAttribs.push_back(GL_DOUBLEBUFFER);
             pfAttribs.push_back(True);
@@ -1245,6 +1290,8 @@ void RenderTexture::_ParseModeString(const char *modeString,
         {
 #ifdef _WIN32
             pfAttribs.push_back(WGL_AUX_BUFFERS_ARB);
+#elif defined( __APPLE__ )
+            pfAttribs.push_back(AGL_AUX_BUFFERS);
 #else
             pfAttribs.push_back(GL_AUX_BUFFERS);
 #endif
@@ -1352,6 +1399,8 @@ void RenderTexture::_ParseModeString(const char *modeString,
 
 #ifdef _WIN32
     pfAttribs.push_back(WGL_DEPTH_BITS_ARB);
+#elif defined( __APPLE__ )
+    pfAttribs.push_back(AGL_DEPTH_SIZE);
 #else
     pfAttribs.push_back(GLX_DEPTH_SIZE);
 #endif
@@ -1361,6 +1410,9 @@ void RenderTexture::_ParseModeString(const char *modeString,
     {
 #ifdef _WIN32
         pfAttribs.push_back(WGL_STENCIL_BITS_ARB);
+        pfAttribs.push_back(0);
+#elif defined( __APPLE__ )
+        pfAttribs.push_back(AGL_STENCIL_SIZE);
         pfAttribs.push_back(0);
 #else
         pfAttribs.push_back(GLX_STENCIL_SIZE);
@@ -1438,6 +1490,7 @@ void RenderTexture::_ParseModeString(const char *modeString,
             pfAttribs.push_back(WGL_PIXEL_TYPE_ARB);
             pfAttribs.push_back(WGL_TYPE_RGBA_FLOAT_ATI);
         }
+#elif defined( __APPLE__ )
 #else
         if (GL_NV_float_buffer)
         {
@@ -1723,6 +1776,7 @@ bool RenderTexture::_VerifyExtensions()
         }
         SetLastError(0);
     }
+#elif defined( __APPLE__ )
 #else
     if (!GLX_SGIX_pbuffer)
     {
@@ -2045,6 +2099,7 @@ bool RenderTexture::_MakeCurrent()
         _wglGetLastError();
         return false;
     }
+#elif defined( __APPLE__ )
 #else
     if (false == glXMakeCurrent(_pDisplay, _hPBuffer, _hGLContext)) 
     {
@@ -2096,6 +2151,7 @@ RenderTexture::RenderTexture(int width, int height,
     _hPBuffer(NULL),
     _hPreviousDC(0),
     _hPreviousContext(0),
+#elif defined( __APPLE__ )
 #else
     _pDisplay(NULL),
     _hGLContext(NULL),
@@ -2212,6 +2268,7 @@ bool RenderTexture::Initialize(bool         bShare       /* = true */,
     
     _pbufferAttribs.push_back(WGL_PBUFFER_LARGEST_ARB);
     _pbufferAttribs.push_back(true);
+#elif defined( __APPLE__ )
 #else
     _pixelFormatAttribs.push_back(GLX_RENDER_TYPE_SGIX);
     _pixelFormatAttribs.push_back(GLX_RGBA_BIT_SGIX);
