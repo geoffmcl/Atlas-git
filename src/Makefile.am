@@ -17,7 +17,7 @@ Atlas_SOURCES = \
 
 Atlas_LDADD = \
 	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgserial -lsgdebug \
-	-lplibsg -lplibpu \
+	-lplibsg -lplibpu -lplibfnt \
 	$(opengl_LIBS) \
 	-lpng -lz
 
@@ -31,7 +31,7 @@ Map_SOURCES = \
 
 Map_LDADD = \
 	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgdebug \
-	-lplibsg -lplibpu \
+	-lplibsg -lplibpu -lplibfnt \
 	$(opengl_LIBS) \
 	-lpng -lz
 
