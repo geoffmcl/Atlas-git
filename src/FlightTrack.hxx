@@ -34,6 +34,8 @@ public:
   FlightTrack( unsigned int max_buffer = 2000 );
   ~FlightTrack();
 
+  void clear();
+
   // The data point supplied is added to the flight track
   // NOTE: This pointer is considered FlightTrack's property
   // after this call, i.e. it's responsible for freeing the memory.

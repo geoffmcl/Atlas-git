@@ -1,3 +1,5 @@
+SUBDIRS = data
+
 EXTRA_DIST = buildmaps.sh
 
 bin_PROGRAMS = Atlas Map MapPS

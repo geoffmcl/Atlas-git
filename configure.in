@@ -157,6 +157,7 @@ if test "x$ac_cv_header_plib_pu_h" != "xyes"; then
     echo "configure aborted."
     exit
 fi
+AC_CHECK_LIB(plibul, ulInit,,,)
 
 # Check for the presence of SimGear
 AC_CHECK_HEADER(simgear/version.h)
@@ -232,5 +233,6 @@ AM_CONFIG_HEADER(src/config.h)
 
 AC_OUTPUT( \
 	Makefile \
-	src/Makefile
+	src/Makefile \
+	src/data/Makefile
 )

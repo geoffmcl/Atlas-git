@@ -34,6 +34,13 @@ FlightTrack::~FlightTrack() {
   }
 }
 
+void FlightTrack::clear() {
+  while (!track.empty()) {
+    delete *(track.begin());
+    track.pop_front();
+  }
+}
+
 void FlightTrack::addPoint( FlightData *data ) {
   // TOLERANCE is set to 1 arc second
   static const float TOLERANCE = M_PI / (180.0f * 3600.0f);

@@ -37,7 +37,7 @@ SGIOChannel *input_channel;
 
 bool dragmode = false, display = false;
 int drag_x, drag_y;
-float scalefactor = 1.0f, mapsize, height;
+float scalefactor = 1.0f, mapsize, width, height;
 float latitude  = 33.5f  , copy_lat;
 float longitude = -110.5f, copy_lon;
 float heading = 0.0f, speed, altitude;
@@ -58,7 +58,9 @@ puFont *font;
 puPopup *interface, *minimized, *info_interface;
 puFrame *frame, *info_frame;
 puOneShot *zoomin, *zoomout, *minimize_button, *minimized_button;
+puOneShot *clear_ftrack;
 puButton *show_arp, *show_nav, *show_name, *show_id;
+puButton *show_ftrack, *follow;
 puText *labeling, *txt_lat, *txt_lon;
 puText *txt_info_lat, *txt_info_lon, *txt_info_alt;
 puText *txt_info_hdg, *txt_info_spd;
@@ -426,6 +428,22 @@ void position_cb ( puObject *cb ) {
   }
 }
 
+void clear_ftrack_cb ( puObject *cb ) {
+  (cb, cb);
+
+  if (track != NULL) {
+    track->clear();
+  }
+
+  glutPostRedisplay();
+}
+
+void showftrack_cb( puObject *cb ) {
+  (cb, cb);
+
+  map->setFeatures( map->getFeatures() ^ Overlays::OVERLAY_FLIGHTTRACK );
+}
+
 void minimize_cb ( puObject *cb ) {
   (cb, cb);
 
@@ -461,7 +479,6 @@ void init_gui(bool textureFonts) {
   zoomout->setCallback(zoom_cb);
 
   show_nav = new puButton(30, 65, "Show Navaids");
-  puBox *b = show_nav->getABox();
   show_nav->setSize(185, 24);
   show_nav->setCallback(show_cb);
   show_nav->setValue(1);
@@ -493,6 +510,16 @@ void init_gui(bool textureFonts) {
   inp_lat->setStyle(PUSTYLE_BEVELLED);
   inp_lon->setStyle(PUSTYLE_BEVELLED);
 
+  if (slaved) {
+    show_ftrack  = new puButton(30, 284, "Show Flight Track");
+    clear_ftrack = new puOneShot(30, 304, "Clear Flight Track");
+    show_ftrack  -> setSize(185, 24);
+    clear_ftrack -> setSize(185, 24);
+    show_ftrack  -> setValue(1);
+    show_ftrack  -> setCallback( showftrack_cb );
+    clear_ftrack -> setCallback( clear_ftrack_cb );
+  }
+
   minimize_button = new puOneShot(195, 370, "X");
   minimize_button->setCallback(minimize_cb);
 
@@ -506,7 +533,7 @@ void init_gui(bool textureFonts) {
 
   if (slaved) {
     info_interface = new puPopup(260, 20);
-    info_frame = new puFrame(260, 20, 420, 120);
+    info_frame = new puFrame(260, 20, 470, 120);
     txt_info_spd = new puText(270, 30);
     txt_info_hdg = new puText(270, 45);
     txt_info_alt = new puText(270, 60);
@@ -519,12 +546,14 @@ void init_gui(bool textureFonts) {
   if (softcursor) {
     puShowCursor();
   }
+
 }
 /******************************************************************************
  GLUT event handlers
 ******************************************************************************/
-void reshapeMap( int width, int _height ) {
-  height = (float)_height;
+void reshapeMap( int _width, int _height ) {
+  width  = (float)_width  ;
+  height = (float)_height ;
   mapsize = (width > height) ? width : height;
 
   map->setSize( mapsize );
@@ -535,6 +564,15 @@ void redrawMap() {
 
   glClearColor( 1.0f, 1.0f, 1.0f, 0.0f );
   glClear( GL_COLOR_BUFFER_BIT );
+
+  /* Fix so that center of map is actually the center of the window.
+     This should probably be taken care of in OutputGL... */
+  glPushMatrix();
+  if (width > height) {
+    glTranslatef( 0.0f, -(width - height) / 2.0f, 0.0f );
+  } else {
+    glTranslatef( -(height - width) / 2.0f, 0.0f, 0.0f );
+  }
 
   map->draw();
 
@@ -580,7 +618,14 @@ void redrawMap() {
     txt_info_spd->setLabel(spd_str);
   }
 
+  // Remove our translation
+  glPopMatrix();
+
   puDisplay();
+  /* I have no idea why I suddenly need to set the viewport here -
+     I think this might be a pui bug, since I didn't have to do this
+     before some plib update. Commenting puDisplay out makes it unnessecary. */
+  glViewport(0, 0, (int)mapsize, (int)mapsize);
   glutSwapBuffers();
 }
 
