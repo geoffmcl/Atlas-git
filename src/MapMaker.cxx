@@ -21,14 +21,16 @@
   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 ---------------------------------------------------------------------------*/
 
-#include <dirent.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
 #include <zlib.h>
-#include <unistd.h>
+#ifndef _MSC_VER
+#  include <unistd.h>
+#endif
 #include <sys/stat.h>
+#include <plib/ul.h>
 
 #include "MapMaker.hxx"
 /*#include <simgear/magvar/magvar.hxx>*/
@@ -421,7 +423,7 @@ int MapMaker::process_binary_file( char *tile_name, sgVec3 xyz ) {
   SGBinObject tile;
 
   vector<float*> v, n;
-  int verts, normals;
+  int verts = 0, normals = 0;
 
   if ( !tile.read_bin( tile_name ) ) {
     return 0;
@@ -684,26 +686,26 @@ int MapMaker::process_directory( char *path, int plen, int lat, int lon,
                       ns(lat), abs((lat+sgnk) / 10 * 10) + sgnk*10,
                       ew(lon), abs(lon), ns(lat), abs(lat) );
 
-  DIR *dir;
-  dirent *ent;
+  ulDir *dir;
+  ulDirEnt *ent;
 
   if (getVerbose()) 
     printf("%s:  ", path + plen);
 
-  if ((dir = opendir(path)) == NULL) {
+  if ((dir = ulOpenDir(path)) == NULL) {
     if (getVerbose()) printf("\n");
     return 0;
   }
 
   path[plen + llen] = '/';  
-  while ((ent = readdir(dir)) != NULL) {
+  while ((ent = ulReadDir(dir)) != NULL) {
     strcpy( path + plen + llen + 1, ent -> d_name );
 
     /* we now have to check if this is a regular file -- I suspect this isn't
        portable to non-UNIX systems... */
     struct stat stat_buf;
     stat( path, &stat_buf );
-    if ( !S_ISREG(stat_buf.st_mode) )
+    if ( !(stat_buf.st_mode & S_IFREG) )
       continue;  
 
     if (getVerbose()) {
@@ -722,7 +724,7 @@ int MapMaker::process_directory( char *path, int plen, int lat, int lon,
   }
 
   if (getVerbose()) putc('\n', stdout);
-  closedir(dir);
+  ulCloseDir(dir);
 
   return 1;
 }

@@ -20,6 +20,12 @@
   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 ---------------------------------------------------------------------------*/
 
+#ifdef _MSC_VER
+   // For access
+#  include <io.h>
+#  define F_OK      00
+#endif
+
 #include <memory.h>
 #include <stdio.h>
 #include <GL/glut.h>

@@ -33,11 +33,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <dirent.h>
 #include <sys/stat.h>
-#include <unistd.h>
+#ifndef _MSC_VER
+#  include <unistd.h>
+#endif
 #include "MapMaker.hxx"
 #include "OutputGL.hxx"
+#include <plib/ul.h>
 
 float clat = -100.0f, clon = -100.0f;   // initialize to unreasonable values
 float autoscale = 0.0f;                 // 0.0f == no autoscale
@@ -49,8 +51,8 @@ MapMaker mapobj;
 
 char outname[512], *scenerypath, *palette;
 int opathl, spathl;
-DIR *dir1, *dir2 = NULL;
-dirent *ent;
+ulDir *dir1, *dir2 = NULL;
+ulDirEnt *ent;
 
 
 /*****************************************************************************/
@@ -91,13 +93,13 @@ void redrawMap() {
     do {
       while (dir2 == NULL) {
 	do {
-	  ent = readdir(dir1);
+	  ent = ulReadDir(dir1);
 	} while (ent != NULL && ent->d_name[0] == '.');
 	if (ent != NULL) {
 	  strcpy( scenerypath+spathl, ent->d_name );
-	  dir2 = opendir(scenerypath);
+	  dir2 = ulOpenDir(scenerypath);
 	} else {
-	  closedir(dir1);
+	  ulCloseDir(dir1);
 	  delete scenerypath;
 	  exit(0); // done reading top directory
 	}
@@ -105,7 +107,7 @@ void redrawMap() {
       
       bool exit = false;
       do {
-	ent = readdir(dir2);
+	ent = ulReadDir(dir2);
 
 	if (ent != NULL) {
 	  exit = (ent->d_name[0] != '.' &&
@@ -117,7 +119,7 @@ void redrawMap() {
       } while (!exit);
 
       if (ent == NULL) {
-	closedir(dir2);
+	ulCloseDir(dir2);
 	dir2 = NULL;
       } else {
 	// we have found a scenery directory - let's check if we already
@@ -314,7 +316,7 @@ int main( int argc, char **argv ) {
     strcat( scenerypath, "/Scenery/" );
     spathl = strlen(scenerypath);
     
-    if ( (dir1 = opendir(scenerypath)) == NULL ) {
+    if ( (dir1 = ulOpenDir(scenerypath)) == NULL ) {
       fprintf( stderr, "%s: Couldn't open directory \"%s\".\n", 
 	       argv[0], scenerypath );
       return 1;

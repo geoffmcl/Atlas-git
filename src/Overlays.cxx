@@ -29,6 +29,39 @@
 
 SG_USING_STD(map);
 
+#ifdef _MSC_VER
+
+double rint( double x) 
+// Copyright (C) 2001 Tor M. Aamodt, University of Toronto 
+// Permisssion to use for all purposes commercial and otherwise granted. 
+// THIS MATERIAL IS PROVIDED "AS IS" WITHOUT WARRANTY, OR ANY CONDITION OR 
+// OTHER TERM OF ANY KIND INCLUDING, WITHOUT LIMITATION, ANY WARRANTY 
+// OF MERCHANTABILITY, SATISFACTORY QUALITY, OR FITNESS FOR A PARTICULAR 
+// PURPOSE. 
+{ 
+    if( x > 0 ) { 
+        __int64 xint = (__int64) (x+0.5); 
+        if( xint % 2 ) { 
+            // then we might have an even number... 
+            double diff = x - (double)xint; 
+            if( diff == -0.5 ) 
+                return double(xint-1); 
+        } 
+        return double(xint); 
+    } else { 
+        __int64 xint = (__int64) (x-0.5); 
+        if( xint % 2 ) { 
+            // then we might have an even number... 
+            double diff = x - (double)xint; 
+            if( diff == 0.5 ) 
+                return double(xint+1); 
+        } 
+        return double(xint); 
+    } 
+}
+
+#endif
+
 bool Overlays::airports_loaded = false;
 bool Overlays::navaids_loaded  = false;
 bool Overlays::fixes_loaded    = false;

@@ -1,4 +1,4 @@
-#include <iostream.h>
+#include <iostream>
 #include <png.h>
 #include "OutputGL.hxx"
 
