@@ -293,7 +293,7 @@ void print_help() {
   printf("  --smooth-color          Make smooth color heights\n");
   printf("  --jpeg                  Create JPEG images with default quality (75)\n");
   printf("  --jpeg=integer          Create JPEG images with specified quality\n");
-  printf("  --rescale=factor        Downsample image ( factor must be a power of two )\n");
+  printf("  --aafactor=integer      Do antialiasing on image ( factor must be a power of two )\n");
 }
 
 bool parse_arg(char* arg) {
@@ -331,7 +331,7 @@ bool parse_arg(char* arg) {
     // do nothing
   } else if ( strcmp(arg, "--singlebuffer") == 0 ) {
     doublebuffer = false;
-  } else if ( sscanf(arg, "--rescale=%d", &rescale_factor) == 1 ) {
+  } else if ( sscanf(arg, "--aafactor=%d", &rescale_factor) == 1 ) {
     // do nothing
   } else if ( sscanf(arg, "--jpeg=%d", &jpeg_quality) == 1 ) {
     create_jpeg = true;
@@ -456,6 +456,8 @@ int main( int argc, char **argv ) {
     cout << "No scenery paths could be found.  You need to set either a valid FG_ROOT and/or FG_SCENERY variable, or specify a valid --fg-root and/or --fg-scenery on the command line.\n";
     exit(-1);
   }
+
+  mapobj.setSize( mapobj.getSize() * rescale_factor );
   
   mapobj.setFeatures(features);
 
