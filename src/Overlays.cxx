@@ -1107,11 +1107,11 @@ void Overlays::load_navaids() {
 }
 
 void Overlays::load_new_fixes() {
-  char *navname = new char[strlen(fg_root) + 512];
-  char line[256];
-
   if (fixes_loaded)
     return;
+	
+  char *navname = new char[strlen(fg_root) + 512];
+  char line[256];
   
   strcpy( navname, fg_root );
   strcat( navname, "/Navaids/fix.dat.gz" );
@@ -1150,11 +1150,11 @@ void Overlays::load_new_fixes() {
 }
 
 void Overlays::load_fixes() {
-  char *navname = new char[strlen(fg_root) + 512];
-  char line[256];
-
   if (fixes_loaded)
     return;
+	
+  char *navname = new char[strlen(fg_root) + 512];
+  char line[256];
   
   strcpy( navname, fg_root );
   strcat( navname, "/Navaids/default.fix.gz" );
