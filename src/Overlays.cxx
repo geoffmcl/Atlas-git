@@ -52,12 +52,12 @@ float nav2_freq, nav2_rad;
 float adf_freq;
 
 
-Overlays::Overlays( char *fg_root = NULL, float scale = 1.0f,
-		    float width = 512.0f ) :
+Overlays::Overlays( char *fg_root, float scale,
+		    float width ) :
   scale(scale) {
   if (fg_root == NULL) {
     if ( (this->fg_root = getenv("FG_ROOT")) == NULL ) {
-      this->fg_root = "/usr/local/lib/FlightGear";
+      this->fg_root = FGBASE_DIR;
     }
   } else {
     this->fg_root = fg_root;
@@ -162,12 +162,12 @@ void Overlays::draw_gridlines( float dtheta, float dalpha, float spacing ) {
   sgVec3 xyr;
   sgVec2 p1, p2;
   bool first;
-  char lable_buffer[50];
 
   output->setColor(grd_color);
 
   // draw line labels
-  for (float glon = rint((lon - dalpha) / grid_alpha) * grid_alpha; 
+  float glon;
+  for (glon = rint((lon - dalpha) / grid_alpha) * grid_alpha; 
        glon <= lon + dalpha; glon += grid_alpha) {
     for (float glat = rint(max(lat - dtheta, -SG_PI/2 + grid_theta) / grid_theta) * grid_theta; 
 	 glat <= min(lat + dtheta, SG_PI/2 - grid_theta/2); glat += grid_theta) {
@@ -182,7 +182,7 @@ void Overlays::draw_gridlines( float dtheta, float dalpha, float spacing ) {
   }
 
   // draw north-south parallel lines
-  for (float glon = rint((lon - dalpha) / grid_alpha) * grid_alpha; 
+  for (glon = rint((lon - dalpha) / grid_alpha) * grid_alpha; 
        glon <= lon + dalpha; glon += grid_alpha) {
     first = true;
 
@@ -268,7 +268,7 @@ void Overlays::airport_labels(float theta, float alpha,
   bool save_shade = output->getShade();
   output->setShade(false);
 
-  for (ARP **i = airports.begin(); i < airports.end(); i++) {
+  for (vector<ARP*>::iterator i = airports.begin(); i < airports.end(); i++) {
     ARP *ap = *i;
     sgVec3 xyr;
 
@@ -291,7 +291,7 @@ void Overlays::airport_labels(float theta, float alpha,
       sgVec2 outlines[ap->rwys.size()*4];
       sgVec2 insides[ap->rwys.size()*4];
       int oc = 0, ic = 0;
-      for (list<RWY*>::iterator j = ap->rwys.begin(); j != ap->rwys.end();
+      for (list<RWY*>::const_iterator j = ap->rwys.begin(); j != ap->rwys.end();
 	   j++) {
 	sgVec2 rwyc, rwyl, rwyw;
 
@@ -319,11 +319,12 @@ void Overlays::airport_labels(float theta, float alpha,
       }
 
       output->setColor( arp_color1 );
-      for (unsigned int k = 0; k < ap->rwys.size(); k++) {
+      unsigned int k;
+      for (k = 0; k < ap->rwys.size(); k++) {
 	output->drawQuad( outlines + k*4, dummy_normals );
       }
       output->setColor( arp_color2 );
-      for (unsigned int k = 0; k < ap->rwys.size(); k++) {
+      for (k = 0; k < ap->rwys.size(); k++) {
 	output->drawQuad( insides + k*4, dummy_normals );
       }
     }
@@ -341,7 +342,7 @@ void Overlays::draw_navaids( float theta, float alpha,
   bool save_shade = output->getShade();
   output->setShade(false);
 
-  for (NAV **i = navaids.begin(); i != navaids.end(); i++) {
+  for (vector<NAV*>::iterator i = navaids.begin(); i != navaids.end(); i++) {
     NAV *n = *i;
 
     sgVec3 xyr;
@@ -668,7 +669,7 @@ void Overlays::load_fixes() {
       n = new NAV;
     
     gzgets( fix, line, 256 );
-    if ( sscanf(line, "%s %f %f", &n->name, &n->lat, &n->lon) == 3 ) {
+    if ( sscanf(line, "%s %f %f", n->name, &n->lat, &n->lon) == 3 ) {
       strcpy(n->id, n->name);
       n->navtype = NAV_FIX;
       n->lat *= SG_DEGREES_TO_RADIANS;
@@ -684,7 +685,7 @@ void Overlays::load_fixes() {
 }
 
 Overlays::ARP *Overlays::findAirport( const char *name ) {
-  for (ARP **i = airports.begin(); i < airports.end(); i++) {
+  for (vector<ARP*>::iterator i = airports.begin(); i < airports.end(); i++) {
     if ( strcmp( (*i)->name, name ) == 0 ) {
       return *i;
     }
@@ -694,7 +695,7 @@ Overlays::ARP *Overlays::findAirport( const char *name ) {
 }
 
 Overlays::NAV *Overlays::findNav( const char *name ) {
-  for (NAV **i = navaids.begin(); i < navaids.end(); i++) {
+  for (vector<NAV*>::const_iterator i = navaids.begin(); i < navaids.end(); i++) {
     if ( strcmp( (*i)->name, name ) == 0 ) {
       return *i;
     }
@@ -707,7 +708,7 @@ Overlays::NAV *Overlays::findNav( float lat, float lon, float freq ) {
   NAV   *closest = NULL;
   float closest_dist = 1e12f;
 
-  for (NAV **i = navaids.begin(); i < navaids.end(); i++) {
+  for (vector<NAV*>::const_iterator i = navaids.begin(); i < navaids.end(); i++) {
     if ( fabs(freq - (*i)->freq) < 0.01f ) {
       // ugly distance metric -- could (should?) be replaced by
       // great circle distance, but works ok for now

@@ -31,9 +31,8 @@ const char* MapBrowser::TXF_FONT_NAME = "/Fonts/helvetica_medium.txf";
 
 MapBrowser::MapBrowser(GLfloat left, GLfloat top, GLfloat size, int features,
                        char *fg_root, bool texturedFonts) :
-  view_left(left), view_top(top), view_size(size), features(features), 
-  texturedFonts(texturedFonts), clat(0.0f), clon(0.0f), pathl(0),
-  scle(100000)
+  view_left(left), view_top(top), view_size(size), clat(0.0f), clon(0.0f),
+  scle(100000), pathl(0), features(features), texturedFonts(texturedFonts)
 {
   mpath[0] = 0;
 
@@ -219,8 +218,8 @@ void MapBrowser::update() {
   if (max_lat >  90) max_lat =  90;
   int num_lat = (max_lat - min_lat) + 1, num_lon = (max_lon - min_lon) + 1;
 
-  for (list<MapTile*>::iterator i = tiles.begin(); i != tiles.end(); i++) {
-    MapTile *tile = *i;
+  for (list<MapTile*>::iterator it = tiles.begin(); it != tiles.end(); it++) {
+    MapTile *tile = *it;
 
     // remove old tiles
     if (tile->c.lat < min_lat - CACHE_LIMIT || 
@@ -228,15 +227,15 @@ void MapBrowser::update() {
          tile->c.lon < min_lon - CACHE_LIMIT || 
          tile->c.lon > max_lon + CACHE_LIMIT) {
  
-      list<MapTile*>::iterator tmp = i; tmp++;
+      list<MapTile*>::iterator tmp = it; tmp++;
       if ( tile->texbuf != NULL ) {
         glDeleteTextures( 1, &tile->texture_handle );
       }
-      tiles.erase( i );
+      tiles.erase( it );
       tiletable.erase( tile->c );
       delete tile->texbuf;
       delete tile;
-      i = tmp;
+      it = tmp;
     } else {
       // update tiles position
       sgVec3 xyr;

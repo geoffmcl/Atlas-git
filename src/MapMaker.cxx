@@ -74,7 +74,7 @@ void MapMaker::setFGRoot( char *fg_root ) {
   if (fg_root == NULL) {
     fg_root = getenv("FG_ROOT");
     if (fg_root == NULL) {
-      fg_root = "/usr/local/lib/FlightGear";
+      fg_root = FGBASE_DIR;
     }
   }
    
@@ -290,7 +290,8 @@ void MapMaker::sub_trifan( const int_list &indices, vector<float*> &v,
          for (int j = 0; j < 3; j++) {
           /* pick the index of the greatest value of order 
              (that has not already been used) */
-          for (int k = j+1; k < 3; k++) {
+          int k;
+          for (k = j+1; k < 3; k++) {
             if (order[k] > order[j]) {
               int tmp = order[j]; order[j] = order[k]; order[k] = tmp;
               tmp = oind[j]; oind[j] = oind[k]; oind[k] = tmp;
@@ -302,7 +303,7 @@ void MapMaker::sub_trifan( const int_list &indices, vector<float*> &v,
           int next = (idx + 1) % 3;
 
           // split this line times[idx] times 
-          for (int k = times[idx]; k > 0; k--) {
+          for (k = times[idx]; k > 0; k--) {
             float lx, ly;
             int lh;
             sgVec3 lnormal;

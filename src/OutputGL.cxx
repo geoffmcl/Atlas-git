@@ -5,9 +5,11 @@
 float OutputGL::circle_x[];
 float OutputGL::circle_y[];
 
+const float OutputGL::BRIGHTNESS = 0.6f;
+
 OutputGL::OutputGL( char *filename, int size, bool smooth_shading, 
 		    bool useTexturedFont, char *fontname ) : 
-  GfxOutput::GfxOutput(filename, size), filename(filename), 
+  GfxOutput(filename, size), filename(filename), 
   useTexturedFont(useTexturedFont)
 {
   glViewport( 0, 0, size, size );

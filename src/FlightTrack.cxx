@@ -23,7 +23,7 @@
 #include "FlightTrack.hxx"
 #include <math.h>
 
-FlightTrack::FlightTrack( unsigned int max_buffer = 2000 ) : 
+FlightTrack::FlightTrack( unsigned int max_buffer ) : 
   max_buffer(max_buffer) {
   // Nothing here yet.
 }

@@ -9,6 +9,7 @@ AC_CONFIG_SRCDIR([src/Atlas.cxx])
 dnl Initialize the automake stuff
 AC_PREREQ(2.52)
 AM_INIT_AUTOMAKE(Atlas, 0.2.1)
+AC_CONFIG_HEADERS
 
 dnl Checks for programs.
 AC_PROG_MAKE_SET
@@ -39,12 +40,24 @@ if test "x$with_simgear" != "x" ; then
     echo "SimGear prefix path is $with_simgear"
     SIMGEAR_DIR="$with_simgear"
 else 
-    echo "Simgear not specified"
+    echo "SimGear not specified"
     SIMGEAR_DIR=
 fi
 
+dnl Specify the base package location
+AC_ARG_WITH(fgbase, [  --with-fgbase=prefix    specify the location of the FlightGear base package])
+
+if test "x$with_fgbase" != "x" ; then
+    echo "FlightGear base package location is $with_fgbase"
+    fgbase_dir="$with_fgbase"
+else
+    echo "FlightGear base package location not specified"
+    fgbase_dir="/usr/local/lib/FlightGear"
+fi
+AC_SUBST(fgbase_dir)
+
 dnl extra library and include directories
-EXTRA_DIRS="${SIMGEAR_DIR} ${PLIB_DIR} /usr/local /usr/local/plib /usr/X11R6"
+EXTRA_DIRS="${SIMGEAR_DIR} ${PLIB_DIR} /usr/local/plib /usr/X11R6"
 
 if test -d /opt/X11R6 ; then
      EXTRA_DIRS="$EXTRA_DIRS /opt/X11R6"
@@ -132,7 +145,7 @@ else
     AC_DEFINE([WIN32], 1, [Define if building on a Win32 platform])
 
     dnl force a failed check since we will be building under windoze
-    AM_CONDITIONAL(ENABLE_XMESA_FX, test "no" = "yes")
+    # AM_CONDITIONAL(ENABLE_XMESA_FX, test "no" = "yes")
 
     dnl just define these to true and hope for the best
     ac_cv_lib_glut_glutGetModifiers="yes"
@@ -170,6 +183,8 @@ AC_SUBST(opengl_LIBS)
 
 AM_CONDITIONAL(HAVE_XWINDOWS, test "x$ac_cv_lib_X11_XCreateWindow" = "xyes" )
 
+AC_LANG_PUSH(C++)
+
 dnl Check for "plib" without which we cannot go on
 AC_CHECK_HEADER(plib/pu.h)
 if test "x$ac_cv_header_plib_pu_h" != "xyes"; then
@@ -183,6 +198,8 @@ if test "x$ac_cv_header_plib_pu_h" != "xyes"; then
     exit
 fi
 AC_CHECK_LIB(plibul, ulInit,,,)
+
+AC_LANG_POP(C++)
 
 # Check for the presence of SimGear
 AC_CHECK_HEADER(simgear/version.h)
@@ -200,6 +217,7 @@ fi
 AC_MSG_CHECKING(for proper simgear version)
 
 AC_TRY_RUN([
+#include <stdio.h>
 #include <simgear/version.h>
 
 #if !defined(SIMGEAR_VERSION)
@@ -259,6 +277,7 @@ AM_CONFIG_HEADER(src/config.h)
 AC_CONFIG_FILES([ \
 	Makefile \
 	src/Makefile \
+	src/buildmaps.sh \
 	src/data/Makefile
 ])
 AC_OUTPUT

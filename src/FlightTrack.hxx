@@ -25,6 +25,9 @@
 
 #include <list>
 #include <plib/sg.h>
+#include <simgear/compiler.h>
+
+SG_USING_STD(list);
 
 struct FlightData {
   float lat, lon, alt, hdg, spd;

@@ -27,6 +27,10 @@
 #include "Projection.hxx"
 #include "Geodesy.hxx"
 
+#ifndef max
+#define max(a,b) (((a) > (b)) ? (a) : (b))
+#endif
+
 static const char *names[]={"Sanson-Flamsteed",
                             "Equidistant Cylindrical (Equatorial)",
 			    "Equidistant Cylindrical (Local)"};

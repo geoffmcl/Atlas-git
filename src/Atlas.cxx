@@ -318,7 +318,7 @@ bool parse_nmea(char *buf) {
 	    string alt_units = msg.substr(begin, end - begin);
 	    begin = end + 1;
 
-	    if ( alt_units != "F" ) {
+	    if ( alt_units != string("F") ) {
 		altitude *= 3.28;
 	    }
 	} else if ( sentence == "PATLA" ) {
@@ -511,9 +511,7 @@ void position_cb ( puObject *cb ) {
   glutPostRedisplay();
 }
 
-void clear_ftrack_cb ( puObject *cb ) {
-  (cb, cb);
-
+void clear_ftrack_cb ( puObject * ) {
   if (track != NULL) {
     track->clear();
   }
@@ -521,16 +519,12 @@ void clear_ftrack_cb ( puObject *cb ) {
   glutPostRedisplay();
 }
 
-void minimize_cb ( puObject *cb ) {
-  (cb, cb);
-
+void minimize_cb ( puObject * ) {
   main_interface->hide();
   minimized->reveal();
 }
 
-void restore_cb ( puObject *cb ) {
-  (cb, cb);
-
+void restore_cb ( puObject * ) {
   minimized->hide();
   main_interface->reveal();
 }
@@ -973,7 +967,7 @@ int main(int argc, char **argv) {
   if (fg_root[0] == 0) {
     char *env = getenv("FG_ROOT");
     if (env == NULL) {
-      strcpy(fg_root, "/usr/local/lib/FlightGear");
+      strcpy(fg_root, FGBASE_DIR);
     } else {
       strcpy(fg_root, env);
     }
@@ -984,7 +978,7 @@ int main(int argc, char **argv) {
       strcpy(path, fg_root);
       strcat(path, "/");
     } else {
-      strcpy(path, "/usr/local/lib/FlightGear/");
+      strcpy(path, FGBASE_DIR);
     }
 
     strcat(path, "Atlas/");

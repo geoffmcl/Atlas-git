@@ -50,8 +50,7 @@ public:
   static const int OVERLAY_ANY_LABEL   = OVERLAY_NAMES | OVERLAY_IDS;
 
   //  Overlays();
-  Overlays( char *fg_root = NULL, float scale = 1.0f,
-	    float width = 512.0f );
+  Overlays( char *fg_root, float scale, float width );
 
   inline void setScale( float s ) { scale = s; }
   inline void setLocation( float lat, float lon ) {

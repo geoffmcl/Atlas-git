@@ -30,8 +30,9 @@ public:
   //void setFont( bool useTexturedFont );
 
 protected:
-  static const float BRIGHTNESS = 0.6f;
-  static const int SUBDIVISIONS = 18;
+  enum { SUBDIVISIONS = 18 };
+
+  static const float BRIGHTNESS;
   static float circle_x[SUBDIVISIONS], circle_y[SUBDIVISIONS];
 
   fntTexFont *font;
