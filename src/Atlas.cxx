@@ -379,7 +379,7 @@ void redrawMap() {
   if (slaved) {
     glPushMatrix();
     glTranslatef( mapsize/2, mapsize/2, 0.0f );
-    glRotatef( heading - 90.0f, 0.0f, 0.0f, 1.0f);
+    glRotatef( 90.0f - heading, 0.0f, 0.0f, 1.0f);
     glBegin(GL_LINES);
     glColor3f( 1.0f, 0.0f, 0.0f );
     glVertex2f( 4.0f, 0.0f );
@@ -553,7 +553,7 @@ int main(int argc, char **argv) {
 			Overlays::OVERLAY_NAMES |
 			Overlays::OVERLAY_FLIGHTTRACK,
 			NULL );
-  map->setTextured(false);
+  map->setTextured(true);
   map->setMapPath(path);
   if (fg_root[0] != 0)
     map->setFGRoot(fg_root);

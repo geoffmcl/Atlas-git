@@ -124,6 +124,7 @@ void MapBrowser::loadDb() {
 
 void MapBrowser::draw() {
   glDisable(GL_BLEND);
+  glColor4f( 1.0f, 1.0f, 1.0f, 1.0f );
 
   if (textured) {
     glEnable( GL_TEXTURE_2D );
@@ -135,13 +136,13 @@ void MapBrowser::draw() {
       glBindTexture(GL_TEXTURE_2D, tile->texture_handle);
     
       glBegin(GL_QUADS);
-      glTexCoord2f(0.0f, 0.0f); 
-      glVertex2f(tile->x - tilesize/2, tile->y - tilesize/2 );
-      glTexCoord2f(1.0f, 0.0f); 
-      glVertex2f(tile->x + tilesize/2, tile->y - tilesize/2 );
-      glTexCoord2f(1.0f, 1.0f); 
-      glVertex2f(tile->x + tilesize/2, tile->y + tilesize/2 );
       glTexCoord2f(0.0f, 1.0f); 
+      glVertex2f(tile->x - tilesize/2, tile->y - tilesize/2 );
+      glTexCoord2f(1.0f, 1.0f); 
+      glVertex2f(tile->x + tilesize/2, tile->y - tilesize/2 );
+      glTexCoord2f(1.0f, 0.0f); 
+      glVertex2f(tile->x + tilesize/2, tile->y + tilesize/2 );
+      glTexCoord2f(0.0f, 0.0f); 
       glVertex2f(tile->x - tilesize/2, tile->y + tilesize/2 );
       glEnd();
     }

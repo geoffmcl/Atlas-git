@@ -214,11 +214,11 @@ void Overlays::airport_labels(bool draw_names, float theta, float alpha,
 
 	// set up two vectors along the length & width of the runway
 	sgSetVec2( rwyl,
-		   (*j)->length  / 2.0f * scale * sin((*j)->hdg),
-		   -(*j)->length / 2.0f * scale * cos((*j)->hdg) );
+		   (*j)->length  / 2.0f * scale * sin(-(*j)->hdg),
+		   -(*j)->length / 2.0f * scale * cos(-(*j)->hdg) );
 	sgSetVec2( rwyw, 
-		   (*j)->width*4.0f * scale  * cos((*j)->hdg), 
-		   (*j)->width*4.0f * scale  * sin((*j)->hdg) );
+		   (*j)->width*4.0f * scale  * cos(-(*j)->hdg), 
+		   (*j)->width*4.0f * scale  * sin(-(*j)->hdg) );
 	ab_lat( (*j)->lat, (*j)->lon, theta, alpha, &cx, &cy, &r );
 	// runway center point
 	rwyc[0] = ::scale(cx, output->getSize(), scale);

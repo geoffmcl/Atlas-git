@@ -76,13 +76,13 @@ bin_SCRIPTS = buildmaps.sh
 Atlas_SOURCES =  	Atlas.cxx 	FlightTrack.hxx FlightTrack.cxx 	Geodesy.hxx 	LoadPng.cxx LoadPng.hxx 	MapBrowser.cxx MapBrowser.hxx 	MapMaker.cxx MapMaker.hxx 	Output.cxx Output.hxx 	OutputGL.cxx OutputGL.hxx 	Overlays.cxx Overlays.hxx
 
 
-Atlas_LDADD =  	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgserial -lsgdebug 	-lplibsg -lplibpu 	$(opengl_LIBS) 	-lpng -lz
+Atlas_LDADD =  	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgserial -lsgdebug 	-lplibsg -lplibfnt -lplibpu 	$(opengl_LIBS) 	-lpng -lz
 
 
 Map_SOURCES =  	Map.cxx 	FlightTrack.hxx FlightTrack.cxx 	MapMaker.cxx MapMaker.hxx 	Output.cxx Output.hxx 	OutputGL.cxx OutputGL.hxx 	Overlays.cxx Overlays.hxx
 
 
-Map_LDADD =  	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgdebug 	-lplibsg -lplibpu 	$(opengl_LIBS) 	-lpng -lz
+Map_LDADD =  	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgdebug 	-lplibsg -lplibfnt 	$(opengl_LIBS) 	-lpng -lz
 
 
 MapPS_SOURCES =  	MapPS.cxx 	FlightTrack.hxx FlightTrack.cxx 	MapMaker.cxx MapMaker.hxx 	Output.cxx Output.hxx 	OutputPS.cxx OutputPS.hxx 	Overlays.cxx Overlays.hxx
@@ -294,7 +294,7 @@ distdir: $(DISTFILES)
 	@for file in $(DISTFILES); do \
 	  d=$(srcdir); \
 	  if test -d $$d/$$file; then \
-	    cp -pr $$d/$$file $(distdir)/$$file; \
+	    cp -pr $$/$$file $(distdir)/$$file; \
 	  else \
 	    test -f $(distdir)/$$file \
 	    || ln $$d/$$file $(distdir)/$$file 2> /dev/null \

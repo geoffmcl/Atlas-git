@@ -60,14 +60,14 @@ inline void ab_xy( float x, float y, float z,float xr, float yr, float zr,
   float xyr = sqrt( xr*xr + yr*yr );
   float rr  = sqrt( xyr*xyr + zr*zr );
   *a   = *r_e / (r * xyr) * (y*xr - yr*x);
-  *b   = -*r_e / (r * rr) * (xyr * z - xy * zr);   // - because of GD
+  *b   = *r_e / (r * rr) * (xyr * z - xy * zr);
 }
 
 inline void ab_lat( float lat, float lon, float lat_r, float lon_r,
 		    float *a, float *b, float *r ) {
   *r = earth_radius_lat( lat );
   *a = *r * cos(lat)*(lon-lon_r);   // even Alexei wasn't sure here :-)
-  *b = -*r * (lat-lat_r);
+  *b = *r * (lat-lat_r);
 }
 
 inline void geod_geoc( float ang, float *Sin, float *Cos ) {
@@ -87,7 +87,7 @@ inline void xyz_lat( float lat, float lon,
   *r = earth_radius_lat( lat );
   geod_geoc( lat, &s, &c );
   *x = *r * c * cos( lon );
-  *y = *r * c * sin( lon );
+  *y = (*r * c * sin( lon ));
   *z = *r * s;
 }
 

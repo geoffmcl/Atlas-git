@@ -8,16 +8,22 @@ OutputGL::OutputGL( char *filename, int size ) :
   glViewport( 0, 0, size, size );
   glMatrixMode( GL_PROJECTION );
   glLoadIdentity();
-  glOrtho( 0.0f, (GLfloat)size, (GLfloat)size, 0.0f, -1.0f, 1.0f );
+  glOrtho( 0.0f, (GLfloat)size, 0.0f, (GLfloat)size, -1.0f, 1.0f );
   glMatrixMode( GL_MODELVIEW );
   glLoadIdentity();
 
   glEnable(GL_BLEND);
   glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
+
+  font = new fntTexFont( "data/helvetica_medium.txf" );
+  textRenderer.setFont( font );
+  textRenderer.setPointSize( 12 );
 }
 
 OutputGL::~OutputGL() {
   closeOutput();
+
+  delete font;
 }
 
 void OutputGL::closeOutput() {
@@ -128,5 +134,9 @@ void OutputGL::drawLine( sgVec2 p1, sgVec2 p2 ) {
 }
 
 void OutputGL::drawText( sgVec2 p, char *text ) {
-  puDrawString( simpleFont, text, (int)p[0], (int)p[1] );
+  textRenderer.begin();
+  textRenderer.start2fv( p );
+  textRenderer.puts( text );
+  textRenderer.end();
+  glDisable(GL_TEXTURE_2D);
 }

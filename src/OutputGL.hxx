@@ -2,7 +2,7 @@
 #define __OUTPUTGL_H__
 
 #include <GL/glut.h>
-#include <plib/pu.h>
+#include <plib/fnt.h>
 #include "Output.hxx"
 
 class OutputGL : public GfxOutput {
@@ -21,7 +21,8 @@ public:
   virtual void drawText    ( sgVec2 p, char *text );
 
 protected:
-  puFont simpleFont;
+  fntTexFont *font;
+  fntRenderer textRenderer;
   char *filename;
 };
 
