@@ -20,8 +20,10 @@
   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 ---------------------------------------------------------------------------*/
 
+#include <memory.h>
 #include <stdio.h>
 #include <GL/glut.h>
+#include <plib/fnt.h>
 #include <plib/pu.h>
 #include <string>
 #include <simgear/io/sg_socket.hxx>
@@ -50,7 +52,17 @@ float update = 1.0f;
 char save_buf[ 2 * 2048 ];
 int save_len = 0;
 
-puFont simple_fnt;
+fntTexFont *texfont;
+puFont *font;
+puPopup *interface;
+puFrame *frame;
+puOneShot *zoomin, *zoomout;
+puButton *show_arp, *show_nav, *show_name, *show_id, *show_none;
+puText *labeling, *txt_lat, *txt_lon;
+puInput *inp_lat, *inp_lon;
+bool interface_visible = true, softcursor = false;
+char lat_str[80], lon_str[80];
+
 MapBrowser *map;
 
 bool parse_nmea(char *buf) {
@@ -343,6 +355,145 @@ static char *coord_format_latlon(float latitude, float longitude, char *buf)
 }
 
 /******************************************************************************
+ PUI code
+******************************************************************************/
+void zoom_cb ( puObject *cb )
+{
+  (cb,cb);
+
+  if (cb == zoomin) { 
+    map->setScale( map->getScale() / 2 );
+    scalefactor /= 2.0f;
+  } else {
+    map->setScale( map->getScale() * 2 );
+    scalefactor *= 2.0f;
+  }
+  glutPostRedisplay();
+}
+
+void show_cb ( puObject *cb )
+{
+  (cb,cb);
+
+  if (cb == show_arp) { 
+    map->setFeatures( map->getFeatures() ^ Overlays::OVERLAY_AIRPORTS );
+  } else {
+    map->setFeatures( map->getFeatures() ^ Overlays::OVERLAY_NAVAIDS );
+  }
+  glutPostRedisplay();
+}
+
+void labeling_cb ( puObject *cb )
+{
+  (cb,cb);
+
+  show_name ->setValue(0);
+  show_id   ->setValue(0);
+  show_none ->setValue(0);
+
+  if (cb == show_name) {
+    map->setFeatures( map->getFeatures() | Overlays::OVERLAY_NAMES );
+    show_name->setValue(1);
+  } else if (cb == show_id) {
+    show_id->setValue(1);
+  } else if (cb == show_none) {
+    map->setFeatures( map->getFeatures() & ~Overlays::OVERLAY_NAMES );
+    show_none->setValue(1);
+  }
+
+  glutPostRedisplay();
+}
+
+void position_cb ( puObject *cb ) {
+  (cb, cb);
+
+  char ns, dummy, *buffer;
+  int degrees;
+  float minutes;
+
+  if (cb == inp_lat) {
+    inp_lat->getValue(&buffer);
+    sscanf(buffer, "%c %d %c %f", &ns, &degrees, &dummy, &minutes);
+    latitude = ((ns=='S'||ns=='s')?-1.0f:1.0f) * 
+      ((float)degrees + minutes / 60.0f) * SG_DEGREES_TO_RADIANS;
+    map->setLocation(latitude, longitude);
+
+    glutPostRedisplay();
+  } else {
+    inp_lon->getValue(&buffer);
+    sscanf(buffer, "%c %d %c %f", &ns, &degrees, &dummy, &minutes);
+    longitude = ((ns=='W'||ns=='w')?-1.0f:1.0f) * 
+      ((float)degrees + minutes / 60.0f) * SG_DEGREES_TO_RADIANS;
+    map->setLocation(latitude, longitude);
+
+    glutPostRedisplay();
+  }
+}
+
+void init_gui(bool textureFonts) {
+  puInit();
+
+  if (textureFonts) {
+    texfont = new fntTexFont( "data/helvetica_medium.txf" );
+    font = new puFont( texfont, 16.0f );
+  } else {
+    font = new puFont();
+  }
+  puSetDefaultFonts(*font, *font);
+  puSetDefaultColourScheme(0.4f, 0.4f, 0.8f, 0.6f);
+
+  interface = new puPopup(20, 20);
+  frame = new puFrame(20, 20, 220, 400);
+
+  zoomin = new puOneShot(30, 30, "Zoom In");
+  zoomin->setCallback(zoom_cb);
+  zoomout = new puOneShot(120, 30, "Zoom Out");
+  zoomout->setCallback(zoom_cb);
+
+  show_nav = new puButton(30, 65, "Show Navaids");
+  puBox *b = show_nav->getABox();
+  show_nav->setSize(185, 24);
+  show_nav->setCallback(show_cb);
+  show_nav->setValue(1);
+  show_arp = new puButton(30, 90, "Show Airports");
+  show_arp->setSize(185, 24);
+  show_arp->setCallback(show_cb);
+  show_arp->setValue(1);
+
+  labeling = new puText(30, 145);
+  labeling->setLabel("Labeling:");
+  show_name = new puButton(30, 125, "Name");
+  show_id   = new puButton(90, 125, "Id");
+  show_none = new puButton(153, 125, "None");
+  show_name ->setSize(60, 24);
+  show_id   ->setSize(60, 24);
+  show_none ->setSize(60, 24);
+  show_name ->setCallback(labeling_cb);
+  show_id   ->setCallback(labeling_cb);
+  show_none ->setCallback(labeling_cb);
+  show_name->setValue(1);
+
+  txt_lat = new puText(30, 250);
+  txt_lat->setLabel("Latitude:");
+  txt_lon = new puText(30, 200);
+  txt_lon->setLabel("Longitude:");
+  inp_lat = new puInput(30, 230, 210, 254);
+  inp_lon = new puInput(30, 180, 210, 204);
+  inp_lat->setValue(lat_str);
+  inp_lon->setValue(lon_str);
+  inp_lat->setCallback(position_cb);
+  inp_lon->setCallback(position_cb);
+  inp_lat->setStyle(PUSTYLE_BEVELLED);
+  inp_lon->setStyle(PUSTYLE_BEVELLED);
+
+  interface->close();
+  interface->reveal();
+
+  if (softcursor) {
+    puShowCursor();
+  }
+}
+/******************************************************************************
  GLUT event handlers
 ******************************************************************************/
 void reshapeMap( int width, int _height ) {
@@ -363,15 +514,15 @@ void redrawMap() {
   if (display) {
     coord_format_latlon(latitude,longitude, buf);
     glColor3f(1.0f, 0.0f, 0.0f);
-    puDrawString(simple_fnt, buf, 0, (int)(mapsize - height) + 10);
+    puDrawString(font, buf, 0, (int)(mapsize - height) + 10);
     
     if (slaved) {
       sprintf( buf, "HDG: %.0f*", heading);
-      puDrawString(simple_fnt, buf, 0, (int)(mapsize - height) + 20);
+      puDrawString(font, buf, 0, (int)(mapsize - height) + 20);
       sprintf( buf, "ALT: %.0f' MSL", altitude);
-      puDrawString(simple_fnt, buf, 0, (int)(mapsize - height) + 30);
+      puDrawString(font, buf, 0, (int)(mapsize - height) + 30);
       sprintf( buf, "SPD: %.0f KIAS", speed);
-      puDrawString(simple_fnt, buf, 0, (int)(mapsize - height) + 40);
+      puDrawString(font, buf, 0, (int)(mapsize - height) + 40);
     }
   }
 
@@ -392,6 +543,21 @@ void redrawMap() {
     glPopMatrix();
   }
 
+  if (!inp_lat->isAcceptingInput()) {
+    sprintf( lat_str, "%c%s", 
+	     (latitude<0)?'S':'N', 
+	     dmshh_format(latitude * SG_RADIANS_TO_DEGREES, buf) );
+    inp_lat->setValue(lat_str);
+  }
+
+  if (!inp_lon->isAcceptingInput()) {
+    sprintf( lon_str, "%c%s", 
+	     (longitude<0)?'W':'E', 
+	     dmshh_format(longitude * SG_RADIANS_TO_DEGREES, buf) );
+    inp_lon->setValue(lon_str);
+  }
+
+  puDisplay();
   glutSwapBuffers();
 }
 
@@ -410,73 +576,93 @@ void timer(int value) {
 }
 
 void mouseClick( int button, int state, int x, int y ) {
-  if (button == GLUT_LEFT_BUTTON) {
-    switch (state) {
-    case GLUT_DOWN:
-      dragmode = true;
-      drag_x = x;
-      drag_y = y;
-      copy_lat = latitude;
-      copy_lon = longitude;
-      break;
-    default:
-      dragmode = false;
+  if ( !puMouse( button, state, x, y ) ) {
+    // PUI didn't consume this event
+    if (button == GLUT_LEFT_BUTTON) {
+      switch (state) {
+      case GLUT_DOWN:
+	dragmode = true;
+	drag_x = x;
+	drag_y = y;
+	copy_lat = latitude;
+	copy_lon = longitude;
+	break;
+      default:
+	dragmode = false;
     }
-  } else
-    dragmode = false;
+    } else
+      dragmode = false;
+  } else {
+    glutPostRedisplay();
+  }
 }
 
 
-void dragMap( int x, int y ) {
-  if (dragmode) {
-    latitude  = (copy_lat + (float)(y - drag_y)*scalefactor / 
-		 (float)mapsize * M_PI / 180.0f);
-    longitude = (copy_lon + (float)(drag_x - x)*scalefactor / 
-		 (float)mapsize * M_PI / 180.0f);
-    map->setLocation( latitude, longitude );
-    glutPostRedisplay();
+void mouseMotion( int x, int y ) {
+  if ( !puMouse(x, y) ) {
+    // PUI didn't consume this event
+    if (dragmode) {
+      latitude  = (copy_lat + (float)(y - drag_y)*scalefactor / 
+		   (float)mapsize * M_PI / 180.0f);
+      longitude = (copy_lon + (float)(drag_x - x)*scalefactor / 
+		   (float)mapsize * M_PI / 180.0f);
+      map->setLocation( latitude, longitude );
+    }
   }
+
+  glutPostRedisplay();
 }
 
 void keyPressed( unsigned char key, int x, int y ) {
-  switch (key) {
-  case '+':
-    map->setScale( map->getScale() / 2 );
-    scalefactor /= 2.0f;
+  if (!puKeyboard(key, PU_DOWN)) {
+    switch (key) {
+    case '+':
+      map->setScale( map->getScale() / 2 );
+      scalefactor /= 2.0f;
+      glutPostRedisplay();
+      break;
+    case '-':
+      map->setScale( map->getScale() * 2 );
+      scalefactor *= 2.0f;
+      glutPostRedisplay();
+      break;
+    case 'D':
+    case 'd':
+      display = !display;
+      glutPostRedisplay();
+      break;
+    case 'A':
+    case 'a':
+      map->setFeatures( map->getFeatures() ^ Overlays::OVERLAY_AIRPORTS );
+      glutPostRedisplay();
+      break;
+    case 'N':
+    case 'n':
+      map->setFeatures( map->getFeatures() ^ Overlays::OVERLAY_NAVAIDS );
+      glutPostRedisplay();
+      break;    
+    case 'T':
+    case 't':
+      map->setTextured( !map->getTextured() );
+      glutPostRedisplay();
+      break;
+    case 'V':
+    case 'v':
+      map->setFeatures( map->getFeatures() ^ Overlays::OVERLAY_NAMES );
+      glutPostRedisplay();
+      break;
+    case ' ':
+      interface_visible = !interface_visible;
+      if (interface_visible) {
+	interface->reveal();
+      } else {
+	interface->hide();
+      }
+      glutPostRedisplay();
+    }
+  } else {
     glutPostRedisplay();
-    break;
-  case '-':
-    map->setScale( map->getScale() * 2 );
-    scalefactor *= 2.0f;
-    glutPostRedisplay();
-    break;
-  case 'D':
-  case 'd':
-    display = !display;
-    glutPostRedisplay();
-    break;
-  case 'A':
-  case 'a':
-    map->setFeatures( map->getFeatures() ^ Overlays::OVERLAY_AIRPORTS );
-    glutPostRedisplay();
-    break;
-  case 'N':
-  case 'n':
-    map->setFeatures( map->getFeatures() ^ Overlays::OVERLAY_NAVAIDS );
-    glutPostRedisplay();
-    break;    
-  case 'T':
-  case 't':
-    map->setTextured( !map->getTextured() );
-    glutPostRedisplay();
-    break;
-  case 'V':
-  case 'v':
-    map->setFeatures( map->getFeatures() ^ Overlays::OVERLAY_NAMES );
-    glutPostRedisplay();
-    break;    
   }
-
 }
 
 
@@ -485,7 +671,9 @@ void print_help() {
   printf("   --lat=x      Start browsing at latitude xx (deg. south i neg.)\n");
   printf("   --lon=x      Start browsing at longitude xx (deg. west i neg.)\n");
   printf("   --path=xxx   Set path for map images\n");
-  printf("   --glutfonts  Use GLUT bitmap fonts (fast for software rendering)\n\n");
+  printf("   --glutfonts  Use GLUT bitmap fonts (fast for software rendering)\n");
+  printf("   --geometry=[width]x[height] Set initial window size\n");
+  printf("   --softcursor Draw mouse cursor using OpenGL (for fullscreen Voodoo cards)\n\n");
   printf("   --udp=x      Input read from UDP socket at specified port (defaults to 5500)\n");
   printf("   --serial=dev Input read from serial port with specified device\n");
   printf("   --baud=x     Set serial port baud rate (defaults to 4800)\n");
@@ -495,6 +683,7 @@ void print_help() {
 int main(int argc, char **argv) {
   char path[512] = "./", fg_root[512] = "\0";
   bool textureFonts = true;
+  int width = 800, height = 600;
 
   glutInit( &argc, argv );
 
@@ -522,6 +711,10 @@ int main(int argc, char **argv) {
       // do nothing
     } else if ( strcmp(argv[i], "--glutfonts") == 0 ) {
       textureFonts = false;
+    } else if ( strcmp(argv[i], "--softcursor") == 0 ) {
+      softcursor = true;
+    } else if ( sscanf(argv[i], "--geometry=%dx%d", &width, &height) == 2 ) {
+      // do nothing
     } else if ( strcmp(argv[i], "--help") == 0 ) {
       print_help();
       return 0;
@@ -532,7 +725,7 @@ int main(int argc, char **argv) {
     }
   }
 
-  printf(" udp = %s  serial = %s  baud = %s\n", port, device, baud );
+  //printf(" udp = %s  serial = %s  baud = %s\n", port, device, baud );
 
   if (path[0] == 0) {
     print_help();
@@ -544,13 +737,14 @@ int main(int argc, char **argv) {
   longitude *= M_PI / 180.0f;
 
   glutInitDisplayMode( GLUT_RGB | GLUT_DEPTH | GLUT_DOUBLE );
-  glutInitWindowSize( 512, 512 );
+  glutInitWindowSize( width, height );
   glutCreateWindow( "Atlas" );
 
   glutReshapeFunc( reshapeMap );
   glutDisplayFunc( redrawMap );
 
-  map = new MapBrowser( 0.0f, 0.0f, 512.0f, 
+  mapsize = (float)( (width>height)?width:height );
+  map = new MapBrowser( 0.0f, 0.0f, mapsize, 
 			Overlays::OVERLAY_AIRPORTS | 
 			Overlays::OVERLAY_NAVAIDS |
 			Overlays::OVERLAY_GRIDLINES | 
@@ -562,10 +756,7 @@ int main(int argc, char **argv) {
   if (fg_root[0] != 0)
     map->setFGRoot(fg_root);
 
-  if (!slaved) {
-    glutMotionFunc( dragMap );
-    glutMouseFunc( mouseClick );
-  } else {
+  if (slaved) {
     glutTimerFunc( (int)(update*1000.0f), timer, 0 );
 
     if ( network ) {
@@ -579,12 +770,17 @@ int main(int argc, char **argv) {
     input_channel->open( SG_IO_IN );
   }
 
-  glutKeyboardFunc( keyPressed );
+  glutMotionFunc       ( mouseMotion );
+  glutPassiveMotionFunc( mouseMotion );
+  glutMouseFunc        ( mouseClick );
+  glutKeyboardFunc     ( keyPressed );
 
   map->setLocation( latitude, longitude );
   printf("Please wait while loading databases..."); fflush(stdout);
   map->loadDb();
   printf("done.\n");
+
+  init_gui(textureFonts);
 
   glutMainLoop();
  
