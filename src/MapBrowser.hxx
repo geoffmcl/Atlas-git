@@ -44,6 +44,7 @@ public:
   void setMapPath( char *path );
   //void setFGRoot( char *fg_root );
   void setFeatures( int features );
+  void toggleFeaturesAllNavaids();
   void setTextured( bool texture = true );
   void setFlightTrack( FlightTrack *track );
 

@@ -60,6 +60,7 @@ puFrame *frame, *info_frame;
 puOneShot *zoomin, *zoomout, *minimize_button, *minimized_button;
 puOneShot *clear_ftrack;
 puButton *show_arp, *show_nav, *show_name, *show_id;
+puButton *show_vor, *show_ndb, *show_fix;
 puButton *show_ftrack, *follow;
 puText *labeling, *txt_lat, *txt_lon;
 puText *txt_info_lat, *txt_info_lon, *txt_info_alt;
@@ -442,8 +443,17 @@ void show_cb ( puObject *cb )
 
   if (cb == show_arp) { 
     map_object->setFeatures( map_object->getFeatures() ^ Overlays::OVERLAY_AIRPORTS );
+  } else if (cb == show_vor) {
+    map_object->setFeatures( map_object->getFeatures() ^
+                             Overlays::OVERLAY_NAVAIDS_VOR );
+  } else if (cb == show_ndb) {
+    map_object->setFeatures( map_object->getFeatures() ^
+                             Overlays::OVERLAY_NAVAIDS_NDB );
+  } else if (cb == show_fix) {
+    map_object->setFeatures( map_object->getFeatures() ^
+                             Overlays::OVERLAY_NAVAIDS_FIX );
   } else {
-    map_object->setFeatures( map_object->getFeatures() ^ Overlays::OVERLAY_NAVAIDS );
+    map_object->toggleFeaturesAllNavaids();
   }
   glutPostRedisplay();
 }
@@ -520,6 +530,10 @@ void restore_cb ( puObject *cb ) {
 void init_gui(bool textureFonts) {
   puInit();
 
+  int curx,cury;
+
+  int puxoff=20,puyoff=20,puxsiz=220,puysiz=400;
+
   if (textureFonts) {
     char font_name[512];
     strcpy( font_name, fg_root );
@@ -533,39 +547,65 @@ void init_gui(bool textureFonts) {
   puSetDefaultFonts(*font, *font);
   puSetDefaultColourScheme(0.4f, 0.4f, 0.8f, 0.6f);
 
-  interface = new puPopup(20, 20);
-  frame = new puFrame(20, 20, 220, 400);
+  interface = new puPopup(puxoff,puyoff);
+  frame = new puFrame(puxoff,puyoff,puxsiz,puysiz);
 
-  zoomin = new puOneShot(30, 30, "Zoom In");
+  curx=30; cury=30;
+
+  zoomin = new puOneShot(curx, cury, "Zoom In");
   zoomin->setCallback(zoom_cb);
-  zoomout = new puOneShot(120, 30, "Zoom Out");
+  zoomout = new puOneShot(curx+80, cury, "Zoom Out");
   zoomout->setCallback(zoom_cb);
 
-  show_nav = new puButton(30, 65, "Show Navaids");
+  cury+=35;
+  
+  show_vor = new puButton(curx, cury, "VOR");
+  show_vor->setSize(60,24);
+  show_vor->setCallback(show_cb);
+  show_vor->setValue(1);
+  show_ndb = new puButton(curx+62, cury, "NDB");
+  show_ndb->setSize(60,24);
+  show_ndb->setCallback(show_cb);
+  show_ndb->setValue(1);
+  show_fix = new puButton(curx+124, cury, "FIX");
+  show_fix->setSize(60,24);
+  show_fix->setCallback(show_cb);
+  show_fix->setValue(1);
+
+  cury+=25;
+
+  show_nav = new puButton(curx, cury, "Show Navaids");
   show_nav->setSize(185, 24);
   show_nav->setCallback(show_cb);
   show_nav->setValue(1);
-  show_arp = new puButton(30, 90, "Show Airports");
+
+  cury+=25;
+
+  show_arp = new puButton(curx, cury, "Show Airports");
   show_arp->setSize(185, 24);
   show_arp->setCallback(show_cb);
   show_arp->setValue(1);
 
-  labeling = new puText(30, 145);
+  cury+=35;
+  
+  labeling = new puText(curx,cury+20);
   labeling->setLabel("Labeling:");
-  show_name = new puButton(30, 125, "Name");
-  show_id   = new puButton(120, 125, "Id");
+  show_name = new puButton(curx, cury, "Name");
+  show_id   = new puButton(curx+100, cury, "Id");
   show_name ->setSize(90, 24);
   show_id   ->setSize(90, 24);
   show_name ->setCallback(labeling_cb);
   show_id   ->setCallback(labeling_cb);
   show_name->setValue(1);
 
-  txt_lat = new puText(30, 250);
+  cury+=55;
+
+  txt_lat = new puText(curx, cury+70);
   txt_lat->setLabel("Latitude:");
-  txt_lon = new puText(30, 200);
+  txt_lon = new puText(curx, cury+20);
   txt_lon->setLabel("Longitude:");
-  inp_lat = new puInput(30, 230, 210, 254);
-  inp_lon = new puInput(30, 180, 210, 204);
+  inp_lat = new puInput(curx, cury+50, curx+180, cury+74);
+  inp_lon = new puInput(curx, cury, curx+180, cury+24);
   inp_lat->setValue(lat_str);
   inp_lon->setValue(lon_str);
   inp_lat->setCallback(position_cb);
@@ -573,9 +613,10 @@ void init_gui(bool textureFonts) {
   inp_lat->setStyle(PUSTYLE_BEVELLED);
   inp_lon->setStyle(PUSTYLE_BEVELLED);
 
+  cury+=104;
   if (slaved) {
-    show_ftrack  = new puButton(30, 284, "Show Flight Track");
-    clear_ftrack = new puOneShot(30, 304, "Clear Flight Track");
+    show_ftrack  = new puButton(curx, cury, "Show Flight Track");
+    clear_ftrack = new puOneShot(curx, cury+20, "Clear Flight Track");
     show_ftrack  -> setSize(185, 24);
     clear_ftrack -> setSize(185, 24);
     show_ftrack  -> setValue(1);
@@ -583,7 +624,9 @@ void init_gui(bool textureFonts) {
     clear_ftrack -> setCallback( clear_ftrack_cb );
   }
 
-  minimize_button = new puOneShot(195, 370, "X");
+  cury=puyoff+puysiz-48;
+
+  minimize_button = new puOneShot(curx+165, cury, "X");
   minimize_button->setCallback(minimize_cb);
 
   interface->close();
@@ -785,7 +828,7 @@ void keyPressed( unsigned char key, int x, int y ) {
       break;
     case 'N':
     case 'n':
-      map_object->setFeatures( map_object->getFeatures() ^ Overlays::OVERLAY_NAVAIDS );
+      map_object->toggleFeaturesAllNavaids();
       glutPostRedisplay();
       break;    
     case 'T':
@@ -911,12 +954,15 @@ int main(int argc, char **argv) {
   glutDisplayFunc( redrawMap );
 
   mapsize = (float)( (width>height)?width:height );
-  map_object = new MapBrowser( 0.0f, 0.0f, mapsize, 
-			       Overlays::OVERLAY_AIRPORTS  | 
-			       Overlays::OVERLAY_NAVAIDS   |
-			       Overlays::OVERLAY_FIXES     |
-			       Overlays::OVERLAY_GRIDLINES | 
-			       Overlays::OVERLAY_NAMES     |
+   map_object = new MapBrowser( 0.0f, 0.0f, mapsize, 
+                               Overlays::OVERLAY_AIRPORTS  | 
+                               Overlays::OVERLAY_NAVAIDS   |
+                               Overlays::OVERLAY_NAVAIDS_VOR |
+                               Overlays::OVERLAY_NAVAIDS_NDB |
+                               Overlays::OVERLAY_NAVAIDS_FIX |
+                               Overlays::OVERLAY_FIXES     |
+                               Overlays::OVERLAY_GRIDLINES | 
+                               Overlays::OVERLAY_NAMES     |
 			       Overlays::OVERLAY_FLIGHTTRACK,
 			       fg_root[0] == 0 ? NULL : fg_root, 
 			       textureFonts );

@@ -112,6 +112,14 @@ void MapBrowser::setFeatures( int features ) {
   overlay->setFeatures(features);
 }
 
+void MapBrowser::toggleFeaturesAllNavaids() {
+  features = features ^ ( Overlays::OVERLAY_NAVAIDS |
+                          Overlays::OVERLAY_NAVAIDS_VOR |
+                          Overlays::OVERLAY_NAVAIDS_NDB |
+                          Overlays::OVERLAY_NAVAIDS_FIX );
+  overlay->setFeatures(features);
+}
+
 void MapBrowser::setTextured( bool textured ) {
   this->textured = textured;
 }
