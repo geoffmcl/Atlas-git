@@ -484,7 +484,8 @@ void print_help() {
   printf("ATLAS - A map browsing utility for FlightGear\n\nUsage:\n");
   printf("   --lat=x      Start browsing at latitude xx (deg. south i neg.)\n");
   printf("   --lon=x      Start browsing at longitude xx (deg. west i neg.)\n");
-  printf("   --path=xxx   Set path for map images\n\n");
+  printf("   --path=xxx   Set path for map images\n");
+  printf("   --glutfonts  Use GLUT bitmap fonts (fast for software rendering)\n\n");
   printf("   --udp=x      Input read from UDP socket at specified port (defaults to 5500)\n");
   printf("   --serial=dev Input read from serial port with specified device\n");
   printf("   --baud=x     Set serial port baud rate (defaults to 4800)\n");
@@ -493,6 +494,7 @@ void print_help() {
 
 int main(int argc, char **argv) {
   char path[512] = "./", fg_root[512] = "\0";
+  bool textureFonts = true;
 
   glutInit( &argc, argv );
 
@@ -518,6 +520,8 @@ int main(int argc, char **argv) {
       // do nothing
     } else if ( sscanf(argv[i], "--fgroot=%s", fg_root) == 1 ) {
       // do nothing
+    } else if ( strcmp(argv[i], "--glutfonts") == 0 ) {
+      textureFonts = false;
     } else if ( strcmp(argv[i], "--help") == 0 ) {
       print_help();
       return 0;
@@ -552,7 +556,7 @@ int main(int argc, char **argv) {
 			Overlays::OVERLAY_GRIDLINES | 
 			Overlays::OVERLAY_NAMES |
 			Overlays::OVERLAY_FLIGHTTRACK,
-			NULL );
+			NULL, textureFonts );
   map->setTextured(true);
   map->setMapPath(path);
   if (fg_root[0] != 0)

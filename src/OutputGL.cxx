@@ -2,8 +2,9 @@
 #include <png.h>
 #include "OutputGL.hxx"
 
-OutputGL::OutputGL( char *filename, int size ) : 
-  GfxOutput::GfxOutput(filename, size), filename(filename)
+OutputGL::OutputGL( char *filename, int size, bool useTexturedFont ) : 
+  GfxOutput::GfxOutput(filename, size), filename(filename), 
+  useTexturedFont(useTexturedFont)
 {
   glViewport( 0, 0, size, size );
   glMatrixMode( GL_PROJECTION );
@@ -15,15 +16,23 @@ OutputGL::OutputGL( char *filename, int size ) :
   glEnable(GL_BLEND);
   glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
 
-  font = new fntTexFont( "data/helvetica_medium.txf" );
-  textRenderer.setFont( font );
-  textRenderer.setPointSize( 12 );
+  if (useTexturedFont) {
+    font = new fntTexFont( "data/helvetica_medium.txf" );
+    textRenderer.setFont( font );
+    textRenderer.setPointSize( 12 );
+  } else {
+    glutFont = new puFont;
+  }
 }
 
 OutputGL::~OutputGL() {
   closeOutput();
 
-  delete font;
+  if (useTexturedFont) {
+    delete font;
+  } else {
+    delete glutFont;
+  }
 }
 
 void OutputGL::closeOutput() {
@@ -134,9 +143,13 @@ void OutputGL::drawLine( sgVec2 p1, sgVec2 p2 ) {
 }
 
 void OutputGL::drawText( sgVec2 p, char *text ) {
-  textRenderer.begin();
-  textRenderer.start2fv( p );
-  textRenderer.puts( text );
-  textRenderer.end();
-  glDisable(GL_TEXTURE_2D);
+  if (useTexturedFont) {
+    textRenderer.begin();
+    textRenderer.start2fv( p );
+    textRenderer.puts( text );
+    textRenderer.end();
+    glDisable(GL_TEXTURE_2D);
+  } else {
+    glutFont->drawString( text, (int)p[0], (int)p[1] );
+  }
 }

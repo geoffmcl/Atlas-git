@@ -28,7 +28,7 @@
 #include "LoadPng.hxx"
 
 MapBrowser::MapBrowser(GLfloat left, GLfloat top, GLfloat size, int features,
-		       char *fg_root) {
+		       char *fg_root, bool texturedFonts) {
   view_left = left;
   view_top  = top;
   view_size = size;
@@ -42,8 +42,9 @@ MapBrowser::MapBrowser(GLfloat left, GLfloat top, GLfloat size, int features,
   scle = 100000;
   zoom = view_size / scle;
   this->features = features;
+  this->texturedFonts = texturedFonts;
 
-  output = new OutputGL( NULL, size );
+  output = new OutputGL( NULL, size, texturedFonts );
 
   // setup overlays
   overlay = new Overlays( fg_root, zoom, size );
@@ -89,7 +90,7 @@ void MapBrowser::setSize( GLfloat size ) {
   zoom = view_size / scle;
 
   delete output;
-  output = new OutputGL(NULL, (int)size);
+  output = new OutputGL(NULL, (int)size, texturedFonts);
   overlay->setOutput( output );
   overlay->setScale( zoom );
 
