@@ -117,11 +117,14 @@ bool OutputGL::getShade() {
 }
 
 void OutputGL::setLightVector( sgVec3 light ) {
-  GLfloat white[] = {BRIGHTNESS, BRIGHTNESS, BRIGHTNESS, 1.0f};
+  GLfloat ambient[] = {BRIGHTNESS/3.0f, BRIGHTNESS/3.0f, BRIGHTNESS/3.0f,1.0f};
+  GLfloat diffuse[] = {BRIGHTNESS, BRIGHTNESS, BRIGHTNESS, 1.0f};
 
   sgCopyVec3( light_vector, light );
-  glLightfv( GL_LIGHT0, GL_AMBIENT, white );
-  glLightfv( GL_LIGHT0, GL_DIFFUSE, white );
+  light_vector[3] = 0.0f;
+  glLightfv( GL_LIGHT0, GL_AMBIENT, ambient );
+  glLightfv( GL_LIGHT0, GL_DIFFUSE, diffuse );
+  glLightfv( GL_LIGHT0, GL_POSITION, light_vector );
   glEnable( GL_LIGHT0 );
 }
 

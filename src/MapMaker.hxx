@@ -52,12 +52,12 @@ public:
   inline void setScale( int scale = 100000 ) { scle = scale; }
   inline void setSize( int size = 512 ) { this->size = size; }
   inline void setLight( sgVec3 light ) { 
-    sgCopyVec3( light_vector, light ); 
-    sgNormaliseVec3( light_vector );
+    sgCopyVec3( map_light, light ); 
+    sgNormaliseVec3( map_light );
   }
   inline void setLight( float x, float y, float z ) {
-    sgSetVec3( light_vector, x, y, z );
-    sgNormaliseVec3( light_vector );
+    sgSetVec3( map_light, x, y, z );
+    sgNormaliseVec3( map_light );
   }
 
   inline char *getFGRoot() { return fg_root; }
@@ -102,7 +102,7 @@ protected:
 
   bool modified;
 
-  sgVec3 light_vector;
+  sgVec3 map_light, light_vector;
   GfxOutput *output;
 
   /* some info variables */

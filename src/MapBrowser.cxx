@@ -44,7 +44,7 @@ MapBrowser::MapBrowser(GLfloat left, GLfloat top, GLfloat size, int features,
   this->features = features;
   this->texturedFonts = texturedFonts;
 
-  output = new OutputGL( NULL, size, texturedFonts );
+  output = new OutputGL( NULL, size, false, texturedFonts );
   output->setShade(false);
 
   // setup overlays
@@ -84,7 +84,7 @@ void MapBrowser::setSize( GLfloat size ) {
   zoom = view_size / scle;
 
   delete output;
-  output = new OutputGL(NULL, (int)size, texturedFonts);
+  output = new OutputGL(NULL, (int)size, false, texturedFonts);
   overlay->setOutput( output );
   overlay->setScale( zoom );
   output->setShade(false);

@@ -28,7 +28,7 @@ public:
   //void setFont( bool useTexturedFont );
 
 protected:
-  static const float BRIGHTNESS = 0.44f;
+  static const float BRIGHTNESS = 0.6f;
 
   fntTexFont *font;
   fntRenderer textRenderer;
@@ -36,7 +36,7 @@ protected:
   char *filename;
   bool useTexturedFont, shade;
 
-  sgVec3 light_vector;
+  sgVec4 light_vector;
 };
 
 #endif

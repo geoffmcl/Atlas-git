@@ -19,13 +19,6 @@
   You should have received a copy of the GNU General Public License
   along with this program; if not, write to the Free Software
   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
----------------------------------------------------------------------------
-  CHANGES
-  2000-02-20        Included some compatibility changes submitted by
-                    Christian Mayer.
-  2000-05-02        Switched to OpenGL rendering, cleaned up a bit (found
-                    -Wall flag :-) and implemented better airports
-  2000-05-20        Now also draws navaids
 ---------------------------------------------------------------------------*/
 
 #include <dirent.h>
@@ -82,7 +75,7 @@ MapMaker::MapMaker( char *fg_root, char *ap_filter, int features,
 
   modified = false;
 
-  setLight( -1, -1, 3 );       // default lighting
+  setLight( -1, -1, 2 );       // default lighting
 }
 
 int MapMaker::createMap(GfxOutput *output,float theta, float alpha, 
@@ -99,7 +92,8 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
   sgMakeRotMat4(rotation_matrix, 
 		alpha * SG_RADIANS_TO_DEGREES,
 		0.0f,
-		theta * SG_RADIANS_TO_DEGREES);
+		90.0f - theta * SG_RADIANS_TO_DEGREES);
+  sgCopyVec3(light_vector, map_light);
   sgXformVec3(light_vector, rotation_matrix);
   output->setLightVector( light_vector );
 

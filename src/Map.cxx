@@ -42,7 +42,7 @@
 float clat = -100.0f, clon = -100.0f;   // initialize to unreasonable values
 char *outp = "map.png";                 // output file name
 bool autoscale = false, global = false, doublebuffer = true;
-bool smooth_shade = true;
+bool smooth_shade = true, textured_fonts = true;
 MapMaker map;
 
 char outname[512], *scenerypath;
@@ -70,7 +70,7 @@ void redrawMap() {
 	    (clon<0.0f)?'W':'E', clon * 180.0f / M_PI);
     glutSetWindowTitle(title_buffer);
 
-    OutputGL output( outp, map.getSize(), smooth_shade );
+    OutputGL output( outp, map.getSize(), smooth_shade, textured_fonts );
     map.createMap( &output, clat, clon, autoscale );
     output.closeOutput();
     exit(0);
@@ -138,7 +138,7 @@ void redrawMap() {
 	    (clon<0.0f)?'W':'E', clon * 180.0f / M_PI);
     glutSetWindowTitle(title_buffer);
 
-    OutputGL output(outname, s, smooth_shade);
+    OutputGL output(outname, s, smooth_shade, textured_fonts);
     map.createMap( &output, clat, clon, true );
     output.closeOutput();
     if (doublebuffer) {
@@ -169,6 +169,7 @@ void print_help() {
   printf("  --atlas=path            Create maps of all scenery, and store them in path\n");
   printf("  --verbose               Display information during processing\n");
   printf("  --singlebuffer          Use single buffered display.\n\n");
+  printf("  --glutfonts             Use GLUT built-in fonts.\n");
 }
 
 int main( int argc, char **argv ) {
@@ -211,6 +212,8 @@ int main( int argc, char **argv ) {
     } else if ( sscanf(argv[arg], "--atlas=%s", cparam) == 1 ) {
       global = true;
       outp = strdup( cparam );
+    } else if ( strcmp(argv[arg], "--glutfonts") == 0 ) {
+      textured_fonts = false;
     } else if ( strcmp(argv[arg], "--verbose") == 0 ) {
       features |= MapMaker::DO_VERBOSE;
     } else if ( strcmp(argv[arg], "--help") == 0 ) {
@@ -282,5 +285,3 @@ int main( int argc, char **argv ) {
 
   return 0;
 }
-
-
