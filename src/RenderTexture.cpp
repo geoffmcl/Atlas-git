@@ -45,23 +45,17 @@
  * Jan. 2005, Removed GLEW dependencies, Erik Hofman, Fred Bouvier
  */
 
-#ifdef HAVE_CONFIG_H
-#  include <config.h>
-#endif
-
-#ifdef HAVE_WINDOWS_H
-#  include <windows.h>
-#endif
-
 #include <simgear/compiler.h>
 #include SG_GL_H
-#ifndef _WIN32
+#ifdef UL_GLX
 #  define GLX_GLXEXT_PROTOTYPES
 #  ifdef __APPLE__
 #    include <OpenGL/glx.h>
 #  else
 #    include <GL/glx.h>
 #  endif
+#elif defined UL_WIN32
+#  include <windows.h>
 #endif
 #include "extensions.hxx"
 #include "RenderTexture.h"
