@@ -59,6 +59,11 @@ void NormalisePath(char* dpath) {
   #endif
 }
 
+const float MapMaker::simple_normals[][3] = {{0.0f, 0.0f, 1.0f},
+					     {0.0f, 0.0f, 1.0f},
+					     {0.0f, 0.0f, 1.0f},
+					     {0.0f, 0.0f, 1.0f}};
+
 MapMaker::MapMaker( char *fg_root, char *ap_filter, int features,
                     int size, int scale ) {
   this->fg_root = NULL;
@@ -153,6 +158,17 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
   sgCopyVec3(light_vector, map_light);
   sgXformVec3(light_vector, rotation_matrix);
   output->setLightVector( light_vector );
+  
+  // Draw a quad spanning the full area and the same as the clear color
+  // to avoid corruption from the pixel read not reading areas we don't
+  // explicitly draw to on some platforms.
+  output->setColor(palette[0]);  // Use the water colour instead - clear colour is very slightly different
+  sgVec2 *baseQuad = new sgVec2[4];
+  sgSetVec2(baseQuad[0], 0.0, 0.0);
+  sgSetVec2(baseQuad[1], 0.0, (float)size);
+  sgSetVec2(baseQuad[2], (float)size, (float)size);
+  sgSetVec2(baseQuad[3], (float)size, 0.0);
+  output->drawQuad(baseQuad, simple_normals);
 
   // calculate which tiles we will have to load
   float dtheta, dalpha;

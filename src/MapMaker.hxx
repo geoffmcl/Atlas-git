@@ -199,6 +199,9 @@ protected:
   int process_directory( char *path, int plen, int lat, int lon, sgVec3 xyz );
   int process_binary_file( char *tile_name, sgVec3 xyz );
   int process_ascii_file( char *tile_name, sgVec3 xyz );
+  
+/*****************************************************************************/
 
+  static const float simple_normals[][3];
 };
 
