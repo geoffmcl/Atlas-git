@@ -225,7 +225,7 @@ void MapBrowser::update() {
 
       TileTable::iterator t = tiletable.find(c);
 
-      if ((*t).second == 0) {  // check if the tile has been loaded
+      if ( t == tiletable.end() ) {  // check if the tile has been loaded
          // Load a new tile
          MapTile *nt = new MapTile;
          nt->c.lat = c.lat;
