@@ -31,7 +31,8 @@ Map_SOURCES = \
 	Output.cxx Output.hxx \
 	OutputGL.cxx OutputGL.hxx \
 	Overlays.cxx Overlays.hxx \
-	Projection.cxx Projection.hxx
+	Projection.cxx Projection.hxx \
+	fg_mkdir.cxx fg_mkdir.hxx
 
 Map_LDADD = \
 	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgdebug \

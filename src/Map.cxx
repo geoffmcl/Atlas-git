@@ -48,6 +48,7 @@
 #endif
 #include "MapMaker.hxx"
 #include "OutputGL.hxx"
+#include "fg_mkdir.hxx"
 #include <simgear/compiler.h>
 #include <simgear/misc/sg_path.hxx>
 #include <vector>
@@ -512,6 +513,18 @@ int main( int argc, char **argv ) {
       fprintf(stderr, "%s: WARNING! Size is not a power of two - you will " \
 	      "not be able to use\n" \
 	      "these maps with the Atlas program!\n", argv[0] );
+    }
+    
+    // Check that the path to store the images exists
+    cout << "outp = " << outp << '\n';
+    dir1 = ulOpenDir(outp);
+    if(NULL == dir1) {
+      fg_mkdir((const char*)outp);
+    }
+    dir1 = ulOpenDir(outp);
+    if(NULL == dir1) {
+      cout << "Unable to create requested Atlas map directory " << outp << "... exiting :-(\n";
+      exit(-1);
     }
 
     dir1 = ulOpenDir(fg_scenery[0].c_str());
