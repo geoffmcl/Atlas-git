@@ -936,7 +936,7 @@ void print_help() {
   printf("   --lon=x      Start browsing at longitude xx (deg. west i neg.)\n");
   printf("   --airport=icao Start browsing at an airport specified by ICAO code icao\n");
   printf("   --path=xxx   Set path for map images\n");
-  printf("   --fgroot=path  Overrides FG_ROOT environment variable\n");
+  printf("   --fg-root=path  Overrides FG_ROOT environment variable\n");
   printf("   --glutfonts  Use GLUT bitmap fonts (fast for software rendering)\n");
   printf("   --geometry=[width]x[height] Set initial window size\n");
   printf("   --softcursor Draw mouse cursor using OpenGL (for fullscreen Voodoo cards)\n\n");
@@ -977,8 +977,8 @@ int main(int argc, char **argv) {
       // do nothing
     } else if ( sscanf(argv[i], "--update=%f", &update) == 1) {
       // do nothing
-    } else if ( strncmp(argv[i], "--fgroot=", 9) == 0 ) {
-      strcpy( fg_root, argv[i]+9 );
+    } else if ( strncmp(argv[i], "--fg-root=", 10) == 0 ) {
+      strcpy( fg_root, argv[i]+10 );
     } else if ( strcmp(argv[i], "--glutfonts") == 0 ) {
       textureFonts = false;
     } else if ( strcmp(argv[i], "--softcursor") == 0 ) {
