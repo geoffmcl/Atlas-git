@@ -57,7 +57,11 @@
 #include SG_GL_H
 #ifndef _WIN32
 #  define GLX_GLXEXT_PROTOTYPES
-#  include SG_GLX_H
+#  ifdef __APPLE__
+#    include <OpenGL/glx.h>
+#  else
+#    include <GL/glx.h>
+#  endif
 #endif
 #include "extensions.hxx"
 #include "RenderTexture.h"
