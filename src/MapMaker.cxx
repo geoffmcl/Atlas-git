@@ -405,7 +405,7 @@ void MapMaker::draw_trifan( const int_list &indices, vector<float*> &v,
   }
 }
 
-int MapMaker::process_file( char *tile_name, sgVec3 xyz ) {
+int MapMaker::process_binary_file( char *tile_name, sgVec3 xyz ) {
   float cr;               // reference point (gbs)
   sgVec3 gbs, tmp;
   int scount = 0;
@@ -417,8 +417,6 @@ int MapMaker::process_file( char *tile_name, sgVec3 xyz ) {
   int verts, normals;
 
   if ( !tile.read_bin( tile_name ) ) {
-    if ( getVerbose() )
-      fprintf( stderr, "Error opening tile \"%s\".\n", tile_name );
     return 0;
   }
 
@@ -493,33 +491,6 @@ int MapMaker::process_file( char *tile_name, sgVec3 xyz ) {
     i++;
   }
 
-  /*
-    // Triangle
-    list<int> vertex_indices;
-    
-    token = strtok(lbuffer+2, " /");
-    while ( token != NULL ) {
-    i1 = atoi(token);
-    token = strtok(NULL, delimiters);
-    i2 = atoi(token);
-    
-    if (i1 >= verts || i1 >= normals) {
-    fprintf(stderr, "Tile \"%s\" contains triangle indices out of " \
-    "bounds.\n", tile_name);
-    vertex_indices.clear();
-    break;
-    }
-    
-    vertex_indices.push_back( i1 );
-    token = strtok(NULL, " /");
-    }
-    
-    if ( !vertex_indices.empty() ) {
-    draw_trifan( vertex_indices, v, n, material );
-    polys++;
-    }
-  */
-
   for (i = 0; i < v.size(); i++) {
     delete v[i];
   }
@@ -529,6 +500,171 @@ int MapMaker::process_file( char *tile_name, sgVec3 xyz ) {
 
   return 1;
 }
+
+int MapMaker::process_ascii_file( char *tile_name, sgVec3 xyz ) {
+  float cr;               // reference point (gbs)
+  sgVec3 gbs, tmp;
+  int scount = 0;
+  int i1, i2, material = 16;
+  int verts = 0, normals = 0;
+  vector<float*> v;                   // vertices
+  vector<float*> n;                   // normals
+
+  char lbuffer[4096];       /* will there be longer lines in
+                                         scenery files? */
+  char *token, delimiters[] = " \t\n";
+
+  // setup some reasonable sizes for vectors
+  v.reserve(1024);
+  n.reserve(1024);
+
+  gzFile tf = gzopen( tile_name, "rb" );
+
+  if (tf == NULL) {
+    return 0;
+  }
+
+  // read the first line
+  gzgets( tf, lbuffer, 4096 );
+  if ( strncmp(lbuffer, "# FGFS Scenery", 14) != 0 ) {
+    gzclose(tf);
+    return 0;
+  }
+
+  modified = true;
+
+  while ( (gzgets(tf, lbuffer, 4096) != Z_NULL) ) {
+    switch (lbuffer[0]) {
+    case '#': {
+      token = strtok(lbuffer+1, delimiters);
+
+      if ( strcmp(token, "gbs") == 0 ) {
+         for (int i = 0; i < 3; i++) {
+          token = strtok(NULL, delimiters);
+          gbs[i] = atof(token);
+         }
+      } else if ( strcmp(token, "usemtl") == 0 ) {
+         token = strtok(NULL, delimiters);
+         StrMap::iterator mat_it = materials.find(token);
+         
+         if (mat_it == materials.end()) {
+          material = -1;  // unknown material
+         } else {
+          material = (*mat_it).second;
+         }
+      }
+    }
+    break;
+
+    case 'v': {
+      if (lbuffer[1] == 'n') {
+         // Make a new normal
+         float *nn = new sgVec3;
+
+         token = strtok(lbuffer+2, delimiters);
+         for (int i = 0; i < 3; i++) {
+          nn[i] = atof(token);
+          token = strtok(NULL, delimiters);
+         }
+
+         n.push_back( nn );
+         normals++;
+      } else if (lbuffer[1] == ' ') {
+         float *nv = new sgVec3;
+         token = strtok(lbuffer+2, delimiters);
+         for (int i = 0; i < 3; i++) {
+          tmp[i] = atof(token);
+          token = strtok(NULL, delimiters);
+         }
+
+         sgAddVec3(tmp, gbs);
+         double pr = sgLengthVec3( tmp );
+         ab_xy( tmp, xyz, nv );
+         // nv[2] contains the sea-level z-coordinate - calculate this vertex'
+         // altitude:
+         nv[2] = pr - nv[2];
+         v.push_back( nv );
+         verts++;
+      }
+    }
+    break;
+
+    case 't': {
+      if (strncmp(lbuffer, "tf ", 3) == 0) {
+         // Triangle fan
+         int_list vertex_indices;
+
+         token = strtok(lbuffer+2, " /");
+         while ( token != NULL ) {
+          i1 = atoi(token);
+          token = strtok(NULL, delimiters);
+          i2 = atoi(token);
+
+          if (i1 >= verts || i1 >= normals) {
+            fprintf(stderr, "Tile \"%s\" contains triangle indices out of " \
+                    "bounds.\n", tile_name);
+            vertex_indices.clear();
+            break;
+          }
+          
+          vertex_indices.push_back( i1 );
+          token = strtok(NULL, " /");
+         }
+         
+         if ( !vertex_indices.empty() ) {
+          draw_trifan( vertex_indices, v, n, material );
+          polys++;
+         }
+      }
+    }
+    break;
+
+    case 'f': {
+      if (strncmp(lbuffer, "f ", 2) == 0) {
+         // Triangle
+         int_list vertex_indices;
+
+         token = strtok(lbuffer+2, " /");
+         while ( token != NULL ) {
+          i1 = atoi(token);
+          token = strtok(NULL, delimiters);
+          i2 = atoi(token);
+
+          if (i1 >= verts || i1 >= normals) {
+            fprintf(stderr, "Tile \"%s\" contains triangle indices out of " \
+                    "bounds.\n", tile_name);
+            vertex_indices.clear();
+            break;
+          }
+          
+          vertex_indices.push_back( i1 );
+          token = strtok(NULL, " /");
+         }
+         
+         if ( !vertex_indices.empty() ) {
+          draw_trifan( vertex_indices, v, n, material );
+          polys++;
+         }
+      }
+    }
+    break;
+
+    }    
+  }
+
+  gzclose( tf );
+
+  unsigned int i;
+  for (i = 0; i < v.size(); i++) {
+    delete v[i];
+  }
+  for (i = 0; i < n.size(); i++) {
+    delete n[i];
+  }
+
+  return 1;
+}
+
 
 // path must be 'FG_ROOT/Scenery/' - more will be appended
 // plen is path length
@@ -554,8 +690,6 @@ int MapMaker::process_directory( char *path, int plen, int lat, int lon,
 
   path[plen + llen] = '/';  
   while ((ent = readdir(dir)) != NULL) {
-    //if (ent -> d_name[0] == '.' || ent -> d_name[0] == 'C')
-    //continue;
     strcpy( path + plen + llen + 1, ent -> d_name );
 
     /* we now have to check if this is a regular file -- I suspect this isn't
@@ -570,7 +704,14 @@ int MapMaker::process_directory( char *path, int plen, int lat, int lon,
       fflush(stdout);
     }
 
-    process_file( path, xyz );
+    /* first try to load the tile as a binary file -- if this fails, we
+       try it as an ascii file */
+    if ( !process_binary_file( path, xyz ) ) {
+      if ( !process_ascii_file( path, xyz ) ) {
+	if ( getVerbose() )
+	  fprintf( stderr, "Tile \"%s\" is of unknown format.\n", path );
+      }
+    }
   }
 
   if (getVerbose()) putc('\n', stdout);
