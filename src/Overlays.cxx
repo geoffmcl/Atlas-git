@@ -112,10 +112,26 @@ void Overlays::draw_gridlines( float dtheta, float dalpha, float spacing ) {
   sgVec3 xyr;
   sgVec2 p1, p2;
   bool first;
+  char lable_buffer[50];
 
   output->setColor(grd_color);
 
-  // draw north-south parallell lines
+  // draw line labels
+  for (float glon = rint((lon - dalpha) / spacing) * spacing; 
+       glon <= lon + dalpha; glon += spacing) {
+	  for (float glat = rint(lat - dtheta / spacing) * spacing; 
+	       glat <= lat + dtheta; glat += spacing) {
+		      ab_lat( glat, glon, lat, lon, xyr );
+		      sgSetVec2( p1, ::scale(xyr[0], output->getSize(), scale), 
+				 ::scale(xyr[1], output->getSize(), scale) );
+			sprintf(lable_buffer, "%c%.1f %c%.1f",
+			    (glat<0.0f)?'S':'N', fabs(glat * SG_RADIANS_TO_DEGREES),
+			    (glon<0.0f)?'W':'E', fabs(glon * SG_RADIANS_TO_DEGREES));
+			output->drawText( p1, lable_buffer);
+	  }
+  }
+
+  // draw north-south parallel lines
   for (float glon = rint((lon - dalpha) / spacing) * spacing; 
        glon <= lon + dalpha; glon += spacing) {
     first = true;
@@ -135,7 +151,7 @@ void Overlays::draw_gridlines( float dtheta, float dalpha, float spacing ) {
     }
   }
 
-  // draw east-west parallell lines
+  // draw east-west parallel lines
   for (float glat = rint(lat - dtheta / spacing) * spacing; 
        glat <= lat + dtheta; glat += spacing) {
     first = true;
