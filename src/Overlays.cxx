@@ -301,7 +301,7 @@ void Overlays::buildRwyCoords( sgVec2 rwyc, sgVec2 rwyl, sgVec2 rwyw,
 // Draws the labels of all airports in the specified region
 void Overlays::airport_labels(float theta, float alpha,
 			      float dtheta, float dalpha ) {
-  load_new_airports();
+  load_airports();
 
   bool save_shade = output->getShade();
   output->setShade(false);
@@ -518,14 +518,141 @@ void Overlays::draw_fix( NAV *n, sgVec2 p ) {
   if (features & OVERLAY_ANY_LABEL) output->drawText( p, n->name );
 }
 
-/* Loads the new format (Flightgear-0.9.3 onwards) airport 
-   database if it isn't already loaded.  Calls the old format
+/* Loads X-Plane format airports (used in FlightGear-0.9.8 onwards) */
+void Overlays::load_airports() {
+  if(airports_loaded)
+    return;
+
+  char *arpname = new char[strlen(fg_root) + 512];
+  char line[1024];
+  const char space[] = " \t\n\r";
+  const char junk[] = "?\n\r";
+  char* token;
+    
+  strcpy( arpname, fg_root );
+  strcat( arpname, "/Airports/apt.dat.gz" );
+
+  gzFile arp;
+
+  arp = gzopen( arpname, "rb" );
+  if (arp == NULL) {
+    fprintf( stderr, "load_airports: Couldn't open \"%s\" .\n", arpname );
+    delete[] arpname;
+    // Try loading the old format instead
+    fprintf( stderr, "Attempting to load old format airports file instead...\n" );
+    load_old_airports();
+    return;
+  } 
+
+  bool line_read = false;
+  bool apt_pos_set = false;
+
+  ARP *ap = NULL;
+  while (!gzeof(arp) || line_read) {
+    if (ap == NULL)
+      ap = new ARP;
+    
+    if (!line_read) {
+      gzgets( arp, line, 1024 );
+    }
+
+    token = strtok(line, space);
+    //cout << token << '\n';
+    if(token == NULL) {
+      // Must have been a blank line.
+      // Do nothing this pass
+      line_read = false;
+    } else {
+      if(!strcmp(token, "99")) {	// TODO - check this with Robin
+	break;
+      }
+      //if(!strcmp(token, "1") || !strcmp(token, "16") || !strcmp(token, "17")) {
+      if(!strcmp(token, "1") || !strcmp(token, "16")) {  // 17 is Heliports - don't read these until Atlas can display a H symbol
+	apt_pos_set = false;
+	token = strtok(NULL, space);  // elev
+	token = strtok(NULL, space);  // not used by Atlas
+	token = strtok(NULL, space);  // ditto
+	token = strtok(NULL, space);  // Code
+	strncpy( ap->id, token, sizeof(ap->id) );
+	token = strtok(NULL, junk);  // Name
+	strncpy( ap->name, token, sizeof(ap->name) );
+	
+	line_read = false;
+	while (!gzeof(arp) && !line_read) {
+	  char rwyid[8];
+	  float heading;
+	  float lat, lon;
+	  float length, width;
+	  
+	  gzgets( arp, line, 256 );
+	  line_read = true;
+	  
+	  token = strtok(line, space);
+	  if(token == NULL) {
+	    // Do nothing - loop will break
+	  } else if(!strcmp(token, "10")) {
+	    token = strtok(NULL, space);
+	    lat = atof(token);
+	    token = strtok(NULL, space);
+	    lon = atof(token);
+	    token = strtok(NULL, space);
+	    if(!strcmp(token, "xxx")) {
+	      // It's a taxiway - break
+	      // NOTE - this is fragile to changes in format.
+	      line_read = true;
+	    } else {
+	      // Runway!
+	      RWY *rwy    = new RWY;
+	      strncpy(rwyid, token, sizeof(rwyid)); // TODO - should strip trailing 'x's off the raw ID.
+	      token = strtok(NULL, space);
+	      heading = atof(token);
+	      token = strtok(NULL, space);
+	      length = atof(token);
+	      token = strtok(NULL, space);  // Dispaced threshold / stopway information for one end
+	      token = strtok(NULL, space);  // ditto
+	      token = strtok(NULL, space);  // Width
+	      width = atof(token);
+	      rwy->lat    = lat    * SG_DEGREES_TO_RADIANS;
+	      rwy->lon    = lon    * SG_DEGREES_TO_RADIANS;
+	      rwy->hdg    = heading* SG_DEGREES_TO_RADIANS;
+	      rwy->length = (int)(length * 0.3048);   // feet to meters
+	      rwy->width  = (int)(width  * 0.3048);
+	      ap->rwys.push_back( rwy );
+	      // Set the airport location from the first runway
+	      if(!apt_pos_set) {
+		ap->lat = rwy->lat;
+		ap->lon = rwy->lon;
+		apt_pos_set = true;
+	      }
+	      line_read = false;
+	    }
+	  }
+	}
+	airports.push_back( ap );
+	ap = NULL;
+      } else {
+	line_read = false;
+      }
+    }
+  }
+	    
+  if (ap != NULL)
+    delete ap;
+  
+  gzclose( arp );
+  delete[] arpname;
+
+  airports_loaded = true;
+}  	
+	
+/* Loads the old format (Flightgear-0.9.3 to 0.9.7) airport 
+   database if it isn't already loaded.  Calls the very old format
    database loader instead if the new format is not found.
    (if *one* instance of the Overlays class has loaded the db,
     no other instance will have to load it again, but it's safe
     to call this function multiple times, since it will just
     return immediately) */
-void Overlays::load_new_airports() {
+void Overlays::load_old_airports() {
   if(airports_loaded)
     return;
 
@@ -544,12 +671,12 @@ void Overlays::load_new_airports() {
   arp = gzopen( arpname, "rb" );
   rwp = gzopen( rwyname, "rb" );
   if (arp == NULL || rwp == NULL) {
-    fprintf( stderr, "load_new_airports: Couldn't open \"%s\" .\n", (arp ? rwyname : arpname) );
+    fprintf( stderr, "load_old_airports: Couldn't open \"%s\" .\n", (arp ? rwyname : arpname) );
     delete[] arpname;
     delete[] rwyname;
     // Try loading the old format instead
-    fprintf( stderr, "Attempting to load old format airports file instead...\n" );
-    load_airports();
+    fprintf( stderr, "Attempting to load very old format airports file instead...\n" );
+    load_very_old_airports();
     return;
   }
   
@@ -661,12 +788,16 @@ void Overlays::load_new_airports() {
   airports_loaded = true;
 }
 
-/* Loads the airport database if it isn't already loaded
+/* Loads the original FlightGear airport database format.
+   (v-0.9.2 and earlier).  
+   Note that this format has been depreciated for ages now,
+   and this code will eventually be removed.
+   The database is only read if it isn't already loaded
    (if *one* instance of the Overlays class has loaded the db,
     no other instance will have to load it again, but it's safe
     to call this function multiple times, since it will just
     return immediately) */
-void Overlays::load_airports() {
+void Overlays::load_very_old_airports() {
   if (airports_loaded)
     return;
 	
