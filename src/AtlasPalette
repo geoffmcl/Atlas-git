@@ -1,0 +1,49 @@
+# ATLAS PALETTE
+#
+# Palette section: defines a number of colours
+# consisting of an index and red, green, blue, alpha values
+# Colour 0 will be used as background colour
+Colour 0	0.761 0.839 0.847 1.0 
+Colour 1 	0.647 0.729 0.647 1.0 
+Colour 2	0.859 0.906 0.804 1.0 
+Colour 3	0.753 0.831 0.682 1.0
+Colour 4	0.949 0.933 0.757 1.0 
+Colour 5	0.941 0.871 0.608 1.0 
+Colour 6	0.878 0.725 0.486 1.0 
+Colour 7	0.816 0.616 0.443 1.0 
+Colour 8	0.776 0.529 0.341 1.0 
+Colour 9	0.824 0.863 0.824 1.0 
+Colour 10	0.682 0.573 0.369 1.0 
+Colour 11	0.275 0.275 0.275 1.0 
+Colour 12	0.761 0.839 0.847 1.0 
+Colour 13	0.761 0.839 0.847 1.0 
+Colour 14	0.439 0.271 0.420 1.0 
+Colour 15	0.975 0.982 0.484 1.0 
+Colour 16	1.000 0.000 0.000 1.0
+#
+# Materials definitions: maps a material name to a Colour index
+# in the palette above. -1 indicates that the material should
+# be Coloured by altitude.
+#
+Material AirportKeep		9
+Material Concrete		16
+Material Default		-1
+Material Urban			15
+Material Unknown		16
+Material Glacier		-1
+Material Ocean			13
+Material Lake			12
+Material IntermittentLake	12
+Material DryLake		-1 
+Material Reservoir		12
+Material IntermittentReservoir	12 
+Material Stream			12
+Material Marsh			-1
+Material Grass			-1
+Material Cloud			16
+Material BuiltUpCover		15
+# These three last are *not optional* and *must* be declared,
+# otherwise Map will crash when drawing runways/navaids
+Material RunwayOutline		14
+Material RunwayFill		9
+Material NavaidLabels		14
