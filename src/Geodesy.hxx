@@ -37,37 +37,36 @@ inline float earth_radius_lat( float lat ) {
 		      sin(lat)/rpol * sin(lat)/rpol );
 }
 
-inline float earth_radius_xy( float x, float y, float z ) {
-  float xy = sqrt( x*x   + y*y  );
-  float r =  sqrt( xy*xy + z * z);
-  float s_lat = z / r;
+inline float earth_radius_xy( sgVec3 v ) {
+  float xy = sqrt( v[0]*v[0] + v[1]*v[1] );
+  float r =  sqrt( xy*xy     + v[2]*v[2] );
+  float s_lat = v[2] / r;
   float c_lat = xy / r;
 
   return 1.0f / sqrt( c_lat/rec   * c_lat/rec +
 		      s_lat/rpol + s_lat/rpol );
 }
 
-inline void ab_xy( float x, float y, float z,float xr, float yr, float zr,
-		   float *a, float *b, float *r_e) {
-  float xy = sqrt( x*x   + y*y );
-  float r  = sqrt( xy*xy + z*z );
-  float s_lat = z / r;
+inline void ab_xy( sgVec3 xyz, sgVec3 ref, sgVec3 dst) {
+  float xy = sqrt( xyz[0]*xyz[0]   + xyz[1]*xyz[1] );
+  float r  = sqrt( xy*xy           + xyz[2]*xyz[2] );
+  float s_lat = xyz[2] / r;
   float c_lat = xy / r;
   
-  *r_e = 1.0f / sqrt( c_lat/rec   * c_lat/rec +
-		      s_lat/rpol * s_lat/rpol );
+  dst[2] = 1.0f / sqrt( c_lat/rec  * c_lat/rec +
+			s_lat/rpol * s_lat/rpol );
 
-  float xyr = sqrt( xr*xr + yr*yr );
-  float rr  = sqrt( xyr*xyr + zr*zr );
-  *a   = *r_e / (r * xyr) * (y*xr - yr*x);
-  *b   = *r_e / (r * rr) * (xyr * z - xy * zr);
+  float xyr = sqrt( ref[0]*ref[0] + ref[1]*ref[1] );
+  float rr  = sqrt( xyr*xyr + ref[2]*ref[2] );
+  dst[0]    = dst[2] / (r * xyr) * (xyz[1]*ref[0] - ref[1]*xyz[0]);
+  dst[1]    = dst[2] / (r * rr) * (xyr * xyz[2] - xy * ref[2]);
 }
 
 inline void ab_lat( float lat, float lon, float lat_r, float lon_r,
-		    float *a, float *b, float *r ) {
-  *r = earth_radius_lat( lat );
-  *a = *r * cos(lat)*(lon-lon_r);   // even Alexei wasn't sure here :-)
-  *b = *r * (lat-lat_r);
+		    sgVec3 dst ) {
+  dst[2] = earth_radius_lat( lat );
+  dst[0] = dst[2] * cos(lat)*(lon-lon_r);   // even Alexei wasn't sure here :-)
+  dst[1] = dst[2] * (lat-lat_r);
 }
 
 inline void geod_geoc( float ang, float *Sin, float *Cos ) {
@@ -81,14 +80,14 @@ inline void geod_geoc( float ang, float *Sin, float *Cos ) {
 }
 
 inline void xyz_lat( float lat, float lon, 
-		     float *x, float *y, float *z, float *r ) {
+		     sgVec3 xyz, float *r ) {
   float s, c;
 
   *r = earth_radius_lat( lat );
   geod_geoc( lat, &s, &c );
-  *x = *r * c * cos( lon );
-  *y = (*r * c * sin( lon ));
-  *z = *r * s;
+  xyz[0] = *r * c * cos( lon );
+  xyz[1] = (*r * c * sin( lon ));
+  xyz[2] = *r * s;
 }
 
 inline void lat_ab( float a, float b, float lat_r, float lon_r,

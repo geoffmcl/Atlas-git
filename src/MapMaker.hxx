@@ -143,13 +143,12 @@ protected:
     return fabs(sgScalarProductVec3( n, light_vector ));
   }
 
-  void sub_trifan( list<int> &tri, vector<float*> &v, vector<float*> &n );
-  void draw_trifan( list<int> &tri, vector<float*> &v, vector<float*> &n,
+  void sub_trifan( list<int> &indices, vector<float*> &v, vector<float*> &n );
+  void draw_trifan( list<int> &indices, vector<float*> &v, vector<float*> &n,
 		    int col );
 
-  int process_directory( char *path, int plen, int lat, int lon, 
-			 float x, float y, float z );
-  int process_file( char *tile_name, float x, float y, float z );
+  int process_directory( char *path, int plen, int lat, int lon, sgVec3 xyz );
+  int process_file( char *tile_name, sgVec3 xyz );
 
 };
 

@@ -200,9 +200,9 @@ int main( int argc, char **argv ) {
     } else if ( sscanf(argv[arg], "--fgroot=%s", cparam) == 1 ) {
       map.setFGRoot( strdup(cparam) );
     } else if ( strcmp(argv[arg], "--enable-airports" ) == 0 ) {
-      features &= MapMaker::DO_AIRPORTS;
+      features |= MapMaker::DO_AIRPORTS;
     } else if ( strcmp(argv[arg], "--enable-navaids" ) == 0 ) {
-      features &= MapMaker::DO_NAVAIDS;
+      features |= MapMaker::DO_NAVAIDS;
     } else if ( strcmp(argv[arg], "--flat-shading" ) == 0 ) {
       smooth_shade = false;
     } else if ( strcmp(argv[arg], "--autoscale") == 0 ) {

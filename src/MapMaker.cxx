@@ -86,8 +86,9 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
   output->clear( rgb[0] );
 
   // set up coordinate space
-  float x, y, z, r_e;
-  xyz_lat( theta, alpha, &x, &y, &z, &r_e );
+  sgVec3 xyz;
+  float r_e;
+  xyz_lat( theta, alpha, xyz, &r_e );
   sgMat4 rotation_matrix;
   sgMakeRotMat4(rotation_matrix, 
 		alpha * SG_RADIANS_TO_DEGREES,
@@ -138,7 +139,7 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
  
   for (int k = min_theta; k <= max_theta; k++) {
     for (int l = min_alpha; l <= max_alpha; l++) {
-      process_directory( subdir, slen, k, l, x, y, z );
+      process_directory( subdir, slen, k, l, xyz );
     }
   }
 
@@ -165,10 +166,9 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
   return 1;
 }
 
-void MapMaker::sub_trifan( list<int> &tri, vector<float*> &v, 
+void MapMaker::sub_trifan( list<int> &indices, vector<float*> &v, 
 			   vector<float*> &n ) {
-  list<int>::iterator index = tri.begin();
-  int nvert = *(index++);      // number of vertices in trifan
+  list<int>::iterator index = indices.begin();
   int cvert = *(index++);      // index of central vertex
   int vert2 = *(index++);      // the first vertex of the circumference
 
@@ -182,7 +182,7 @@ void MapMaker::sub_trifan( list<int> &tri, vector<float*> &v,
   sgCopyVec3( nrm[1], n[vert2]);
 
   // now loop over each triangle in the fan
-  while ( index != tri.end() ) {
+  while ( index != indices.end() ) {
     vert2 = *(index++);
 
     // get third vertex
@@ -295,9 +295,9 @@ void MapMaker::sub_trifan( list<int> &tri, vector<float*> &v,
   }
 }
 
-void MapMaker::draw_trifan( list<int> &tri, vector<float*> &v, 
+void MapMaker::draw_trifan( list<int> &indices, vector<float*> &v, 
 			    vector<float*> &n, int col ) {
-  list<int>::iterator index = tri.begin();
+  list<int>::iterator index = indices.begin();
   int cvert = *(index++), vert2 = *(index++);
 
   sgVec3 t[3], nrm[3];
@@ -310,7 +310,7 @@ void MapMaker::draw_trifan( list<int> &tri, vector<float*> &v,
   sgSetVec2( p[0], scale(t[0][0], size, zoom), scale(t[0][1], size, zoom) );
   sgSetVec2( p[1], scale(t[1][0], size, zoom), scale(t[1][1], size, zoom) );
 
-  while ( index != tri.end() ) {
+  while ( index != indices.end() ) {
     vert2 = *(index++);
 
     sgCopyVec3( t[2], v[vert2] );
@@ -338,13 +338,13 @@ void MapMaker::draw_trifan( list<int> &tri, vector<float*> &v,
   }
 
   if (col < 0) {
-    sub_trifan( tri, v, n );
+    sub_trifan( indices, v, n );
   }
 }
 
-int MapMaker::process_file( char *tile_name, float x, float y, float z ) {
-  float cx, cy, cz, cr;               // reference point (gbs)
-  float f1, f2, f3;                   // temp. storage
+int MapMaker::process_file( char *tile_name, sgVec3 xyz ) {
+  float cr;               // reference point (gbs)
+  sgVec3 gbs, tmp;
   int scount = 0;
   int i1, i2, material = 16;
   int verts = 0, normals = 0;
@@ -376,36 +376,32 @@ int MapMaker::process_file( char *tile_name, float x, float y, float z ) {
   modified = true;
 
   while ( (gzgets(tf, lbuffer, 4096) != Z_NULL) ) {      
-    if ( sscanf(lbuffer, "# gbs %f %f %f %f", &cx, &cy, &cz, &cr) == 4 ) {
-      /* do nothing */
-    } else if (sscanf(lbuffer, "v %f %f %f", &f1, &f2, &f3) == 3) {
-      // Make a new vertice
+    if ( sscanf(lbuffer, "# gbs %f %f %f %f", 
+		&tmp[0], &tmp[1], &tmp[2], &cr) == 4 ) {
+      sgCopyVec3( gbs, tmp );
+    } else if (sscanf(lbuffer, "v %f %f %f", 
+		      &tmp[0], &tmp[1], &tmp[2]) == 3) {
+      // Make a new vertice and translate into map coordinate system
       float *nv = new sgVec3;
-      
-      // Add tile center
-      f1 += cx;
-      f2 += cy;
-      f3 += cz;
-
-      // Translate vertex into the map coordinate system
-      double pr = sqrt(f1*f1 + f2*f2 + f3*f3);
-      float xr, yr, zr;
-      ab_xy( f1, f2, f3, x, y, z, &xr, &yr, &zr ); 
-      sgSetVec3( nv, xr, yr, pr - zr );   /* zr is the sea level z coord at
-					     this latitude */
+      sgAddVec3(tmp, gbs);
+      double pr = sgLengthVec3( tmp );
+      ab_xy( tmp, xyz, nv );
+      // nv[2] contains the sea-level z-coordinate - calculate this vertex'
+      // altitude:
+      nv[2] = pr - nv[2];
       v.push_back( nv );
       verts++;
-    } else if (sscanf(lbuffer, "vn %f %f %f", &f1, &f2, &f3) == 3) {
+    } else if (sscanf(lbuffer, "vn %f %f %f", 
+		      &tmp[0], &tmp[1], &tmp[2]) == 3) {
       // Make a new normal
       float *nn = new sgVec3;
-      sgSetVec3( nn, f1, f2, f3 );
+      sgCopyVec3( nn, tmp );
       n.push_back( nn );
       normals++;
     } else if (strncmp(lbuffer, "tf ", 3) == 0) {
       // Triangle fan
-      list<int> tri;
+      list<int> vertex_indices;
       int c = 3;
-
       while ( lbuffer[c] != 0 ) {
 	while (lbuffer[c]==' ') c++;
 	sscanf( lbuffer + c, "%d/%d", &i1, &i2 );
@@ -416,11 +412,11 @@ int MapMaker::process_file( char *tile_name, float x, float y, float z ) {
 	  break;
 	}
 
-	tri.push_back( i1 );
+	vertex_indices.push_back( i1 );
 	while (lbuffer[c] != ' ' && lbuffer[c] != 0) c++;
       }
 
-      draw_trifan( tri, v, n, material );
+      draw_trifan( vertex_indices, v, n, material );
       polys++;
     } else if (sscanf(lbuffer, "# usemtl %s", mtl) == 1) {
       int i;
@@ -451,7 +447,7 @@ int MapMaker::process_file( char *tile_name, float x, float y, float z ) {
 // path must be 'FG_ROOT/Scenery/' - more will be appended
 // plen is path length
 int MapMaker::process_directory( char *path, int plen, int lat, int lon, 
-				 float x, float y, float z ) {
+				 sgVec3 xyz ) {
   int sgnk = (lat < 0) ? 1 : 0, sgnl = (lon < 0) ? 1 : 0;
 
   int llen = sprintf( path + plen, "%c%03d%c%02d/%c%03d%c%02d", 
@@ -481,7 +477,7 @@ int MapMaker::process_directory( char *path, int plen, int lat, int lon,
     }                                      
 
     strcpy( path + plen + llen + 1, ent -> d_name );
-    process_file( path, x, y, z );
+    process_file( path, xyz );
   }
 
   if (getVerbose()) putc('\n', stdout);

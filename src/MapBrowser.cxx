@@ -190,10 +190,10 @@ void MapBrowser::update() {
       i = tmp;
     } else {
       // update tiles position
-      float x, y, r;
+      sgVec3 xyr;
       ab_lat( rad(tile->c.lat+0.5f), rad(tile->c.lon+0.5f), clat, clon, 
-	      &x, &y, &r );
-      scale( x, y, &tile->x, &tile->y );
+	      xyr );
+      scale( xyr[0], xyr[1], &tile->x, &tile->y );
     }
   }
 
@@ -245,10 +245,10 @@ void MapBrowser::update() {
 	  //printf("failed!\n");
 	}
 
-	float x, y, r;
+	sgVec3 xyr;
 	ab_lat( rad(nt->c.lat+0.5f), rad(nt->c.lon+0.5f), clat, clon, 
-		&x, &y, &r );
-	scale( x, y, &nt->x, &nt->y );
+		xyr );
+	scale( xyr[0], xyr[1], &nt->x, &nt->y );
       }
     }
   }

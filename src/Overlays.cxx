@@ -69,7 +69,7 @@ Overlays::Overlays( char *fg_root = NULL, float scale = 1.0f,
 }
 
 void Overlays::drawOverlays() {
-  const float GRIDC = 2;
+  const float GRIDC = 0.5f * SG_DEGREES_TO_RADIANS / 125.0f;
 
   float dtheta, dalpha;
 
@@ -88,8 +88,7 @@ void Overlays::drawOverlays() {
 
   if (features & OVERLAY_GRIDLINES) {
     draw_gridlines( dtheta * 1.5f, dalpha * 1.5f, 
-		    rint(dalpha / (0.2f * SG_DEGREES_TO_RADIANS)) * 
-		    (0.2f * SG_DEGREES_TO_RADIANS) / GRIDC );
+		    rint(1.0f / scale) * GRIDC );
   }
 
   if (features & OVERLAY_FLIGHTTRACK) {
@@ -101,7 +100,7 @@ void Overlays::draw_gridlines( float dtheta, float dalpha, float spacing ) {
   // Divide gridlines into 10' steps
   const float STEP = 10.0f / 60.0f * SG_DEGREES_TO_RADIANS;
 
-  float cx, cy, r;
+  sgVec3 xyr;
   sgVec2 p1, p2;
   bool first;
 
@@ -113,9 +112,9 @@ void Overlays::draw_gridlines( float dtheta, float dalpha, float spacing ) {
     first = true;
 
     for (float glat = lat - dtheta; glat <= lat + dtheta; glat += STEP) {
-      ab_lat( glat, glon, lat, lon, &cx, &cy, &r );
-      sgSetVec2( p1, ::scale(cx, output->getSize(), scale), 
-		 ::scale(cy, output->getSize(), scale) );
+      ab_lat( glat, glon, lat, lon, xyr );
+      sgSetVec2( p1, ::scale(xyr[0], output->getSize(), scale), 
+		 ::scale(xyr[1], output->getSize(), scale) );
 
       if (first) {
 	first = false;
@@ -133,9 +132,9 @@ void Overlays::draw_gridlines( float dtheta, float dalpha, float spacing ) {
     first = true;
 
     for (float glon = lon - dalpha; glon <= lon + dalpha; glon += STEP) {
-      ab_lat( glat, glon, lat, lon, &cx, &cy, &r );
-      sgSetVec2( p1, ::scale(cx, output->getSize(), scale), 
-		 ::scale(cy, output->getSize(), scale) );
+      ab_lat( glat, glon, lat, lon, xyr );
+      sgSetVec2( p1, ::scale(xyr[0], output->getSize(), scale), 
+		 ::scale(xyr[1], output->getSize(), scale) );
 
       if (first) {
 	first = false;
@@ -159,11 +158,11 @@ void Overlays::draw_flighttrack() {
     output->setColor(trk_color);
 
     while ( (point = flight_track->getNextPoint()) != NULL ) {
-      float cx, cy, r;
-      ab_lat( point->lat, point->lon, lat, lon, &cx, &cy, &r );
+      sgVec3 xyr;
+      ab_lat( point->lat, point->lon, lat, lon, xyr );
       
-      sgSetVec2( p1, ::scale(cx, output->getSize(), scale), 
-		 ::scale(cy, output->getSize(), scale) );
+      sgSetVec2( p1, ::scale(xyr[0], output->getSize(), scale), 
+		 ::scale(xyr[1], output->getSize(), scale) );
 
       if (first) {
 	first = false;
@@ -196,14 +195,14 @@ void Overlays::airport_labels(float theta, float alpha,
 
   for (ARP **i = airports.begin(); i < airports.end(); i++) {
     ARP *ap = *i;
-    float cx, cy, r;
+    sgVec3 xyr;
 
     if (fabs(ap->lat - theta) < dtheta && fabs(ap->lon - alpha) < dalpha) {
-      ab_lat( ap->lat, ap->lon, theta, alpha, &cx, &cy, &r );
+      ab_lat( ap->lat, ap->lon, theta, alpha, xyr );
       sgVec2 p;
 
-      sgSetVec2( p, ::scale(cx, output->getSize(), scale), 
-		 ::scale(cy, output->getSize(), scale) );
+      sgSetVec2( p, ::scale(xyr[0], output->getSize(), scale), 
+		 ::scale(xyr[1], output->getSize(), scale) );
 	    
       if (ap->name[0] != 0) {
 	output->setColor( arp_color1 );
@@ -228,10 +227,10 @@ void Overlays::airport_labels(float theta, float alpha,
 	sgSetVec2( rwyw, 
 		   (*j)->width*4.0f * scale  * cos(-(*j)->hdg), 
 		   (*j)->width*4.0f * scale  * sin(-(*j)->hdg) );
-	ab_lat( (*j)->lat, (*j)->lon, theta, alpha, &cx, &cy, &r );
+	ab_lat( (*j)->lat, (*j)->lon, theta, alpha, xyr );
 	// runway center point
-	rwyc[0] = ::scale(cx, output->getSize(), scale);
-	rwyc[1] = ::scale(cy, output->getSize(), scale);
+	rwyc[0] = ::scale(xyr[0], output->getSize(), scale);
+	rwyc[1] = ::scale(xyr[1], output->getSize(), scale);
 
 	// construct outlines
 	buildRwyCoords( rwyc, rwyl, rwyw, outlines + oc );
@@ -270,14 +269,14 @@ void Overlays::draw_navaids( float theta, float alpha,
   for (NAV **i = navaids.begin(); i != navaids.end(); i++) {
     NAV *n = *i;
 
-    float cx, cy, r;
+    sgVec3 xyr;
     sgVec2 p;
 
     if (fabs(n->lat - theta) < dtheta && fabs(n->lon - alpha) < dalpha) {
-      ab_lat( n->lat, n->lon, theta, alpha, &cx, &cy, &r );
+      ab_lat( n->lat, n->lon, theta, alpha, xyr );
 
-      sgSetVec2( p,  ::scale(cx, output->getSize(), scale), 
-		 ::scale(cy, output->getSize(), scale) );
+      sgSetVec2( p,  ::scale(xyr[0], output->getSize(), scale), 
+		 ::scale(xyr[1], output->getSize(), scale) );
 
       switch (n->navtype) {
       case NAV_VOR:
