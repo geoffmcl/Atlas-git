@@ -37,6 +37,7 @@ const float Overlays::airport_color1[4] = {0.439, 0.271, 0.420, 0.7};
 const float Overlays::airport_color2[4] = {0.824, 0.863, 0.824, 0.7};
 const float Overlays::navaid_color[4]   = {0.439, 0.271, 0.420, 0.7}; 
 const float Overlays::grid_color[4]     = {0.639, 0.371, 0.620, 0.3};
+const float Overlays::track_color[4]    = {0.071, 0.243, 0.427, 0.5};
 
 Overlays::Overlays( char *fg_root = NULL, float scale = 1.0f,
 		    float width = 512.0f ) :
@@ -52,6 +53,7 @@ Overlays::Overlays( char *fg_root = NULL, float scale = 1.0f,
   setAirportColor( airport_color1, airport_color2 );
   setNavaidColor( navaid_color );
   setGridColor( grid_color );
+  setTrackColor( track_color );
   flight_track = new FlightTrack;
 
   time_params = new SGTime();
@@ -148,7 +150,7 @@ void Overlays::draw_flighttrack() {
 
     flight_track->firstPoint();
     
-    output->setColor(grd_color);
+    output->setColor(trk_color);
 
     while ( (point = flight_track->getNextPoint()) != NULL ) {
       float cx, cy, r;

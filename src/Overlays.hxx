@@ -74,6 +74,9 @@ public:
   inline void setGridColor( const float *color ) {
     memcpy( grd_color, color, sizeof(float)*4 );
   }
+  inline void setTrackColor( const float *color ) {
+    memcpy( trk_color, color, sizeof(float)*4 );
+  }
 
   inline void setFeatures(int features) {
     this->features = features;
@@ -134,10 +137,12 @@ protected:
   static const float airport_color2[4];
   static const float navaid_color[4];
   static const float grid_color[4];
+  static const float track_color[4];
   float arp_color1[4]; 
   float arp_color2[4];
   float nav_color[4]; 
   float grd_color[4];
+  float trk_color[4];
 
   SGTime *time_params;
   SGMagVar *mag;

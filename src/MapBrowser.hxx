@@ -49,7 +49,7 @@ public:
   void setFGRoot( char *fg_root );
   void setFeatures( int features );
   void setTextured( bool texture = true );
-  void setRecordFlight( bool record = true );
+  void setFlightTrack( FlightTrack *track );
 
   inline float getLat()   { return clat;  }
   inline float getLon()   { return clon;  }
@@ -57,7 +57,7 @@ public:
   inline float getSize()  { return view_size; }
   inline int getFeatures() { return features; }
   inline bool getTextured() { return textured; }
-  inline bool getRecordFlight() { return recording; }
+  inline FlightTrack* getFlightTrack() { return track; }
 
   void loadDb();
   void draw();
@@ -109,9 +109,9 @@ protected:
 
   char mpath[512];
   int  pathl, features;
-  bool textured, recording, texturedFonts;
+  bool textured, texturedFonts;
   OutputGL *output;
   Overlays *overlay;
-  FlightTrack track;
+  FlightTrack *track;
 };
 

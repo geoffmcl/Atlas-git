@@ -41,7 +41,7 @@
 
 float clat = -100.0f, clon = -100.0f;   // initialize to unreasonable values
 char *outp = "map.png";                 // output file name
-bool autoscale = false, global = false;
+bool autoscale = false, global = false, doublebuffer = true;
 MapMaker map;
 
 char outname[512], *scenerypath;
@@ -61,7 +61,14 @@ void reshapeMap( int width, int height ) {
 }
 
 void redrawMap() {
+  char title_buffer[256];
+
   if (!global) {
+    sprintf(title_buffer, "%c%.1f %c%.1f",
+	    (clat<0.0f)?'S':'N', clat * 180.0f / M_PI,
+	    (clon<0.0f)?'W':'E', clon * 180.0f / M_PI);
+    glutSetWindowTitle(title_buffer);
+
     OutputGL output( outp, map.getSize() );
     map.createMap( &output, clat, clon, autoscale );
     output.closeOutput();
@@ -125,10 +132,18 @@ void redrawMap() {
     } while (ent == NULL);
 
    
+    sprintf(title_buffer, "%c%.1f %c%.1f",
+	    (clat<0.0f)?'S':'N', clat * 180.0f / M_PI,
+	    (clon<0.0f)?'W':'E', clon * 180.0f / M_PI);
+    glutSetWindowTitle(title_buffer);
+
     OutputGL output(outname, s);
     map.createMap( &output, clat, clon, true );
     output.closeOutput();
-    glutSwapBuffers();
+    if (doublebuffer) {
+      glutSwapBuffers();
+    }
+
     glutPostRedisplay();
   }
 }
@@ -151,7 +166,8 @@ void print_help() {
   printf("  --disable-navaids       Don't show navaids\n");
   printf("  --disable-shading       Don't do nice shading of the terrain\n");
   printf("  --atlas=path            Create maps of all scenery, and store them in path\n");
-  printf("  --verbose               Display information during processing\n\n");
+  printf("  --verbose               Display information during processing\n");
+  printf("  --singlebuffer          Use single buffered display.\n\n");
 }
 
 int main( int argc, char **argv ) {
@@ -189,6 +205,8 @@ int main( int argc, char **argv ) {
       features &= ~MapMaker::DO_SHADE;
     } else if ( strcmp(argv[arg], "--autoscale") == 0 ) {
       autoscale = true;
+    } else if ( strcmp(argv[arg], "--singlebuffer") == 0 ) {
+      doublebuffer = false;
     } else if ( sscanf(argv[arg], "--atlas=%s", cparam) == 1 ) {
       global = true;
       outp = strdup( cparam );
@@ -248,7 +266,12 @@ int main( int argc, char **argv ) {
 
   // now initialize GLUT
   glutInit( &argc, argv );
-  glutInitDisplayMode( GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH );
+
+  if (doublebuffer) {
+    glutInitDisplayMode( GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH );
+  } else {
+    glutInitDisplayMode( GLUT_SINGLE | GLUT_RGBA | GLUT_DEPTH );
+  }
   glutInitWindowSize( map.getSize(), map.getSize() );
   glutCreateWindow( "MAP - Please wait while drawing" );
   glutReshapeFunc( reshapeMap );

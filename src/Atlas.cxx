@@ -31,6 +31,7 @@
 
 #include "MapBrowser.hxx"
 #include "Overlays.hxx"
+#include "FlightTrack.hxx"
 
 SGIOChannel *input_channel;
 
@@ -54,16 +55,19 @@ int save_len = 0;
 
 fntTexFont *texfont;
 puFont *font;
-puPopup *interface, *minimized;
-puFrame *frame;
+puPopup *interface, *minimized, *info_interface;
+puFrame *frame, *info_frame;
 puOneShot *zoomin, *zoomout, *minimize_button, *minimized_button;
 puButton *show_arp, *show_nav, *show_name, *show_id;
 puText *labeling, *txt_lat, *txt_lon;
+puText *txt_info_lat, *txt_info_lon, *txt_info_alt;
+puText *txt_info_hdg, *txt_info_spd;
 puInput *inp_lat, *inp_lon;
 bool interface_visible = true, softcursor = false;
-char lat_str[80], lon_str[80];
+char lat_str[80], lon_str[80], alt_str[80], hdg_str[80], spd_str[80];
 
 MapBrowser *map;
+FlightTrack *track = NULL;
 
 bool parse_nmea(char *buf) {
     cout << "parsing nmea message = " << buf << endl;
@@ -500,6 +504,18 @@ void init_gui(bool textureFonts) {
   minimized_button->setCallback(restore_cb);
   minimized->close();
 
+  if (slaved) {
+    info_interface = new puPopup(460, 20);
+    info_frame = new puFrame(460, 20, 620, 120);
+    txt_info_spd = new puText(470, 30);
+    txt_info_hdg = new puText(470, 45);
+    txt_info_alt = new puText(470, 60);
+    txt_info_lon = new puText(470, 75);
+    txt_info_lat = new puText(470, 90);
+    info_interface->close();
+    info_interface->reveal();
+  }
+
   if (softcursor) {
     puShowCursor();
   }
@@ -521,21 +537,6 @@ void redrawMap() {
   glClear( GL_COLOR_BUFFER_BIT );
 
   map->draw();
-
-  if (display) {
-    coord_format_latlon(latitude,longitude, buf);
-    glColor3f(1.0f, 0.0f, 0.0f);
-    puDrawString(font, buf, 0, (int)(mapsize - height) + 10);
-    
-    if (slaved) {
-      sprintf( buf, "HDG: %.0f*", heading);
-      puDrawString(font, buf, 0, (int)(mapsize - height) + 20);
-      sprintf( buf, "ALT: %.0f' MSL", altitude);
-      puDrawString(font, buf, 0, (int)(mapsize - height) + 30);
-      sprintf( buf, "SPD: %.0f KIAS", speed);
-      puDrawString(font, buf, 0, (int)(mapsize - height) + 40);
-    }
-  }
 
   // Draw aircraft if in slave mode
   if (slaved) {
@@ -568,6 +569,17 @@ void redrawMap() {
     inp_lon->setValue(lon_str);
   }
 
+  if (slaved) {
+    sprintf( hdg_str, "HDG: %.0f*", heading);    
+    sprintf( alt_str, "ALT: %.0f' MSL", altitude);
+    sprintf( spd_str, "SPD: %.0f KIAS", speed);
+    txt_info_lat->setLabel(lat_str);
+    txt_info_lon->setLabel(lon_str);
+    txt_info_alt->setLabel(alt_str);
+    txt_info_hdg->setLabel(hdg_str);
+    txt_info_spd->setLabel(spd_str);
+  }
+
   puDisplay();
   glutSwapBuffers();
 }
@@ -579,6 +591,15 @@ void timer(int value) {
   while ( (length = input_channel->readline( buffer, 512 )) > 0 ) {
       parse_nmea(buffer);
   }
+
+  // record flight
+  FlightData *d = new FlightData;
+  d->lat = latitude;
+  d->lon = longitude;
+  d->alt = altitude;
+  d->hdg = heading;
+  d->spd = speed;
+  track->addPoint(d);
   
   map->setLocation( latitude, longitude );
   
@@ -639,8 +660,15 @@ void keyPressed( unsigned char key, int x, int y ) {
       break;
     case 'D':
     case 'd':
-      display = !display;
-      glutPostRedisplay();
+      if (slaved) {
+	display = !display;
+	if (display) {
+	  info_interface->reveal();
+	} else {
+	  info_interface->hide();
+	}
+	glutPostRedisplay();
+      }
       break;
     case 'A':
     case 'a':
@@ -777,6 +805,9 @@ int main(int argc, char **argv) {
 
   if (slaved) {
     glutTimerFunc( (int)(update*1000.0f), timer, 0 );
+
+    track = new FlightTrack();
+    map->setFlightTrack(track);
 
     if ( network ) {
 	input_channel = new SGSocket( "", port, "udp" );

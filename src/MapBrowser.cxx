@@ -49,9 +49,10 @@ MapBrowser::MapBrowser(GLfloat left, GLfloat top, GLfloat size, int features,
   // setup overlays
   overlay = new Overlays( fg_root, zoom, size );
   overlay->setOutput( output );
-  overlay->setFlightTrack(&track);
+  overlay->setFeatures(features);
 
   textured = true;
+  track = NULL;
 }
 
 MapBrowser::~MapBrowser() {
@@ -64,14 +65,6 @@ void MapBrowser::setLocation( float lat, float lon ) {
   clon = lon;
 
   overlay->setLocation(lat, lon);
-
-  // Record if necessary
-  if (recording) {
-    FlightData *data = new FlightData;
-    data->lat = lat;
-    data->lon = lon;
-    track.addPoint(data);
-  }
 
   update();
 }
@@ -115,8 +108,9 @@ void MapBrowser::setTextured( bool textured ) {
   this->textured = textured;
 }
 
-void MapBrowser::setRecordFlight( bool record ) {
-  recording = record;
+void MapBrowser::setFlightTrack( FlightTrack *track ) {
+  this->track = track;
+  overlay->setFlightTrack(track);
 }
 
 void MapBrowser::loadDb() {
