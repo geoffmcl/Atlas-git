@@ -89,10 +89,6 @@ MapMaker::MapMaker( char *fg_root, char *ap_filter, int features,
 }
 
 MapMaker::~MapMaker() {
-  for (StrMap::iterator it = materials.begin(); it != materials.end(); it++) {
-    delete[] (*it).first;
-  }
-
   for (unsigned int i = 0; i < palette.size(); i++) {
     delete[] palette[i];
   }
@@ -115,11 +111,6 @@ void MapMaker::setFGRoot( char *fg_root ) {
 
 void MapMaker::setPalette( char* filename ) {
   if (palette_loaded) {
-    for (StrMap::iterator it = materials.begin(); it != materials.end(); 
-         it++) {
-      delete (*it).first;
-    }
-    
     for (unsigned int i = 0; i < palette.size(); i++) {
       delete palette[i];
     }
@@ -687,12 +678,11 @@ int MapMaker::process_binary_file( char *tile_name, sgVec3 xyz ) {
 	tri != tris.end(); 
 	tri++) {
 
-    const char* mat_name = tri_mats[i].c_str();
-    StrMap::const_iterator mat_it = materials.find( mat_name );
+    StrMap::const_iterator mat_it = materials.find( tri_mats[i] );
     if ( mat_it == materials.end() ) {
       if (getVerbose()) {
 	fprintf( stderr, "Warning: unknown material \"%s\" encountered.\n", 
-		 mat_name );
+		 tri_mats[i].c_str() );
       }
       material = -1;
     } else {
@@ -709,12 +699,11 @@ int MapMaker::process_binary_file( char *tile_name, sgVec3 xyz ) {
 	fan != fans.end(); 
 	fan++) {
 
-    const char* mat_name = fan_mats[i].c_str();
-    StrMap::const_iterator mat_it = materials.find( mat_name );
+    StrMap::const_iterator mat_it = materials.find( fan_mats[i] );
     if ( mat_it == materials.end() ) {
       if (getVerbose()) {
 	fprintf( stderr, "Warning: unknown material \"%s\" encountered.\n", 
-		 mat_name );
+		 fan_mats[i].c_str() );
       }
       material = -1;
     } else {
@@ -731,12 +720,11 @@ int MapMaker::process_binary_file( char *tile_name, sgVec3 xyz ) {
 	strip != strips.end(); 
 	strip++) {
 
-    const char* mat_name = strip_mats[i].c_str();
-    StrMap::const_iterator mat_it = materials.find( mat_name );
+    StrMap::const_iterator mat_it = materials.find( strip_mats[i] );
     if ( mat_it == materials.end() ) {
       if (getVerbose()) {
 	fprintf( stderr, "Warning: unknown material \"%s\" encountered.\n", 
-		 mat_name );
+		 strip_mats[i].c_str() );
       }
       material = -1;
     } else {
@@ -1000,7 +988,8 @@ void MapMaker::read_materials(char *fname /* = NULL */) {
     return;
   }
 
-  char line[256], *token, delimiters[] = " \t", *material;
+  string material;
+  char line[256], *token, delimiters[] = " \t";
   unsigned int index;
   int elev_level = 0;
   float* colour;
@@ -1043,8 +1032,7 @@ void MapMaker::read_materials(char *fname /* = NULL */) {
       token = strtok(line, delimiters); // "Material"
 
       token = strtok(NULL, delimiters); // material name
-      material = new char[strlen(token)+1];
-      strcpy(material, token);
+      material = token;
 
       token = strtok(NULL, delimiters); // index
       index = atoi(token);
@@ -1052,7 +1040,7 @@ void MapMaker::read_materials(char *fname /* = NULL */) {
       materials[material] = index;
 
       int height;
-      if ( sscanf(material, "Elevation_%d", &height) == 1 ) {
+      if ( sscanf(material.c_str(), "Elevation_%d", &height) == 1 ) {
          if (elev_level >= MAX_ELEV_LEVELS) {
           fprintf(stderr, "Only %d elevation levels allowed.\n", 
                   MAX_ELEV_LEVELS);

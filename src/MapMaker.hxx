@@ -103,12 +103,7 @@ public:
 
 protected:
   /* colours and materials */
-  struct WordLess {
-    bool operator()(const char* v1, const char* v2) const {
-      return (strcmp(v1, v2) < 0);
-    }
-  };
-  typedef std::map<const char*, int, WordLess> StrMap;
+  typedef std::map<string, int> StrMap;
 
   vector<float*> palette;
   StrMap materials;
