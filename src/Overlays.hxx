@@ -47,6 +47,7 @@ public:
   static const int OVERLAY_NAVAIDS_VOR  = 1 << 7;
   static const int OVERLAY_NAVAIDS_NDB  = 1 << 8;
   static const int OVERLAY_NAVAIDS_FIX  = 1 << 9;
+  static const int OVERLAY_NAVAIDS_ILS  = 1 << 10;
   static const int OVERLAY_ANY_LABEL   = OVERLAY_NAMES | OVERLAY_IDS;
 
   //  Overlays();
@@ -80,6 +81,9 @@ public:
   }
   inline void setVorFromColor( const float *color ) {
     memcpy( vor_from_color, color, sizeof(float)*4 );
+  }
+  inline void setIlsColor( const float *color ) {
+    memcpy( ils_color, color, sizeof(float)*4 );
   }
   inline void setGridColor( const float *color ) {
     memcpy( grd_color, color, sizeof(float)*4 );
@@ -120,12 +124,13 @@ public:
     list<RWY*> rwys;
   };
 
-  enum NavType { NAV_VOR, NAV_DME, NAV_NDB, NAV_FIX };
+  enum NavType { NAV_VOR, NAV_DME, NAV_NDB, NAV_ILS, NAV_FIX };
 
   struct NAV {
     char name[64], id[6];
     NavType navtype;
     float lat, lon, freq, magvar;
+    int range;
   };
 
   // Find an airport by name
@@ -150,6 +155,7 @@ protected:
 		    float dtheta, float dalpha);
   void draw_ndb( NAV *n, sgVec2 p );
   void draw_vor( NAV *n, sgVec2 p );
+  void draw_ils( NAV *n, sgVec2 p );
   void draw_fix( NAV *n, sgVec2 p );
   void draw_flighttrack();
   void draw_gridlines( float dtheta, float dalpha, float spacing );
@@ -166,13 +172,15 @@ protected:
   static const float navaid_color[4];
   static const float static_vor_to_color[4];
   static const float static_vor_from_color[4];
+  static const float static_ils_color[4];
   static const float grid_color[4];
   static const float track_color[4];
   float arp_color1[4]; 
   float arp_color2[4];
-  float nav_color[4]; 
+  float nav_color[4];
   float vor_to_color[4]; 
-  float vor_from_color[4]; 
+  float vor_from_color[4];
+  float ils_color[4];
   float grd_color[4];
   float trk_color[4];
 

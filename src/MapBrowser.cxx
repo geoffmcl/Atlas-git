@@ -141,6 +141,7 @@ void MapBrowser::toggleFeaturesAllNavaids() {
   features = features ^ ( Overlays::OVERLAY_NAVAIDS |
                           Overlays::OVERLAY_NAVAIDS_VOR |
                           Overlays::OVERLAY_NAVAIDS_NDB |
+			  Overlays::OVERLAY_NAVAIDS_ILS |
                           Overlays::OVERLAY_NAVAIDS_FIX );
   overlay->setFeatures(features);
 }

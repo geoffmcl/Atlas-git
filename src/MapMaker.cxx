@@ -231,6 +231,7 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
     overlays.setNavaidColor( palette[materials["NavaidLabels"]] );
     overlays.setVorToColor( palette[materials["VorToLine"]] );
     overlays.setVorFromColor( palette[materials["VorFromLine"]] );
+    overlays.setIlsColor( palette[materials["IlsLoc"]] );
     overlays.setLocation( theta, alpha );
 
     int features = Overlays::OVERLAY_NAMES | Overlays::OVERLAY_IDS;
@@ -240,6 +241,7 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
       if (getNavaidsVOR()) features += Overlays::OVERLAY_NAVAIDS_VOR;
       if (getNavaidsNDB()) features += Overlays::OVERLAY_NAVAIDS_NDB;
       if (getNavaidsFIX()) features += Overlays::OVERLAY_NAVAIDS_FIX;
+      if (getNavaidsILS()) features += Overlays::OVERLAY_NAVAIDS_ILS;
     }
     overlays.setFeatures(features);
 

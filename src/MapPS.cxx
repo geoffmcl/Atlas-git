@@ -96,6 +96,7 @@ int main( int argc, char **argv ) {
       if (!strstr(cparam,"vor")) features &= ~MapMaker::DO_NAVAIDS_VOR;
       if (!strstr(cparam,"ndb")) features &= ~MapMaker::DO_NAVAIDS_NDB;
       if (!strstr(cparam,"fix")) features &= ~MapMaker::DO_NAVAIDS_FIX;
+      if (!strstr(cparam,"ils")) features &= ~MapMaker::DO_NAVAIDS_ILS;
     } else if ( strcmp(argv[arg], "--disable-shading" ) == 0 ) {
       features &= ~MapMaker::DO_SHADE;
     } else if ( strcmp(argv[arg], "--autoscale") == 0 ) {

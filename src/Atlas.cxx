@@ -75,7 +75,7 @@ puFrame *frame, *info_frame;
 puOneShot *zoomin, *zoomout, *minimize_button, *minimized_button;
 puOneShot *clear_ftrack, *choose_projection_button;
 puButton *show_arp, *show_nav, *show_name, *show_id;
-puButton *show_vor, *show_ndb, *show_fix;
+puButton *show_vor, *show_ndb, *show_fix, *show_ils;
 puButton *show_ftrack, *follow;
 puText *labeling, *txt_lat, *txt_lon;
 puText *txt_info_lat, *txt_info_lon, *txt_info_alt;
@@ -460,7 +460,7 @@ void zoom_cb ( puObject *cb )
   }
   new_scale=map_object->getScale();
    
-  printf("scale: %f\n", new_scale);
+  //printf("scale: %f\n", new_scale);
   
   //set map math depending on resolution
   if (lowres_avlble) {
@@ -486,6 +486,8 @@ void show_cb ( puObject *cb )
     feature = Overlays::OVERLAY_NAVAIDS_NDB;
   } else if (cb == show_fix) {
     feature = Overlays::OVERLAY_NAVAIDS_FIX;
+  } else if (cb == show_ils) {
+    feature = Overlays::OVERLAY_NAVAIDS_ILS;
   } else if (cb == show_nav) {
     feature = Overlays::OVERLAY_NAVAIDS;
   } else if (cb == show_name) {
@@ -601,15 +603,19 @@ void init_gui(bool textureFonts) {
   cury+=35;
   
   show_vor = new puButton(curx, cury, "VOR");
-  show_vor->setSize(60,24);
+  show_vor->setSize(44,24);
   show_vor->setCallback(show_cb);
   show_vor->setValue(1);
-  show_ndb = new puButton(curx+62, cury, "NDB");
-  show_ndb->setSize(60,24);
+  show_ndb = new puButton(curx+46, cury, "NDB");
+  show_ndb->setSize(44,24);
   show_ndb->setCallback(show_cb);
   show_ndb->setValue(1);
-  show_fix = new puButton(curx+124, cury, "FIX");
-  show_fix->setSize(60,24);
+  show_ils = new puButton(curx+92, cury, "ILS");
+  show_ils->setSize(44,24);
+  show_ils->setCallback(show_cb);
+  show_ils->setValue(1);
+  show_fix = new puButton(curx+138, cury, "FIX");
+  show_fix->setSize(44,24);
   show_fix->setCallback(show_cb);
   show_fix->setValue(0);
 
@@ -1037,6 +1043,7 @@ int main(int argc, char **argv) {
                                Overlays::OVERLAY_NAVAIDS   |
                                Overlays::OVERLAY_NAVAIDS_VOR |
                                Overlays::OVERLAY_NAVAIDS_NDB |
+			       Overlays::OVERLAY_NAVAIDS_ILS |
                                //Overlays::OVERLAY_NAVAIDS_FIX |
                                //Overlays::OVERLAY_FIXES     |
                                Overlays::OVERLAY_GRIDLINES | 

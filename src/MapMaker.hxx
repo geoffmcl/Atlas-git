@@ -55,13 +55,14 @@ public:
   static const int DO_NAVAIDS_VOR  = 32;
   static const int DO_NAVAIDS_NDB  = 64;
   static const int DO_NAVAIDS_FIX  =128;
-  static const int DO_ALL_FEAT     = 1+2+4+8+16+32+64+128;
+  static const int DO_NAVAIDS_ILS  =256;
+  static const int DO_ALL_FEAT     = 1+2+4+8+16+32+64+128+256;
 
   // CONSTRUCTOR
   MapMaker( char *fg_root = 0, 
 	    char *ap_filter = NULL, 
 	    int features = DO_SHADE | DO_AIRPORTS | DO_NAVAIDS |
-	                   DO_NAVAIDS_VOR | DO_NAVAIDS_NDB | DO_NAVAIDS_FIX,
+	                   DO_NAVAIDS_VOR | DO_NAVAIDS_NDB | DO_NAVAIDS_FIX | DO_NAVAIDS_ILS,
 	    int size = 256, int scale = 100000 );
   ~MapMaker();
 
@@ -88,7 +89,8 @@ public:
   inline bool getNavaids() { return features & DO_NAVAIDS; }
   inline bool getNavaidsVOR() { return features & DO_NAVAIDS_VOR; }
   inline bool getNavaidsNDB() { return features & DO_NAVAIDS_NDB; }
-  inline bool getNavaidsFIX() { return features & DO_NAVAIDS_FIX; }  
+  inline bool getNavaidsFIX() { return features & DO_NAVAIDS_FIX; }
+  inline bool getNavaidsILS() { return features & DO_NAVAIDS_ILS; }
   inline int getScale() { return scle; }
   inline int getSize() { return size; }
   inline float *getLight() { return light_vector; }

@@ -72,7 +72,8 @@ const float Overlays::airport_color1[4] = {0.439, 0.271, 0.420, 0.7};
 const float Overlays::airport_color2[4] = {0.824, 0.863, 0.824, 0.7};
 const float Overlays::navaid_color[4]   = {0.439, 0.271, 0.420, 0.7}; 
 const float Overlays::static_vor_to_color[4]   = {0.200, 0.800, 0.200, 0.7}; 
-const float Overlays::static_vor_from_color[4] = {0.800, 0.200, 0.200, 0.7}; 
+const float Overlays::static_vor_from_color[4] = {0.800, 0.200, 0.200, 0.7};
+const float Overlays::static_ils_color[4] = {0.800, 0.200, 0.200, 0.7}; 
 const float Overlays::grid_color[4]     = {0.639, 0.371, 0.620, 0.3};
 const float Overlays::track_color[4]    = {0.071, 0.243, 0.427, 0.5};
 
@@ -103,6 +104,7 @@ Overlays::Overlays( char *fg_root, float scale,
   setNavaidColor( navaid_color );
   setVorToColor( static_vor_to_color );
   setVorFromColor( static_vor_to_color );
+  setIlsColor( static_ils_color );
   setGridColor( grid_color );
   setTrackColor( track_color );
   flight_track = new FlightTrack;
@@ -403,6 +405,9 @@ void Overlays::draw_navaids( float theta, float alpha,
       case NAV_NDB:
 	if (features & OVERLAY_NAVAIDS_NDB) draw_ndb(n, p);
 	break;
+      case NAV_ILS:
+	if (features & OVERLAY_NAVAIDS_ILS) draw_ils(n, p);
+	break;
       case NAV_FIX:
 	if (features & OVERLAY_NAVAIDS_FIX) draw_fix(n, p);
 	break;
@@ -416,7 +421,7 @@ void Overlays::draw_navaids( float theta, float alpha,
 // Draw one specified NDB
 void Overlays::draw_ndb( NAV *n, sgVec2 p ) {
   static const int RADIUS = 10;
-  char freqbuf[8];
+  char freqbuf[20];
   sprintf( freqbuf, "%.0f", n->freq );
 
   output->setColor( nav_color );
@@ -430,12 +435,43 @@ void Overlays::draw_ndb( NAV *n, sgVec2 p ) {
   if (features & OVERLAY_ANY_LABEL) output->drawText( p, freqbuf );
 }
 
+// Draw one specified ILS
+void Overlays::draw_ils( NAV *n, sgVec2 p ) {
+  char freqbuf[20];
+  sprintf( freqbuf, "%.0f", n->freq );
+  float ilsSize = 3000.0f;
+  ilsSize *= scale;  // Clip the min/max size?
+  // n->magvar is true heading for ILS
+  float tdir = (n->magvar - 3.0) * SG_DEGREES_TO_RADIANS;
+  sgVec2 offset1 = {-ilsSize * sin(tdir), -ilsSize * cos(tdir)};
+  tdir = (n->magvar + 3.0) * SG_DEGREES_TO_RADIANS;
+  sgVec2 offset2 = {-ilsSize * sin(tdir), -ilsSize * cos(tdir)};
+  tdir = n->magvar * SG_DEGREES_TO_RADIANS;
+  sgVec2 offset3 = {-1.0 * (ilsSize + 10) * sin(tdir), -1.0 * (ilsSize + 10) * cos(tdir)};
+  // Shift the origin of the LOC towards the threshold end of the rwy a bit - otherwise it looks daft.
+  // It would be better if we could match LOC to rwy (or GS) to do this, but that's probably hard!
+  sgVec2 offset0 = {(ilsSize * -0.9) * sin(tdir), (ilsSize * -0.9) * cos(tdir)};
+  sgVec2 p0, p1, p2, p3;
+  sgAddVec2(p0, p, offset0);
+  sgAddVec2(p1, p0, offset1);
+  sgAddVec2(p2, p0, offset2);
+  sgAddVec2(p3, p0, offset3);
+  
+  output->setColor( ils_color );
+  output->drawLine(p0, p1);
+  output->drawLine(p0, p2);
+  output->drawLine(p1, p2);
+  if (features & OVERLAY_ANY_LABEL) output->drawText( p3, freqbuf );
+  p3[1] -= 10;
+  if (features & OVERLAY_IDS) output->drawText( p3, n->id ); 
+}
+
 // Draw one specified VOR
 void Overlays::draw_vor( NAV *n, sgVec2 p ) {
   static const int SUBDIVISIONS = 12;
   static const int RADIUS = 15;
 
-  char freqbuf[8];
+  char freqbuf[20];
   sprintf( freqbuf, "%.2f", n->freq );
 
   output->setColor( nav_color );
@@ -914,7 +950,7 @@ void Overlays::load_new_navaids() {
   while (!gzeof(nav)) {
     //char sNavtype[10];
     int iNavtype;
-    char sMagVar[10];
+    //char sMagVar[10];
     int elev;
 
     if (n == NULL)
@@ -922,13 +958,16 @@ void Overlays::load_new_navaids() {
     
     gzgets( nav, line, 256 );
     
-    if ( sscanf(line, "%d %f %f %d %f %s %s",
-		&iNavtype, &n->lat, &n->lon, &elev, &n->freq, n->id, sMagVar) == 7 ) {
+    if ( sscanf(line, "%d %f %f %d %f %f %s",
+		&iNavtype, &n->lat, &n->lon, &elev, &n->freq, &n->magvar, n->id) == 7 ) {
 	bool bNavaid = true;
 	switch (iNavtype) {
 	case 3: n->navtype = NAV_VOR; break;
 	case 12: n->navtype = NAV_DME; break;
 	case 2: n->navtype = NAV_NDB; break;
+	case 4: n->navtype = NAV_ILS; break;	// code 4 is for localisers as part of full ILS - might also consider 5 (LDA & SDF) and 6 (glideslope).
+	case 5: n->navtype = NAV_ILS; break;
+	//case 6: n->navtype = NAV_GS; break;
 	default: bNavaid = false;
 	}
 
@@ -937,6 +976,7 @@ void Overlays::load_new_navaids() {
 	
 	if(bNavaid) {
 
+	    //cout << iNavtype << " " << n->lat << " " << n->lon << " " << elev << " " << n->freq << " " << n->magvar << " " << n->id << " " << n->name << '\n';
 	    n->lat *= SG_DEGREES_TO_RADIANS;
 	    n->lon *= SG_DEGREES_TO_RADIANS;
 	    elev = (int) ( elev * SG_FEET_TO_METER );
@@ -953,12 +993,21 @@ void Overlays::load_new_navaids() {
 		}
 	    }
 	    */
-	    n->magvar = sgGetMagVar(n->lon, n->lat, elev, time_params->getJD());
+	    if(n->navtype == NAV_ILS) {
+	      // The magvar is the inbound heading - keep it.
+	    } else {
+	      n->magvar = sgGetMagVar(n->lon, n->lat, elev, time_params->getJD());
+	    }
 	    // cout << "navid = " << n->id << " magvar = " << n->magvar * RAD_TO_DEG
 	    //      << endl;
     
-	    //strcpy(n->name, line+55);  // 51?
-	    strcpy(n->name, line+52);
+	    if(n->navtype == NAV_ILS) {
+	      strcpy(n->name, line+56);
+	    } else {
+	      // Urghh - the width formatting changes halfway through code 12 in the current FG data :-(
+	      // ILS/Other split is the best we can do for now.
+	      strcpy(n->name, line+52);
+	    }
     
 	    navaids.push_back(n);
 	    n = NULL;
@@ -993,9 +1042,9 @@ void Overlays::load_navaids() {
   gzFile nav;
 
   nav = gzopen( navname, "rb" );
-  if (nav == NULL) {
-    delete[] navname;      
+  if (nav == NULL) {      
     fprintf( stderr, "load_navaids: Couldn't open \"%s\" .\n", navname );
+    delete[] navname;
     return;
   }
 
@@ -1068,8 +1117,8 @@ void Overlays::load_new_fixes() {
 
   fix = gzopen( navname, "rb" );
   if (fix == NULL) {
-    delete[] navname;
     fprintf( stderr, "load_fixes: Couldn't open \"%s\" .\n", navname );
+    delete[] navname;
     // Try loading the old format instead
     fprintf( stderr, "Attempting to load old format fixes file instead...\n" );
     load_fixes();
@@ -1111,8 +1160,8 @@ void Overlays::load_fixes() {
 
   fix = gzopen( navname, "rb" );
   if (fix == NULL) {
-    delete[] navname;
     fprintf( stderr, "load_fixes: Couldn't open \"%s\" .\n", navname );
+    delete[] navname;
     return;
   }
 
