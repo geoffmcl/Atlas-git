@@ -39,7 +39,7 @@ public:
   static const int CACHE_LIMIT = 2;
 
   MapBrowser( GLfloat x1, GLfloat y1, GLfloat size, int features, 
-	      char *fg_root, bool texturedFonts = true );
+              char *fg_root, bool texturedFonts = true );
   ~MapBrowser();
 
   void setLocation( float lat, float lon );
@@ -87,10 +87,15 @@ protected:
     int lat, lon;
   };
 
+  struct Tilewidth {
+    GLfloat rn, rs;
+  };
+
   struct MapTile {
     Coord   c;
+    Tilewidth w;
     GLuint  texture_handle;
-    GLfloat x, y;
+    GLfloat xsw, ysw, xnw, ynw, xno, yno, xso, yso;
     GLubyte *texbuf;
   };
 
@@ -112,4 +117,3 @@ protected:
   Overlays *overlay;
   FlightTrack *track;
 };
-
