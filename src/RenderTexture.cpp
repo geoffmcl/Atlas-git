@@ -46,9 +46,9 @@
  */
 
 #include <simgear/compiler.h>
-#include SG_GL_H
 #include <plib/ul.h>
 #ifdef UL_GLX
+#  include SG_GL_H
 #  define GLX_GLXEXT_PROTOTYPES
 #  ifdef __APPLE__
 #    include <AGL/agl.h>
@@ -56,7 +56,8 @@
 #    include <GL/glx.h>
 #  endif
 #elif defined UL_WIN32
-#  include <windows.h>
+#  include <windows.h> // MUST be before SG_GL_H and all other GL related include directive
+#  include SG_GL_H
 #endif
 #include "extensions.hxx"
 #include "RenderTexture.h"
