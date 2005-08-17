@@ -267,10 +267,10 @@ bool parse_arg(char* arg) {
     mapobj.setLight( x, y, z );
   } else if ( sscanf(arg, "--airport-filter=%s", cparam) == 1 ) {
     mapobj.setAPFilter( strdup(cparam) );
-  } else if ( sscanf(arg, "--output=%s", cparam) == 1 ) {
-    outp = strdup(cparam);
-  } else if ( sscanf(arg, "--fg-root=%s", cparam) == 1 ) {
-    mapobj.setFGRoot( cparam );
+  } else if ( strncmp(arg, "--output=", 9) == 0 ) {
+    outp = strdup(arg+9);
+  } else if ( strncmp(arg, "--fg-root=", 10) == 0 ) {
+    mapobj.setFGRoot( arg+10 );
   } else if ( strncmp(arg, "--fg-scenery=", 13 ) == 0 ) {
     raw_scenery_path = arg + 13;
   } else if ( strcmp(arg, "--enable-airports" ) == 0 ) {
@@ -293,11 +293,11 @@ bool parse_arg(char* arg) {
     create_jpeg = true;
   } else if ( strcmp(arg, "--headless") == 0 ) {
     headless = true;
-  } else if ( sscanf(arg, "--atlas=%s", cparam) == 1 ) {
+  } else if ( strncmp(arg, "--atlas=", 8) == 0 ) {
     global = true;
-    outp = strdup( cparam );
-  } else if ( sscanf(arg, "--palette=%s", cparam) == 1 ) {
-    mapobj.setPalette(cparam);
+    outp = strdup( arg+8 );
+  } else if ( strncmp(arg, "--palette=", 10) == 0 ) {
+    mapobj.setPalette(arg+10);
   } else if ( strcmp(arg, "--glutfonts") == 0 ) {
     textured_fonts = false;
   } else if ( strcmp(arg, "--verbose") == 0 ) {

@@ -99,10 +99,10 @@ int main( int argc, char **argv ) {
       mapobj.setLight( x, y, z );
     } else if ( sscanf(argv[arg], "--airport-filter=%s", cparam) == 1 ) {
       mapobj.setAPFilter( strdup(cparam) );
-    } else if ( sscanf(argv[arg], "--output=%s", cparam) == 1 ) {
-      outp = strdup(cparam);
-    } else if ( sscanf(argv[arg], "--fg-root=%s", cparam) == 1 ) {
-      mapobj.setFGRoot( strdup(cparam) );
+    } else if ( strncmp(argv[arg], "--output=", 9) == 0 ) {
+      outp = strdup(argv[arg]+9);
+    } else if ( strncmp(argv[arg], "--fg-root=", 10) == 0 ) {
+      mapobj.setFGRoot( argv[arg]+10 );
     } else if ( strncmp(argv[arg], "--fg-scenery=", 13 ) == 0 ) {
       raw_scenery_path = argv[arg] + 13;
     } else if ( strcmp(argv[arg], "--disable-airports" ) == 0 ) {
@@ -118,9 +118,9 @@ int main( int argc, char **argv ) {
       features &= ~MapMaker::DO_SHADE;
     } else if ( strcmp(argv[arg], "--autoscale") == 0 ) {
       autoscale = true;
-    } else if ( sscanf(argv[arg], "--atlas=%s", cparam) == 1 ) {
+    } else if ( strncmp(argv[arg], "--atlas=", 8) == 0 ) {
       global = true;
-      outp = strdup( cparam );
+      outp = strdup( argv[arg]+8 );
     } else if ( strcmp(argv[arg], "--verbose") == 0 ) {
       features |= MapMaker::DO_VERBOSE;
     } else if ( strcmp(argv[arg], "--help") == 0 ) {
