@@ -333,16 +333,26 @@ void MapBrowser::update() {
         }
 
 	sgVec3 xyr;
+        float dx;
+        if ( abs( nt->c.lat ) < 83 ) {
+          dx = 1.0f;
+        } else if ( abs( nt->c.lat ) < 86 ) {
+          dx = 2.0f;
+        } else if ( abs( nt->c.lat ) < 88 ) {
+          dx = 4.0f;
+        } else {
+          dx = 8.0f;
+        }
 	projection->ab_lat( rad((float) nt->c.lat), rad((float) nt->c.lon), clat, clon, 
 		xyr );
 	scale( xyr[0], xyr[1], &nt->xsw, &nt->ysw );
 	projection->ab_lat( rad(nt->c.lat+1.0f), rad((float) nt->c.lon), clat, clon, 
 		xyr );
 	scale( xyr[0], xyr[1], &nt->xnw, &nt->ynw );
-	projection->ab_lat( rad(nt->c.lat+1.0f), rad(nt->c.lon+1.0f), clat, clon, 
+	projection->ab_lat( rad(nt->c.lat+1.0f), rad(nt->c.lon+dx), clat, clon, 
 		xyr );
 	scale( xyr[0], xyr[1], &nt->xno, &nt->yno );
-	projection->ab_lat( rad((float) nt->c.lat), rad(nt->c.lon+1.0f), clat, clon, 
+	projection->ab_lat( rad((float) nt->c.lat), rad(nt->c.lon+dx), clat, clon, 
 		xyr );
 	scale( xyr[0], xyr[1], &nt->xso, &nt->yso );
 
