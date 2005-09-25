@@ -176,6 +176,18 @@ void MapBrowser::draw() {
       if ( tile->texbuf != NULL ) {
 	GLfloat dxs = tile->w.rs*zoom / tilesize / 2.0f;
 	GLfloat dxn = tile->w.rn*zoom / tilesize / 2.0f;
+        if ( abs( tile->c.lat ) >= 83 ) {
+           dxs *= 2.0f;
+           dxn *= 2.0f;
+        }
+        if ( abs( tile->c.lat ) >= 86 ) {
+           dxs *= 2.0f;
+           dxn *= 2.0f;
+        }
+        if ( abs( tile->c.lat ) >= 88 ) {
+           dxs *= 2.0f;
+           dxn *= 2.0f;
+        }
 
 	glBindTexture(GL_TEXTURE_2D, tile->texture_handle);
     
@@ -242,17 +254,27 @@ void MapBrowser::update() {
     } else {
       // update tiles position
       sgVec3 xyr;
+      float dx;
+      if ( abs( tile->c.lat ) < 83 ) {
+        dx = 1.0f;
+      } else if ( abs( tile->c.lat ) < 86 ) {
+        dx = 2.0f;
+      } else if ( abs( tile->c.lat ) < 88 ) {
+        dx = 4.0f;
+      } else {
+        dx = 8.0f;
+      }
       projection->ab_lat( rad((float) tile->c.lat), rad((float) tile->c.lon), clat, clon, 
-              xyr );
+            xyr );
       scale( xyr[0], xyr[1], &tile->xsw, &tile->ysw );
       projection->ab_lat( rad(tile->c.lat+1.0f), rad((float) tile->c.lon), clat, clon, 
-              xyr );
+            xyr );
       scale( xyr[0], xyr[1], &tile->xnw, &tile->ynw );
-      projection->ab_lat( rad(tile->c.lat+1.0f), rad(tile->c.lon+1.0f), clat, clon, 
-              xyr );
+      projection->ab_lat( rad(tile->c.lat+1.0f), rad(tile->c.lon+dx), clat, clon, 
+            xyr );
       scale( xyr[0], xyr[1], &tile->xno, &tile->yno );
-      projection->ab_lat( rad((float) tile->c.lat), rad(tile->c.lon+1.0f), clat, clon, 
-              xyr );
+      projection->ab_lat( rad((float) tile->c.lat), rad(tile->c.lon+dx), clat, clon, 
+            xyr );
       scale( xyr[0], xyr[1], &tile->xso, &tile->yso );
     }
   }
