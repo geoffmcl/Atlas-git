@@ -275,12 +275,7 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
 
       output->closeFragment();
       ++i;
-      if ( nb_frag > 32 ) {
-        if ( i > nb_frag ) {
-          printf("."); fflush( stdout );
-          i -= nb_frag;
-        }
-      } else if ( nb_frag > 1 ) {
+      if ( nb_frag > 1 ) {
         while ( j < i * 32 / nb_frag ) {
           printf(".");
           j++;
