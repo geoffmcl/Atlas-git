@@ -34,8 +34,9 @@ const float rpol = 6356752.314f;      // earth radius, polar   (?)
 
 //Returns Earth radius at a given latitude (Ellipsoide equation with two equal axis)
 inline float earth_radius_lat( float lat ) {
-  return 1.0f / sqrt( cos(lat)/rec  * cos(lat)/rec +
-		      sin(lat)/rpol * sin(lat)/rpol );
+  double a = cos(lat)/rec;
+  double b = sin(lat)/rpol;
+  return 1.0f / sqrt( a * a + b * b );
 }
 
 inline void ab_xy( sgVec3 xyz, sgVec3 ref, sgVec3 dst) {
