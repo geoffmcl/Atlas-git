@@ -102,7 +102,7 @@ protected:
     Tilewidth w;
     GLuint  texture_handle;
     GLfloat xsw, ysw, xnw, ynw, xno, yno, xso, yso;
-    GLubyte *texbuf;
+    bool tex;
   };
 
   struct TileLess {

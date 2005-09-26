@@ -120,7 +120,6 @@ void MapBrowser::changeResolution(char *path) {
      itmp = i--;
      tiles.erase( itmp );
      tiletable.erase(tile->c);
-     delete tile->texbuf;
      delete tile;
   }
   
@@ -173,7 +172,7 @@ void MapBrowser::draw() {
 
     for (list<MapTile*>::iterator i = tiles.begin(); i != tiles.end(); i++) {
       MapTile *tile = *i;
-      if ( tile->texbuf != NULL ) {
+      if ( tile->tex ) {
 	GLfloat dxs = tile->w.rs*zoom / tilesize / 2.0f;
 	GLfloat dxn = tile->w.rn*zoom / tilesize / 2.0f;
         if ( abs( tile->c.lat ) >= 83 ) {
@@ -243,12 +242,11 @@ void MapBrowser::update() {
          tile->c.lon > max_lon + CACHE_LIMIT) {
  
       list<MapTile*>::iterator tmp = it; tmp++;
-      if ( tile->texbuf != NULL ) {
+      if ( tile->tex ) {
         glDeleteTextures( 1, &tile->texture_handle );
       }
       tiles.erase( it );
       tiletable.erase( tile->c );
-      delete tile->texbuf;
       delete tile;
       it = tmp;
     } else {
@@ -293,6 +291,7 @@ void MapBrowser::update() {
       if ( t == tiletable.end() ) {  // check if the tile has been loaded
         // Load a new tile
         MapTile *nt = new MapTile;
+        nt->tex = false;
         nt->c.lat = c.lat;
         nt->c.lon = c.lon;
         tlat = (float) c.lat * SG_DEGREES_TO_RADIANS;
@@ -306,13 +305,14 @@ void MapBrowser::update() {
 
         //printf("Loading tile %s...\n", mpath);
 
-	if ( (nt->texbuf = (GLubyte*)loadPng( mpath, &wid, &hei )) == NULL ) {
+        GLubyte *texbuf;
+	if ( (texbuf = (GLubyte*)loadPng( mpath, &wid, &hei )) == NULL ) {
 	  sprintf( mpath+pathl, "%c%03d%c%02d.jpg", 
 		   (c.lon < 0)?'w':'e', abs(c.lon),
 		   (c.lat < 0)?'s':'n', abs(c.lat) );         
-	  nt->texbuf = (GLubyte*)loadJpg( mpath, &wid, &hei );
+	  texbuf = (GLubyte*)loadJpg( mpath, &wid, &hei );
 	}
-	if ( nt->texbuf != NULL ) {
+	if ( texbuf != NULL ) {
           glPixelStorei(GL_UNPACK_ALIGNMENT, 3);
           glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
           glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
@@ -326,7 +326,9 @@ void MapBrowser::update() {
           glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP );
           glTexEnvf( GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE );
           glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB, wid, hei, 0, GL_RGB, 
-                         GL_UNSIGNED_BYTE, nt->texbuf );
+                         GL_UNSIGNED_BYTE, texbuf );
+          delete texbuf;
+          nt->tex = true;
         } else {
           // printf("Tile %s couldn't be loaded\n",mpath);
 	  // texbuf is NULL; texture_handle is undefined.
