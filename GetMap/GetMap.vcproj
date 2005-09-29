@@ -2,8 +2,8 @@
 <VisualStudioProject
 	ProjectType="Visual C++"
 	Version="7.10"
-	Name="MapPS"
-	ProjectGUID="{817953DF-1AA8-4CA1-8B0B-40901755B5CF}"
+	Name="GetMap"
+	ProjectGUID="{E352C929-7912-468F-80E1-76F56A0A5B8E}"
 	Keyword="Win32Proj">
 	<Platforms>
 		<Platform
@@ -19,11 +19,11 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="..\..;&quot;..\..\..\zlib-1.1.4&quot;;..\..\SimGear;&quot;..\..\..\libpng-1.2.6&quot;"
-				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE,FGBASE_DIR=\&quot;C:\\FlightGear\\data\&quot;"
+				AdditionalIncludeDirectories="&quot;..\..\..\..\curl-7.14.0\include&quot;"
+				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
-				RuntimeLibrary="3"
+				RuntimeLibrary="5"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				Detect64BitPortabilityProblems="TRUE"
@@ -32,12 +32,12 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="wsock32.lib sg_d.lib pui.lib ul.lib fnt.lib net.lib SimGear_d.lib libpngd.lib zlibd.lib"
-				OutputFile="$(OutDir)/MapPS.exe"
+				AdditionalDependencies="libcurld.lib"
+				OutputFile="$(OutDir)/GetMap.exe"
 				LinkIncremental="2"
-				AdditionalLibraryDirectories="&quot;..\..\..\libpng-1.2.6&quot;;&quot;..\..\..\zlib-1.1.4&quot;;..\..\plib;..\..\SimGear\Debug"
+				AdditionalLibraryDirectories="&quot;..\..\..\..\curl-7.14.0\lib&quot;"
 				GenerateDebugInformation="TRUE"
-				ProgramDatabaseFile="$(OutDir)/MapPS.pdb"
+				ProgramDatabaseFile="$(OutDir)/GetMap.pdb"
 				SubSystem="1"
 				TargetMachine="1"/>
 			<Tool
@@ -69,14 +69,9 @@
 			CharacterSet="2">
 			<Tool
 				Name="VCCLCompilerTool"
-				Optimization="2"
-				InlineFunctionExpansion="1"
-				OmitFramePointers="TRUE"
-				AdditionalIncludeDirectories="..\..;&quot;..\..\..\zlib-1.1.4&quot;;..\..\SimGear;&quot;..\..\..\libpng-1.2.6&quot;"
-				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE,FGBASE_DIR=\&quot;C:\\FlightGear\\data\&quot;"
-				StringPooling="TRUE"
-				RuntimeLibrary="0"
-				EnableFunctionLevelLinking="TRUE"
+				AdditionalIncludeDirectories="&quot;..\..\..\..\curl-7.14.0\include&quot;"
+				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
+				RuntimeLibrary="4"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				Detect64BitPortabilityProblems="TRUE"
@@ -85,10 +80,10 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="wsock32.lib sg-nd.lib pui-nd.lib ul-nd.lib fnt-nd.lib net-nd.lib SimGear-nd.lib libpng.lib zlib-nd.lib"
-				OutputFile="$(OutDir)/MapPS.exe"
+				AdditionalDependencies="libcurl.lib"
+				OutputFile="$(OutDir)/GetMap.exe"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="&quot;I:\FlightGear\cvs\SimGear\release-nd&quot;;&quot;..\..\..\libpng-1.2.6&quot;;&quot;..\..\..\zlib-1.1.4&quot;;..\..\plib"
+				AdditionalLibraryDirectories="&quot;..\..\..\..\curl-7.14.0\lib&quot;"
 				GenerateDebugInformation="TRUE"
 				SubSystem="1"
 				OptimizeReferences="2"
@@ -121,60 +116,21 @@
 	<Files>
 		<Filter
 			Name="Source Files"
-			Filter="cpp;c;cxx;def;odl;idl;hpj;bat;asm">
+			Filter="cpp;c;cxx;def;odl;idl;hpj;bat;asm;asmx"
+			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}">
 			<File
-				RelativePath="..\src\FlightTrack.cxx">
-			</File>
-			<File
-				RelativePath="..\src\MapMaker.cxx">
-			</File>
-			<File
-				RelativePath="..\src\MapPS.cxx">
-			</File>
-			<File
-				RelativePath="..\src\Output.cxx">
-			</File>
-			<File
-				RelativePath="..\src\OutputPS.cxx">
-			</File>
-			<File
-				RelativePath="..\src\Overlays.cxx">
-			</File>
-			<File
-				RelativePath="..\src\Projection.cxx">
-			</File>
-			<File
-				RelativePath="..\src\Scenery.cxx">
+				RelativePath="..\src\GetMap.cxx">
 			</File>
 		</Filter>
 		<Filter
 			Name="Header Files"
-			Filter="h;hpp;hxx;hm;inl;inc">
-			<File
-				RelativePath="..\src\FlightTrack.hxx">
-			</File>
-			<File
-				RelativePath="..\src\MapMaker.hxx">
-			</File>
-			<File
-				RelativePath="..\src\Output.hxx">
-			</File>
-			<File
-				RelativePath="..\src\OutputPS.hxx">
-			</File>
-			<File
-				RelativePath="..\src\Overlays.hxx">
-			</File>
-			<File
-				RelativePath="..\src\Projection.hxx">
-			</File>
-			<File
-				RelativePath="..\src\Scenery.hxx">
-			</File>
+			Filter="h;hpp;hxx;hm;inl;inc;xsd"
+			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}">
 		</Filter>
 		<Filter
 			Name="Resource Files"
-			Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe">
+			Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx"
+			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}">
 		</Filter>
 	</Files>
 	<Globals>

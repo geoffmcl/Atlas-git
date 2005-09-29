@@ -1,7 +1,7 @@
-<?xml version="1.0" encoding = "Windows-1252"?>
+<?xml version="1.0" encoding="Windows-1252"?>
 <VisualStudioProject
 	ProjectType="Visual C++"
-	Version="7.00"
+	Version="7.10"
 	Name="atlas"
 	ProjectGUID="{E008B81E-8B7F-4E04-AE7E-DD59823B1005}"
 	SccProjectName=""
@@ -22,6 +22,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				InlineFunctionExpansion="1"
+				AdditionalIncludeDirectories="..\..;&quot;..\..\..\zlib-1.1.4&quot;;..\..\SimGear;&quot;..\..\..\libpng-1.2.6&quot;;&quot;..\..\..\jpeg-6b&quot;"
 				PreprocessorDefinitions="WIN32,NDEBUG,_CONSOLE,FGBASE_DIR=\&quot;C:\\FlightGear\\data\&quot;"
 				StringPooling="TRUE"
 				RuntimeLibrary="0"
@@ -32,17 +33,18 @@
 				ObjectFile=".\Release/"
 				ProgramDataBaseFileName=".\Release/"
 				WarningLevel="3"
-				SuppressStartupBanner="TRUE"/>
+				SuppressStartupBanner="TRUE"
+				Detect64BitPortabilityProblems="TRUE"/>
 			<Tool
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions="/MACHINE:I386"
-				AdditionalDependencies="wsock32.lib pui-nd.lib ul-nd.lib fnt-nd.lib net-nd.lib SimGear-nd.lib libpng.lib"
+				AdditionalDependencies="wsock32.lib sg-nd.lib pui-nd.lib ul-nd.lib fnt-nd.lib net-nd.lib SimGear-nd.lib libpng.lib zlib-nd.lib libjpeg.lib"
 				OutputFile=".\Release/atlas.exe"
 				LinkIncremental="1"
 				SuppressStartupBanner="TRUE"
-				AdditionalLibraryDirectories="&quot;I:\FlightGear\cvs\SimGear\release-nd&quot;"
+				AdditionalLibraryDirectories="&quot;I:\FlightGear\cvs\SimGear\release-nd&quot;;&quot;..\..\..\libpng-1.2.6&quot;;&quot;..\..\..\zlib-1.1.4&quot;;..\..\plib;&quot;..\..\..\jpeg-6b&quot;"
 				ProgramDatabaseFile=".\Release/atlas.pdb"
 				SubSystem="1"/>
 			<Tool
@@ -61,7 +63,13 @@
 			<Tool
 				Name="VCWebServiceProxyGeneratorTool"/>
 			<Tool
+				Name="VCXMLDataGeneratorTool"/>
+			<Tool
 				Name="VCWebDeploymentTool"/>
+			<Tool
+				Name="VCManagedWrapperGeneratorTool"/>
+			<Tool
+				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
 		</Configuration>
 		<Configuration
 			Name="Debug|Win32"
@@ -74,6 +82,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
+				AdditionalIncludeDirectories="..\..;&quot;..\..\..\zlib-1.1.4&quot;;..\..\SimGear;&quot;..\..\..\libpng-1.2.6&quot;;&quot;..\..\..\jpeg-6b&quot;"
 				PreprocessorDefinitions="WIN32,_DEBUG,_CONSOLE,FGBASE_DIR=\&quot;C:\\FlightGear\\data\&quot;"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -90,11 +99,11 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions="/MACHINE:I386"
-				AdditionalDependencies="wsock32.lib pui_d.lib ul_d.lib fnt_d.lib net_d.lib SimGear_d.lib libpng.lib"
+				AdditionalDependencies="wsock32.lib sg_d.lib pui_d.lib ul_d.lib fnt_d.lib net_d.lib SimGear_d.lib libpngd.lib zlibd.lib libjpegd.lib"
 				OutputFile=".\Debug/atlas.exe"
 				LinkIncremental="2"
 				SuppressStartupBanner="TRUE"
-				AdditionalLibraryDirectories="&quot;i:\fgfs-osg\OpenSceneGraph\lib&quot;"
+				AdditionalLibraryDirectories="&quot;..\..\..\libpng-1.2.6&quot;;&quot;..\..\..\zlib-1.1.4&quot;;..\..\plib;..\..\SimGear\Debug;&quot;..\..\..\jpeg-6b&quot;"
 				GenerateDebugInformation="TRUE"
 				ProgramDatabaseFile=".\Debug/atlas.pdb"
 				SubSystem="1"/>
@@ -114,9 +123,17 @@
 			<Tool
 				Name="VCWebServiceProxyGeneratorTool"/>
 			<Tool
+				Name="VCXMLDataGeneratorTool"/>
+			<Tool
 				Name="VCWebDeploymentTool"/>
+			<Tool
+				Name="VCManagedWrapperGeneratorTool"/>
+			<Tool
+				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
 		</Configuration>
 	</Configurations>
+	<References>
+	</References>
 	<Files>
 		<Filter
 			Name="Source Files"
@@ -128,13 +145,13 @@
 				RelativePath="..\src\FlightTrack.cxx">
 			</File>
 			<File
+				RelativePath="..\src\LoadJpg.cxx">
+			</File>
+			<File
 				RelativePath="..\src\LoadPng.cxx">
 			</File>
 			<File
 				RelativePath="..\src\MapBrowser.cxx">
-			</File>
-			<File
-				RelativePath="..\src\MapMaker.cxx">
 			</File>
 			<File
 				RelativePath="..\src\Output.cxx">
@@ -159,13 +176,13 @@
 				RelativePath="..\src\Geodesy.hxx">
 			</File>
 			<File
+				RelativePath="..\src\LoadJpg.hxx">
+			</File>
+			<File
 				RelativePath="..\src\LoadPng.hxx">
 			</File>
 			<File
 				RelativePath="..\src\MapBrowser.hxx">
-			</File>
-			<File
-				RelativePath="..\src\MapMaker.hxx">
 			</File>
 			<File
 				RelativePath="..\src\Output.hxx">
