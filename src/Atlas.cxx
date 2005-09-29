@@ -68,6 +68,7 @@ int  sock;
 float update = 1.0f;
 char save_buf[ 2 * 2048 ];
 int save_len = 0;
+int mode = MapBrowser::ATLAS;
 
 fntTexFont *texfont;
 puFont *font;
@@ -948,6 +949,7 @@ void print_help() {
   printf("   --udp=x      Input read from UDP socket at specified port (defaults to 5500)\n");
   printf("   --serial=dev Input read from serial port with specified device\n");
   printf("   --baud=x     Set serial port baud rate (defaults to 4800)\n");
+  printf("   --landsat    Set landsat mode\n");
 }
 
 int main(int argc, char **argv) {
@@ -990,6 +992,8 @@ int main(int argc, char **argv) {
       softcursor = true;
     } else if ( sscanf(argv[i], "--geometry=%dx%d", &width, &height) == 2 ) {
       // do nothing
+    } else if ( strcmp(argv[i], "--landsat") == 0 ) {
+      mode = MapBrowser::LANDSAT;
     } else if ( strcmp(argv[i], "--help") == 0 ) {
       print_help();
       return 0;
@@ -1055,6 +1059,7 @@ int main(int argc, char **argv) {
                                Overlays::OVERLAY_NAMES     |
 			       Overlays::OVERLAY_FLIGHTTRACK,
 			       fg_root[0] == 0 ? NULL : fg_root, 
+                               mode,
 			       textureFonts );
   map_object->setTextured(true);
   map_object->setMapPath(path);

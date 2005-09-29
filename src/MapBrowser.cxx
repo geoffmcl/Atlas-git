@@ -31,9 +31,10 @@
 const char* MapBrowser::TXF_FONT_NAME = "/Fonts/helvetica_medium.txf";
 
 MapBrowser::MapBrowser(GLfloat left, GLfloat top, GLfloat size, int features,
-                       char *fg_root, bool texturedFonts) :
+                       char *fg_root, int m, bool texturedFonts) :
   view_left(left), view_top(top), view_size(size), clat(0.0f), clon(0.0f),
-  scle(100000), pathl(0), features(features), texturedFonts(texturedFonts)
+  scle(100000), pathl(0), features(features), texturedFonts(texturedFonts),
+  mode(m)
 {
   mpath[0] = 0;
 
@@ -168,24 +169,28 @@ void MapBrowser::draw() {
 
   if (textured) {
     glEnable( GL_TEXTURE_2D );
-    GLfloat tilesize = earth_radius_lat(clat) * SG_DEGREES_TO_RADIANS * zoom;
+    GLfloat tilesize = earth_radius_lat(clat) * SG_DEGREES_TO_RADIANS;
 
     for (list<MapTile*>::iterator i = tiles.begin(); i != tiles.end(); i++) {
       MapTile *tile = *i;
       if ( tile->tex ) {
-	GLfloat dxs = tile->w.rs*zoom / tilesize / 2.0f;
-	GLfloat dxn = tile->w.rn*zoom / tilesize / 2.0f;
-        if ( abs( tile->c.lat ) >= 83 ) {
-           dxs *= 2.0f;
-           dxn *= 2.0f;
-        }
-        if ( abs( tile->c.lat ) >= 86 ) {
-           dxs *= 2.0f;
-           dxn *= 2.0f;
-        }
-        if ( abs( tile->c.lat ) >= 88 ) {
-           dxs *= 2.0f;
-           dxn *= 2.0f;
+	GLfloat dxs = 0.5f;
+	GLfloat dxn = 0.5f;
+        if ( mode == ATLAS ) {
+	  dxs = tile->w.rs / tilesize / 2.0f;
+	  dxn = tile->w.rn / tilesize / 2.0f;
+          if ( abs( tile->c.lat ) >= 83 ) {
+            dxs *= 2.0f;
+            dxn *= 2.0f;
+          }
+          if ( abs( tile->c.lat ) >= 86 ) {
+            dxs *= 2.0f;
+            dxn *= 2.0f;
+          }
+          if ( abs( tile->c.lat ) >= 88 ) {
+            dxs *= 2.0f;
+            dxn *= 2.0f;
+          }
         }
 
 	glBindTexture(GL_TEXTURE_2D, tile->texture_handle);
@@ -292,8 +297,7 @@ void MapBrowser::update() {
         // Load a new tile
         MapTile *nt = new MapTile;
         nt->tex = false;
-        nt->c.lat = c.lat;
-        nt->c.lon = c.lon;
+        nt->c = c;
         tlat = (float) c.lat * SG_DEGREES_TO_RADIANS;
         nt->w.rs = earth_radius_lat(tlat) * cos(tlat) * SG_DEGREES_TO_RADIANS;
         tlat = (float) (c.lat + 1) * SG_DEGREES_TO_RADIANS;
