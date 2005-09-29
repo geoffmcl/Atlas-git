@@ -20,7 +20,7 @@
   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 ---------------------------------------------------------------------------
 
-Try with --base-url=http://wms.jpl.nasa.gov/cgi-bin/wms.cgi?LAYERS=modis,global_mosaic&styles=default,visual&
+Try with --base-url='http://wms.jpl.nasa.gov/cgi-bin/wms.cgi?LAYERS=modis,global_mosaic&styles=default,visual&'
 
 ---------------------------------------------------------------------------
   CHANGES
@@ -131,6 +131,8 @@ int main( int argc, char **argv ) {
     fprintf(stderr, "%s: --base-url option missing.\n", argv[0]);
     exit(1);
   }
+
+  std::cout << "Getting landsat images from " << base_url.c_str() << std::endl;
 
   CURL *ceh = curl_easy_init();
   if ( ceh != 0 ) {

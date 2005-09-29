@@ -33,6 +33,17 @@ else
 	PLIB_DIR=
 fi
 
+dnl Specify the libcurl location
+AC_ARG_WITH(plib, [  --with-libcurl=prefix      specify the prefix path to libcurl])
+
+if test "x$with_libcurl" != "x" ; then
+    echo "libcurl prefix path is $with_libcurl"
+	LIBCURL_DIR="$with_libcurl"
+else
+    echo "libcurl not specified"
+	LIBCURL_DIR=
+fi
+
 dnl Specify the simgear location
 AC_ARG_WITH(simgear, [  --with-simgear=prefix   specify the prefix path to simgear])
 
@@ -87,7 +98,7 @@ AC_SUBST(AR)
 AC_SUBST(ARFLAGS)
 
 dnl extra library and include directories
-EXTRA_DIRS="${SIMGEAR_DIR} ${PLIB_DIR} /usr/local/plib"
+EXTRA_DIRS="${SIMGEAR_DIR} ${PLIB_DIR} ${LIBCURL_DIR} /usr/local/plib"
 
 dnl Determine an extra directories to add to include/lib search paths
 case "${host}" in
@@ -260,6 +271,10 @@ fi
 AC_CHECK_LIB(plibul, ulInit,,,)
 
 AC_LANG_POP(C++)
+
+AC_CHECK_HEADER(curl/curl.h)
+AC_CHECK_LIB(curl, curl_easy_init,,,)
+AM_CONDITIONAL(HAVE_CURL, test "x$ac_cv_lib_curl_curl_easy_init" = "xyes" )
 
 # Check for the presence of SimGear
 AC_CHECK_HEADER(simgear/version.h)

@@ -2,6 +2,7 @@
 Atlas
 Map
 MapPS
+GetMap
 buildmaps.sh
 config.h
 config.h.in

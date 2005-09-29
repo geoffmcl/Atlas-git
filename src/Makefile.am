@@ -4,6 +4,10 @@ EXTRA_DIST = buildmaps.sh AtlasPalette
 
 bin_PROGRAMS = Atlas Map MapPS
 
+if HAVE_CURL
+bin_PROGRAMS += GetMap
+endif
+
 bin_SCRIPTS = buildmaps.sh
 
 Atlas_SOURCES = \
@@ -58,3 +62,9 @@ MapPS_LDADD = \
 	-lplibsg -lplibpu -lplibul -lsgbucket \
 	$(opengl_LIBS) \
 	-lpng -lz
+
+GetMap_SOURCES = \
+	GetMap.cxx
+
+GetMap_LDADD = \
+	-lcurl
