@@ -131,6 +131,42 @@ int main( int argc, char **argv ) {
     fprintf(stderr, "%s: --base-url option missing.\n", argv[0]);
     exit(1);
   }
+  if ( min_lat == 1000 ) {
+    fprintf(stderr, "%s: --min-lat option missing.\n", argv[0]);
+    exit(1);
+  }
+  if ( min_lat < -90 || min_lat >= 90 ) {
+    fprintf(stderr, "%s: --min-lat out of range. Should be between -90 and 90.\n", argv[0]);
+    exit(1);
+  }
+  if ( min_lon == 1000 ) {
+    fprintf(stderr, "%s: --min-lon option missing.\n", argv[0]);
+    exit(1);
+  }
+  if ( min_lon < -180 || min_lon >= 180 ) {
+    fprintf(stderr, "%s: --min-lon out of range. Should be between -180 and 180.\n", argv[0]);
+    exit(1);
+  }
+  if ( max_lat == -1000 ) {
+    fprintf(stderr, "%s: --max-lat option missing.\n", argv[0]);
+    exit(1);
+  }
+  if ( max_lat < -90 || max_lat >= 90 ) {
+    fprintf(stderr, "%s: --max-lat out of range. Should be between -90 and 90.\n", argv[0]);
+    exit(1);
+  }
+  if ( max_lon == -1000 ) {
+    fprintf(stderr, "%s: --max-lon option missing.\n", argv[0]);
+    exit(1);
+  }
+  if ( max_lon < -180 || max_lon >= 180 ) {
+    fprintf(stderr, "%s: --max-lon out of range. Should be between -180 and 180.\n", argv[0]);
+    exit(1);
+  }
+
+  if ( min_lon > max_lon ) {
+    max_lon += 360;
+  }
 
   std::cout << "Getting landsat images from " << base_url.c_str() << std::endl;
 
@@ -138,8 +174,12 @@ int main( int argc, char **argv ) {
   if ( ceh != 0 ) {
     for ( int y = min_lat; y < max_lat; y += 1 ) {
       for ( int x = min_lon; x < max_lon; x += 1 ) {
+        int rx = x;
+        if ( rx >= 180 ) {
+          rx -= 360;
+        }
         std::ostringstream fname;
-        fname << outp << "/" << ( x < 0 ? "w" : "e" ) << std::setw( 3 ) << std::setfill( '0' ) << abs(x)
+        fname << outp << "/" << ( rx < 0 ? "w" : "e" ) << std::setw( 3 ) << std::setfill( '0' ) << abs(rx)
                             << ( y < 0 ? "s" : "n" ) << std::setw( 2 ) << std::setfill( '0' ) << abs(y)
                             << ".jpg";
 
@@ -149,7 +189,7 @@ int main( int argc, char **argv ) {
 
         std::ostringstream surl;
         surl << base_url << "REQUEST=GetMap&VERSION=1.1.1&WIDTH=" << size << "&HEIGHT=" << size << "&BBOX="
-            << x << "," << y << "," << x+1 << "," << y+1 << "&FORMAT=image/jpeg&SRS=EPSG:4326";
+            << rx << "," << y << "," << rx+1 << "," << y+1 << "&FORMAT=image/jpeg&SRS=EPSG:4326";
 
         std::string url = surl.str();
         curl_easy_setopt( ceh, CURLOPT_URL, url.c_str() );
