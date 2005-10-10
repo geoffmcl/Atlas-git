@@ -59,8 +59,7 @@ MapPS_SOURCES = \
 
 MapPS_LDADD = \
 	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgdebug \
-	-lplibsg -lplibpu -lplibul -lsgbucket \
-	$(opengl_LIBS) \
+	-lplibsg -lsgbucket \
 	-lpng -lz
 
 GetMap_SOURCES = \
