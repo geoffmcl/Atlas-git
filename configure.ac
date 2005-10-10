@@ -254,24 +254,6 @@ AC_SUBST(opengl_LIBS)
 
 AM_CONDITIONAL(HAVE_XWINDOWS, test "x$ac_cv_lib_X11_XCreateWindow" = "xyes" )
 
-AC_LANG_PUSH(C++)
-
-dnl Check for "plib" without which we cannot go on
-AC_CHECK_HEADER(plib/pu.h)
-if test "x$ac_cv_header_plib_pu_h" != "xyes"; then
-    echo
-    echo "You *must* have the plib library installed on your system to build"
-    echo "the FGFS simulator!"
-    echo
-    echo "Please see README.plib for more details."
-    echo
-    echo "configure aborted."
-    exit
-fi
-AC_CHECK_LIB(plibul, ulInit,,,)
-
-AC_LANG_POP(C++)
-
 AC_CHECK_HEADER(curl/curl.h)
 AC_CHECK_LIB(curl, curl_easy_init,,,)
 AM_CONDITIONAL(HAVE_CURL, test "x$ac_cv_lib_curl_curl_easy_init" = "xyes" )
@@ -330,6 +312,24 @@ int main() {
    AC_MSG_ERROR([Install latest simgear first...])],
   AC_MSG_RESULT(yes)
 )
+
+AC_LANG_PUSH(C++)
+
+dnl Check for "plib" without which we cannot go on
+AC_CHECK_HEADER(plib/pu.h)
+if test "x$ac_cv_header_plib_pu_h" != "xyes"; then
+    echo
+    echo "You *must* have the plib library installed on your system to build"
+    echo "the FGFS simulator!"
+    echo
+    echo "Please see README.plib for more details."
+    echo
+    echo "configure aborted."
+    exit
+fi
+AC_CHECK_LIB(plibul, ulInit,,,)
+
+AC_LANG_POP(C++)
 
 dnl Checks for header files.
 AC_HEADER_STDC
