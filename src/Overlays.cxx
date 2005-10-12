@@ -963,6 +963,7 @@ void Overlays::load_new_navaids() {
     
     if ( sscanf(line, "%d %f %f %d %f %f %s",
 		&iNavtype, &n->lat, &n->lon, &elev, &n->freq, &n->magvar, n->id) == 7 ) {
+	n->freq /= 100.0f;
 	bool bNavaid = true;
 	switch (iNavtype) {
 	case 3: n->navtype = NAV_VOR; break;
