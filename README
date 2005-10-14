@@ -9,8 +9,8 @@ To use the Atlas program, you must have some of the scenery from FlightGear
 (a freeware flight simulator) installed. These files can be found at the
 FlightGear homepage: http://www.flightgear.org
 
-You also need to copy src/AtlasPalette from this package into your FlightGear
-base directory (often /usr/local/lib/FlightGear).  If your FlightGear base
+You might need to help Atlas find the FlightGear base data directory
+(often /usr/local/lib/FlightGear).  If your FlightGear base
 directory is somewhere else, you can either set the FG_ROOT environment
 variable, or use the --fgroot=path command-line option to specify the
 FlightGear base directory.
