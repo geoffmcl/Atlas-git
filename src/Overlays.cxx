@@ -441,7 +441,7 @@ void Overlays::draw_ndb( NAV *n, sgVec2 p ) {
 // Draw one specified ILS
 void Overlays::draw_ils( NAV *n, sgVec2 p ) {
   char freqbuf[20];
-  sprintf( freqbuf, "%.0f", n->freq );
+  sprintf( freqbuf, "%.1f", n->freq );
   float ilsSize = 3000.0f;
   ilsSize *= scale;  // Clip the min/max size?
   // n->magvar is true heading for ILS
@@ -966,10 +966,12 @@ void Overlays::load_new_navaids() {
 	n->freq /= 100.0f;
 	bool bNavaid = true;
 	switch (iNavtype) {
+	case 2: n->navtype = NAV_NDB;
+	    n->freq *= 100.0f;
+	    break;
 	case 3: n->navtype = NAV_VOR; break;
-	case 12: n->navtype = NAV_DME; break;
-	case 2: n->navtype = NAV_NDB; break;
 	case 4: n->navtype = NAV_ILS; break;	// code 4 is for localisers as part of full ILS - might also consider 5 (LDA & SDF) and 6 (glideslope).
+	case 12: n->navtype = NAV_DME; break;
 	case 5: n->navtype = NAV_ILS; break;
 	//case 6: n->navtype = NAV_GS; break;
 	default: bNavaid = false;
