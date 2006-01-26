@@ -961,8 +961,8 @@ void Overlays::load_new_navaids() {
     
     gzgets( nav, line, 256 );
     
-    if ( sscanf(line, "%d %f %f %d %f %f %s",
-		&iNavtype, &n->lat, &n->lon, &elev, &n->freq, &n->magvar, n->id) == 7 ) {
+    if ( sscanf(line, "%d %f %f %d %f %d %f %s",
+		&iNavtype, &n->lat, &n->lon, &elev, &n->freq, &n->range, &n->magvar, n->id) == 8 ) {
 	n->freq /= 100.0f;
 	bool bNavaid = true;
 	switch (iNavtype) {
