@@ -441,7 +441,7 @@ void Overlays::draw_ndb( NAV *n, sgVec2 p ) {
 // Draw one specified ILS
 void Overlays::draw_ils( NAV *n, sgVec2 p ) {
   char freqbuf[20];
-  sprintf( freqbuf, "%.1f", n->freq );
+  sprintf( freqbuf, "%.2f", n->freq );
   float ilsSize = 3000.0f;
   ilsSize *= scale;  // Clip the min/max size?
   // n->magvar is true heading for ILS
