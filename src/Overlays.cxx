@@ -972,6 +972,7 @@ void Overlays::load_new_navaids() {
 	case 3: n->navtype = NAV_VOR; break;
 	case 4: n->navtype = NAV_ILS; break;	// code 4 is for localisers as part of full ILS - might also consider 5 (LDA & SDF) and 6 (glideslope).
 	case 12: n->navtype = NAV_DME; break;
+	case 13: n->navtype = NAV_DME; break;
 	case 5: n->navtype = NAV_ILS; break;
 	//case 6: n->navtype = NAV_GS; break;
 	default: bNavaid = false;
