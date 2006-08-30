@@ -27,6 +27,7 @@
 // Original RenderTexture code: Mark J. Harris
 // Original Render-to-depth-texture support: Thorsten Scheuermann
 // Linux Copy-to-texture: Eric Werness
+// OS X: Alexander Powell (someone please help)
 // Various Bug Fixes: Daniel (Redge) Sperl 
 //                    Bill Baxter
 //
@@ -45,16 +46,19 @@
  * Changelog:
  *
  * Jan. 2005, Removed GLEW dependencies, Erik Hofman
+ * Mar. 2006, Added MAC OS X support, Alexander Powell
  */
 #include <simgear/compiler.h>
-#include <plib/ul.h>
 
-#ifdef UL_GLX
+#if !defined( _WIN32 ) && !defined( __MACH__ )
 #  include <X11/Xlib.h>
 #endif
 #include SG_GL_H
-#ifdef UL_GLX
-#  include <GL/glx.h>
+#if defined( __MACH__)
+#  include <OpenGL/CGLTypes.h>
+#endif
+#ifndef _WIN32
+#  include SG_GLX_H
 #endif
 
 #include <string>
@@ -338,6 +342,11 @@ protected: // data
     
     HDC          _hPreviousDC;
     HGLRC        _hPreviousContext;
+#elif defined( __MACH__ )
+    CGLContextObj      _hGLContext;
+    CGLPBufferObj   _hPBuffer;
+   
+    CGLContextObj      _hPreviousContext;
 #else
     Display     *_pDisplay;
     GLXContext   _hGLContext;
@@ -349,8 +358,8 @@ protected: // data
     
     // Texture stuff
     GLenum       _iTextureTarget;
-    unsigned int _iTextureID;
-    unsigned int _iDepthTextureID;
+    GLuint       _iTextureID;
+    GLuint       _iDepthTextureID;
     
     unsigned short* _pPoorDepthTexture; // [Redge]
 
