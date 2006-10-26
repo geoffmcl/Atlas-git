@@ -61,8 +61,8 @@
 #include "OutputGL.hxx"
 #include "fg_mkdir.hxx"
 #include <simgear/misc/sg_path.hxx>
-#include "extensions.hxx"
-#include "RenderTexture.h"
+#include <simgear/screen/extensions.hxx>
+#include <simgear/screen/RenderTexture.h>
 #include "Scenery.hxx"
 #include <vector>
 #include STL_STRING

@@ -36,14 +36,12 @@ Map_SOURCES = \
 	OutputGL.cxx OutputGL.hxx \
 	Overlays.cxx Overlays.hxx \
 	Projection.cxx Projection.hxx \
-	RenderTexture.cpp RenderTexture.h \
 	Scenery.cxx Scenery.hxx \
-	extensions.cxx extensions.hxx \
 	fg_mkdir.cxx fg_mkdir.hxx
 
 Map_LDADD = \
 	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgdebug \
-	-lplibsg -lplibpu -lplibul -lplibfnt -lsgbucket \
+	-lplibsg -lplibpu -lplibul -lplibfnt -lsgbucket -lsgscreen \
 	$(opengl_LIBS) \
 	-lpng -lz -ljpeg
 
