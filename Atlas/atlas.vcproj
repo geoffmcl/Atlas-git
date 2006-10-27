@@ -22,12 +22,12 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				InlineFunctionExpansion="1"
-				AdditionalIncludeDirectories="..\..;&quot;..\..\..\zlib-1.1.4&quot;;..\..\SimGear;&quot;..\..\..\libpng-1.2.6&quot;;&quot;..\..\..\jpeg-6b&quot;"
-				PreprocessorDefinitions="WIN32,NDEBUG,_CONSOLE,FGBASE_DIR=\&quot;C:\\FlightGear\\data\&quot;"
+				AdditionalIncludeDirectories="..\..;&quot;..\..\zlib-1.1.4&quot;;..\..\SimGear;&quot;..\..\libpng-1.2.6&quot;;&quot;..\..\jpeg-6b&quot;"
+				PreprocessorDefinitions="WIN32,NDEBUG,_CONSOLE,FGBASE_DIR=\&quot;C:\\FlightGear\\data\&quot;;NOMINMAX"
 				StringPooling="TRUE"
 				RuntimeLibrary="0"
 				EnableFunctionLevelLinking="TRUE"
-				UsePrecompiledHeader="2"
+				UsePrecompiledHeader="0"
 				PrecompiledHeaderFile=".\Release/atlas.pch"
 				AssemblerListingLocation=".\Release/"
 				ObjectFile=".\Release/"
@@ -44,7 +44,7 @@
 				OutputFile=".\Release/atlas.exe"
 				LinkIncremental="1"
 				SuppressStartupBanner="TRUE"
-				AdditionalLibraryDirectories="&quot;I:\FlightGear\cvs\SimGear\release-nd&quot;;&quot;..\..\..\libpng-1.2.6&quot;;&quot;..\..\..\zlib-1.1.4&quot;;..\..\plib;&quot;..\..\..\jpeg-6b&quot;"
+				AdditionalLibraryDirectories="&quot;..\..\SimGear\release-nd&quot;;&quot;..\..\libpng-1.2.6&quot;;&quot;..\..\zlib-1.1.4&quot;;..\..\plib;&quot;..\..\jpeg-6b&quot;"
 				ProgramDatabaseFile=".\Release/atlas.pdb"
 				SubSystem="1"/>
 			<Tool
@@ -82,8 +82,8 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="..\..;&quot;..\..\..\zlib-1.1.4&quot;;..\..\SimGear;&quot;..\..\..\libpng-1.2.6&quot;;&quot;..\..\..\jpeg-6b&quot;"
-				PreprocessorDefinitions="WIN32,_DEBUG,_CONSOLE,FGBASE_DIR=\&quot;C:\\FlightGear\\data\&quot;"
+				AdditionalIncludeDirectories="..\..;&quot;..\..\zlib-1.1.4&quot;;..\..\SimGear;&quot;..\..\libpng-1.2.6&quot;;&quot;..\..\jpeg-6b&quot;"
+				PreprocessorDefinitions="WIN32,_DEBUG,_CONSOLE,FGBASE_DIR=\&quot;C:\\FlightGear\\data\&quot;,NOMINMAX"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
 				UsePrecompiledHeader="2"
@@ -103,7 +103,7 @@
 				OutputFile=".\Debug/atlas.exe"
 				LinkIncremental="2"
 				SuppressStartupBanner="TRUE"
-				AdditionalLibraryDirectories="&quot;..\..\..\libpng-1.2.6&quot;;&quot;..\..\..\zlib-1.1.4&quot;;..\..\plib;..\..\SimGear\Debug;&quot;..\..\..\jpeg-6b&quot;"
+				AdditionalLibraryDirectories="&quot;..\..\libpng-1.2.6&quot;;&quot;..\..\zlib-1.1.4&quot;;..\..\plib;..\..\SimGear\Debug;&quot;..\..\jpeg-6b&quot;"
 				GenerateDebugInformation="TRUE"
 				ProgramDatabaseFile=".\Debug/atlas.pdb"
 				SubSystem="1"/>

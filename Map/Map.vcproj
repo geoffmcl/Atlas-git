@@ -19,8 +19,8 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="..\..;&quot;..\..\..\zlib-1.1.4&quot;;..\..\SimGear;&quot;..\..\..\libpng-1.2.6&quot;;&quot;..\..\..\jpeg-6b&quot;"
-				PreprocessorDefinitions="WIN32,_DEBUG,_CONSOLE,FGBASE_DIR=\&quot;C:\\FlightGear\\data\&quot;"
+				AdditionalIncludeDirectories="..\..;&quot;..\..\zlib-1.1.4&quot;;..\..\SimGear;&quot;..\..\libpng-1.2.6&quot;;&quot;..\..\jpeg-6b&quot;"
+				PreprocessorDefinitions="WIN32,_DEBUG,_CONSOLE,FGBASE_DIR=\&quot;C:\\FlightGear\\data\&quot;;NOMINMAX"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -35,7 +35,7 @@
 				AdditionalDependencies="wsock32.lib sg_d.lib pui_d.lib ul_d.lib fnt_d.lib net_d.lib SimGear_d.lib libpngd.lib zlibd.lib libjpegd.lib"
 				OutputFile="$(OutDir)/Map.exe"
 				LinkIncremental="2"
-				AdditionalLibraryDirectories="&quot;..\..\..\libpng-1.2.6&quot;;&quot;..\..\..\zlib-1.1.4&quot;;..\..\plib;..\..\SimGear\Debug;&quot;..\..\..\jpeg-6b&quot;"
+				AdditionalLibraryDirectories="&quot;..\..\libpng-1.2.6&quot;;&quot;..\..\zlib-1.1.4&quot;;..\..\plib;..\..\SimGear\Debug;&quot;..\..\jpeg-6b&quot;"
 				GenerateDebugInformation="TRUE"
 				ProgramDatabaseFile="$(OutDir)/Map.pdb"
 				SubSystem="1"
@@ -72,8 +72,8 @@
 				Optimization="2"
 				InlineFunctionExpansion="1"
 				OmitFramePointers="TRUE"
-				AdditionalIncludeDirectories="..\..;&quot;..\..\..\zlib-1.1.4&quot;;..\..\SimGear;&quot;..\..\..\libpng-1.2.6&quot;;&quot;..\..\..\jpeg-6b&quot;"
-				PreprocessorDefinitions="WIN32,NDEBUG,_CONSOLE,FGBASE_DIR=\&quot;C:\\FlightGear\\data\&quot;"
+				AdditionalIncludeDirectories="..\..;&quot;..\..\zlib-1.1.4&quot;;..\..\SimGear;&quot;..\..\libpng-1.2.6&quot;;&quot;..\..\jpeg-6b&quot;"
+				PreprocessorDefinitions="WIN32,NDEBUG,_CONSOLE,FGBASE_DIR=\&quot;C:\\FlightGear\\data\&quot;;NOMINMAX"
 				StringPooling="TRUE"
 				RuntimeLibrary="0"
 				EnableFunctionLevelLinking="TRUE"
@@ -88,7 +88,7 @@
 				AdditionalDependencies="wsock32.lib sg-nd.lib pui-nd.lib ul-nd.lib fnt-nd.lib net-nd.lib SimGear-nd.lib libpng.lib zlib-nd.lib libjpeg.lib"
 				OutputFile="$(OutDir)/Map.exe"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="&quot;I:\FlightGear\cvs\SimGear\release-nd&quot;;&quot;..\..\..\libpng-1.2.6&quot;;&quot;..\..\..\zlib-1.1.4&quot;;..\..\plib;&quot;..\..\..\jpeg-6b&quot;"
+				AdditionalLibraryDirectories="&quot;..\..\SimGear\release-nd&quot;;&quot;..\..\libpng-1.2.6&quot;;&quot;..\..\zlib-1.1.4&quot;;..\..\plib;&quot;..\..\jpeg-6b&quot;"
 				GenerateDebugInformation="TRUE"
 				SubSystem="1"
 				OptimizeReferences="2"
@@ -123,9 +123,6 @@
 			Name="Source Files"
 			Filter="cpp;c;cxx;def;odl;idl;hpj;bat;asm">
 			<File
-				RelativePath="..\src\extensions.cxx">
-			</File>
-			<File
 				RelativePath="..\src\fg_mkdir.cxx">
 			</File>
 			<File
@@ -150,18 +147,12 @@
 				RelativePath="..\src\Projection.cxx">
 			</File>
 			<File
-				RelativePath="..\src\RenderTexture.cpp">
-			</File>
-			<File
 				RelativePath="..\src\Scenery.cxx">
 			</File>
 		</Filter>
 		<Filter
 			Name="Header Files"
 			Filter="h;hpp;hxx;hm;inl;inc">
-			<File
-				RelativePath="..\src\extensions.hxx">
-			</File>
 			<File
 				RelativePath="..\src\fg_mkdir.hxx">
 			</File>
@@ -182,9 +173,6 @@
 			</File>
 			<File
 				RelativePath="..\src\Projection.hxx">
-			</File>
-			<File
-				RelativePath="..\src\RenderTexture.h">
 			</File>
 			<File
 				RelativePath="..\src\Scenery.hxx">
