@@ -949,7 +949,8 @@ void print_help() {
   printf("   --udp=x      Input read from UDP socket at specified port (defaults to 5500)\n");
   printf("   --serial=dev Input read from serial port with specified device\n");
   printf("   --baud=x     Set serial port baud rate (defaults to 4800)\n");
-  printf("   --landsat    Set landsat mode\n");
+  printf("   --square     Set square mode ( map 1x1 degree area on the whole image )\n");
+  printf("                  to be compatible with images retrieved by GetMap\n");
 }
 
 int main(int argc, char **argv) {
@@ -992,8 +993,8 @@ int main(int argc, char **argv) {
       softcursor = true;
     } else if ( sscanf(argv[i], "--geometry=%dx%d", &width, &height) == 2 ) {
       // do nothing
-    } else if ( strcmp(argv[i], "--landsat") == 0 ) {
-      mode = MapBrowser::LANDSAT;
+    } else if ( strcmp(argv[i], "--square") == 0 ) {
+      mode = MapBrowser::SQUARE;
     } else if ( strcmp(argv[i], "--help") == 0 ) {
       print_help();
       return 0;

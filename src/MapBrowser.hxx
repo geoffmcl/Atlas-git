@@ -36,7 +36,7 @@ class MapBrowser {
 public:
   static const int CACHE_LIMIT = 2;
 
-  enum { ATLAS, LANDSAT };
+  enum { ATLAS, SQUARE };
 
   MapBrowser( GLfloat x1, GLfloat y1, GLfloat size, int features, 
               char *fg_root, int mode, bool texturedFonts = true );
