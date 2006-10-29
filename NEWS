@@ -1,3 +1,11 @@
+New in 0.3.1
+* New GetMap utility to fetch map image from wms servers ( landsat and al. ).
+* Add a new --square option to Atlas to display square 1x1 degree image chunks.
+* Fix problems with whitespaces in path.
+* Fix map display problems at the pole.
+* Use SimGear for offscreen (headless) rendering.
+* Various fixes for buid-time and run-time.
+
 New in 0.3.0
 * ILS approaches displayed.
 * Support for FlightGear's changed (again!) airport and navaid data formats.
