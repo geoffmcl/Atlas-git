@@ -3,12 +3,12 @@ dnl working configure script.
 dnl
 dnl $Id$
 
-AC_INIT
+AC_INIT([Atlas], [0.3.1])
 AC_CONFIG_SRCDIR([src/Atlas.cxx])
 
 dnl Initialize the automake stuff
 AC_PREREQ(2.52)
-AM_INIT_AUTOMAKE(Atlas, 0.3.1)
+AM_INIT_AUTOMAKE
 
 dnl Checks for programs.
 AC_PROG_MAKE_SET
@@ -159,91 +159,68 @@ AC_CHECK_LIB(pthread, pthread_exit)
 
 dnl check for OpenGL related libraries
 
-if test "x$ac_cv_header_windows_h" != "xyes" ; then
-    dnl Reasonable stuff for non-windoze variants ... :-)
+case "${host}" in
+*-*-cygwin* | *-*-mingw32*)
+    dnl CygWin under Windoze.
 
-    AC_CHECK_LIB(socket, socket)
-    AC_CHECK_LIB(X11, XCreateWindow)
-    AC_CHECK_LIB(Xext, XShmCreateImage)
-    AC_CHECK_LIB(Xi, XGetExtensionVersion)
-    AC_CHECK_LIB(ICE, IceOpenConnection)
-    AC_CHECK_LIB(SM, SmcOpenConnection)
-    AC_CHECK_LIB(Xt, XtMalloc)
-    AC_CHECK_LIB(Xmu, XmuLookupStandardColormap)
+    echo Win32 specific hacks...
+    AC_DEFINE([WIN32], 1, [Define for Win32 platforms])
+    AC_DEFINE([NOMINMAX], 1, [Define for Win32 platforms])
 
-    AC_CHECK_LIB(GLcore, glNewList)
-    if test "x$ac_cv_lib_GLcore_glNewList" = "xno" ; then
-	dnl if no GLcore, check for GL
-	AC_CHECK_LIB(GL, glNewList)
-	if test "x$ac_cv_lib_GL_glNewList" = "xno" ; then
-	    dnl if no GL, check for MesaGL
-	    AC_CHECK_LIB(MesaGL, glNewList)
-	fi
-    else
-	dnl if GLcore found, then also check for GL
-	AC_CHECK_LIB(GL, glXCreateContext)
+    LIBS="$LIBS -lglut32 -lglu32 -lopengl32 -luser32 -lgdi32"
+
+    dnl add -lwsock32 for mingwin
+    case "${host}" in
+    *-*-mingw32*)
+        echo "********** BUILDING FOR MINGW32 *************"
+        network_LIBS="$network_LIBS -lws2_32"
+        ;;
+    esac
+
+    echo "Will link apps with $LIBS"
+    ;;
+
+
+*-apple-darwin*)
+    dnl Mac OS X
+
+    LIBS="$LIBS -framework GLUT -framework OpenGL -framework AGL -framework Carbon -lobjc"
+    ;;
+
+*)
+    dnl X-Windows based machines
+
+    dnl Skip X11 library tests if requested.
+    if test "x$no_x" != "xyes"; then
+        AC_SEARCH_LIBS(XCreateWindow, X11)
+        AC_SEARCH_LIBS(XShmCreateImage, Xext)
+        AC_SEARCH_LIBS(XGetExtensionVersion, Xi)
+        AC_SEARCH_LIBS(IceOpenConnection, ICE)
+        AC_SEARCH_LIBS(SmcOpenConnection, SM)
+        AC_SEARCH_LIBS(XtMalloc, Xt)
+        AC_SEARCH_LIBS(XmuLookupStandardColormap, Xmu)
+    fi
+
+    AC_SEARCH_LIBS(glNewList, [ GL GLcore MesaGL ])
+    if test "x$ac_cv_search_glNewList" = "x-lGLcore"; then
+        dnl if GLcore found, then also check for GL
+        AC_SEARCH_LIBS(glXCreateContext, GL)
     fi
 
     dnl if using mesa, check for xmesa.h
-    if test "x$ac_cv_lib_MesaGL_glNewList" = "xyes" ; then
-	AC_CHECK_HEADER(GL/xmesa.h)
-	if test "x$ac_cv_header_GL_xmesa_h" = "xyes"; then
-            AC_DEFINE([XMESA], 1, [Define for Mesa FX mode])
-            AC_DEFINE([FX], 1, [Define for Mesa FX mode])
+    if test "x$ac_cv_search_glNewList" = "x-lMesaGL"; then
+        AC_CHECK_HEADER(GL/fxmesa.h)
+        if test "x$ac_cv_header_GL_fxmesa_h" = "xyes"; then
+            AC_DEFINE([XMESA], 1, [Define for fxmesa])
+            AC_DEFINE([FX], 1, [Define for fxmesa])
         fi
     fi
 
-    AC_CHECK_LIB(GLU, gluLookAt)
-    if test "x$ac_cv_lib_GLU_gluLookAt" = "xno" ; then
-	dnl if no GLU, check for MesaGLU
-	AC_CHECK_LIB(MesaGLU, gluLookAt)
-    fi
+    AC_SEARCH_LIBS(gluLookAt, [ GLU MesaGLU ])
+    AC_SEARCH_LIBS(glutGetModifiers, [ glut freeglut ])
+    ;;
 
-    dnl check for glut
-    AC_CHECK_LIB(glut, glutGetModifiers)
-
-    dnl test for glutGameModeString, but avoid adding glut a second time into
-    dnl the list of libraries
-    save_LIBS="$LIBS"
-    AC_CHECK_LIB(glut, glutGameModeString)
-    LIBS="$save_LIBS"
-else
-    dnl Win32 is a little wierd because it has to try to handle the various
-    dnl winbloze-isms.  We'll just do this manually for now.
-
-    echo Win32 specific hacks...
-    AC_DEFINE([WIN32], 1, [Define if building on a Win32 platform])
-
-    dnl force a failed check since we will be building under windoze
-    # AM_CONDITIONAL(ENABLE_XMESA_FX, test "no" = "yes")
-
-    dnl just define these to true and hope for the best
-    ac_cv_lib_glut_glutGetModifiers="yes"
-    ac_cv_lib_glut_glutGameModeString="yes"
-
-    if test "x$with_sgi_opengl" = "xyes" ; then
-        echo "Building with glut.dll, glu.dll, and opengl.dll"
-	WIN32_GLUT=glut
-	WIN32_GLU=glu
-	WIN32_OPENGL=opengl
-    else 
-	echo "Building with glut32.dll, glu32.dll, and opengl32.dll"
-	WIN32_GLUT=glut32
-	WIN32_GLU=glu32
-	WIN32_OPENGL=opengl32
-    fi
-
-    LIBS="$LIBS -l${WIN32_GLUT} -l${WIN32_GLU} -l${WIN32_OPENGL}"
-    LIBS="$LIBS -luser32 -lgdi32"
-    echo "Will link apps with $LIBS"
-fi
-
-if test "x$ac_cv_lib_glut_glutGetModifiers" = "xno"; then
-    echo 
-    echo "Unable to find the necessary OpenGL or GLUT libraries."
-    echo "See config.log for automated test details and results ..."
-    exit 1
-fi
+esac
 
 opengl_LIBS="$LIBS"
 LIBS="$base_LIBS"
