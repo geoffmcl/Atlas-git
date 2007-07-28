@@ -27,6 +27,9 @@
 #include "Overlays.hxx"
 #include "Geodesy.hxx"
 
+#include <iostream>
+#include <sstream>
+
 SG_USING_STD(map);
 
 #ifdef _MSC_VER
@@ -76,6 +79,7 @@ const float Overlays::static_vor_from_color[4] = {0.800, 0.200, 0.200, 0.7};
 const float Overlays::static_ils_color[4] = {0.800, 0.200, 0.200, 0.7}; 
 const float Overlays::grid_color[4]     = {0.639, 0.371, 0.620, 0.3};
 const float Overlays::track_color[4]    = {0.071, 0.243, 0.427, 0.5};
+const float Overlays::aircraft_color[4]    = {1.0, 0.0, 0.0, 1.0};
 
 const float Overlays::dummy_normals[][3] = {{0.0f, 0.0f, 0.0f},
 					    {0.0f, 0.0f, 0.0f},
@@ -107,6 +111,7 @@ Overlays::Overlays( char *fg_root, float scale,
   setIlsColor( static_ils_color );
   setGridColor( grid_color );
   setTrackColor( track_color );
+  setAircraftColor( aircraft_color );
   flight_track = new FlightTrack;
   projection= new Projection;
 
@@ -265,6 +270,14 @@ void Overlays::draw_gridlines( float dtheta, float dalpha, float spacing ) {
   }
 }
 
+// Rotate a point x, y by an angle (in radians), putting the result in
+// the two-element vector v.
+static void rotate(float x, float y, float angle, sgVec2 v) {
+  sgSetVec2(v,
+	    (x * cos(angle)) - (y * sin(angle)),
+	    (x * sin(angle)) + (y * cos(angle)));
+}
+
 void Overlays::draw_flighttrack() {
   if (flight_track != NULL) {
     FlightData *point;
@@ -289,6 +302,43 @@ void Overlays::draw_flighttrack() {
       }
 
       sgCopyVec2( p2, p1 );
+    }
+
+    // If the flight track is non-empty, draw the aircraft at the last
+    // point in the track (which should be in p1).
+    if (!first) {
+      sgVec2 c, offset;
+      float heading;
+
+      // Get heading and convert it to radians.
+      point = flight_track->getLastPoint();
+      heading = (90.0f - point->hdg) * SG_DEGREES_TO_RADIANS;
+
+      output->setColor(ac_color);
+
+      // Center of aircraft.
+      sgCopyVec2(c, p1);
+
+      // Draw aircraft, starting with fuselage.
+      rotate(4.0f, 0.0f, heading, offset);
+      sgAddVec2(p1, c, offset);
+      rotate(-9.0f, 0.0f, heading, offset);
+      sgAddVec2(p2, c, offset);
+      output->drawLine(p1, p2);
+
+      // Wings
+      rotate(0.0f, -7.0f, heading, offset);
+      sgAddVec2(p1, c, offset);
+      rotate(0.0f, 7.0f, heading, offset);
+      sgAddVec2(p2, c, offset);
+      output->drawLine(p1, p2);
+
+      // Tail
+      rotate(-7.0f, -3.0f, heading, offset);
+      sgAddVec2(p1, c, offset);
+      rotate(-7.0f, 3.0f, heading, offset);
+      sgAddVec2(p2, c, offset);
+      output->drawLine(p1, p2);
     }
   }
 }
@@ -668,6 +718,9 @@ void Overlays::load_airports() {
 	  }
 	}
 	airports.push_back( ap );
+	
+	// Create a search token for this airport.
+	tokenizeLocation(Overlays::AIRPORT, ap, tokens);
 	ap = NULL;
       } else {
 	line_read = false;
@@ -682,6 +735,9 @@ void Overlays::load_airports() {
   delete[] arpname;
 
   airports_loaded = true;
+
+  // Sort all the search tokens.
+  sort(tokens.begin(), tokens.end());
 }  	
 	
 /* Loads the old format (Flightgear-0.9.3 to 0.9.7) airport 
@@ -803,6 +859,9 @@ void Overlays::load_old_airports() {
 	  
 	  airports.push_back( ap );
 	  pos_needed = false;  // Just in case pos_needed got set by an airport without a runway.  Shouldn't happen!!
+	
+	  // Create a search token for this airport.
+	  tokenizeLocation(Overlays::AIRPORT, ap, tokens);
 	}
 	ap = NULL;
       } else {
@@ -825,6 +884,9 @@ void Overlays::load_old_airports() {
   delete[] rwyname;
 
   airports_loaded = true;
+
+  // Sort all the search tokens.
+  sort(tokens.begin(), tokens.end());
 }
 
 /* Loads the original FlightGear airport database format.
@@ -901,6 +963,10 @@ void Overlays::load_very_old_airports() {
 	}
 
 	airports.push_back( ap );
+	
+	// Create a search token for this airport.
+	tokenizeLocation(Overlays::AIRPORT, ap, tokens);
+
 	ap = NULL;
       } else {
 	line_read = false;
@@ -919,6 +985,9 @@ void Overlays::load_very_old_airports() {
   delete[] arpname;
 
   airports_loaded = true;
+
+  // Sort all the search tokens.
+  sort(tokens.begin(), tokens.end());
 }
 
 /* Loads the new format (FG-0.9.6? onwards) navaid database if it isn't already loaded
@@ -960,9 +1029,12 @@ void Overlays::load_new_navaids() {
       n = new NAV;
     
     gzgets( nav, line, 256 );
+
+    int nameStart;
     
-    if ( sscanf(line, "%d %f %f %d %f %d %f %s",
-		&iNavtype, &n->lat, &n->lon, &elev, &n->freq, &n->range, &n->magvar, n->id) == 8 ) {
+    if ( sscanf(line, "%d %f %f %d %f %d %f %s %n",
+		&iNavtype, &n->lat, &n->lon, &elev, &n->freq, &n->range, &n->magvar, n->id, &nameStart) == 8 ) {
+	strcpy(n->name, line + nameStart);
 	n->freq /= 100.0f;
 	bool bNavaid = true;
 	switch (iNavtype) {
@@ -1008,15 +1080,10 @@ void Overlays::load_new_navaids() {
 	    // cout << "navid = " << n->id << " magvar = " << n->magvar * RAD_TO_DEG
 	    //      << endl;
     
-	    if(n->navtype == NAV_ILS) {
-	      strcpy(n->name, line+56);
-	    } else {
-	      // Urghh - the width formatting changes halfway through code 12 in the current FG data :-(
-	      // ILS/Other split is the best we can do for now.
-	      strcpy(n->name, line+52);
-	    }
-    
 	    navaids.push_back(n);
+
+	    // Create a search token for this navaid.
+	    tokenizeLocation(Overlays::NAVAID, n, tokens);
 	    n = NULL;
 	}
     }
@@ -1028,6 +1095,9 @@ void Overlays::load_new_navaids() {
   delete[] navname;
  
   navaids_loaded = true;
+
+  // Sort all the search tokens.
+  sort(tokens.begin(), tokens.end());
 }
 
 /* Loads the navaid database if it isn't already loaded
@@ -1098,6 +1168,9 @@ void Overlays::load_navaids() {
 	strcpy(n->name, line+55);  // 51?
 
 	navaids.push_back(n);
+
+	// Create a search token for this navaid.
+	tokenizeLocation(Overlays::NAVAID, n, tokens);
 	n = NULL;
     }
   }
@@ -1108,6 +1181,9 @@ void Overlays::load_navaids() {
   delete[] navname;
  
   navaids_loaded = true;
+
+  // Sort all the search tokens.
+  sort(tokens.begin(), tokens.end());
 }
 
 void Overlays::load_new_fixes() {
@@ -1144,6 +1220,9 @@ void Overlays::load_new_fixes() {
       n->lat *= SG_DEGREES_TO_RADIANS;
       n->lon *= SG_DEGREES_TO_RADIANS;
       navaids.push_back(n);
+
+      // Create a search token for this fix.
+      tokenizeLocation(Overlays::NAVAID, n, tokens);
       n = NULL;
     }
   }
@@ -1151,6 +1230,9 @@ void Overlays::load_new_fixes() {
   delete[] navname;
   gzclose(fix);
   fixes_loaded = true;
+
+  // Sort all the search tokens.
+  sort(tokens.begin(), tokens.end());
 }
 
 void Overlays::load_fixes() {
@@ -1183,6 +1265,8 @@ void Overlays::load_fixes() {
       n->navtype = NAV_FIX;
       n->lat *= SG_DEGREES_TO_RADIANS;
       n->lon *= SG_DEGREES_TO_RADIANS;
+
+      // Create a search token for this fix.
       navaids.push_back(n);
       n = NULL;
     }
@@ -1191,6 +1275,9 @@ void Overlays::load_fixes() {
   delete[] navname;
   gzclose(fix);
   fixes_loaded = true;
+
+  // Sort all the search tokens.
+  sort(tokens.begin(), tokens.end());
 }
 
 Overlays::ARP *Overlays::findAirport( const char *name ) {
@@ -1240,4 +1327,337 @@ Overlays::NAV *Overlays::findNav( float lat, float lon, float freq ) {
   }
 
   return closest;
+}
+
+// Checks if the record at index i in the tokens vector matches the
+// search tokens.  To match, each search token must match a token in
+// the record.
+bool Overlays::recordMatches(int i, vector<string> completeSearchTokens, 
+			     string partialSearchToken)
+{
+    TOKEN t = tokens[i];
+    vector<TOKEN> tmp;
+    int j, k;
+
+    // The given token, i, points to a single airport or navaid.
+    // Create a vector of TOKEN records for it.
+    if (t.t == Overlays::AIRPORT) {
+	ARP *ap = (Overlays::ARP *)t.locAddr;
+	tokenizeLocation(t.t, t.locAddr, tmp);
+    } else {
+	NAV *n = (Overlays::NAV *)t.locAddr;
+	tokenizeLocation(t.t, t.locAddr, tmp);
+    }
+
+    // Search the vector for all the complete search tokens.
+    for (k = 0; k < completeSearchTokens.size(); k++) {
+	for (j = 0; j < tmp.size(); j++) {
+	    // Complete search tokens require an exact match.
+	    if (strcasecmp(completeSearchTokens[k].c_str(), 
+			   tmp[j].token.c_str()) == 0) {
+		break;
+	    }
+	}
+	if (j == tmp.size()) {
+	    // We found no match, so bail.
+	    return false;
+	}
+    }
+    // Search the vector for the partial search token.
+    if (partialSearchToken != "") {
+	for (j = 0; j < tmp.size(); j++) {
+	    // Partial search tokens require a "head" match.
+	    if (strncasecmp(partialSearchToken.c_str(), 
+			    tmp[j].token.c_str(),
+			    partialSearchToken.size()) == 0) {
+		break;
+	    }
+	}
+	if (j == tmp.size()) {
+	    // We found no match, so bail.
+	    return false;
+	}
+    }
+
+    return true;
+}
+
+// Starts (if str is new) or continues (if str is the same as the
+// previous call) a search in the tokens vector (which is assumed to
+// be sorted) for str.  The results (TOKEN records) are placed in the
+// matches vector.  Returns true if the matches vector changed.  Finds
+// at most maxMatches results (this was added so that a GUI-based
+// application can get a reasonable response for a potentially large
+// search).  If maxMatches < 0, then there is no limit, and all
+// matches are found in a single call.
+//
+// Matching
+//
+// A location record (ARP or NAV) has a bunch of tokens.  These are
+// just the whitespace-separated strings in the name and the id.  For
+// example, the ARP record:
+//
+//   id = 'CYYC', name = 'Calgary Intl'
+//
+// has 3 tokens, "CYYC", "Calgary", and "Intl".
+//
+// A search string also consists of a set of whitespace-separated
+// search tokens.  A token with trailing whitespace is called a
+// "complete" token, while a token with no whitespace following is an
+// "incomplete" token.  In a search string, there can be 0 or more
+// complete tokens, and 0 or 1 incomplete tokens.
+//
+// Complete tokens and incomplete tokens match differently.  A
+// complete token must match exactly, whereas an incomplete token only
+// needs to match the head of a string.  For example, the complete
+// token "Foo" only matches "foo", "FOO", "fOo", etc, (case doesn't
+// matter), whereas the incomplete token "Foo" matches "foo",
+// "FoOt", "FOOBAR", etc.
+//
+// A search string (which contains a set of tokens) matches a location
+// record (ie, and ARP or NAV record) if all of the tokens in the
+// search string have matches in the tokens in the record.
+//
+// Using the ARP record above, the partial search strings "C", "cy",
+// "CA", "INTL" all match.  As well, "Calgary CY" matches (a complete
+// match with "Calgary" and a partial match with "CY"), but "Calgary
+// CY " doesn't (both "Calgary" and "CY" are complete because they
+// have trailing whitespace, and "CY" fails to match anything).
+bool Overlays::findMatches(char *str, int maxMatches)
+{
+    static char *lastSearchString = NULL;
+    static int end;
+    
+    istringstream stream(str);
+    vector<string> completeSearchTokens;
+    string partialSearchToken, aToken;
+
+    int i;
+    int noOfMatches;
+    bool changed = false;
+
+    // A bit of a silly case, but it seemed important to allow it.
+    if (maxMatches == 0) {
+	return changed;
+    }
+
+    if (maxMatches < 0) {
+	maxMatches = tokens.size();
+    }
+
+    // Check if this is a new search or a continuation of an old search.
+    if ((lastSearchString == NULL) || (strcmp(str, lastSearchString) != 0)) {
+	// New.  Reset the static variables.
+	free(lastSearchString);
+	lastSearchString = strdup(str);
+	end = -1;
+	matches.clear();
+	changed = true;
+    }
+
+    // Tokenize the search string.  All tokens except the last are
+    // complete tokens.  The last may or may not be complete.
+    stream >> aToken;
+    while (stream) {
+	// To determine if the current token is complete or not, we
+	// just see if we've gone to the end of the stream.  If we're
+	// at the very end, then the current token is incomplete.
+	int loc = stream.tellg();
+	if (loc == strlen(str)) {
+	    partialSearchToken = aToken;
+	} else {
+	    completeSearchTokens.push_back(aToken);
+	}
+	stream >> aToken;
+    }
+
+    // Now grab a search token.  It doesn't really matter which one we
+    // choose.
+    bool isPartial;
+    if (completeSearchTokens.size() > 0) {
+	aToken = completeSearchTokens.back();
+	completeSearchTokens.pop_back();
+	isPartial = false;
+    } else if (partialSearchToken.length() > 0) {
+	aToken = partialSearchToken;
+	isPartial = true;
+	partialSearchToken = "";
+    } else {
+	// No tokens in the search string at all.  Does that mean we
+	// match everything, or nothing?  I choose nothing.
+	return changed;
+    }
+
+    if (end == -1) {
+	int res;
+
+	// Search for the first matching token.  A binary search would
+	// speed things up, but the termination conditions are hairy
+	// and my brain couldn't cope.
+	for (i = 0; i < tokens.size(); i++) {
+	    if (isPartial) {
+		res = strncasecmp(aToken.c_str(), 
+				  tokens[i].token.c_str(), 
+				  aToken.length());
+	    } else {
+		res = strcasecmp(aToken.c_str(), 
+				 tokens[i].token.c_str());
+	    }
+	    if (res == 0) {
+		break;
+	    }
+	}
+
+	// Did we find anything?
+	if (i == tokens.size()) {
+	    // Nope.
+	    return changed;
+	}
+
+	// Yes.
+	end = i - 1;
+    }
+
+    // At this point, end is just before the range we want to check.
+    i = end + 1;
+    noOfMatches = 0;
+    while ((noOfMatches < maxMatches) &&
+	   (i < tokens.size())) {
+	int res;
+	if (isPartial) {
+	    res = strncasecmp(aToken.c_str(),
+			      tokens[i].token.c_str(), 
+			      aToken.length());
+	} else {
+	    res = strcasecmp(aToken.c_str(),
+			     tokens[i].token.c_str());
+	}
+	if (res != 0) {
+	    // We've run out of matches for this token, so bail.
+	    break;
+	}
+	// This record matches aToken.  See if matches all the others.
+	if (recordMatches(i, completeSearchTokens, partialSearchToken)) {
+	    // It does.  If it isn't in the list already, add it.
+	    // EYE - use a set instead of an array?
+	    int j;
+	    for (j = 0; j < matches.size(); j++) {
+		if (tokens[i].locAddr == matches[j].locAddr) {
+		    break;
+		}
+	    }
+	    if (j == matches.size()) {
+		matches.push_back(tokens[i]);
+		noOfMatches++;
+		changed = true;
+	    }
+	}
+	i++;
+    }
+    end = i - 1;
+
+    return changed;
+}
+
+Overlays::TOKEN Overlays::getToken(int i)
+{
+    if ((i < 0) || (i >= matches.size())) {
+	// Out of bounds.  Return an empty token.
+	Overlays::TOKEN empty;
+	empty.token = "";
+	empty.t = NONE;
+	empty.locAddr = NULL;
+
+	return empty;
+    }
+
+    return matches[i];
+}
+
+int Overlays::noOfMatches()
+{
+    return matches.size();
+}
+
+// A token is less than another token if it is lexically before it
+// (ignoring case), or if the token is the same and the name is
+// lexically before it (ignoring case).
+bool operator< (const Overlays::TOKEN& left, const Overlays::TOKEN& right)
+{
+    int result = strcasecmp(left.token.c_str(), right.token.c_str());
+    if (result == 0) {
+	char *leftName, *rightName;
+
+	if (left.t == Overlays::AIRPORT) {
+	    leftName = ((Overlays::ARP *)left.locAddr)->name;
+	} else {
+	    leftName = ((Overlays::NAV *)left.locAddr)->name;
+	}
+	if (right.t == Overlays::AIRPORT) {
+	    rightName = ((Overlays::ARP *)right.locAddr)->name;
+	} else {
+	    rightName = ((Overlays::NAV *)right.locAddr)->name;
+	}
+
+	// strcmp() < 1 if leftName < rightName
+	return (strcasecmp(leftName, rightName) < 0);
+    } else {
+	return (result < 0);
+    }
+}
+
+void Overlays::tokenizeLocation(LocationType lType, void *loc, 
+				vector<TOKEN> &vec)
+{
+    TOKEN t;
+    char *id;
+    char *name;
+    float freq;
+    bool isNDB;
+    
+    if (lType == AIRPORT) {
+	id = ((ARP *)loc)->id;
+	name = ((ARP *)loc)->name;
+    } else {
+	NAV *n = (NAV *)loc;
+	id = n->id;
+	name = n->name;
+	freq = n->freq;
+	isNDB = (n->navtype == NAV_NDB);
+    }
+
+    // Create a token using the id.
+    t.token = id;
+    t.t = lType;
+    t.locAddr = loc;
+    vec.push_back(t);
+
+    // Create token(s) using the name.
+    istringstream stream(name);
+    stream >> t.token;
+    while (stream) {
+	t.t = lType;
+	t.locAddr = loc;
+	vec.push_back(t);
+
+	stream >> t.token;
+    }
+
+    // Create a token using the frequency (if it has one).
+    if (lType == NAVAID) {
+	ostringstream buf;
+
+	// NDB frequencies are written as whole numbers; others are
+	// written with 2 significant digits after the decimal point.
+	if (isNDB) {
+	    buf.precision(0);
+	} else {
+	    buf.precision(2);
+	}
+	buf << fixed << freq;
+	t.token = buf.str();
+	t.t = lType;
+	t.locAddr = loc;
+	vec.push_back(t);
+    }
 }

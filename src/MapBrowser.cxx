@@ -310,6 +310,7 @@ void MapBrowser::update() {
         //printf("Loading tile %s...\n", mpath);
 
         GLubyte *texbuf;
+	bool found = true;
 	if ( (texbuf = (GLubyte*)loadPng( mpath, &wid, &hei )) == NULL ) {
 	  sprintf( mpath+pathl, "%c%03d%c%02d.jpg", 
 		   (c.lon < 0)?'w':'e', abs(c.lon),
@@ -336,6 +337,7 @@ void MapBrowser::update() {
         } else {
           // printf("Tile %s couldn't be loaded\n",mpath);
 	  // texbuf is NULL; texture_handle is undefined.
+	  found = false;
         }
 
 	sgVec3 xyr;
@@ -362,8 +364,10 @@ void MapBrowser::update() {
 		xyr );
 	scale( xyr[0], xyr[1], &nt->xso, &nt->yso );
 
-	tiles.push_back(nt);
-	tiletable[nt->c] = nt ;
+	if (found) {
+	  tiles.push_back(nt);
+	  tiletable[nt->c] = nt ;
+	}
       }
     }
   }

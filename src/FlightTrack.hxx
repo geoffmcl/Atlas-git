@@ -39,6 +39,7 @@ public:
   ~FlightTrack();
 
   void clear();
+  bool empty();
 
   // The data point supplied is added to the flight track
   // NOTE: This pointer is considered FlightTrack's property
@@ -46,6 +47,7 @@ public:
   void addPoint( FlightData *data );
 
   void firstPoint();
+  FlightData *getLastPoint();
   FlightData *getNextPoint();
 
 protected:

@@ -28,6 +28,8 @@
 #include <stdio.h>
 #include <memory.h>
 
+#include <string>
+
 #include <simgear/magvar/magvar.hxx>
 #include <simgear/timing/sg_time.hxx>
 
@@ -91,6 +93,9 @@ public:
   inline void setTrackColor( const float *color ) {
     memcpy( trk_color, color, sizeof(float)*4 );
   }
+  inline void setAircraftColor( const float *color ) {
+    memcpy( ac_color, color, sizeof(float)*4 );
+  }
 
   inline void setFeatures(int features) {
     this->features = features;
@@ -133,12 +138,30 @@ public:
     int range;
   };
 
+  // This is used by the search code (findMatches, ...).  It is used
+  // to map from a single search token to a NAV or APR structure.
+  // These TOKEN structures are stored, sorted, in the tokens vector.
+  // When a search is performed, the matching records are placed in
+  // the matches vector.
+  enum LocationType { NONE, AIRPORT, NAVAID };
+  struct TOKEN {
+    string token;
+    LocationType t;
+    void *locAddr;
+  };
+
   // Find an airport by name
   ARP* findAirport( const char* name );
   // Find an airport by ICAO code
   ARP* findAirportByCode( const char* id );
   NAV* findNav    ( const char* name );
   NAV* findNav    ( float lat, float lon, float freq );
+
+  bool recordMatches(int i, vector<string> completeSearchTokens, 
+		     string partialSearchToken);
+  bool findMatches(char *str, int maxMatches);
+  TOKEN getToken(int i);
+  int noOfMatches();
 
 protected:
 
@@ -175,6 +198,7 @@ protected:
   static const float static_ils_color[4];
   static const float grid_color[4];
   static const float track_color[4];
+  static const float aircraft_color[4];
   float arp_color1[4]; 
   float arp_color2[4];
   float nav_color[4];
@@ -183,14 +207,21 @@ protected:
   float ils_color[4];
   float grd_color[4];
   float trk_color[4];
+  float ac_color[4];
 
   SGTime *time_params;
   SGMagVar *mag;
+
+  vector<TOKEN> tokens;
+  vector<TOKEN> matches;
+  void tokenizeLocation(LocationType lType, void *loc, vector<TOKEN> &vec);
 };
 
 // nav radios (global hack)
 extern float nav1_freq, nav1_rad;
 extern float nav2_freq, nav2_rad;
 extern float adf_freq;
+
+bool operator< (const Overlays::TOKEN& left, const Overlays::TOKEN& right);
 
 #endif        // __OVERLAYS_H__

@@ -41,6 +41,10 @@ void FlightTrack::clear() {
   }
 }
 
+bool FlightTrack::empty() {
+  return track.empty();
+}
+
 void FlightTrack::addPoint( FlightData *data ) {
   // TOLERANCE is set to 1 arc second
   static const float TOLERANCE = SG_DEGREES_TO_RADIANS / 3600.0f;
@@ -59,7 +63,7 @@ void FlightTrack::addPoint( FlightData *data ) {
 
   if (fabs(lastlat - data->lat) > TOLERANCE || 
       fabs(lastlon - data->lon) > TOLERANCE) {
-    if (track.size() > max_buffer) {
+      if ((max_buffer != 0) && (track.size() > max_buffer)) {
       delete track.front();
       track.pop_front();
     }
@@ -70,6 +74,10 @@ void FlightTrack::addPoint( FlightData *data ) {
 
 void FlightTrack::firstPoint() {
   track_pos = track.begin();
+}
+
+FlightData *FlightTrack::getLastPoint() {
+  return track.back();
 }
 
 FlightData *FlightTrack::getNextPoint() {
