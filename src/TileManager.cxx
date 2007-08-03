@@ -28,9 +28,9 @@
 #include "TileManager.hxx"
 
 // TileManager constructor.  Command-line parameters given to Atlas
-// should be passed in via the globalVars map.
-TileManager::TileManager(std::map<std::string, std::string> globalVars) :
-    _globalVars(globalVars)
+// are passed in via Preferences object.
+TileManager::TileManager(Preferences &prefs) :
+    _prefs(prefs)
 {
 }
 
@@ -42,7 +42,7 @@ void TileManager::checkScenery()
     // seeing what we have.  We assume that we "have" the scenery for
     // a tile if the directory exists.  This is hardly foolproof, but
     // it's a good approximation.
-    SGPath scenery(_globalVars["scenery_root"]);
+    SGPath scenery(_prefs.scenery_root);
     ulDir *dir10;
     ulDirEnt *ent10;
 
@@ -72,7 +72,7 @@ void TileManager::checkScenery()
 		    // directory!  Add the tile to our "database" if
 		    // it has pending work (ie, no hires or lowres
 		    // map).
-		    Tile *t = new Tile(ent1->d_name, _globalVars);
+		    Tile *t = new Tile(ent1->d_name, _prefs);
 		    unsigned int tasks = 0;
 
 		    if (!t->hasHiresMap()) {
@@ -81,7 +81,7 @@ void TileManager::checkScenery()
 		    // Generate a lowres map when there isn't one
 		    // and the user wants them.
 		    if (!t->hasLowresMap() &&
-			(_globalVars["lowres_map_size"] != "0")) {
+			(_prefs.lowres_map_size != 0)) {
 			tasks |= Tile::GENERATE_LOWRES_MAP;
 		    }
 		    if (tasks != Tile::NO_TASK) {

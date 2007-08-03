@@ -27,6 +27,8 @@
 #include <sstream>
 #include <map>
 
+#include "Preferences.hxx"
+
 class Tile {
 public:
     enum TaskState {NOT_STARTED, 
@@ -39,10 +41,8 @@ public:
 	       GENERATE_HIRES_MAP = 1 << 1,
 	       GENERATE_LOWRES_MAP = 1 << 2};
 
-    Tile(float latitude, float longitude, 
-	 std::map<std::string, std::string> globalVars);
-    Tile(char *name, 
-	 std::map<std::string, std::string> globalVars);
+    Tile(float latitude, float longitude, Preferences &prefs);
+    Tile(char *name, Preferences &prefs);
     ~Tile();
 
     // The "standard" name of the tile (eg, "w128n37").  Always 7
@@ -63,7 +63,6 @@ public:
     int syncedFiles();
     int syncedSize();
     Tile::TaskState taskState();
-    /*TaskState taskState();*/
 
     void setTasks(unsigned int t);
     unsigned int tasks();
@@ -73,7 +72,7 @@ public:
     Tile::Task doSomeWork();
 
 protected:
-    std::map<std::string, std::string> _globalVars;
+    Preferences &_prefs;
 
     void _initTile();
     FILE *_startCommand(const char *command);

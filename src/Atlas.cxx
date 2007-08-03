@@ -28,6 +28,7 @@
 
 #include <memory.h>
 #include <stdio.h>
+
 #include <simgear/compiler.h>
 #include SG_GLUT_H
 #include <plib/fnt.h>
@@ -44,8 +45,12 @@
 #include "Tile.hxx"
 #include "TileManager.hxx"
 #include "Search.hxx"
+#include "Preferences.hxx"
 
 #define SCALECHANGEFACTOR 1.3f
+
+// User preferences (including command-line arguments).
+Preferences prefs;
 
 SGIOChannel *input_channel;
 
@@ -53,27 +58,14 @@ bool dragmode = false;
 int drag_x, drag_y;
 float scalefactor = 1.0f, mapsize, width, height;
 
-// P13
-//float latitude  = 33.5f  , copy_lat;
-//float longitude = -110.5f, copy_lon;
-// Bay Area
-float latitude = 37.5f , copy_lat;
-float longitude = -122.25f , copy_lon;
+float latitude, copy_lat;
+float longitude, copy_lon;
 
 float heading = 0.0f, speed, altitude;
-char icao[256] = "";
 
-bool slaved = false;
-bool network = false;
-bool serial = false;
-char baud[256] = "4800";
-char port[256] = "5500";
-char device[256] = "/dev/ttyS0";
 int  sock;
-float update = 1.0f;
 char save_buf[ 2 * 2048 ];
 int save_len = 0;
-int mode = MapBrowser::ATLAS;
 
 fntTexFont *texfont;
 puFont *font;
@@ -100,18 +92,11 @@ puDial *dial_sync_progress;
 // Search interface.
 Search *search_interface;
 
-bool softcursor = false;
+// bool softcursor = false;
 char lat_str[80], lon_str[80], alt_str[80], hdg_str[80], spd_str[80];
 
-char fg_root[512] = "";
-char path[512]="";
-char lowrespath[512]="";
+SGPath lowrespath;
 int lowres_avlble;
-
-// This maps between command-line parameters (like "lowres_map_size")
-// and their values (as strings).  It makes passing many parameters in
-// to classes convenient.
-std::map<std::string, std::string> globalVars;
 
 MapBrowser *map_object;
 FlightTrack *track = NULL;
@@ -374,7 +359,6 @@ bool parse_nmea(char *buf) {
     
 	    string nav1_freq_str = msg.substr(begin, end - begin);
 	    begin = end + 1;
-// 	    cout << "  nav1_freq = " << nav1_freq_str << endl;
 
 	    // nav1 selected radial
 	    end = msg.find(",", begin);
@@ -384,7 +368,6 @@ bool parse_nmea(char *buf) {
     
 	    string nav1_rad_str = msg.substr(begin, end - begin);
 	    begin = end + 1;
-// 	    cout << "  nav1_rad = " << nav1_rad_str << endl;
 
 	    // nav2 freq
 	    end = msg.find(",", begin);
@@ -394,7 +377,6 @@ bool parse_nmea(char *buf) {
     
 	    string nav2_freq_str = msg.substr(begin, end - begin);
 	    begin = end + 1;
-// 	    cout << "  nav2_freq = " << nav2_freq_str << endl;
 
 	    // nav2 selected radial
 	    end = msg.find(",", begin);
@@ -404,7 +386,6 @@ bool parse_nmea(char *buf) {
     
 	    string nav2_rad_str = msg.substr(begin, end - begin);
 	    begin = end + 1;
-// 	    cout << "  nav2_rad = " << nav2_rad_str << endl;
 
 	    // adf freq
 	    end = msg.find("*", begin);
@@ -414,7 +395,6 @@ bool parse_nmea(char *buf) {
     
 	    string adf_freq_str = msg.substr(begin, end - begin);
 	    begin = end + 1;
-// 	    cout << "  adf_freq = " << adf_freq_str << endl;
 
 	    nav1_freq = atof( nav1_freq_str.c_str() );
 	    nav1_rad =  atof( nav1_rad_str.c_str() ) * 
@@ -643,12 +623,12 @@ void loadTile(float latitude, float longitude)
     std::ostringstream buf;
     unsigned int tasks;
 
-    tile = new Tile(latitude, longitude, globalVars);
+    tile = new Tile(latitude, longitude, prefs);
 
     // We always ask for scenery and a hires map.
     tasks = Tile::SYNC_SCENERY | Tile::GENERATE_HIRES_MAP;
     // Ask for a lowres map only if the user wants them.
-    if (globalVars["lowres_map_size"] != "0") {
+    if (prefs.lowres_map_size != 0) {
 	tasks |= Tile::GENERATE_LOWRES_MAP;
     }
     tile->setTasks(tasks);
@@ -874,16 +854,14 @@ void zoom_cb ( puObject *cb )
   }
   new_scale=map_object->getScale();
    
-  //printf("scale: %f\n", new_scale);
-  
   //set map math depending on resolution
   if (lowres_avlble) {
      if (new_scale > 1000000 && prev_scale <=1000000) {
 	puts("Switching to low resolution maps");
-	map_object->changeResolution(lowrespath);
+	map_object->changeResolution(lowrespath.c_str());
      } else if (new_scale <= 1000000 && prev_scale > 1000000) {
 	puts("Switching to default resolution maps");
-	map_object->changeResolution(path);
+	map_object->changeResolution(prefs.path.c_str());
      }
   }
   glutPostRedisplay();
@@ -990,11 +968,10 @@ void init_gui(bool textureFonts) {
   int puxoff=20,puyoff=20,puxsiz=205,puysiz=420;
 
   if (textureFonts) {
-    char font_name[512];
-    strcpy( font_name, fg_root );
-    strcat( font_name, "/Fonts/helvetica_medium.txf" );
+    SGPath font_name(prefs.fg_root.str());
+    font_name.append("Fonts/helvetica_medium.txf");
 
-    texfont = new fntTexFont( font_name );
+    texfont = new fntTexFont( font_name.c_str() );
     font = new puFont( texfont, 16.0f );
 //     font = new puFont( texfont, 12.0f );
   } else {
@@ -1076,7 +1053,7 @@ void init_gui(bool textureFonts) {
   inp_lon->setStyle(PUSTYLE_BEVELLED);
 
   cury+=104;
-  if (slaved) {
+  if (prefs.slaved) {
     show_ftrack  = new puButton(curx, cury, "Show Flight Track");
     clear_ftrack = new puOneShot(curx, cury+25, "Clear Flight Track");
     show_ftrack  -> setSize(185, 24);
@@ -1105,7 +1082,7 @@ void init_gui(bool textureFonts) {
   minimized_button->setCallback(restore_cb);
   minimized->close();
 
-  if (slaved) {
+  if (prefs.slaved) {
     info_interface = new puPopup(260, 20);
     info_frame = new puFrame(0, 0, 210, 100);
     txt_info_spd = new puText(10, 10);
@@ -1148,7 +1125,7 @@ void init_gui(bool textureFonts) {
   }
   search_interface->hide();
 
-  if (softcursor) {
+  if (prefs.softcursor) {
     puShowCursor();
   }
 
@@ -1200,7 +1177,7 @@ void redrawMap() {
 
   // BJS - We should add a slaved toggle to the interface, and draw
   // the airplane/crosshairs based on that.
-  if (!slaved) {
+  if (!prefs.slaved) {
   // Draw Crosshair if slaved==false
     glBegin(GL_LINES);
     glVertex2f(0.0f, 0.0f);
@@ -1229,7 +1206,7 @@ void redrawMap() {
     inp_lon->setValue(lon_str);
   }
 
-  if (slaved) {
+  if (prefs.slaved) {
     sprintf( hdg_str, "HDG: %.0f*", heading < 0.0 ? heading + 360.0 : heading);    
     sprintf( alt_str, "ALT: %.0f ft MSL", altitude);
     sprintf( spd_str, "SPD: %.0f KIAS", speed);
@@ -1265,7 +1242,7 @@ void timer(int value) {
   if (totalLength > 0) {
       // If we're in terrasync mode, we need to check for unloaded
       // tiles as the aircraft moves.
-      if (globalVars["terrasync_mode"] == "yes") {
+      if (prefs.terrasync_mode) {
 	  terrasyncUpdate();
       }
 
@@ -1282,10 +1259,10 @@ void timer(int value) {
       // make it a toggle?  We really need a preferences pane.
 //       map_object->setLocation( latitude, longitude );
   
-//       glutPostRedisplay();
+      glutPostRedisplay();
   }
 
-  glutTimerFunc( (int)(update * 1000.0f), timer, value );
+  glutTimerFunc( (int)(prefs.update * 1000.0f), timer, value );
 }
 
 // Called to monitor syncing tiles.  It monitors the currently
@@ -1299,7 +1276,7 @@ void tileTimer(int value) {
     Tile *t;
 
     // Get our concurrency level.  0 indicates maximum concurrency.
-    concurrency = strtol(globalVars["concurrency"].c_str(), NULL, 10);
+    concurrency = prefs.concurrency;
     if (concurrency == 0) {
 	concurrency = tileManager->noOfTiles();
     }
@@ -1395,8 +1372,6 @@ void tileManagerTimer(int value) {
 //     glutTimerFunc(1000, otherAircraftTimer, 0);
 // }
 
-// BJS - We should investigate why initial mouse clicks don't seem to
-// be caught (eg, when trying to drag the map).
 void mouseClick( int button, int state, int x, int y ) {
   if ( !puMouse( button, state, x, y ) ) {
     // PUI didn't consume this event
@@ -1409,6 +1384,7 @@ void mouseClick( int button, int state, int x, int y ) {
 	copy_lat = latitude;
 	copy_lon = longitude;
 
+	// EYE - huh?
 	// If we don't do this and some widget is currently active,
 	// subsequent mouse moves will be swallowed by PUI.
 // 	puSetActiveWidget(NULL, 0, 0);
@@ -1458,7 +1434,7 @@ void keyPressed( unsigned char key, int x, int y ) {
       break;
     case 'D':
     case 'd':
-      if (slaved) {
+      if (prefs.slaved) {
 	if (!info_interface->isVisible()) {
 	  info_interface->reveal();
 	} else {
@@ -1539,186 +1515,47 @@ void specPressed(int key, int x, int y) {
   }
 }
 
-
-void print_help() {
-  printf("ATLAS - A map browsing utility for FlightGear\n\nUsage:\n");
-  printf("   --lat=x      Start browsing at latitude xx (deg. south i neg.)\n");
-  printf("   --lon=x      Start browsing at longitude xx (deg. west i neg.)\n");
-  printf("   --airport=icao Start browsing at an airport specified by ICAO code icao\n");
-  printf("   --path=xxx   Set path for map images\n");
-  printf("   --fg-root=path  Overrides FG_ROOT environment variable\n");
-  printf("   --glutfonts  Use GLUT bitmap fonts (fast for software rendering)\n");
-  printf("   --geometry=[width]x[height] Set initial window size\n");
-  printf("   --softcursor Draw mouse cursor using OpenGL (for fullscreen Voodoo cards)\n\n");
-  printf("   --udp=x      Input read from UDP socket at specified port (defaults to 5500)\n");
-  printf("   --serial=dev Input read from serial port with specified device\n");
-  printf("   --baud=x     Set serial port baud rate (defaults to 4800)\n");
-  printf("   --square     Set square mode ( map 1x1 degree area on the whole image )\n");
-  printf("                  to be compatible with images retrieved by GetMap\n");
-  printf("   --fg-scenery=path  Location of FlightGear scenery (defaults to $fg-root/Scenery-Terrasync)\n");
-  printf("   --server=addr  Rsync scenery server (defaults to scenery.flightgear.org)\n");
-  printf("   --map-path=path  Location of Map executable (defaults to 'Map')\n");
-  printf("   --size=pixels  Create maps of size pixels*pixels (default 256)\n");
-  printf("   --lowres-size=pixels  Create lowres maps of size pixels*pixels (default 0,\n");
-  printf("                meaning don't generate lowres maps)\n");
-  printf("   --max-track=num  Maximum number of points to record while tracking a flight\n");
-  printf("                (defaults to 2000, 0 = unlimited)\n");
-  printf("   --terrasync-mode  Download scenery while tracking a flight (default is\n");
-  printf("                to not download)\n");
-  printf("   --concurrency=num  Number of tiles to simultaneously update (defaults to 1,\n");
-  printf("                0 = unlimited)\n");
-}
-
 int main(int argc, char **argv) {
-  bool textureFonts = true;
-  int width = 800, height = 600;
-  unsigned int max_track = 2000;
-
   glutInit( &argc, argv );
 
-  // By default, we don't run in terrasync mode.
-  globalVars["terrasync_mode"] = "no";
-
-  // parse arguments
-  for (int i = 1; i < argc; i++) {
-    if ( strncmp(argv[i], "--path=", 7) == 0 ) {
-      strcpy( path, argv[i]+7 );
-      strcat( path, "/" );
-    } else if ( sscanf(argv[i], "--lat=%f", &latitude)  == 1 ) {
-      // do nothing
-    } else if ( sscanf(argv[i], "--lon=%f", &longitude) == 1 ) {
-      // do nothing
-    } else if ( sscanf(argv[i], "--airport=%s", icao) == 1 ) {
-      // Make sure it's in uppercase only
-      for(unsigned int i=0; i<strlen(icao); ++i) {
-	icao[i] = toupper(icao[i]);
-      }
-    } else if ( sscanf(argv[i], "--udp=%s", port) == 1) {
-      // EYE - shouldn't we *always* be slaved, and just use this
-      // option to use a non-standard port?
-      slaved = true;
-      network = true;
-      serial = false;
-    } else if ( sscanf(argv[i], "--serial=%s", device) == 1) {
-      slaved = true;
-      serial = true;
-      network = false;
-    } else if ( sscanf(argv[i], "--baud=%s", baud) == 1) {
-      // do nothing
-    } else if ( sscanf(argv[i], "--update=%f", &update) == 1) {
-      // do nothing
-    } else if ( strncmp(argv[i], "--fg-root=", 10) == 0 ) {
-      strcpy( fg_root, argv[i]+10 );
-    } else if ( strcmp(argv[i], "--glutfonts") == 0 ) {
-      textureFonts = false;
-    } else if ( strcmp(argv[i], "--softcursor") == 0 ) {
-      softcursor = true;
-    } else if ( sscanf(argv[i], "--geometry=%dx%d", &width, &height) == 2 ) {
-      // do nothing
-    } else if ( strcmp(argv[i], "--square") == 0 ) {
-      mode = MapBrowser::SQUARE;
-    } else if ( strncmp(argv[i], "--fg-scenery=", 13) == 0 ) {
-	globalVars["scenery_root"] = argv[i] + 13;
-    } else if ( strncmp(argv[i], "--server=", 9) == 0 ) {
-	globalVars["rsync_server"] = argv[i] + 9;
-    } else if ( strncmp(argv[i], "--map-path=", 11) == 0 ) {
-	globalVars["map_executable"] = argv[i] + 11;
-    } else if ( strncmp(argv[i], "--size=", 7) == 0 ) {
-	globalVars["map_size"] = argv[i] + 7;
-    } else if ( strncmp(argv[i], "--lowres-size=", 14) == 0 ) {
-	globalVars["lowres_map_size"] = argv[i] + 14;
-    } else if ( sscanf(argv[i], "--max-track=%d", &max_track) == 1 ) {
-	// do nothing
-    } else if ( strncmp(argv[i], "--terrasync-mode", 16 ) == 0 ) {
-	globalVars["terrasync_mode"] = "yes";
-    } else if ( strncmp(argv[i], "--concurrency=", 14 ) == 0 ) {
-	globalVars["concurrency"] = argv[i] + 14;
-    } else if ( strcmp(argv[i], "--help") == 0 ) {
-      print_help();
-      return 0;
-    } else {
-      print_help();
-      fprintf( stderr, "%s: unknown flag \"%s\".\n", argv[0], argv[i] );
-      return 1;
-    }
+  // Load our preferences.  If there's a problem with any of the
+  // arguments, it will print some errors to stderr, and return false.
+  if (!prefs.loadPreferences(argc, argv)) {
+      exit(1);
   }
 
-  if (fg_root[0] == 0) {
-    char *env = getenv("FG_ROOT");
-    if (env == NULL) {
-      strcpy(fg_root, FGBASE_DIR);
-    } else {
-      strcpy(fg_root, env);
-    }
-  }
-
-  if (path[0] == 0) {
-    if (fg_root[0] != 0) {
-      strcpy(path, fg_root);
-      strcat(path, "/");
-    } else {
-      strcpy(path, FGBASE_DIR);
-    }
-    strcat(path, "Atlas/");
-  }  
-    
-  if (access(path, F_OK)==-1) {
-     printf("\nWarning: path %s doesn't exist. Maps won't be loaded!\n", path);
+  // A bit of post-preference processing.
+  if (access(prefs.path.c_str(), F_OK)==-1) {
+      printf("\nWarning: path %s doesn't exist. Maps won't be loaded!\n", 
+	     prefs.path.c_str());
   } else {
-     strcpy(lowrespath, path);
-     strcat(lowrespath, "lowres/");
-     if (access(lowrespath, F_OK)==-1) {
-	printf("\nWarning: path %s doesn't exist. Low resolution maps won't be loaded\n", lowrespath);
-	lowres_avlble=0;
+      lowrespath.set(prefs.path.str());
+      lowrespath.append("/lowres");
+      if (access(lowrespath.c_str(), F_OK) == -1) {
+	  printf("\nWarning: path %s doesn't exist. Low resolution maps won't be loaded\n", lowrespath.c_str());
+	  lowres_avlble = 0;
 
-	// Since there's no lowres directory, tell the tile manager
-	// that we don't want lowres maps (regardless of what the user
-	// actually asked for).
-	globalVars["lowres_map_size"] = "0";
-     } else {
-	lowres_avlble=1;
-     }
-  }
-
-  // Put useful global variables into a map.
-  // EYE - use this for all variables?
-  // EYE - we should also be able to deal with lowres directories
-  globalVars["fg_root"] = fg_root;
-  globalVars["atlas_root"] = path;
-
-  // Give default values to global variables that haven't been
-  // explicitly set.
-  if (globalVars.count("scenery_root") == 0) {
-      globalVars["scenery_root"] = globalVars["fg_root"] + "/Scenery-TerraSync";
-  }
-  if (globalVars.count("rsync_server") == 0) {
-      globalVars["rsync_server"] = "scenery.flightgear.org";
-  }
-  if (globalVars.count("map_executable") == 0) {
-      globalVars["map_executable"] = "Map";
-  }
-  if (globalVars.count("map_size") == 0) {
-      globalVars["map_size"] = "256";
-  }
-  if (globalVars.count("lowres_map_size") == 0) {
-      globalVars["lowres_map_size"] = "0";
-  }
-  if (globalVars.count("concurrency") == 0) {
-      globalVars["concurrency"] = "1";
+	  // Since there's no lowres directory, tell the tile manager
+	  // that we don't want lowres maps (regardless of what the
+	  // user actually asked for).
+	  prefs.lowres_map_size = 0;
+      } else {
+	  lowres_avlble = 1;
+      }
   }
 
-  latitude  *= SG_DEGREES_TO_RADIANS;
-  longitude *= SG_DEGREES_TO_RADIANS;
+  latitude  = prefs.latitude * SG_DEGREES_TO_RADIANS;
+  longitude = prefs.longitude * SG_DEGREES_TO_RADIANS;
 
   glutInitDisplayMode( GLUT_RGB | GLUT_DEPTH | GLUT_DOUBLE );
-  glutInitWindowSize( width, height );
+  glutInitWindowSize( prefs.width, prefs.height );
   glutCreateWindow( "Atlas" );
 
   glutReshapeFunc( reshapeMap );
   glutDisplayFunc( redrawMap );
 
-  mapsize = (float)( (width>height)?width:height );
-   map_object = new MapBrowser( 0.0f, 0.0f, mapsize, 
+  mapsize = (float)( (prefs.width>prefs.height)?prefs.width:prefs.height );
+  map_object = new MapBrowser( 0.0f, 0.0f, mapsize, 
                                Overlays::OVERLAY_AIRPORTS  | 
                                Overlays::OVERLAY_NAVAIDS   |
                                Overlays::OVERLAY_NAVAIDS_VOR |
@@ -1729,23 +1566,23 @@ int main(int argc, char **argv) {
                                Overlays::OVERLAY_GRIDLINES | 
                                Overlays::OVERLAY_NAMES     |
 			       Overlays::OVERLAY_FLIGHTTRACK,
-			       fg_root[0] == 0 ? NULL : fg_root, 
-                               mode,
-			       textureFonts );
+			       prefs.fg_root.str().length() == 0 ? NULL : prefs.fg_root.c_str(), 
+                               prefs.mode,
+			       prefs.textureFonts );
   map_object->setTextured(true);
-  map_object->setMapPath(path);
+  map_object->setMapPath(prefs.path.c_str());
 
 
-  if (slaved) {
-    glutTimerFunc( (int)(update*1000.0f), timer, 0 );
+  if (prefs.slaved) {
+    glutTimerFunc( (int)(prefs.update*1000.0f), timer, 0 );
 
-    track = new FlightTrack(max_track);
+    track = new FlightTrack(prefs.max_track);
     map_object->setFlightTrack(track);
 
-    if ( network ) {
-	input_channel = new SGSocket( "", port, "udp" );
-    } else if ( serial ) {
-	input_channel = new SGSerial( device, baud );
+    if ( prefs.network ) {
+	input_channel = new SGSocket( "", prefs.port, "udp" );
+    } else if ( prefs.serial ) {
+	input_channel = new SGSerial( prefs.device, prefs.baud );
     } else {
 	printf("unknown input, defaulting to network on port 5500\n");
 	input_channel = new SGSocket( "", "5500", "udp" );
@@ -1759,29 +1596,31 @@ int main(int argc, char **argv) {
   glutKeyboardFunc     ( keyPressed  );
   glutSpecialFunc      ( specPressed );
 
-  printf("Please wait while loading databases..."); fflush(stdout);
+  printf("Please wait while loading databases ... "); fflush(stdout);
   map_object->loadDb();
   printf("done.\n");
   
-  if(strlen(icao) != 0) {
-    Overlays::ARP* apt = map_object->getOverlays()->findAirportByCode(icao);
+  if(strlen(prefs.icao) != 0) {
+    Overlays::ARP* apt = map_object->getOverlays()->findAirportByCode(prefs.icao);
     if(apt) {
       latitude = apt->lat;
       longitude = apt->lon;
     } else {
-      printf("Unable to find airport %s.\n", icao);
+      printf("Unable to find airport %s.\n", prefs.icao);
     }
   }
   
   map_object->setLocation( latitude, longitude );
   
-  init_gui(textureFonts);
+  init_gui(prefs.textureFonts);
 
   // Create a tile manager.  In its creator it will see which scenery
   // directories we have, and whether there are maps generated for
   // those directories.
-  tileManager = new TileManager(globalVars);
+  printf("Please wait while checking existing scenery ... "); fflush(stdout);
+  tileManager = new TileManager(prefs);
   glutTimerFunc(0, tileManagerTimer, 0);
+  printf("done.\n");
 
   // Listen for any AI aircraft, updating once per second.
 //   ai_aircraft = new SGSocket("", "5400", "udp");
@@ -1792,7 +1631,7 @@ int main(int argc, char **argv) {
 
   glutMainLoop();
  
-  if (slaved)
+  if (prefs.slaved)
       input_channel->close();
 
   return 0;

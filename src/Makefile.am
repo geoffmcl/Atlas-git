@@ -24,7 +24,8 @@ Atlas_SOURCES = \
 	Tile.cxx Tile.hxx \
 	TileManager.cxx TileManager.hxx \
 	fg_mkdir.cxx fg_mkdir.hxx \
-	Search.cxx Search.hxx
+	Search.cxx Search.hxx \
+	Preferences.cxx Preferences.hxx
 
 Atlas_LDADD = \
 	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgserial -lsgdebug -lsgbucket\

@@ -93,7 +93,7 @@ float nav2_freq, nav2_rad;
 float adf_freq;
 
 
-Overlays::Overlays( char *fg_root, float scale,
+Overlays::Overlays( const char *fg_root, float scale,
 		    float width ) :
   scale(scale) {
   if (fg_root == NULL) {

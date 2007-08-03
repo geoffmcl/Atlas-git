@@ -53,7 +53,7 @@ public:
   static const int OVERLAY_ANY_LABEL   = OVERLAY_NAMES | OVERLAY_IDS;
 
   //  Overlays();
-  Overlays( char *fg_root, float scale, float width );
+  Overlays( const char *fg_root, float scale, float width );
 
   inline void setScale( float s ) { scale = s; }
   inline void setLocation( float lat, float lon ) {
@@ -185,7 +185,7 @@ protected:
 
   int features;
   float scale, lat, lon, size;
-  char *fg_root;
+  const char *fg_root;
   GfxOutput *output;
   FlightTrack *flight_track;
   Projection *projection;

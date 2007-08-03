@@ -39,13 +39,13 @@ public:
   enum { ATLAS, SQUARE };
 
   MapBrowser( GLfloat x1, GLfloat y1, GLfloat size, int features, 
-              char *fg_root, int mode, bool texturedFonts = true );
+              const char *fg_root, int mode, bool texturedFonts = true );
   ~MapBrowser();
 
   void setLocation( float lat, float lon );
   void setScale( float scale );
   void setSize( GLfloat size );
-  void setMapPath( char *path );
+  void setMapPath( const char *path );
   //void setFGRoot( char *fg_root );
   void setFeatures( int features );
   void toggleFeaturesAllNavaids();
@@ -69,7 +69,7 @@ public:
   inline int getNumProjections() {
      return projection->NUM_PROJECTIONS;
   }
-  void changeResolution(char *);
+  void changeResolution(const char *);
 protected:
   void update();
 

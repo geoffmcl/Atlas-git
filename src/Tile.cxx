@@ -33,18 +33,18 @@
 #include "TileManager.hxx"
 #include "fg_mkdir.hxx"
 
-// Latitude and longitude must be in degrees.
-Tile::Tile(float latitude, float longitude, 
-	   std::map<std::string, std::string> globalVars) :
-    _globalVars(globalVars)
+// Creates a structure representing the tile which covers the given
+// latitude and longitude (must be in degrees).
+Tile::Tile(float latitude, float longitude, Preferences &prefs) : _prefs(prefs)
 {
     TileManager::latLonToTileInfo(latitude, longitude, _name, _dir,
 				  &_lat, &_lon);
     _initTile();
 }
 
-Tile::Tile(char *name, std::map<std::string, std::string> globalVars) :
-    _globalVars(globalVars)
+// Creates a structure representing the tile of the given canonical
+// name (eg, "e178s39").
+Tile::Tile(char *name, Preferences &prefs) : _prefs(prefs)
 {
     float lat, lon;
     TileManager::nameToLatLon(name, &lat, &lon);
@@ -149,10 +149,9 @@ void Tile::nextTask()
 	    // regenerate them.  This isn't completely reliable, but
 	    // it would be a strange situation indeed where this test
 	    // doesn't work, and it saves a lot of calls to Map.
-	    int s, t;
-	    s = strtol(_globalVars["map_size"].c_str(), NULL, 10);
-	    t = strtol(_globalVars["lowres_map_size"].c_str(), NULL, 10);
-	    if (_upToDate && (s == _hiresSize) && (t == _lowresSize)) {
+	    if (_upToDate && 
+		(_prefs.map_size == _hiresSize) && 
+		(_prefs.lowres_map_size == _lowresSize)) {
 		_tasks = NO_TASK;
 	    }
 	}
@@ -398,7 +397,7 @@ void Tile::_startChecking()
 
     // Only check - don't specify a destination.
     // EYE - will Windows blow up on this?
-    cmd << "rsync -v -a " << _globalVars["rsync_server"] << "::" 
+    cmd << "rsync -v -a " << _prefs.rsync_server << "::" 
 	<< p.str() << " 2> /dev/null";
 
     if ((_f = _startCommand(cmd.str().c_str())) == NULL) {
@@ -450,7 +449,7 @@ void Tile::_startSyncing()
 {
     std::ostringstream cmd;
     std::string source("Scenery");
-    SGPath dest(_globalVars["scenery_root"]);
+    SGPath dest(_prefs.scenery_root.str());
     int err;
 
     _syncedFiles = 0;
@@ -483,7 +482,7 @@ void Tile::_startSyncing()
     // considered, whether or not they are actually downloaded.
     cmd.clear();
     cmd.str("");
-    cmd << "rsync -v -v -a --delete " << _globalVars["rsync_server"] << "::" 
+    cmd << "rsync -v -v -a --delete " << _prefs.rsync_server << "::" 
 	<< source << " " << dest.str();
 
     if ((_f = _startCommand(cmd.str().c_str())) == NULL) {
@@ -511,7 +510,6 @@ bool Tile::_continueSyncing()
     // objects and terrain.  We do it on a line-by-line basis.  If we
     // don't match a line, we ignore it and continue.
     while (_getRealLine(str)) {
-//     if (_getRealLine(str)) {
 	// The feedback we get from rsync depends on whether files
 	// are being updated or not.  If a file is updated, we get:
 	//   e006n43/3055936.btg.gz
@@ -538,10 +536,20 @@ bool Tile::_continueSyncing()
 void Tile::_startMapping()
 {
     std::ostringstream cmd;
+    SGPath output(_prefs.path.str());
+    int size;
 
     // EYE - when Map is called, Atlas moves to the background (since
     // Map is a windowed app, although without a window?).  It would
     // be nice if Map had a truly non-windowed version.
+
+    if (currentTask() == GENERATE_HIRES_MAP) {
+	size = _prefs.map_size;
+    } else {
+	output.append("lowres");
+	size = _prefs.lowres_map_size;
+    }
+    output.append(_name);
 
     // Notes on Map call:
     // - lat,lon is *center* of map
@@ -550,30 +558,21 @@ void Tile::_startMapping()
     //   so that Atlas doesn't try to read an incomplete png file.
     //   After the file has been downloaded in its entirety and is
     //   safe for Atlas to read, we rename it.
-    if (currentTask() == GENERATE_HIRES_MAP) {
-	cmd << _globalVars["map_executable"] 
-	    << " --fg-root=" << _globalVars["fg_root"] 
-	    << " --fg-scenery=" << _globalVars["scenery_root"]
-	    << " --lat=" << _lat
-	    << " --lon=" << _lon
-	    << " --output=" << _globalVars["atlas_root"] << _name
-	    << " --size=" << _globalVars["map_size"]
-	    << " --headless --autoscale 2> /dev/null";
-	// EYE - I pipe stderr into /dev/null because I get messages
-	// like this if I try to run more than one instance of Map:
-	// 2007-07-10 17:11:00.547 Map[18200] CFLog (0): CFMessagePort: bootstrap_register(): failed 1103 (0x44f), port = 0x3203, name = 'Map.ServiceProvider'
-	// See /usr/include/servers/bootstrap_defs.h for the error codes.
-	// 2007-07-10 17:11:00.547 Map[18200] CFLog (99): CFMessagePortCreateLocal(): failed to name Mach port (Map.ServiceProvider)
-    } else {
-	cmd << _globalVars["map_executable"] 
-	    << " --fg-root=" << _globalVars["fg_root"] 
-	    << " --fg-scenery=" << _globalVars["scenery_root"]
-	    << " --lat=" << _lat
-	    << " --lon=" << _lon
-	    << " --output=" << _globalVars["atlas_root"] << "lowres/" << _name
-	    << " --size=" << _globalVars["lowres_map_size"]
-	    << " --headless --autoscale 2> /dev/null";
-    }
+    cmd << _prefs.map_executable.str()
+	<< " --fg-root=" << _prefs.fg_root.str()
+	<< " --fg-scenery=" << _prefs.scenery_root.str()
+	<< " --lat=" << _lat
+	<< " --lon=" << _lon
+	<< " --output=" << output.str()
+	<< " --size=" << size
+	<< " --headless --autoscale 2> /dev/null";
+    // EYE - I pipe stderr into /dev/null because I get messages like
+    // this if I try to run more than one instance of Map:
+
+    // 2007-07-10 17:11:00.547 Map[18200] CFLog (0): CFMessagePort: bootstrap_register(): failed 1103 (0x44f), port = 0x3203, name = 'Map.ServiceProvider'
+    // See /usr/include/servers/bootstrap_defs.h for the error codes.
+    // 2007-07-10 17:11:00.547 Map[18200] CFLog (99): CFMessagePortCreateLocal(): failed to name Mach port (Map.ServiceProvider)
+
     if ((_f = _startCommand(cmd.str().c_str())) == NULL) {
 	// EYE - need to do more cleanup.
 	// EYE - try parsing command output to detect some errors (eg,
@@ -593,7 +592,6 @@ bool Tile::_continueMapping()
     // We won't try to parse the output, which really isn't very
     // useful anyway.
     while (_getRealLine(str)) {
-//     if (_getRealLine(str)) {
     }
 
     if (_eof) {
@@ -602,7 +600,7 @@ bool Tile::_continueMapping()
 	std::string cmd;
 	int err;
 
-	source.set(_globalVars["atlas_root"]);
+	source.set(_prefs.path.str());
 	if (currentTask() == GENERATE_LOWRES_MAP) {
 	    source.append("lowres");
 	}
@@ -611,6 +609,7 @@ bool Tile::_continueMapping()
 	dest = source;
 	dest.concat(".png");
 
+	// EYE - Windows?
 	cmd = "mv " + source.str() + " " + dest.str();
 	if (err = system(cmd.c_str())) {
 	    // EYE - need to do more cleanup?
@@ -637,7 +636,7 @@ void Tile::_initTile()
     _f = NULL;
 
     // Check the hires map.
-    map.set(_globalVars["atlas_root"]);
+    map.set(_prefs.path.str());
     map.append(_name);
     map.concat(".png");
     if (map.exists() && _pngSize(map.c_str(), &width, &height)) {
@@ -648,7 +647,7 @@ void Tile::_initTile()
     }
 
     // Now lowres.
-    map.set(_globalVars["atlas_root"]);
+    map.set(_prefs.path.str());
     map.append("lowres");
     map.append(_name);
     map.concat(".png");

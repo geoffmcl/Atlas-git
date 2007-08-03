@@ -31,7 +31,7 @@
 const char* MapBrowser::TXF_FONT_NAME = "/Fonts/helvetica_medium.txf";
 
 MapBrowser::MapBrowser(GLfloat left, GLfloat top, GLfloat size, int features,
-                       char *fg_root, int m, bool texturedFonts) :
+                       const char *fg_root, int m, bool texturedFonts) :
   view_left(left), view_top(top), view_size(size), clat(0.0f), clon(0.0f),
   scle(100000), pathl(0), features(features), texturedFonts(texturedFonts),
   mode(m)
@@ -105,12 +105,16 @@ void MapBrowser::setSize( GLfloat size ) {
   update();
 }
 
-void MapBrowser::setMapPath( char *path ) {
+void MapBrowser::setMapPath( const char *path ) {
   strcpy( mpath, path );
+  // EYE - use SGPath instead?
+  if (mpath[strlen(mpath) - 1] != '/') {
+      strcat(mpath, "/");
+  }
   pathl = strlen( mpath );
 }
 
-void MapBrowser::changeResolution(char *path) {
+void MapBrowser::changeResolution(const char *path) {
   MapTile *tile;
   list<MapTile*>::iterator i = tiles.end(),
                            itmp;

@@ -29,13 +29,14 @@
 #define __TILEMANAGER_H__
 
 #include "Tile.hxx"
+#include "Preferences.hxx"
 
 #include <string>
 #include <list>
 
 class TileManager {
 public:
-    TileManager(std::map<std::string, std::string> globalVars);
+    TileManager(Preferences &prefs);
 
     void checkScenery();
 
@@ -55,8 +56,8 @@ protected:
     // List of tiles that need to be processed.
     std::list<Tile *> _tiles;
 
-    // Map of command-line parameters and their values.
-    std::map<std::string, std::string> _globalVars;
+    // Atlas preferences.
+    Preferences _prefs;
 };
 
 #endif        // __TILEMANAGER_H__
