@@ -24,6 +24,9 @@
 #include <getopt.h>
 #include "config.h"
 #include "libgen.h"
+//#include <iostream>
+#include <fstream>
+//#include <string>
 
 // This is a space-saving macro used when parsing command-line
 // arguments.  The function 'f' is assumed to be sscanf().
@@ -234,6 +237,7 @@ Preferences::Preferences()
 
 // First loads preferences from ~/.atlasrc (if it exists), then checks
 // the command line options passed in via argc and argv.
+// bool Preferences::loadPreferences(int argc, char *argv[])
 bool Preferences::loadPreferences(int argc, char *argv[])
 {
     // Check for a preferences file.
@@ -246,10 +250,10 @@ bool Preferences::loadPreferences(int argc, char *argv[])
 	rcpath.set(atlasrc);
     }
 
-    FILE* rc = fopen(rcpath.c_str(), "r");
-    if (rc != NULL) {
-	char *line, *lines[2];
-	size_t length;
+    std::ifstream rc(rcpath.c_str());
+    if (rc.is_open()) {
+	char *lines[2];
+	string line;
 
 	// By default, getopt_long() (called in _loadPreferences())
 	// skips past the first argument, which is usually the
@@ -259,17 +263,16 @@ bool Preferences::loadPreferences(int argc, char *argv[])
 	// anyway, our error messages depend on argv[0] being set to
 	// the executable.
 	lines[0] = argv[0];
-	while ((line = fgetln(rc, &length)) != NULL) {
-	    // Get rid of any leading and trailing whitespace.
-	    _superChomp(&line, &length);
+	while (!rc.eof()) {
+	    getline(rc, line);
 
 	    // Skip comments and emtpy lines.  Our version is given in
 	    // a special comment of the format "#ATLASRC Version x".
 	    int version;
-	    if (length == 0) {
+	    if (line.length() == 0) {
 		continue;
 	    }
-	    if (sscanf(line, "#ATLASRC Version %d", &version) == 1) {
+	    if (sscanf(line.c_str(), "#ATLASRC Version %d", &version) == 1) {
 		if (version > 1) {
 		    fprintf(stderr, "%s: Unknown %s version: %d\n",
 			    basename(argv[0]), atlasrc, version);
@@ -281,10 +284,9 @@ bool Preferences::loadPreferences(int argc, char *argv[])
 		continue;
 	    }
 
+	    // EYE - should we remove leading and trailing whitespace?
 	    // I guess it's a real option.
-	    lines[1] = (char *)malloc(sizeof(char) * length + 1);
-	    strncpy(lines[1], line, length);
-	    lines[1][length] = '\0';
+	    lines[1] = (char *)line.c_str();
 
 	    // Try to make sense of it.
 	    if (!_loadPreferences(2, lines)) {
@@ -292,11 +294,9 @@ bool Preferences::loadPreferences(int argc, char *argv[])
 			basename(argv[0]), atlasrc, lines[1]);
 		return false;
 	    }
-
-	    free(lines[1]);
 	}
 
-	fclose(rc);
+	rc.close();
     }
 
     // Now parse the real command-line arguments.
@@ -336,6 +336,7 @@ void Preferences::savePreferences()
 // appropriate variables in Preferences) if there are no problems.
 // Returns false (and prints an error message as appropriate) if
 // there's a problem, or if the user asked for --version or --help.
+// bool Preferences::_loadPreferences(int argc, char *argv[])
 bool Preferences::_loadPreferences(int argc, char *argv[])
 {
     int c;
@@ -465,24 +466,4 @@ bool Preferences::_loadPreferences(int argc, char *argv[])
     }
 
     return true;
-}
-
-// "Removes" any leading and trailing whitespace (spaces, tabs,
-// newlines).  Actually, it doesn't change the contents of the string
-// - it just moves the pointer to the head of the string, and adjusts
-// the length.
-void Preferences::_superChomp(char **line, size_t *length)
-{
-    char *whitespace = " \t\r\n";
-
-    // Chomp the head.
-    while ((length > 0) && (strchr(whitespace, (*line)[0]) != NULL)) {
-	(*line)++;
-	(*length)--;
-    }
-
-    // Chomp the tail.
-    while ((length > 0) && (strchr(whitespace, (*line)[*length - 1]) != NULL)) {
-	(*length)--;
-    }
 }

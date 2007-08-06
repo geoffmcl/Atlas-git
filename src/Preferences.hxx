@@ -102,7 +102,6 @@ public:
 
 protected:
     bool _loadPreferences(int argc, char *argv[]);
-    void _superChomp(char **line, size_t *length);
 };
 
 #endif        // __PREFERENCES_H__
