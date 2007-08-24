@@ -1,38 +1,3 @@
-Atlas Installation
-==================
-
-   These are Atlas-specific instructions.  Generic instructions
-follow in `Basic Installation'.
-
-   To build under Unix, follow these steps:
-
-	./autogen.sh
-	./configure
-	make
-	make install
-
-   The `configure' shell script accepts a few Atlas-specific options:
-
-`--with-fgbase=prefix'    specify the location of the FlightGear base package
-
-   This points the root directory of the FlightGear installation (the
-   directory which includes sub-directories such as Aircraft,
-   Airports, Docs, Scenery, etc.)
-
-`--with-plib=prefix'      specify the prefix path to plib
-
-   If you use this option, `configure' expects to find two
-   subdirectories here: `include/plib' (containing header files) and
-   `lib' (containing libraries).
-
-`--with-simgear=prefix'   specify the prefix path to simgear
-
-   Similar to plib, if you use this option, `configure' expects to
-   find two subdirectories here: `include/simgear' (containing header
-   files) and `lib' (containing libraries).
-
-`--with-libcurl=prefix'   specify the prefix path to libcurl
-
 Basic Installation
 ==================
 
