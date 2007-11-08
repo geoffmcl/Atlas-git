@@ -24,9 +24,7 @@
 #include <getopt.h>
 #include "config.h"
 #include "libgen.h"
-//#include <iostream>
 #include <fstream>
-//#include <string>
 
 // This is a space-saving macro used when parsing command-line
 // arguments.  The function 'f' is assumed to be sscanf().
@@ -68,8 +66,8 @@ static struct option long_options[] = {
     {"geometry", required_argument, 0, GEOMETRY_OPTION},
     {"softcursor", no_argument, 0, SOFTCURSOR_OPTION},
     {"udp", optional_argument, 0, UDP_OPTION},
-    {"serial", required_argument, 0, SERIAL_OPTION},
-    {"baud", optional_argument, 0, BAUD_OPTION},
+    {"serial", optional_argument, 0, SERIAL_OPTION},
+    {"baud", required_argument, 0, BAUD_OPTION},
     {"update", required_argument, 0, UPDATE_OPTION},
     {"square", no_argument, 0, SQUARE_OPTION},
     {"fg-scenery", required_argument, 0, FG_SCENERY_OPTION},
@@ -88,11 +86,11 @@ static struct option long_options[] = {
 static void print_short_help(char *name) {
     printf("usage: %s [--lat=<x>] [--lon=<x>] [--airport=<icao>] [--path=<path>]\n", name);
     printf("\t[--fg-root=<path>] [--glutfonts] [--geometry=<w>x<h>]\n");
-    printf("\t[--softcursor] [--udp[=<port>]] [--serial=<dev>] [--baud[=<rate>]]\n");
+    printf("\t[--softcursor] [--udp[=<port>]] [--serial=[<dev>]] [--baud=<rate>]\n");
     printf("\t[--square] [--fg-scenery=<path>] [--server=<addr>]\n");
     printf("\t[--map-executable=<path>] [--size=<pixels>] [--lowres-size=<pixels>]\n");
     printf("\t[--max-track=<x>] [--terrasync-mode] [--concurrency=<n>]\n");
-    printf("\t[--update=<s>] [--version] [--help]\n");
+    printf("\t[--update=<s>] [--version] [--help] [<flight file>] ...\n");
 }
 
 // Prints a long entry for the give option.
@@ -128,10 +126,11 @@ static void print_help_for(int option)
 	printf("\t(defaults to 5500)\n");
 	break;
     case SERIAL_OPTION:
-	printf("--serial=<dev>\tInput read from serial port with specified device\n");
+	printf("--serial[=<dev>]\tInput read from serial port with specified device\n");
+	printf("\t(defaults to /dev/ttyS0)\n");
 	break;
     case BAUD_OPTION:
-	printf("--baud[=<rate>]\tSet serial port baud rate (defaults to 4800)\n");
+	printf("--baud=<rate>\tSet serial port baud rate (defaults to 4800)\n");
 	break;
     case UPDATE_OPTION:
 	printf("--update=<s>\tCheck for position updates every x seconds (defaults to 1.0)\n");
@@ -181,7 +180,10 @@ static void print_help_for(int option)
 
 // This prints a long help message.
 static void print_help() {
-  printf("ATLAS - A map browsing utility for FlightGear\n\nUsage:\n");
+  // EYE - use executable name here?
+  printf("ATLAS - A map browsing utility for FlightGear\n\nUsage:\n\n");
+  // EYE - use executable name here?
+  printf("Atlas <options> [<flight file>] ...\n\n");
   for (int i = FIRST_OPTION + 1; i < LAST_OPTION; i++) {
       printf("   ");
       print_help_for(i);
@@ -213,9 +215,12 @@ Preferences::Preferences()
     width = 800;
     height = 600;
     softcursor = false;
-    port = strdup("5500");
-    device = strdup("/dev/ttyS0");
-    baud = strdup("4800");
+//     port = strdup("5500");
+//     device = strdup("/dev/ttyS0");
+//     baud = strdup("4800");
+    _port = 5500;
+    _serial.device = strdup("/dev/ttyS0");
+    _serial.baud = 4800;
     update = 1.0;
     mode = MapBrowser::ATLAS;
 
@@ -229,15 +234,10 @@ Preferences::Preferences()
     max_track = 2000;
     terrasync_mode = false;
     concurrency = 1;
-
-    slaved = false;
-    network = false;
-    serial = false;
 }
 
 // First loads preferences from ~/.atlasrc (if it exists), then checks
 // the command line options passed in via argc and argv.
-// bool Preferences::loadPreferences(int argc, char *argv[])
 bool Preferences::loadPreferences(int argc, char *argv[])
 {
     // Check for a preferences file.
@@ -314,9 +314,13 @@ void Preferences::savePreferences()
     printf("%d\n", width);
     printf("%d\n", height);
     printf("%d\n", softcursor);
-    printf("%s\n", port);
-    printf("%s\n", device);
-    printf("%s\n", baud);
+    for (int i = 0; i < networkConnections.size(); i++) {
+	printf("net: %u\n", networkConnections[i]);
+    }
+    for (int i = 0; i < serialConnections.size(); i++) {
+	printf("serial: %s@%u\n", 
+	       serialConnections[i].device, serialConnections[i].baud);
+    }
     printf("%.1f\n", update);
     printf("%d\n", mode);
     printf("%s\n", scenery_root.c_str());
@@ -327,20 +331,21 @@ void Preferences::savePreferences()
     printf("%d\n", max_track);
     printf("%d\n", terrasync_mode);
     printf("%d\n", concurrency);
-    printf("%d\n", slaved);
-    printf("%d\n", network);
-    printf("%d\n", serial);
+
+    for (int i = 0; i < flightFiles.size(); i++) {
+	printf("%s\n", flightFiles[i].c_str());
+    }						
 }
 
 // Checks the given set of preferences.  Returns true (and sets the
 // appropriate variables in Preferences) if there are no problems.
 // Returns false (and prints an error message as appropriate) if
 // there's a problem, or if the user asked for --version or --help.
-// bool Preferences::_loadPreferences(int argc, char *argv[])
 bool Preferences::_loadPreferences(int argc, char *argv[])
 {
     int c;
     int option_index = 0;
+    SGPath p;
 
     // This is necessary because we may call getopt_long() many times.
     optreset = 1;
@@ -378,30 +383,33 @@ bool Preferences::_loadPreferences(int argc, char *argv[])
 	    softcursor = true;
 	    break;
 	case UDP_OPTION:
-	    // This option's argument is optional, so we need to check
-	    // if optarg has a real value.
-	    if (optarg) {
-		free(port);
-		port = strdup(optarg);
-	    }
+	    // EYE - we need better documentation about how the UDP,
+	    // SERIAL, and BAUD options interact.
 
-	    slaved = true;
-	    network = true;
-	    serial = false;
+	    // Whenever a unique --udp appears on the command line, we
+	    // create an entry for it in networkConnections.  Whenever
+	    // a unique --serial appears, we create an entry for it
+	    // (using the current baud rate).  Whenever --baud
+	    // appears, we just change the baud variable.  It does not
+	    // affect --serial's that appear before it.
+	    unsigned int thisPort = _port;
+	    if (optarg) {
+		OPTION_CHECK(sscanf(optarg, "%u", &thisPort), 1, UDP_OPTION);
+	    }
+	    networkConnections.push_back(thisPort);
 	    break;
 	case SERIAL_OPTION:
-	    free(device);
-	    device = strdup(optarg);
-
-	    slaved = true;
-	    network = false;
-	    serial = true;
+	    SerialConnection thisConnection;
+	    thisConnection.baud = _serial.baud;
+	    if (optarg) {
+		thisConnection.device = strdup(optarg);
+	    } else {
+		thisConnection.device = strdup(_serial.device);
+	    }
+	    serialConnections.push_back(thisConnection);
 	    break;
 	case BAUD_OPTION:
-	    if (optarg) {
-		free(baud);
-		baud = strdup(optarg);
-	    }
+	    OPTION_CHECK(sscanf(optarg, "%u", &_serial.baud), 1, BAUD_OPTION);
 	    break;
 	case UPDATE_OPTION:
 	    OPTION_CHECK(sscanf(optarg, "%f", &update), 1, UPDATE_OPTION);
@@ -453,16 +461,9 @@ bool Preferences::_loadPreferences(int argc, char *argv[])
 	    assert(false);
 	}
     }
-    if (optind < argc) {
-	fprintf(stderr, "%s: unrecognized argument(s): ", argv[0]);
-	while (optind < argc) {
-	    fprintf(stderr, "%s ", argv[optind++]);
-	}
-	fprintf(stderr, "\n\n");
-
-	print_short_help(argv[0]);
-
-	return false;
+    while (optind < argc) {
+	p.set(argv[optind++]);
+	flightFiles.push_back(p);
     }
 
     return true;

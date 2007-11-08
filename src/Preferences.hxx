@@ -23,6 +23,7 @@
 #ifndef __PREFERENCES_H__
 #define __PREFERENCES_H__
 
+#include <vector>
 #include <simgear/misc/sg_path.hxx>
 
 // This class (of which there should only be one instantiated), keeps
@@ -58,6 +59,11 @@
 //
 //   http://argtable.sourceforge.net/
 
+struct SerialConnection {
+    char *device;
+    int baud;
+};
+
 class Preferences {
 public:
     Preferences();
@@ -82,9 +88,9 @@ public:
     int width;
     int height;
     bool softcursor;
-    char *port;
-    char *device;
-    char *baud;
+    // EYE - use sets?
+    vector<int> networkConnections;
+    vector<SerialConnection> serialConnections;
     float update;
     int mode;
     SGPath scenery_root;
@@ -96,12 +102,13 @@ public:
     bool terrasync_mode;
     int concurrency;
 
-    // These are derived from the preferences we load, but don't have
-    // command-line options of their own.
-    bool slaved, network, serial;
+    vector<SGPath> flightFiles;
 
 protected:
     bool _loadPreferences(int argc, char *argv[]);
+    unsigned int _port;
+    SerialConnection _serial;
+    unsigned int _baud;
 };
 
 #endif        // __PREFERENCES_H__
