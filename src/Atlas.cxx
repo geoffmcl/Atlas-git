@@ -34,10 +34,9 @@
 #include <plib/fnt.h>
 #include <plib/pu.h>
 #include <string>
-#include <simgear/io/sg_socket.hxx>
-#include <simgear/io/sg_serial.hxx>
 
 #include <map>
+#include <stdexcept>
 
 #include "MapBrowser.hxx"
 #include "Overlays.hxx"
@@ -46,26 +45,22 @@
 #include "TileManager.hxx"
 #include "Search.hxx"
 #include "Preferences.hxx"
+#include "Graphs.hxx"
 
 #define SCALECHANGEFACTOR 1.3f
 
 // User preferences (including command-line arguments).
 Preferences prefs;
 
-SGIOChannel *input_channel;
-
 bool dragmode = false;
 int drag_x, drag_y;
 float scalefactor = 1.0f, mapsize, width, height;
 
+// EYE - replace this stuff with current point?
 float latitude, copy_lat;
 float longitude, copy_lon;
 
-float heading = 0.0f, speed, altitude;
-
-int  sock;
-char save_buf[ 2 * 2048 ];
-int save_len = 0;
+// float heading = 0.0f, speed, altitude;
 
 fntTexFont *texfont;
 puFont *font;
@@ -83,6 +78,11 @@ puInput *inp_lat, *inp_lon;
 puPopupMenu *choose_projection_menu;
 puObject *proj_item[MAX_NUM_PROJECTIONS];
 
+puButtonBox *button_box_info;
+// EYE - constant alert!  We should get '3' from Graphs.hxx somehow.
+char *button_box_labels[3];
+puSlider *smoother;
+
 // Synchronization and map generation interface.
 puPopup *sync_interface;
 puFrame *sync_frame;
@@ -92,14 +92,23 @@ puDial *dial_sync_progress;
 // Search interface.
 Search *search_interface;
 
-// bool softcursor = false;
+// Altitude/Speed interface.
+int graphs_window;
+int main_window;
+Graphs *graphs;
+
 char lat_str[80], lon_str[80], alt_str[80], hdg_str[80], spd_str[80];
+
+// File save dialog.
+puFileSelector *saveDialog = NULL;
 
 SGPath lowrespath;
 int lowres_avlble;
 
 MapBrowser *map_object;
 FlightTrack *track = NULL;
+vector<FlightTrack *> tracks;
+int currentFlightTrack;
 
 // The tile manager keeps track of tiles that need to be updated.
 TileManager *tileManager;
@@ -109,309 +118,7 @@ TileManager *tileManager;
 unsigned int nthTile = 0;
 
 // SGIOChannel *ai_aircraft;
-FlightTrack *ai_track = NULL;
-
-bool parse_nmea(char *buf) {
-  //  cout << "parsing nmea message = " << buf << endl;
-
-    string msg = buf;
-    //msg = msg.substr( 0, length );
-
-    string::size_type begin_line, end_line, begin, end;
-    begin_line = begin = 0;
-
-    // extract out each line
-    end_line = msg.find("\n", begin_line);
-    while ( end_line != string::npos ) {
-	string line = msg.substr(begin_line, end_line - begin_line);
-	begin_line = end_line + 1;
-
-	// leading character
-	string start = msg.substr(begin, 1);
-	++begin;
-
-	// sentence
-	end = msg.find(",", begin);
-	if ( end == string::npos ) {
-	    return false;
-	}
-    
-	string sentence = msg.substr(begin, end - begin);
-	begin = end + 1;
-
-	double lon_deg, lon_min, lat_deg, lat_min;
-
-	if ( sentence == "GPRMC" ) {
-	    // time
-	    end = msg.find(",", begin);
-	    if ( end == string::npos ) {
-		return false;
-	    }
-    
-	    string utc = msg.substr(begin, end - begin);
-	    begin = end + 1;
-
-	    // junk
-	    end = msg.find(",", begin);
-	    if ( end == string::npos ) {
-		return false;
-	    }
-
-	    string junk = msg.substr(begin, end - begin);
-	    begin = end + 1;
-
-	    // latitude val
-	    end = msg.find(",", begin);
-	    if ( end == string::npos ) {
-		return false;
-	    }
-    
-	    string lat_str = msg.substr(begin, end - begin);
-	    begin = end + 1;
-
-	    lat_deg = atof( lat_str.substr(0, 2).c_str() );
-	    lat_min = atof( lat_str.substr(2).c_str() );
-
-	    // latitude dir
-	    end = msg.find(",", begin);
-	    if ( end == string::npos ) {
-		return false;
-	    }
-    
-	    string lat_dir = msg.substr(begin, end - begin);
-	    begin = end + 1;
-
-	    latitude = lat_deg + ( lat_min / 60.0 );
-	    if ( lat_dir == "S" ) {
-		latitude *= -1;
-	    }
-	    latitude *= SG_DEGREES_TO_RADIANS;  // convert to radians
-
-	    // longitude val
-	    end = msg.find(",", begin);
-	    if ( end == string::npos ) {
-		return false;
-	    }
-    
-	    string lon_str = msg.substr(begin, end - begin);
-	    begin = end + 1;
-
-	    lon_deg = atof( lon_str.substr(0, 3).c_str() );
-	    lon_min = atof( lon_str.substr(3).c_str() );
-
-	    // longitude dir
-	    end = msg.find(",", begin);
-	    if ( end == string::npos ) {
-		return false;
-	    }
-    
-	    string lon_dir = msg.substr(begin, end - begin);
-	    begin = end + 1;
-
-	    longitude = lon_deg + ( lon_min / 60.0 );
-	    if ( lon_dir == "W" ) {
-		longitude *= -1;
-	    }
-	    longitude *= SG_DEGREES_TO_RADIANS;  // convert to radians
-
-	    // speed
-	    end = msg.find(",", begin);
-	    if ( end == string::npos ) {
-		return false;
-	    }
-    
-	    string speed_str = msg.substr(begin, end - begin);
-	    begin = end + 1;
-	    speed = atof( speed_str.c_str() );
-
-	    // heading
-	    end = msg.find(",", begin);
-	    if ( end == string::npos ) {
-		return false;
-	    }
-    
-	    string hdg_str = msg.substr(begin, end - begin);
-	    begin = end + 1;
-	    heading = atof( hdg_str.c_str() );
-	} else if ( sentence == "GPGGA" ) {
-	    // time
-	    end = msg.find(",", begin);
-	    if ( end == string::npos ) {
-		return false;
-	    }
-    
-	    string utc = msg.substr(begin, end - begin);
-	    begin = end + 1;
-
-	    // latitude val
-	    end = msg.find(",", begin);
-	    if ( end == string::npos ) {
-		return false;
-	    }
-    
-	    string lat_str = msg.substr(begin, end - begin);
-	    begin = end + 1;
-
-	    lat_deg = atof( lat_str.substr(0, 2).c_str() );
-	    lat_min = atof( lat_str.substr(2).c_str() );
-
-	    // latitude dir
-	    end = msg.find(",", begin);
-	    if ( end == string::npos ) {
-		return false;
-	    }
-    
-	    string lat_dir = msg.substr(begin, end - begin);
-	    begin = end + 1;
-
-	    latitude = lat_deg + ( lat_min / 60.0 );
-	    if ( lat_dir == "S" ) {
-		latitude *= -1;
-	    }
-	    latitude *= SG_DEGREES_TO_RADIANS;  // convert to radians
-
-	    // cur_fdm_state->set_Latitude( latitude * SG_DEGREES_TO_RADIANS );
-
-	    // longitude val
-	    end = msg.find(",", begin);
-	    if ( end == string::npos ) {
-		return false;
-	    }
-    
-	    string lon_str = msg.substr(begin, end - begin);
-	    begin = end + 1;
-
-	    lon_deg = atof( lon_str.substr(0, 3).c_str() );
-	    lon_min = atof( lon_str.substr(3).c_str() );
-
-	    // longitude dir
-	    end = msg.find(",", begin);
-	    if ( end == string::npos ) {
-		return false;
-	    }
-    
-	    string lon_dir = msg.substr(begin, end - begin);
-	    begin = end + 1;
-
-	    longitude = lon_deg + ( lon_min / 60.0 );
-	    if ( lon_dir == "W" ) {
-		longitude *= -1;
-	    }
-	    longitude *= SG_DEGREES_TO_RADIANS;  // convert to radians
-
-	    // cur_fdm_state->set_Longitude( longitude * SG_DEGREES_TO_RADIANS );
-
-	    // junk
-	    end = msg.find(",", begin);
-	    if ( end == string::npos ) {
-		return false;
-	    }
-    
-	    string junk = msg.substr(begin, end - begin);
-	    begin = end + 1;
-
-	    // junk
-	    end = msg.find(",", begin);
-	    if ( end == string::npos ) {
-		return false;
-	    }
-    
-	    junk = msg.substr(begin, end - begin);
-	    begin = end + 1;
-
-	    // junk
-	    end = msg.find(",", begin);
-	    if ( end == string::npos ) {
-		return false;
-	    }
-    
-	    junk = msg.substr(begin, end - begin);
-	    begin = end + 1;
-
-	    // altitude
-	    end = msg.find(",", begin);
-	    if ( end == string::npos ) {
-		return false;
-	    }
-    
-	    string alt_str = msg.substr(begin, end - begin);
-	    altitude = atof( alt_str.c_str() );
-	    begin = end + 1;
-	    
-	    // altitude units
-	    end = msg.find(",", begin);
-	    if ( end == string::npos ) {
-		return false;
-	    }
-    
-	    string alt_units = msg.substr(begin, end - begin);
-	    begin = end + 1;
-
-	    if ( alt_units != string("F") ) {
-		altitude *= 3.28;
-	    }
-	} else if ( sentence == "PATLA" ) {
-	    // nav1 freq
-	    end = msg.find(",", begin);
-	    if ( end == string::npos ) {
-		return false;
-	    }
-    
-	    string nav1_freq_str = msg.substr(begin, end - begin);
-	    begin = end + 1;
-
-	    // nav1 selected radial
-	    end = msg.find(",", begin);
-	    if ( end == string::npos ) {
-		return false;
-	    }
-    
-	    string nav1_rad_str = msg.substr(begin, end - begin);
-	    begin = end + 1;
-
-	    // nav2 freq
-	    end = msg.find(",", begin);
-	    if ( end == string::npos ) {
-		return false;
-	    }
-    
-	    string nav2_freq_str = msg.substr(begin, end - begin);
-	    begin = end + 1;
-
-	    // nav2 selected radial
-	    end = msg.find(",", begin);
-	    if ( end == string::npos ) {
-		return false;
-	    }
-    
-	    string nav2_rad_str = msg.substr(begin, end - begin);
-	    begin = end + 1;
-
-	    // adf freq
-	    end = msg.find("*", begin);
-	    if ( end == string::npos ) {
-		return false;
-	    }
-    
-	    string adf_freq_str = msg.substr(begin, end - begin);
-	    begin = end + 1;
-
-	    nav1_freq = atof( nav1_freq_str.c_str() );
-	    nav1_rad =  atof( nav1_rad_str.c_str() ) * 
-	      SGD_DEGREES_TO_RADIANS;
-	    nav2_freq = atof( nav2_freq_str.c_str() );
-	    nav2_rad =  atof( nav2_rad_str.c_str() ) * 
-	      SGD_DEGREES_TO_RADIANS;
-	    adf_freq =  atof( adf_freq_str.c_str() );
-	}
-
-	begin = begin_line;
-	end_line = msg.find("\n", begin_line);
-
-  }
-  
-  return true;
-}
+// FlightTrack *ai_track = NULL;
 
 /*****************************************************************************/
 /* Convert degrees to dd mm'ss.s" (DMS-Format)                               */
@@ -608,6 +315,27 @@ char *matchAtIndex(Search *s, int i)
     }
 
     return result;
+}
+
+/******************************************************************************
+Smoothing callback.
+******************************************************************************/
+void smoother_cb(puObject *dial) 
+{
+    // This must be static, as PUI will access it later.
+    static char buf[50];
+    sprintf(buf, "%d", smoother->getIntegerValue());
+    smoother->setLegend(buf);
+
+    // Update the graphs.
+    graphs->setSmoothing(smoother->getIntegerValue());
+    glutSetWindow(graphs_window);
+    glutPostRedisplay();
+
+    // Update the interface.
+    glutSetWindow(main_window);
+    puDisplay(main_window);
+    glutPostRedisplay();
 }
 
 /******************************************************************************
@@ -928,6 +656,7 @@ void clear_ftrack_cb ( puObject * ) {
     track->clear();
   }
 
+  glutPostWindowRedisplay(graphs_window);
   glutPostRedisplay();
 }
 
@@ -957,6 +686,43 @@ void projection_cb (puObject *cb) {
    glutPostRedisplay();
 }
       
+// EYE - this counts on the Graphs type values being same as the
+// corresponding entries in the button box.
+void redrawGraphs();
+void graph_type_cb (puObject *cb) 
+{
+    glutSetWindow(graphs_window);
+    if (button_box_info->getValue() == 0) {
+	glutHideWindow();
+    } else {
+	graphs->setGraphTypes(button_box_info->getValue());
+	glutShowWindow();
+	// EYE - calling glutPostRedisplay() doesn't seem to work
+	// here, so I call redrawGraphs() directly.
+	redrawGraphs();
+    }
+
+    glutSetWindow(main_window);
+}
+
+void file_cb(puObject *cb)
+{
+    // If the user hit "Ok", then the string value of the save dialog
+    // will be non-empty.
+    char *file = saveDialog->getStringValue();
+    if (strcmp(file, "") != 0) {
+	// Note: it's important that we don't let 'track' change while
+	// the save dialog is active.
+	track->setFilePath(file);
+	track->save();
+	glutSetWindow(graphs_window);
+	glutPostRedisplay();
+    }
+
+    puDeleteObject(saveDialog);
+    saveDialog = NULL;
+}
+
 /*****************************************************************************
  PUI Code (WIDGETS)
 *****************************************************************************/
@@ -1053,7 +819,7 @@ void init_gui(bool textureFonts) {
   inp_lon->setStyle(PUSTYLE_BEVELLED);
 
   cury+=104;
-  if (prefs.slaved) {
+  if (tracks.size() > 0) {
     show_ftrack  = new puButton(curx, cury, "Show Flight Track");
     clear_ftrack = new puOneShot(curx, cury+25, "Clear Flight Track");
     show_ftrack  -> setSize(185, 24);
@@ -1082,19 +848,52 @@ void init_gui(bool textureFonts) {
   minimized_button->setCallback(restore_cb);
   minimized->close();
 
-  if (prefs.slaved) {
-    info_interface = new puPopup(260, 20);
-    info_frame = new puFrame(0, 0, 210, 100);
-    txt_info_spd = new puText(10, 10);
-    txt_info_hdg = new puText(10, 25);
-    txt_info_alt = new puText(10, 40);
-    txt_info_lon = new puText(10, 55);
-    txt_info_lat = new puText(10, 70);
-    info_interface->close();
-    info_interface->reveal();
+  //////////////////////////////////////////////////////////////////////
+  //
+  // Info Interface
+  //
+  // This gives information about the current aircraft position, and
+  // is also used to manage aircraft flight tracks.
+  if (tracks.size() > 0) {
+      info_interface = new puPopup(260, 20);
+      info_frame = new puFrame(0, 0, 470, 90);
+      txt_info_spd = new puText(5, 0);
+      txt_info_hdg = new puText(5, 15);
+      txt_info_alt = new puText(5, 30);
+      txt_info_lon = new puText(5, 45);
+      txt_info_lat = new puText(5, 60);
+
+      // EYE - Perhaps we should get these from Graphs.hxx (if not the
+      // actual text, at least the number).
+      button_box_labels[0] = "Altitude";
+      button_box_labels[1] = "Speed";
+      button_box_labels[2] = "Rate of Climb";
+      button_box_info = 
+	  new puButtonBox(180, 0, 355, 90, button_box_labels, FALSE);
+      button_box_info->setCallback(graph_type_cb);
+      smoother = new puSlider(360, 10, 100);
+      smoother->setLabelPlace(PUPLACE_TOP_CENTERED);
+      // EYE - fix this font stuff.
+      font = new puFont(texfont, 12.0f);
+      smoother->setLegendFont(*font);
+      smoother->setLabelFont(*font);
+      smoother->setLabel("Smoothing (s)");
+      smoother->setMinValue(0.0);	// 0.0 = no smoothing
+      smoother->setMaxValue(60.0);	// 60.0 = smooth over a 60s interval
+      smoother->setStepSize(1.0);
+      smoother->setCallback(smoother_cb);
+
+      info_interface->close();
+      info_interface->reveal();
   }
 
-  // Create sync interface (initially hidden).
+  //////////////////////////////////////////////////////////////////////
+  //
+  // Tile Synchronization Interface
+  //
+  // This interface is displayed when downloading tiles and generating
+  // maps.  It shows the progress of the downloading and generation
+  // processes.
   sync_interface = new puPopup(20, 450);
   sync_frame = new puFrame(0, 0, 300, 80);
   // Stick a progress meter in the upper right corner.
@@ -1107,9 +906,14 @@ void init_gui(bool textureFonts) {
   txt_sync_bytes = new puText(5, 5);
   sync_interface->close();
 
-  // Create search interface (initially hidden).  The initial location
-  // doesn't matter, as we'll later ensure it appears in the upper
-  // right corner.
+  //////////////////////////////////////////////////////////////////////
+  //
+  // Search Interface
+  //
+  // The search interface is used to search for airports and navaids.
+
+  // The initial location doesn't matter, as we'll later ensure it
+  // appears in the upper right corner.
   search_interface = new Search(0, 0, 300, 300);
   search_interface->setCallback(searchItemSelected);
   search_interface->setSelectCallback(searchItemSelected);
@@ -1154,6 +958,11 @@ void reshapeMap( int _width, int _height ) {
   map_object->setSize( mapsize );
 }
 
+// EYE - BJS - when an object's centre moves off the map, we don't
+// draw the object, in spite of the fact that parts of the object
+// should still be visible.  Another manifestation of this is that
+// when you zoom in on an airport, it will suddenly disappear at high
+// enough zoom levels.  This should be fixed.
 void redrawMap() {
   char buf[256];
   
@@ -1175,21 +984,15 @@ void redrawMap() {
   glTranslatef( mapsize/2, mapsize/2, 0.0f );
   glColor3f( 1.0f, 0.0f, 0.0f );
 
-  // BJS - We should add a slaved toggle to the interface, and draw
-  // the airplane/crosshairs based on that.
-  if (!prefs.slaved) {
-  // Draw Crosshair if slaved==false
+  if (!track) {
+    // If there is no current track, then draw a crosshair.
     glBegin(GL_LINES);
-    glVertex2f(0.0f, 0.0f);
     glVertex2f(0.0f, 20.0f);
-    glVertex2f(0.0f, 0.0f);
     glVertex2f(0.0f, -20.0f);
-    glVertex2f(0.0f, 0.0f);
     glVertex2f(20.0f, 0.0f);
-    glVertex2f(0.0f, 0.0f);
     glVertex2f(-20.0f, 0.0f);
+    glEnd(); 
   }
-  glEnd(); 
   glPopMatrix();
    
   if (!inp_lat->isAcceptingInput()) {
@@ -1206,15 +1009,32 @@ void redrawMap() {
     inp_lon->setValue(lon_str);
   }
 
-  if (prefs.slaved) {
-    sprintf( hdg_str, "HDG: %.0f*", heading < 0.0 ? heading + 360.0 : heading);    
-    sprintf( alt_str, "ALT: %.0f ft MSL", altitude);
-    sprintf( spd_str, "SPD: %.0f KIAS", speed);
-    txt_info_lat->setLabel(lat_str);
-    txt_info_lon->setLabel(lon_str);
-    txt_info_alt->setLabel(alt_str);
-    txt_info_hdg->setLabel(hdg_str);
-    txt_info_spd->setLabel(spd_str);
+  // EYE - is track always valid?
+  if (track) {
+      FlightData *p;
+      if (track->live()) {
+	  p = track->getLastPoint();
+      } else {
+	  p = track->dataAtPoint(track->mark());
+      }
+
+      if (p) {
+	  sprintf(hdg_str, "HDG: %.0f*", p->hdg < 0.0 ? p->hdg + 360.0 : p->hdg);    
+	  sprintf(alt_str, "ALT: %.0f ft MSL", p->alt);
+	  sprintf(spd_str, "SPD: %.0f KIAS", p->spd);
+	  sprintf(lat_str, "%c%s", 
+		  (p->lat < 0) ? 'S':'N',
+		  dmshh_format(p->lat * SG_RADIANS_TO_DEGREES, buf));
+	  sprintf(lon_str, "%c%s", 
+		  (p->lon < 0) ? 'W':'E', 
+		  dmshh_format(p->lon * SG_RADIANS_TO_DEGREES, buf));
+
+	  txt_info_lat->setLabel(lat_str);
+	  txt_info_lon->setLabel(lon_str);
+	  txt_info_alt->setLabel(alt_str);
+	  txt_info_hdg->setLabel(hdg_str);
+	  txt_info_spd->setLabel(spd_str);
+      }
   }
 
   // Remove our translation
@@ -1228,48 +1048,116 @@ void redrawMap() {
   glutSwapBuffers();
 }
 
+// Display function for the graphs window.
+void redrawGraphs() {
+    graphs->draw();
+    glutSwapBuffers();
+}
+
+// Called when the graphs window is resized.
+void reshapeGraphs(int w, int h)
+{
+    glViewport(0, 0, (GLsizei) w, (GLsizei) h);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluOrtho2D(0.0, (GLdouble) w, 0.0, (GLdouble) h);
+}
+
+// Called for mouse motion events (when a mouse button is depressed)
+// in the graphs window.
+void motionGraphs(int x, int y) 
+{
+    graphs->setMark(x);
+
+    glutPostRedisplay();
+    glutPostWindowRedisplay(main_window);
+}
+
+// Called for mouse button events in the graphs window.
+void mouseGraphs(int button, int state, int x, int y)
+{
+    // EYE - should we look at the button and state eventually?
+    motionGraphs(x, y);
+}
+
+void keyPressed( unsigned char key, int x, int y );
+
+// Called when the user presses a key in the graphs window.  We just
+// pass the key on to the handler for the main window.
+void keyboardGraphs(unsigned char key, int x, int y)
+{
+    // EYE - keyPressed does a call to puKeyboard.  Is this okay
+    // (especially if we do the same in the future)?
+    keyPressed(key, x, y);
+    glutPostRedisplay();
+    glutPostWindowRedisplay(main_window);
+}
+
+// EYE - we assume that the current window is the graphs window when
+// this and the other event functions are called.  Is this assumption
+// correct?
+// Called when the user presses a "special" key in the graphs window,
+// where "special" includes directional keys.
+void specialGraphs(int key, int x, int y) 
+{
+    switch (key + PU_KEY_GLUT_SPECIAL_OFFSET) {
+    case PU_KEY_LEFT:
+	if (track->mark() > 0) {
+	    track->setMark(track->mark() - 1);
+	}
+	break;
+    case PU_KEY_RIGHT:
+	if (track->mark() < (track->size() - 1)) {
+	    track->setMark(track->mark() + 1);
+	}
+	break;
+    case PU_KEY_HOME:
+	track->setMark(0);
+	break;
+    case PU_KEY_END:
+	track->setMark(track->size() - 1);
+	break;
+    default:
+	return;
+    }
+
+    // EYE - is there a better way?
+    glutPostRedisplay();
+    glutPostWindowRedisplay(main_window);
+}
+
+// Called periodically to check for input on network and serial ports.
 void timer(int value) {
-  char buffer[512];
+    // Check for input on all live tracks.
+    for (int i = 0; i < tracks.size(); i++) {
+	if (tracks[i]->live() && tracks[i]->checkForInput()) {
+	    // If we're in terrasync mode, we need to check for
+	    // unloaded tiles as the aircraft moves.
+	    if (prefs.terrasync_mode) {
+		terrasyncUpdate();
+	    }
 
-  int length, totalLength = 0;
-  while ( (length = input_channel->readline( buffer, 512 )) > 0 ) {
-      parse_nmea(buffer);
-      totalLength += length;
-  }
+	    // And update our graphs if we're displaying this track.
+	    if (i == currentFlightTrack) {
+		glutSetWindow(graphs_window);
+		glutPostRedisplay();
+	    }
 
-  // If we managed to read data, then we'll assume we need to add some
-  // flight data.
-  if (totalLength > 0) {
-      // If we're in terrasync mode, we need to check for unloaded
-      // tiles as the aircraft moves.
-      if (prefs.terrasync_mode) {
-	  terrasyncUpdate();
-      }
+	    // Just in case the main window has changed.
+	    glutSetWindow(main_window);
+	    glutPostRedisplay();
+	}
+    }
 
-      // record flight
-      FlightData *d = new FlightData;
-      d->lat = latitude;
-      d->lon = longitude;
-      d->alt = altitude;
-      d->hdg = heading;
-      d->spd = speed;
-      track->addPoint(d);
-
-      // EYE - or perhaps Atlas shouldn't follow the aircraft?  Or
-      // make it a toggle?  We really need a preferences pane.
-//       map_object->setLocation( latitude, longitude );
-  
-      glutPostRedisplay();
-  }
-
-  glutTimerFunc( (int)(prefs.update * 1000.0f), timer, value );
+    // Check again later.
+    glutTimerFunc( (int)(prefs.update * 1000.0f), timer, value );
 }
 
 // Called to monitor syncing tiles.  It monitors the currently
 // downloading tile(s), and updates the interface.
 // EYE - mark syncing tiles somehow
-// EYE - it would be nice to use a smaller font size, and characters
-//       get clipped in font
+// EYE - it would be nice to use a smaller font size.  Also, characters
+//       get clipped with our current font and spacing.
 void tileTimer(int value) {
     int i;
     int concurrency;
@@ -1318,6 +1206,7 @@ void tileTimer(int value) {
     }
 
     // This is necessary so that Atlas draws any newly-created maps.
+
     // EYE - Atlas will not redraw a map if it already has one in its
     // cache.  Thus, for example, a new, higher-definition map will
     // not be displayed immediately.
@@ -1434,11 +1323,18 @@ void keyPressed( unsigned char key, int x, int y ) {
       break;
     case 'D':
     case 'd':
-      if (prefs.slaved) {
+      // Hide/show the info interface and the graphs window.
+      if (tracks.size() > 0) {
 	if (!info_interface->isVisible()) {
 	  info_interface->reveal();
+	  glutSetWindow(graphs_window);
+	  glutShowWindow();
+	  glutSetWindow(main_window);
 	} else {
 	  info_interface->hide();
+	  glutSetWindow(graphs_window);
+	  glutHideWindow();
+	  glutSetWindow(main_window);
 	}
 	glutPostRedisplay();
       }
@@ -1450,15 +1346,52 @@ void keyPressed( unsigned char key, int x, int y ) {
       break;
     case 'C':
     case 'c':
-      // Center the map on the last position of the aircraft (if it
-      // has a non-empty track).
+      // Center the map on the marked position of the aircraft, or, if
+      // it has no mark, its last position.
       if (track && !track->empty()) {
-	latitude = track->getLastPoint()->lat;
-	longitude = track->getLastPoint()->lon;
+	  if (track->mark() >= 0) {
+	      latitude = track->dataAtPoint(track->mark())->lat;
+	      longitude = track->dataAtPoint(track->mark())->lon;
+	  } else {
+	      latitude = track->getLastPoint()->lat;
+	      longitude = track->getLastPoint()->lon;
+	  }
 	map_object->setLocation( latitude, longitude );
 	glutPostRedisplay();
       }
       break;
+    case 'F':
+    case 'f':
+	// If there's a save track dialog present, then don't do anything.
+	// EYE - beep?
+	if (saveDialog) {
+	    return;
+	}
+	if (key == 'f') {
+	    currentFlightTrack = (currentFlightTrack + 1) % tracks.size();
+	} else {
+	    currentFlightTrack = 
+		(currentFlightTrack + tracks.size() - 1) % tracks.size();
+	}
+	track = tracks[currentFlightTrack];
+
+	glutSetWindow(graphs_window);
+	graphs->setFlightTrack(track);
+	glutPostRedisplay();
+
+	glutSetWindow(main_window);
+	map_object->setFlightTrack(track);
+	if (track->mark() >= 0) {
+	    latitude = track->dataAtPoint(track->mark())->lat;
+	    longitude = track->dataAtPoint(track->mark())->lon;
+	} else if (track->size() > 0) {
+	    latitude = track->getLastPoint()->lat;
+	    longitude = track->getLastPoint()->lon;
+	}
+	map_object->setLocation(latitude, longitude);
+	glutPostRedisplay();
+
+	break;
     case 'J':
     case 'j':
       // Toggle the search interface.
@@ -1484,11 +1417,40 @@ void keyPressed( unsigned char key, int x, int y ) {
       show_nav->setValue(!show_nav->getValue());
       show_cb(show_nav);
       break;    
+    case 'S':
+    case 's':
+	// We should warn the user if Atlas quits with unsaved tracks.
+	// However, I don't think GLUT gives us a way to catch program
+	// exits.  Let the user beware!
+	if (track->hasFile()) {
+	    track->save();
+	} else if (saveDialog == NULL) {
+	    // Only start a new dialog if one isn't running already.
+	    glutSetWindow(main_window);
+	    saveDialog = new puFileSelector(250, 150, 500, 400, "");
+	    saveDialog->setCallback(file_cb);
+	    saveDialog->setUserData((void *)track);
+	    // EYE - how do I set the font of the file dialog?
+// 	    saveDialog->setLegendFont(PUFONT_HELVETICA_10);
+// 	    saveDialog->setLabelFont(PUFONT_HELVETICA_10);
+// 	    puFont *f = new puFont(PUFONT_HELVETICA_10);
+// 	    saveDialog->setLegendFont(*f);
+	    glutPostRedisplay();
+	}
+	break;
     case 'T':
     case 't':
       map_object->setTextured( !map_object->getTextured() );
       glutPostRedisplay();
       break;
+    case 'U':
+    case 'u':
+	// 'u'nattach (ie, detach)
+	track->detach();
+	track->setMark(0);
+	glutSetWindow(graphs_window);
+	glutPostRedisplay();
+	break;
     case 'V':
     case 'v':
       show_name->setValue(!show_name->getValue());
@@ -1549,7 +1511,7 @@ int main(int argc, char **argv) {
 
   glutInitDisplayMode( GLUT_RGB | GLUT_DEPTH | GLUT_DOUBLE );
   glutInitWindowSize( prefs.width, prefs.height );
-  glutCreateWindow( "Atlas" );
+  main_window = glutCreateWindow( "Atlas" );
 
   glutReshapeFunc( reshapeMap );
   glutDisplayFunc( redrawMap );
@@ -1573,21 +1535,53 @@ int main(int argc, char **argv) {
   map_object->setMapPath(prefs.path.c_str());
 
 
-  if (prefs.slaved) {
-    glutTimerFunc( (int)(prefs.update*1000.0f), timer, 0 );
+  // Read in files.
+  for (int i = 0; i < prefs.flightFiles.size(); i++) {
+      // Read in the whole file in one swack.  Files that couldn't be
+      // opened are added to a list, then reported.
+      FlightTrack *aTrack;
+      try {
+	  aTrack = new FlightTrack(prefs.flightFiles[i].c_str());
+	  // Set the mark aircraft to the beginning of the track.
+	  aTrack->setMark(0);
+	  tracks.push_back(aTrack);
+      } catch (runtime_error e) {
+	  printf("Failed to read flight file '%s'\n", 
+		 prefs.flightFiles[i].c_str());
+      }
+  }
 
-    track = new FlightTrack(prefs.max_track);
-    map_object->setFlightTrack(track);
+  // Make network connections.
+  for (int i = 0; i < prefs.networkConnections.size(); i++) {
+      tracks.push_back(new FlightTrack(prefs.networkConnections[i],
+				       prefs.max_track));
+  }
+  // Make serial connections.
+  for (int i = 0; i < prefs.serialConnections.size(); i++) {
+      FlightTrack *f = 
+	  new FlightTrack(prefs.serialConnections[i].device,
+			  prefs.serialConnections[i].baud,
+			  prefs.max_track);
+      tracks.push_back(f);
+  }
+  if (tracks.size() == 0) {
+      currentFlightTrack = -1;
+  } else {
+      currentFlightTrack = 0;
+      track = tracks[currentFlightTrack];
+      map_object->setFlightTrack(track);
+      if (track->size() > 0) {
+	  // EYE - what if user specified latitude/longitude on command line?
+	  latitude = track->getLastPoint()->lat;
+	  longitude = track->getLastPoint()->lon;
+      }
+  }
+  map_object->setFlightTrack(track);
 
-    if ( prefs.network ) {
-	input_channel = new SGSocket( "", prefs.port, "udp" );
-    } else if ( prefs.serial ) {
-	input_channel = new SGSerial( prefs.device, prefs.baud );
-    } else {
-	printf("unknown input, defaulting to network on port 5500\n");
-	input_channel = new SGSocket( "", "5500", "udp" );
-    }
-    input_channel->open( SG_IO_IN );
+  // Check network connections and serial connections periodically (as
+  // specified by the "update" user preference).
+  if ((prefs.networkConnections.size() + prefs.serialConnections.size()) > 0) {
+      glutTimerFunc((int)(prefs.update * 1000.0f), timer, 0);
   }
 
   glutMotionFunc       ( mouseMotion );
@@ -1629,10 +1623,55 @@ int main(int argc, char **argv) {
 //   map_object->setFlightTrack(ai_track);
 //   glutTimerFunc(1000, otherAircraftTimer, 0);
 
+  // EYE - if we allow users to load files from the command line, we
+  // need to always create the second window.
+
+  // Create a second window, placed below the first.
+  if (tracks.size() > 0) {
+      // First, get the position of the first window.  We must do this
+      // now, because the glutGet call works on the current window.
+      int x, y, h;
+      x = glutGet(GLUT_WINDOW_X);
+      y = glutGet(GLUT_WINDOW_Y);
+      h = glutGet(GLUT_WINDOW_HEIGHT);
+
+      graphs_window = glutCreateWindow("-- graphs --");
+      glutDisplayFunc(redrawGraphs);
+      glutReshapeFunc(reshapeGraphs);
+      glutMotionFunc(motionGraphs);
+      glutMouseFunc(mouseGraphs);
+      glutKeyboardFunc(keyboardGraphs);
+      glutSpecialFunc(specialGraphs);
+
+      // EYE - tutorial.text flight is not handled correctly, but
+      // maybe there's no way to fix it
+
+      // EYE - add keyboard function: space (play in real time, pause)
+
+      glutReshapeWindow(800, 200);
+      // EYE - this kind of works, but neglects the border OS X adds
+      // around the window (and perhaps other effects too), so there
+      // is some overlap.
+      glutPositionWindow(x, y + h);
+
+      graphs = new Graphs(graphs_window);
+      graphs->setAircraftColor(map_object->getOverlays()->aircraftColor());
+      graphs->setMarkColor(map_object->getOverlays()->aircraftMarkColor());
+      graphs->setFlightTrack(track);
+
+      // EYE - this counts on the Graphs type values being same as the
+      // corresponding entries in the button box.  As well, is there a
+      // cleaner way to do this?  Is there a way to force the call to
+      // the callback without calling it explicitly?
+      button_box_info->setValue(Graphs::ALTITUDE | 
+				Graphs::SPEED | 
+				Graphs::CLIMB_RATE);
+      graph_type_cb(button_box_info);
+      smoother->setValue((int)graphs->smoothing());
+      smoother_cb(smoother);
+  }
+
   glutMainLoop();
  
-  if (prefs.slaved)
-      input_channel->close();
-
   return 0;
 }
