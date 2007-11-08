@@ -80,6 +80,7 @@ const float Overlays::static_ils_color[4] = {0.800, 0.200, 0.200, 0.7};
 const float Overlays::grid_color[4]     = {0.639, 0.371, 0.620, 0.3};
 const float Overlays::track_color[4]    = {0.071, 0.243, 0.427, 0.5};
 const float Overlays::aircraft_color[4]    = {1.0, 0.0, 0.0, 1.0};
+const float Overlays::aircraft_mark_color[4]    = {1.0, 1.0, 0.0, 1.0};
 
 const float Overlays::dummy_normals[][3] = {{0.0f, 0.0f, 0.0f},
 					    {0.0f, 0.0f, 0.0f},
@@ -112,7 +113,9 @@ Overlays::Overlays( const char *fg_root, float scale,
   setGridColor( grid_color );
   setTrackColor( track_color );
   setAircraftColor( aircraft_color );
-  flight_track = new FlightTrack;
+  setAircraftMarkColor( aircraft_mark_color );
+//   flight_track = new FlightTrack;
+  flight_track = NULL;		// EYE - how did this work before?
   projection= new Projection;
 
   time_params = new SGTime();
@@ -304,43 +307,62 @@ void Overlays::draw_flighttrack() {
       sgCopyVec2( p2, p1 );
     }
 
-    // If the flight track is non-empty, draw the aircraft at the last
-    // point in the track (which should be in p1).
+    // Draw aircraft.
     if (!first) {
-      sgVec2 c, offset;
-      float heading;
-
-      // Get heading and convert it to radians.
-      point = flight_track->getLastPoint();
-      heading = (90.0f - point->hdg) * SG_DEGREES_TO_RADIANS;
-
-      output->setColor(ac_color);
-
-      // Center of aircraft.
-      sgCopyVec2(c, p1);
-
-      // Draw aircraft, starting with fuselage.
-      rotate(4.0f, 0.0f, heading, offset);
-      sgAddVec2(p1, c, offset);
-      rotate(-9.0f, 0.0f, heading, offset);
-      sgAddVec2(p2, c, offset);
-      output->drawLine(p1, p2);
-
-      // Wings
-      rotate(0.0f, -7.0f, heading, offset);
-      sgAddVec2(p1, c, offset);
-      rotate(0.0f, 7.0f, heading, offset);
-      sgAddVec2(p2, c, offset);
-      output->drawLine(p1, p2);
-
-      // Tail
-      rotate(-7.0f, -3.0f, heading, offset);
-      sgAddVec2(p1, c, offset);
-      rotate(-7.0f, 3.0f, heading, offset);
-      sgAddVec2(p2, c, offset);
-      output->drawLine(p1, p2);
+	if (flight_track->live()) {
+	    // If there's a live aircraft, draw it at the end of the
+	    // track, in the aircraft colour.
+	    _drawAircraft(flight_track->getLastPoint(), ac_color);
+	} else if (flight_track->mark() >= 0) {
+	    // If it's not live, and there's a value for mark, draw
+	    // the aircraft at the mark in the mark colour.
+	    _drawAircraft(flight_track->dataAtPoint(flight_track->mark()),
+			  ac_mark_color);
+	}
     }
   }
+}
+
+// Draws an aircraft silhouette at the given point, in the given colour.
+void Overlays::_drawAircraft(FlightData *point, float color[4])
+{
+    sgVec2 p1, p2;
+
+    sgVec2 c, offset;
+    float heading;
+
+    sgVec3 xyr;
+    projection->ab_lat(point->lat, point->lon, lat, lon, xyr);
+
+    sgSetVec2(p1, ::scale(xyr[0], output->getSize(), scale), 
+	      ::scale(xyr[1], output->getSize(), scale));
+    heading = (90.0f - point->hdg) * SG_DEGREES_TO_RADIANS;
+
+    output->setColor(color);
+
+    // Center of aircraft.
+    sgCopyVec2(c, p1);
+
+    // Draw aircraft, starting with fuselage.
+    rotate(4.0f, 0.0f, heading, offset);
+    sgAddVec2(p1, c, offset);
+    rotate(-9.0f, 0.0f, heading, offset);
+    sgAddVec2(p2, c, offset);
+    output->drawLine(p1, p2);
+
+    // Wings
+    rotate(0.0f, -7.0f, heading, offset);
+    sgAddVec2(p1, c, offset);
+    rotate(0.0f, 7.0f, heading, offset);
+    sgAddVec2(p2, c, offset);
+    output->drawLine(p1, p2);
+
+    // Tail
+    rotate(-7.0f, -3.0f, heading, offset);
+    sgAddVec2(p1, c, offset);
+    rotate(-7.0f, 3.0f, heading, offset);
+    sgAddVec2(p2, c, offset);
+    output->drawLine(p1, p2);
 }
 
 // Fills in the points array with four corner points of the runway (8 floats)

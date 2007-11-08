@@ -96,6 +96,16 @@ public:
   inline void setAircraftColor( const float *color ) {
     memcpy( ac_color, color, sizeof(float)*4 );
   }
+  inline void setAircraftMarkColor( const float *color ) {
+    memcpy( ac_mark_color, color, sizeof(float)*4 );
+  }
+
+  inline float *aircraftColor() {
+      return ac_color;
+  }
+  inline float *aircraftMarkColor() {
+      return ac_mark_color;
+  }
 
   inline void setFeatures(int features) {
     this->features = features;
@@ -181,6 +191,7 @@ protected:
   void draw_ils( NAV *n, sgVec2 p );
   void draw_fix( NAV *n, sgVec2 p );
   void draw_flighttrack();
+  void _drawAircraft(FlightData *point, float color[4]);
   void draw_gridlines( float dtheta, float dalpha, float spacing );
 
   int features;
@@ -199,6 +210,7 @@ protected:
   static const float grid_color[4];
   static const float track_color[4];
   static const float aircraft_color[4];
+  static const float aircraft_mark_color[4];
   float arp_color1[4]; 
   float arp_color2[4];
   float nav_color[4];
@@ -208,6 +220,7 @@ protected:
   float grd_color[4];
   float trk_color[4];
   float ac_color[4];
+  float ac_mark_color[4];
 
   SGTime *time_params;
   SGMagVar *mag;
@@ -217,6 +230,7 @@ protected:
   void tokenizeLocation(LocationType lType, void *loc, vector<TOKEN> &vec);
 };
 
+// EYE - huh?
 // nav radios (global hack)
 extern float nav1_freq, nav1_rad;
 extern float nav2_freq, nav2_rad;
