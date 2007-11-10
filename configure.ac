@@ -323,6 +323,15 @@ AC_FUNC_VPRINTF
 AC_CHECK_FUNCS( ftime gettimeofday timegm memcpy bcopy mktime strstr rand \
 	random setitimer getitimer signal GetLocalTime rint getrusage )
 
+dnl Check for optreset variable.
+AC_CACHE_CHECK([for optreset], atlas_cv_var_optreset, [
+  AC_TRY_LINK([#include <unistd.h>],[extern int optreset; optreset = 1;],
+  [atlas_cv_var_optreset=yes],[atlas_cv_var_optreset=no])])
+if test "x$atlas_cv_var_optreset" = "xyes"; then
+  AC_DEFINE([HAVE_OPTRESET],[],[Defined if the optreset variable exists.])
+fi
+
+
 AM_CONFIG_HEADER(src/config.h)
 
 AC_CONFIG_FILES([ \

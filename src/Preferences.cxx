@@ -347,9 +347,15 @@ bool Preferences::_loadPreferences(int argc, char *argv[])
     int option_index = 0;
     SGPath p;
 
-    // This is necessary because we may call getopt_long() many times.
+    // The use of optind (or optind and optreset, depending on your
+    // system) is necessary because we may call getopt_long() many
+    // times.
+#ifdef HAVE_OPTRESET
     optreset = 1;
     optind = 1;
+#else
+    optind = 0;
+#endif
     while ((c = getopt_long(argc, argv, "", long_options, &option_index)) 
 	   != -1) {
 	switch (c) {
