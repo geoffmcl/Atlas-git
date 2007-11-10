@@ -193,7 +193,11 @@ void FlightTrack::firstPoint()
 
 FlightData *FlightTrack::getLastPoint() 
 {
-    return _track.back();
+    if (_track.size() > 0) {
+	return _track.back();
+    } else {
+	return NULL;
+    }
 }
 
 FlightData *FlightTrack::getNextPoint() 
