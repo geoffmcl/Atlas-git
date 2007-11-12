@@ -549,6 +549,8 @@ bool FlightTrack::_parse_nmea(char *buf, FlightData *d)
 	    sscanf(tokens[3], "%f", &d->nav2_freq);
 	    sscanf(tokens[4], "%f", &d->nav2_rad);
 	    sscanf(tokens[5], "%f", &d->adf_freq);
+	    d->nav1_rad *= SG_DEGREES_TO_RADIANS;
+	    d->nav2_rad *= SG_DEGREES_TO_RADIANS;
 	} else if ((strcmp(tokens[0], "") == 0) && (tokenCount == 1)) {
 	    // This is what an empty line is parsed as.
 	} else {
