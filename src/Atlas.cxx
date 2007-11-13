@@ -161,6 +161,29 @@ static char *coord_format_latlon(float latitude, float longitude, char *buf)
 }
 #endif
 
+/*****************************************************************************/
+/* Center map at aircraft's current position.
+/*****************************************************************************/
+void centerMapOnAircraft()
+{
+    if (track && !track->empty()) {
+	FlightData *pos;
+	if (track->live()) {
+	    // Live tracks use the aircraft's current position.
+	    pos = track->getLastPoint();
+	} else {
+	    // Saved tracks use the mark.
+	    pos = track->dataAtPoint(track->mark());
+	}
+
+	latitude = pos->lat;
+	longitude = pos->lon;
+	map_object->setLocation(latitude, longitude);
+
+	glutPostRedisplay();
+    }
+}
+
 /******************************************************************************
 Search helper functions.
 ******************************************************************************/
@@ -1067,10 +1090,17 @@ void reshapeGraphs(int w, int h)
 // in the graphs window.
 void motionGraphs(int x, int y) 
 {
-    graphs->setMark(x);
+    // Marks are only honoured for non-live tracks.
+    if (!track->live()) {
+	graphs->setMark(x);
 
-    glutPostRedisplay();
-    glutPostWindowRedisplay(main_window);
+	if (prefs.autocenter_mode) {
+	    centerMapOnAircraft();
+	}
+
+	glutPostRedisplay();
+	glutPostWindowRedisplay(main_window);
+    }
 }
 
 // Called for mouse button events in the graphs window.
@@ -1100,6 +1130,12 @@ void keyboardGraphs(unsigned char key, int x, int y)
 // where "special" includes directional keys.
 void specialGraphs(int key, int x, int y) 
 {
+    // The special keys all adjust the mark.  However, live tracks
+    // have no mark.
+    if (track->live()) {
+	return;
+    }
+
     switch (key + PU_KEY_GLUT_SPECIAL_OFFSET) {
     case PU_KEY_LEFT:
 	if (track->mark() > 0) {
@@ -1121,6 +1157,10 @@ void specialGraphs(int key, int x, int y)
 	return;
     }
 
+    if (prefs.autocenter_mode) {
+	centerMapOnAircraft();
+    }
+
     // EYE - is there a better way?
     glutPostRedisplay();
     glutPostWindowRedisplay(main_window);
@@ -1135,6 +1175,12 @@ void timer(int value) {
 	    // unloaded tiles as the aircraft moves.
 	    if (prefs.terrasync_mode) {
 		terrasyncUpdate();
+	    }
+
+	    // If we're in auto-center mode, and this track is the
+	    // currently displayed track, then recenter the map.
+	    if (prefs.autocenter_mode && (tracks[i] == track)) {
+		centerMapOnAircraft();
 	    }
 
 	    // And update our graphs if we're displaying this track.
@@ -1345,23 +1391,19 @@ void keyPressed( unsigned char key, int x, int y ) {
       show_cb(show_arp);
       break;
     case 'C':
-    case 'c':
-      // Center the map on the marked position of the aircraft, or, if
-      // it has no mark, its last position.
-      if (track && !track->empty()) {
-	  if (track->mark() >= 0) {
-	      latitude = track->dataAtPoint(track->mark())->lat;
-	      longitude = track->dataAtPoint(track->mark())->lon;
-	  } else {
-	      latitude = track->getLastPoint()->lat;
-	      longitude = track->getLastPoint()->lon;
-	  }
-	map_object->setLocation( latitude, longitude );
-	glutPostRedisplay();
+      // Toggle auto-centering.
+      prefs.autocenter_mode = !prefs.autocenter_mode;
+      if (prefs.autocenter_mode) {
+	  centerMapOnAircraft();
       }
+      break;
+    case 'c':
+      centerMapOnAircraft();
       break;
     case 'F':
     case 'f':
+	// Select the next ('f') or previous ('F') flight track.
+
 	// If there's a save track dialog present, then don't do anything.
 	// EYE - beep?
 	if (saveDialog) {
@@ -1375,21 +1417,15 @@ void keyPressed( unsigned char key, int x, int y ) {
 	}
 	track = tracks[currentFlightTrack];
 
+	// Update the graphs window.
 	glutSetWindow(graphs_window);
 	graphs->setFlightTrack(track);
 	glutPostRedisplay();
 
+	// Update the main window.
 	glutSetWindow(main_window);
 	map_object->setFlightTrack(track);
-	if (track->mark() >= 0) {
-	    latitude = track->dataAtPoint(track->mark())->lat;
-	    longitude = track->dataAtPoint(track->mark())->lon;
-	} else if (track->size() > 0) {
-	    latitude = track->getLastPoint()->lat;
-	    longitude = track->getLastPoint()->lon;
-	}
-	map_object->setLocation(latitude, longitude);
-	glutPostRedisplay();
+	centerMapOnAircraft();
 
 	break;
     case 'J':
@@ -1446,10 +1482,12 @@ void keyPressed( unsigned char key, int x, int y ) {
     case 'U':
     case 'u':
 	// 'u'nattach (ie, detach)
-	track->detach();
-	track->setMark(0);
-	glutSetWindow(graphs_window);
-	glutPostRedisplay();
+	if (track->live()) {
+	    track->detach();
+	    track->setMark(0);
+	    glutSetWindow(graphs_window);
+	    glutPostRedisplay();
+	}
 	break;
     case 'V':
     case 'v':

@@ -51,7 +51,7 @@ enum {FIRST_OPTION,
       SQUARE_OPTION, FG_SCENERY_OPTION, SERVER_OPTION, MAP_PATH_OPTION, 
       SIZE_OPTION, LOWRES_SIZE_OPTION, MAX_TRACK_OPTION, 
       TERRASYNC_MODE_OPTION, CONCURRENCY_OPTION, UPDATE_OPTION,
-      VERSION_OPTION, HELP_OPTION,
+      AUTO_CENTER_MODE_OPTION, VERSION_OPTION, HELP_OPTION,
       LAST_OPTION
 };
 
@@ -78,6 +78,7 @@ static struct option long_options[] = {
     {"max-track", required_argument, 0, MAX_TRACK_OPTION},
     {"terrasync-mode", no_argument, 0, TERRASYNC_MODE_OPTION},
     {"concurrency", required_argument, 0, CONCURRENCY_OPTION},
+    {"autocenter-mode", no_argument, 0, AUTO_CENTER_MODE_OPTION},
     {"version", no_argument, 0, VERSION_OPTION},
     {"help", no_argument, 0, HELP_OPTION},
     {0, 0, 0, 0}
@@ -90,7 +91,8 @@ static void print_short_help(char *name) {
     printf("\t[--square] [--fg-scenery=<path>] [--server=<addr>]\n");
     printf("\t[--map-executable=<path>] [--size=<pixels>] [--lowres-size=<pixels>]\n");
     printf("\t[--max-track=<x>] [--terrasync-mode] [--concurrency=<n>]\n");
-    printf("\t[--update=<s>] [--version] [--help] [<flight file>] ...\n");
+    printf("\t[--update=<s>] [--autocenter-mode] [--version]\n");
+    printf("\t[--help] [<flight file>] ...\n");
 }
 
 // Prints a long entry for the give option.
@@ -169,6 +171,10 @@ static void print_help_for(int option)
 	printf("--concurrency=<n>\tNumber of tiles to simultaneously update (defaults to\n");
 	printf("\t1, 0 = unlimited)\n");
 	break;
+    case AUTO_CENTER_MODE_OPTION:
+	printf("--autocenter-mode\tAutomatically center map on aircraft (default is\n");
+	printf("\tto not auto-center)\n");
+	break;
     case VERSION_OPTION:
 	printf("--version\tPrint version number\n");
 	break;
@@ -234,6 +240,7 @@ Preferences::Preferences()
     max_track = 2000;
     terrasync_mode = false;
     concurrency = 1;
+    autocenter_mode = false;
 }
 
 // First loads preferences from ~/.atlasrc (if it exists), then checks
@@ -447,6 +454,9 @@ bool Preferences::_loadPreferences(int argc, char *argv[])
 	    break;
 	case CONCURRENCY_OPTION:
 	    OPTION_CHECK(sscanf(optarg, "%d", &concurrency), 1, CONCURRENCY_OPTION);
+	    break;
+	case AUTO_CENTER_MODE_OPTION:
+	    autocenter_mode = true;
 	    break;
 	case HELP_OPTION:
 	    print_help();

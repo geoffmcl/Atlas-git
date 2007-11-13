@@ -49,7 +49,9 @@
 //
 // (4) Modify print_short_help() and print_help_for()
 //
-// (5) Add code to process the option in Preferences::loadPreferences
+// (5) Add code to process the option in Preferences::_loadPreferences
+//
+// (6) Give it a default value in Preferences::Preferences
 //
 // Easy!
 
@@ -101,6 +103,7 @@ public:
     int max_track;
     bool terrasync_mode;
     int concurrency;
+    bool autocenter_mode;
 
     vector<SGPath> flightFiles;
 
