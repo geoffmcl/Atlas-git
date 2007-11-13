@@ -46,8 +46,8 @@ Map_SOURCES = \
 	fg_mkdir.cxx fg_mkdir.hxx
 
 Map_LDADD = \
-	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgdebug \
-	-lplibsg -lplibpu -lplibul -lplibfnt -lsgbucket -lsgscreen \
+	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgserial -lsgdebug \
+	-lplibsg -lplibpu -lplibul -lplibfnt -lplibnet -lsgbucket -lsgscreen \
 	$(opengl_LIBS) \
 	-lpng -lz -ljpeg
 
@@ -62,8 +62,8 @@ MapPS_SOURCES = \
 	Scenery.cxx Scenery.hxx
 
 MapPS_LDADD = \
-	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgdebug \
-	-lplibsg -lsgbucket \
+	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgserial -lsgdebug \
+	-lplibsg -lplibnet -lsgbucket \
 	-lpng -lz
 
 GetMap_SOURCES = \
