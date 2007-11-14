@@ -160,13 +160,6 @@ int main( int argc, char **argv ) {
   clat *= SG_DEGREES_TO_RADIANS;
   clon *= SG_DEGREES_TO_RADIANS;
 
-
-  // Hack alert -- set the nav1_freq and nav2_freq variables to things
-  //   which will prevent MapPS from thinking a radio is set to these
-  //   frequencies
-
-  nav1_freq=nav2_freq=-1000.;
-  
   char *scenerypath = new char[strlen(mapobj.getFGRoot()) + 256];
   char *workingpath = new char[strlen(mapobj.getFGRoot()) + 256];
   strcpy( scenerypath, mapobj.getFGRoot() );
