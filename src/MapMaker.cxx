@@ -330,8 +330,8 @@ void MapMaker::sub_trifan( const int_list &indices, vector<float*> &v,
       for (int j = 0; j < 3; j++) {
          int next = (j+1) % 3;
          
-         ctimes = abs( elev2colour((int)t[j][2]) - 
-                      elev2colour((int)t[next][2]) );
+         ctimes = abs( elev2index((int)t[j][2]) - 
+                      elev2index((int)t[next][2]) );
          times[j] = ctimes;
 
          if (ctimes > 0) {
@@ -377,7 +377,7 @@ void MapMaker::sub_trifan( const int_list &indices, vector<float*> &v,
             
             if (levels[lh][2] != 0.0f) {
               // this line can now be transformed into a polygon
-              int ecol = lh + 1;
+              int ecol = elev_colindex[lh];
 
               sgVec2 quadverts[4];
               sgVec3 quadnorms[4];

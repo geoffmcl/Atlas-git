@@ -139,6 +139,13 @@ protected:
     return elev_colindex[i];
   }
 
+  inline int elev2index( int elev ) {
+    int i;
+    for (i = 0; i < number_elev_levels-1 && elev >= elev_height[i]; i++);
+  
+    return i;
+  }
+
 # define APPROX(Ca,Cb,X,D) ((Cb-Ca)/D*X+Ca)
   inline void elev2colour_smooth( int elev, float color[4] ) {
     int i,j;
@@ -165,7 +172,7 @@ protected:
 			      float *x, float *y, sgVec3 n, int *h ) {
     float min = (u[2] < v[2]) ? u[2] : v[2];
 
-    int j = elev2colour( (int)min )-1;
+    int j = elev2index( (int)min );
     *h = j + k - 1;
     float t = ((float)elev_height[*h] - u[2]) / (v[2] - u[2]);
     *x = u[0] + t * (v[0] - u[0]);
