@@ -87,6 +87,9 @@ public:
   inline void setIlsColor( const float *color ) {
     memcpy( ils_color, color, sizeof(float)*4 );
   }
+  inline void setNdbColor( const float *color ) {
+    memcpy( ndb_color, color, sizeof(float)*4 );
+  }
   inline void setGridColor( const float *color ) {
     memcpy( grd_color, color, sizeof(float)*4 );
   }
@@ -207,6 +210,7 @@ protected:
   static const float static_vor_to_color[4];
   static const float static_vor_from_color[4];
   static const float static_ils_color[4];
+  static const float static_ndb_color[4];
   static const float grid_color[4];
   static const float track_color[4];
   static const float aircraft_color[4];
@@ -217,6 +221,7 @@ protected:
   float vor_to_color[4]; 
   float vor_from_color[4];
   float ils_color[4];
+  float ndb_color[4];
   float grd_color[4];
   float trk_color[4];
   float ac_color[4];
@@ -229,12 +234,6 @@ protected:
   vector<TOKEN> matches;
   void tokenizeLocation(LocationType lType, void *loc, vector<TOKEN> &vec);
 };
-
-// EYE - huh?
-// nav radios (global hack)
-extern float nav1_freq, nav1_rad;
-extern float nav2_freq, nav2_rad;
-extern float adf_freq;
 
 bool operator< (const Overlays::TOKEN& left, const Overlays::TOKEN& right);
 

@@ -77,6 +77,7 @@ const float Overlays::navaid_color[4]   = {0.439, 0.271, 0.420, 0.7};
 const float Overlays::static_vor_to_color[4]   = {0.200, 0.800, 0.200, 0.7}; 
 const float Overlays::static_vor_from_color[4] = {0.800, 0.200, 0.200, 0.7};
 const float Overlays::static_ils_color[4] = {0.800, 0.200, 0.200, 0.7}; 
+const float Overlays::static_ndb_color[4] = {0.200, 0.200, 0.800, 0.7}; 
 const float Overlays::grid_color[4]     = {0.639, 0.371, 0.620, 0.3};
 const float Overlays::track_color[4]    = {0.071, 0.243, 0.427, 0.5};
 const float Overlays::aircraft_color[4]    = {1.0, 0.0, 0.0, 1.0};
@@ -86,12 +87,6 @@ const float Overlays::dummy_normals[][3] = {{0.0f, 0.0f, 0.0f},
 					    {0.0f, 0.0f, 0.0f},
 					    {0.0f, 0.0f, 0.0f},
 					    {0.0f, 0.0f, 0.0f}};
-
-
-// nav radios (global hack)
-float nav1_freq, nav1_rad;
-float nav2_freq, nav2_rad;
-float adf_freq;
 
 
 Overlays::Overlays( const char *fg_root, float scale,
@@ -110,6 +105,7 @@ Overlays::Overlays( const char *fg_root, float scale,
   setVorToColor( static_vor_to_color );
   setVorFromColor( static_vor_to_color );
   setIlsColor( static_ils_color );
+  setNdbColor( static_ndb_color );
   setGridColor( grid_color );
   setTrackColor( track_color );
   setAircraftColor( aircraft_color );
@@ -281,46 +277,45 @@ static void rotate(float x, float y, float angle, sgVec2 v) {
 	    (x * sin(angle)) + (y * cos(angle)));
 }
 
-void Overlays::draw_flighttrack() {
-  if (flight_track != NULL) {
-    FlightData *point;
-    sgVec2 p1, p2;
-    bool first = true;
+void Overlays::draw_flighttrack() 
+{
+    if (flight_track != NULL) {
+	FlightData *point;
+	sgVec2 p1, p2;
+	bool first = true;
 
-    flight_track->firstPoint();
+	flight_track->firstPoint();
     
-    output->setColor(trk_color);
+	output->setColor(trk_color);
 
-    while ( (point = flight_track->getNextPoint()) != NULL ) {
-      sgVec3 xyr;
-      projection->ab_lat( point->lat, point->lon, lat, lon, xyr );
+	while ( (point = flight_track->getNextPoint()) != NULL ) {
+	    sgVec3 xyr;
+	    projection->ab_lat( point->lat, point->lon, lat, lon, xyr );
       
-      sgSetVec2( p1, ::scale(xyr[0], output->getSize(), scale), 
-		 ::scale(xyr[1], output->getSize(), scale) );
+	    sgSetVec2( p1, ::scale(xyr[0], output->getSize(), scale), 
+		       ::scale(xyr[1], output->getSize(), scale) );
 
-      if (first) {
-	first = false;
-      } else {
-	output->drawLine( p1, p2 );
-      }
+	    if (first) {
+		first = false;
+	    } else {
+		output->drawLine( p1, p2 );
+	    }
 
-      sgCopyVec2( p2, p1 );
-    }
+	    sgCopyVec2( p2, p1 );
+	}
 
-    // Draw aircraft.
-    if (!first) {
-	if (flight_track->live()) {
-	    // If there's a live aircraft, draw it at the end of the
-	    // track, in the aircraft colour.
-	    _drawAircraft(flight_track->getLastPoint(), ac_color);
-	} else if (flight_track->mark() >= 0) {
-	    // If it's not live, and there's a value for mark, draw
-	    // the aircraft at the mark in the mark colour.
-	    _drawAircraft(flight_track->dataAtPoint(flight_track->mark()),
-			  ac_mark_color);
+	// Draw aircraft at its current position.  For live tracks,
+	// this is the end of the track.  For file-based tracks, this
+	// is at the current mark.
+	if (!first) {
+	    FlightData *pos = flight_track->getCurrentPoint();
+	    if (flight_track->live()) {
+		_drawAircraft(pos, ac_color);
+	    } else {
+		_drawAircraft(pos, ac_mark_color);
+	    }
 	}
     }
-  }
 }
 
 // Draws an aircraft silhouette at the given point, in the given colour.
@@ -332,6 +327,12 @@ void Overlays::_drawAircraft(FlightData *point, float color[4])
     float heading;
 
     sgVec3 xyr;
+
+    // A little sanity checking.
+    if (point == NULL) {
+	return;
+    }
+
     projection->ab_lat(point->lat, point->lon, lat, lon, xyr);
 
     sgSetVec2(p1, ::scale(xyr[0], output->getSize(), scale), 
@@ -499,6 +500,47 @@ void Overlays::draw_ndb( NAV *n, sgVec2 p ) {
   char freqbuf[20];
   sprintf( freqbuf, "%.0f", n->freq );
 
+  FlightData *pos = NULL;
+  if (flight_track) {
+      pos = flight_track->getCurrentPoint();
+  }
+  if (pos && (fabs(n->freq - pos->adf_freq) < SG_EPSILON)) {
+      sgVec3 xyr;
+      sgVec2 p1;
+      projection->ab_lat(pos->lat, pos->lon, lat, lon, xyr );
+      
+      sgSetVec2( p1, ::scale(xyr[0], output->getSize(), scale), 
+		 ::scale(xyr[1], output->getSize(), scale) );
+
+      output->setColor(static_ndb_color);
+      output->drawLine(p, p1);
+
+      // The ADF just shows the direction to the NDB, so it's
+      // independent of magnetic variation.
+      float absoluteBearing, relativeBearing;
+      absoluteBearing = 
+	  atan2(p[1] - p1[1], p[0] - p1[0]) * SG_RADIANS_TO_DEGREES;
+      absoluteBearing = -(absoluteBearing - 90.0);
+      if (absoluteBearing < 0.0) {
+	  absoluteBearing += 360.0;
+      }
+      // Note that pos->hdg gives the aircraft's true (not magnetic)
+      // heading.
+      relativeBearing = absoluteBearing - pos->hdg;
+      if (relativeBearing < 0.0) {
+	  relativeBearing += 360.0;
+      }
+
+      // Tag the aircraft with the absolute and relative bearings to
+      // the NDB.  MB = Magnetic Bearing, RB = Relative Bearing.
+      char *tag;
+      asprintf(&tag, "MB: %.0f\nRB: %.0f", absoluteBearing, relativeBearing);
+      // Draw the text a little away from the aircraft.
+      p1[0] += 5;
+      output->drawText(p1, tag);
+      free(tag);
+  }
+
   output->setColor( nav_color );
   output->drawCircle( p, RADIUS );
 
@@ -572,30 +614,38 @@ void Overlays::draw_vor( NAV *n, sgVec2 p ) {
   //     p[0] + cos(n->magvar)*RADIUS, p[1] + sin(n->magvar)*RADIUS );
   //output->drawLine(p, p2);
 
+  // Get the current navigation settings.
+  FlightData *pos = NULL;
+  if (flight_track) {
+      pos = flight_track->getCurrentPoint();
+  }
+
+  // EYE - draw VOR1 and VOR2 differently?
+
   // if this nav is selected, draw radial
-  if ( fabs( n->freq - nav1_freq ) < SG_EPSILON ) {
+  if (pos && (fabs(n->freq - pos->nav1_freq) < SG_EPSILON)) {
       sgVec2 end;
       sgSetVec2( end,
-		 p[0] + sin(nav1_rad + n->magvar) * 500,
-		 p[1] + cos(nav1_rad + n->magvar) * 500 );
+		 p[0] + sin(pos->nav1_rad + n->magvar) * 500,
+		 p[1] + cos(pos->nav1_rad + n->magvar) * 500 );
       output->setColor( static_vor_from_color );
       output->drawLine(p, end);
       sgSetVec2( end,
-		 p[0] - sin(nav1_rad + n->magvar) * 500,
-		 p[1] - cos(nav1_rad + n->magvar) * 500 );
+		 p[0] - sin(pos->nav1_rad + n->magvar) * 500,
+		 p[1] - cos(pos->nav1_rad + n->magvar) * 500 );
       output->setColor( static_vor_to_color );
       output->drawLine(p, end);
   }
-  if ( fabs( n->freq - nav2_freq ) < SG_EPSILON ) {
+  if (pos && (fabs(n->freq - pos->nav2_freq) < SG_EPSILON)) {
       sgVec2 end;
       sgSetVec2( end,
-		 p[0] + sin(nav2_rad + n->magvar) * 500,
-		 p[1] + cos(nav2_rad + n->magvar) * 500 );
+		 p[0] + sin(pos->nav2_rad + n->magvar) * 500,
+		 p[1] + cos(pos->nav2_rad + n->magvar) * 500 );
       output->setColor( static_vor_from_color );
       output->drawLine(p, end);
       sgSetVec2( end,
-		 p[0] - sin(nav2_rad + n->magvar) * 500,
-		 p[1] - cos(nav2_rad + n->magvar) * 500 );
+		 p[0] - sin(pos->nav2_rad + n->magvar) * 500,
+		 p[1] - cos(pos->nav2_rad + n->magvar) * 500 );
       output->setColor( static_vor_to_color );
       output->drawLine(p, end);
   }
