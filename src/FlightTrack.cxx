@@ -191,15 +191,6 @@ void FlightTrack::firstPoint()
     _track_pos = _track.begin();
 }
 
-FlightData *FlightTrack::getLastPoint() 
-{
-    if (_track.size() > 0) {
-	return _track.back();
-    } else {
-	return NULL;
-    }
-}
-
 FlightData *FlightTrack::getNextPoint() 
 {
     if (_track_pos != _track.end()) {
@@ -215,6 +206,28 @@ FlightData *FlightTrack::dataAtPoint(int i)
 	return NULL;
     } else {
 	return _track[i];
+    }
+}
+
+FlightData *FlightTrack::getLastPoint() 
+{
+    if (_track.size() > 0) {
+	return _track.back();
+    } else {
+	return NULL;
+    }
+}
+
+FlightData *FlightTrack::getCurrentPoint() 
+{
+    if (_track.size() == 0) {
+	return NULL;
+    }
+
+    if (live()) {
+	return getLastPoint();
+    } else {
+	return dataAtPoint(mark());
     }
 }
 
@@ -532,6 +545,8 @@ bool FlightTrack::_parse_nmea(char *buf, FlightData *d)
 	    // Speed and heading
 	    sscanf(tokens[7], "%f", &d->spd);
 	    sscanf(tokens[8], "%f", &d->hdg);
+
+	    // EYE - we should check the checksum (and do what?)
 	} else if ((strcmp(tokens[0], "$GPGGA") == 0) && (tokenCount == 15))  {
 	    // GPGGA also includes the UTC time, latitude, and
 	    // longitude.  However, since GPRMC also contains that

@@ -77,11 +77,16 @@ public:
 
     // Sequential access to the flight track.
     void firstPoint();
-    FlightData *getLastPoint();
     FlightData *getNextPoint();
 
     // Random access to the flight track.
     FlightData *dataAtPoint(int i);
+    
+    // Convenience access.  The first gets the last point, obviously.
+    // The second retrieves the last point if we're live, otherwise it
+    // returns the marked point.
+    FlightData *getLastPoint();
+    FlightData *getCurrentPoint();
 
     int size();
 

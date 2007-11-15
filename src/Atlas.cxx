@@ -167,14 +167,7 @@ static char *coord_format_latlon(float latitude, float longitude, char *buf)
 void centerMapOnAircraft()
 {
     if (track && !track->empty()) {
-	FlightData *pos;
-	if (track->live()) {
-	    // Live tracks use the aircraft's current position.
-	    pos = track->getLastPoint();
-	} else {
-	    // Saved tracks use the mark.
-	    pos = track->dataAtPoint(track->mark());
-	}
+	FlightData *pos = track->getCurrentPoint();
 
 	latitude = pos->lat;
 	longitude = pos->lon;
@@ -1034,12 +1027,7 @@ void redrawMap() {
 
   // EYE - is track always valid?
   if (track) {
-      FlightData *p;
-      if (track->live()) {
-	  p = track->getLastPoint();
-      } else {
-	  p = track->dataAtPoint(track->mark());
-      }
+      FlightData *p = track->getCurrentPoint();
 
       if (p) {
 	  sprintf(hdg_str, "HDG: %.0f*", p->hdg < 0.0 ? p->hdg + 360.0 : p->hdg);    
@@ -1604,14 +1592,15 @@ int main(int argc, char **argv) {
   }
   if (tracks.size() == 0) {
       currentFlightTrack = -1;
+      track = NULL;
   } else {
       currentFlightTrack = 0;
       track = tracks[currentFlightTrack];
-      map_object->setFlightTrack(track);
-      if (track->size() > 0) {
+      FlightData *pos = track->getCurrentPoint();
+      if (pos) {
 	  // EYE - what if user specified latitude/longitude on command line?
-	  latitude = track->getLastPoint()->lat;
-	  longitude = track->getLastPoint()->lon;
+	  latitude = pos->lat;
+	  longitude = pos->lon;
       }
   }
   map_object->setFlightTrack(track);
