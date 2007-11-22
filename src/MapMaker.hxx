@@ -100,8 +100,8 @@ public:
 
   int createMap(GfxOutput *output, float theta, float alpha, 
 		string dirpath, float autoscale = 0.0f);
-  int drawOverlays(GfxOutput *output, float theta, float alpha, 
-		bool do_square = false, bool flipy = false );
+//   int drawOverlays(GfxOutput *output, float theta, float alpha, 
+// 		bool do_square = false, bool flipy = false );
 
 protected:
   /* colours and materials */
@@ -114,7 +114,8 @@ protected:
   // Elevation limits for colours
   static const int MAX_ELEV_LEVELS = 27;
   int number_elev_levels;
-  int elev_height[MAX_ELEV_LEVELS]; 
+//   int elev_height[MAX_ELEV_LEVELS]; 
+  double elev_height[MAX_ELEV_LEVELS]; 
   int elev_colindex[MAX_ELEV_LEVELS];
 
   /* member variables for the run */
@@ -132,14 +133,16 @@ protected:
   /* some info variables */
   int polys;
 
-  inline int elev2colour( int elev ) {
+//   inline int elev2colour( int elev ) {
+  inline int elev2colour( double elev ) {
     int i;
     for (i = 0; i < number_elev_levels-1 && elev >= elev_height[i]; i++);
   
     return elev_colindex[i];
   }
 
-  inline int elev2index( int elev ) {
+//   inline int elev2index( int elev ) {
+  inline int elev2index( double elev ) {
     int i;
     for (i = 0; i < number_elev_levels-1 && elev >= elev_height[i]; i++);
   
@@ -147,6 +150,9 @@ protected:
   }
 
 # define APPROX(Ca,Cb,X,D) ((Cb-Ca)/D*X+Ca)
+    // EYE - check this!  And we need to clearly specify: if
+    // elevations between x and y are colour c, then what should x be
+    // coloured?  y? x + y / 2?
   inline void elev2colour_smooth( int elev, float color[4] ) {
     int i,j;
     for (i = 0; i < number_elev_levels-1 && elev > elev_height[i]; i++);
@@ -197,6 +203,10 @@ protected:
 
   void sub_trifan( const int_list &indices, vector<float*> &v, 
 		   vector<float*> &n );
+  void draw_elevation_tri( int vert0, int vert1, int vert2,
+			   vector<float*> &v, vector <float*> &n, int col );
+  void draw_a_tri( int vert0, int vert1, int vert2,
+		    vector<float*> &v, vector <float*> &n, int col );
   void draw_trifan( const int_list &indices, 
 		    vector<float*> &v, vector <float*> &n, int col );
   void draw_tri( const int_list &indices, 
