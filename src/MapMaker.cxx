@@ -288,375 +288,133 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
   return 1;
 }
 
-#if 0
-void MapMaker::sub_trifan( const int_list &indices, vector<float*> &v, 
-			   vector<float*> &n ) {
-  int_list::const_iterator index = indices.begin();
-  int cvert = *(index++);      // index of central vertex
-  int vert2 = *(index++);      // the first vertex of the circumference
+// A helper function for draw_elevation_tri.  Draws a figure (which
+// may be a triangle, quadrilateral, or pentagon).  The number of
+// vertices and normals is given by 'vertices'.  The 'ts' array gives
+// the vertices, 'nrms' the normals, and 'ps' the scaled map
+// coordinates.
+//
+// We can assume that the vertices are given from top to bottom, and
+// that they move around the perimeter of the figure in the correct
+// order.  As well, we only need to guarantee that the last two points
+// remain unchanged - the calling function doesn't care about the
+// "upper" points.  (This is a *very* specialized routine).
+void MapMaker::draw_elevation_slice(int vertices, bool smooth, int k,
+				    sgVec3 *ts, sgVec3 *nrms, sgVec2 *ps)
+{
+    sgVec4 color[5];
 
-  sgVec3 t[3], nrm[3];
-  float length2 = 0.6f * scle;
-
-  // get the two first vertices
-  sgCopyVec3( t[0], v[cvert]);
-  sgCopyVec3( t[1], v[vert2]);
-  sgCopyVec3( nrm[0], n[cvert]);
-  sgCopyVec3( nrm[1], n[vert2]);
-
-  // now loop over each triangle in the fan
-  while ( index != indices.end() ) {
-    vert2 = *(index++);
-
-    // get third vertex
-    sgCopyVec3( t[2], v[vert2] );
-    sgCopyVec3( nrm[2], n[vert2] );
-    
-    // check whether this triangle is visible (?)
-    if (fabs(t[0][0]) < length2 || fabs(t[0][1]) < length2 ||
-         fabs(t[1][0]) < length2 || fabs(t[1][1]) < length2 ||
-         fabs(t[2][0]) < length2 || fabs(t[2][1]) < length2) {
-      
-      int ctimes = 0, max_ctimes = 0;
-      int times[3], order[3], oind[3];
-      float levels[MAX_ELEV_LEVELS][4];
-      sgVec3 normal[MAX_ELEV_LEVELS][2];
-
-      for (int k = 0; k < number_elev_levels; k++) { 
-         levels[k][0] = 0.0f; levels[k][1] = 0.0f; 
-         levels[k][2] = 0.0f; levels[k][3] = 0.0f;
-      }
-      
-      // check for each line how many elevation levels it passes
-      for (int j = 0; j < 3; j++) {
-         int next = (j+1) % 3;
-         
-         ctimes = abs( elev2index((int)t[j][2]) - 
-                      elev2index((int)t[next][2]) );
-         times[j] = ctimes;
-
-         if (ctimes > 0) {
-          float lx, ly;
-          int lh;
-          sgVec3 dummy_normal;
-          level_triangle( (float*)&t[j], (float*)&t[next], nrm[j], nrm[next], 
-                          ctimes, &lx, &ly, dummy_normal, &lh );
-
-          order[j] = elev_height[lh];
-          if (ctimes > max_ctimes) max_ctimes = ctimes;
-         } else
-          order[j] = 0;
-
-         oind[j] = j;
-      }
-
-      // if some line stretches across more than one elevation level
-      if (max_ctimes > 0) {      // we have to subdivide
-         for (int j = 0; j < 3; j++) {
-          /* pick the index of the greatest value of order 
-             (that has not already been used) */
-          int k;
-          for (k = j+1; k < 3; k++) {
-            if (order[k] > order[j]) {
-              int tmp = order[j]; order[j] = order[k]; order[k] = tmp;
-              tmp = oind[j]; oind[j] = oind[k]; oind[k] = tmp;
-            }
-          }
-
-          int idx = oind[j];      /* idx is the index of the vertex 
-                                     with highest elevation */
-          int next = (idx + 1) % 3;
-
-          // split this line times[idx] times 
-          for (k = times[idx]; k > 0; k--) {
-            float lx, ly;
-            int lh;
-            sgVec3 lnormal;
-            level_triangle( (float*)&t[idx], (float*)&t[next], 
-                            nrm[idx], nrm[next], k, &lx, &ly, lnormal, &lh );
-            int pmin = (t[idx][2] < t[next][2]) ? idx : next;
-            
-            if (levels[lh][2] != 0.0f) {
-              // this line can now be transformed into a polygon
-              int ecol = elev_colindex[lh];
-
-              sgVec2 quadverts[4];
-              sgVec3 quadnorms[4];
-              sgSetVec2( quadverts[0], 
-                         scale(levels[lh][2], size, zoom), 
-                         scale(levels[lh][3], size, zoom) );
-              sgSetVec2( quadverts[1], 
-                         scale(levels[lh][0], size, zoom), 
-                         scale(levels[lh][1], size, zoom) );
-              sgSetVec2( quadverts[2],
-                         scale(lx, size, zoom), scale(ly, size, zoom) );
-              sgSetVec2( quadverts[3],
-                         scale(t[pmin][0], size, zoom), 
-                         scale(t[pmin][1], size, zoom) );
-              sgCopyVec3(quadnorms[0], normal[lh][1]);
-              sgCopyVec3(quadnorms[1], normal[lh][0]);
-              sgCopyVec3(quadnorms[2], lnormal);
-              sgCopyVec3(quadnorms[3], nrm[pmin]);
-
-              output->setColor(palette[ecol]);
-              output->drawQuad(quadverts, quadnorms);
-            } else {
-              levels[lh][0] = lx;
-              levels[lh][1] = ly;
-              levels[lh][2] = t[pmin][0];
-              levels[lh][3] = t[pmin][1];
-              sgCopyVec3(normal[lh][0], lnormal);
-              sgCopyVec3(normal[lh][1], nrm[pmin]);
-            }
-          }
-         } 
-      }
+    if (smooth) {
+	for (int i = 0; i < vertices; i++) {
+	    elev2colour_smooth((int)ts[i][2], color[i]);
+	}
     }
 
-    sgCopyVec3( t[1], t[2] );
-    sgCopyVec3( nrm[1], nrm[2] );
-  }
+    // Draw the figure.
+    if (vertices == 3) {
+	// Triangle
+	if (smooth) {
+	    output->drawTriangle(ps, nrms, color);
+	} else {
+	    output->setColor(palette[elev_colindex[k]]);
+	    output->drawTriangle(ps, nrms);
+	}
+    } else if (vertices == 4) {
+	// Quadrilateral.
+	if (smooth) {
+	    output->drawQuad(ps, nrms, color);
+	} else {
+	    output->setColor(palette[elev_colindex[k]]);
+	    output->drawQuad(ps, nrms);
+	}
+    } else {
+	// Pentagon.  Draw it as a quadrilateral and a triangle.  The
+	// quadralateral consists of the first 4 points, and the
+	// triangle consists of the remaining two *and* the first one.
+	// To draw the triangle, then, we copy the last two points
+	// over the second and third points (this is okay, because
+	// they won't be used again), and draw a triangle consisting
+	// of the first 3 points.
+	if (smooth) {
+	    output->drawQuad(ps, nrms, color);
+	} else {
+	    output->setColor(palette[elev_colindex[k]]);
+	    output->drawQuad(ps, nrms);
+	}
+
+	sgCopyVec3(ts[1], ts[3]);
+	sgCopyVec3(nrms[1], nrms[3]);
+	sgCopyVec2(ps[1], ps[3]);
+	sgCopyVec4(color[1], color[3]);
+
+	sgCopyVec3(ts[2], ts[4]);
+	sgCopyVec3(nrms[2], nrms[4]);
+	sgCopyVec2(ps[2], ps[4]);
+	sgCopyVec4(color[2], color[4]);
+
+	if (smooth) {
+	    output->drawTriangle(ps, nrms, color);
+	} else {
+	    output->drawTriangle(ps, nrms);
+	}
+    }
 }
 
-void MapMaker::draw_tri( const int_list &indices, vector<float*> &v,
-                         vector<float*> &n, int col) {
-  int_list::const_iterator index = indices.begin();
-  unsigned int pos = 0;
-  // Some btg airport files economize on normals. 
-  bool single_normal = false;
-  if(n.size() < v.size()) single_normal = true;
-  
-  while(indices.size() - pos >= 3) {
-    int vert0 = *(index++), vert1 = *(index++), vert2 = *(index++);
-    // TODO - should add some checking that the returned values of
-    // vert0 -> 2 are not greater than the node array size.
-    
-    sgVec3 t[3], nrm[3];
-    sgVec2 p[3];
-    sgVec4 color[3];
-    
-    sgCopyVec3( t[0], v[vert0] );
-    sgCopyVec3( t[1], v[vert1] );
-    sgCopyVec3( t[2], v[vert2] );
-    sgCopyVec3( nrm[0], (single_normal ? *(n.begin()) : n[vert0]) );
-    sgCopyVec3( nrm[1], (single_normal ? *(n.begin()) : n[vert1]) );
-    sgCopyVec3( nrm[2], (single_normal ? *(n.begin()) : n[vert2]) );
-    sgSetVec2( p[0], scale(t[0][0], size, zoom), scale(t[0][1], size, zoom) );
-    sgSetVec2( p[1], scale(t[1][0], size, zoom), scale(t[1][1], size, zoom) );
-    sgSetVec2( p[2], scale(t[2][0], size, zoom), scale(t[2][1], size, zoom) );
-    
-    bool smooth=false;
-    bool save_shade = output->getShade();
-    
-    if (col == 12 || col == 13) {
-      // do not shade ocean/lake/etc.
-      output->setColor(palette[col]);
-      // DCL - and switch lighting off for water for now (see the Jan 2005 mailing list archives)
-      output->setShade(false);
-    } else {
-      int dcol;
-      if (col>=0) {
-         dcol = col;
-      } else {
-	dcol = elev2colour((int)((t[0][2] + t[1][2] + t[2][2]) / 3.0f));
-	if(features & DO_SMOOTH_COLOR) {
-	  elev2colour_smooth((int)t[0][2], color[0]);
-	  elev2colour_smooth((int)t[1][2], color[1]);
-	  elev2colour_smooth((int)t[2][2], color[2]);
-	  smooth=true;
-        }
-      }
-      output->setColor(palette[dcol]);
-    }
-    
-    if(smooth) {
-      output->drawTriangle( p, nrm, color );
-    } else {
-      output->drawTriangle( p, nrm );
-    }
-    
-    // DCL - restore the original lighting in case we turned it off for water
-    output->setShade(save_shade);
-    
-    pos += 3;
-  }
+// A helper function for draw_elevation_tri.  Given an upper and a
+// lower vertex defining an edge, and an elevation at which to slice
+// the edge, creates a new point at that slice.  The new point is
+// added to the ts, nrms, and ps arrays at the index 'dest'.
+void MapMaker::create_sub_point(float *topVert, float *bottomVert, 
+				float *topNorm, float *bottomNorm, 
+				int dest, double elevation,
+				sgVec3 *ts, sgVec3 *nrms, sgVec2 *ps)
+{
+    sgVec3 newPoint, newNorm;
+    double scaling = 
+	(elevation - bottomVert[2]) / (topVert[2] - bottomVert[2]);
+    assert((scaling <= 1.0) && (0.0 <= scaling));
+
+    sgSubVec3(newPoint, topVert, bottomVert);
+    sgScaleVec3(newPoint, scaling);
+    sgAddVec3(newPoint, bottomVert);
+    sgSubVec3(newNorm, topNorm, bottomNorm);
+    sgScaleVec3(newNorm, scaling);
+    sgAddVec3(newNorm, bottomNorm);
+
+    sgCopyVec3(ts[dest], newPoint);
+    sgCopyVec3(nrms[dest], newNorm);
+    sgSetVec2(ps[dest], 
+	      scale(newPoint[0], size, zoom),
+	      scale(newPoint[1], size, zoom));
 }
 
-void MapMaker::draw_trifan( const int_list &indices, vector<float*> &v, 
-                            vector<float*> &n, int col ) {
-  // Some btg airport files economize on normals. 
-  bool single_normal = false;
-  if(n.size() < v.size()) single_normal = true;
-  
-  int_list::const_iterator index = indices.begin();
-  int cvert = *(index++), vert2 = *(index++);
-
-  sgVec3 t[3], nrm[3];
-  sgVec2 p[3];
-  sgVec4 color[3];
-
-  sgCopyVec3( t[0], v[cvert] );
-  sgCopyVec3( t[1], v[vert2] );
-  sgCopyVec3( nrm[0], (single_normal ? *(n.begin()) : n[cvert]) );
-  sgCopyVec3( nrm[1], (single_normal ? *(n.begin()) : n[vert2]) );
-  sgSetVec2( p[0], scale(t[0][0], size, zoom), scale(t[0][1], size, zoom) );
-  sgSetVec2( p[1], scale(t[1][0], size, zoom), scale(t[1][1], size, zoom) );
-
-  while ( index != indices.end() ) {
-    bool smooth=false;
-    bool save_shade = output->getShade();
-    vert2 = *(index++);
-
-    sgCopyVec3( t[2], v[vert2] );
-    sgCopyVec3( nrm[2], (single_normal ? *(n.begin()) : n[vert2]) );
-    sgSetVec2( p[2], scale(t[2][0], size, zoom), scale(t[2][1], size, zoom) );
-
-    if (col == 12 || col == 13) {
-      // do not shade ocean/lake/etc.
-      output->setColor(palette[col]);
-      // DCL - and switch lighting off for water for now (see the Jan 2005 mailing list archives)
-      output->setShade(false);
-    } else {
-      int dcol;
-      if (col>=0) {
-         dcol = col;
-      } else {
-	dcol = elev2colour((int)((t[0][2] + t[1][2] + t[2][2]) / 3.0f));
-	if(features & DO_SMOOTH_COLOR) {
-	  elev2colour_smooth((int)t[0][2], color[0]);
-	  elev2colour_smooth((int)t[1][2], color[1]);
-	  elev2colour_smooth((int)t[2][2], color[2]);
-	  smooth=true;
-        }
-      }
-      output->setColor(palette[dcol]);
-    }
-
-    if(smooth)
-      output->drawTriangle( p, nrm, color );
-    else
-      output->drawTriangle( p, nrm );
-
-    sgCopyVec2( p[1], p[2] );
-    sgCopyVec3( t[1], t[2] );
-    sgCopyVec3( nrm[1], nrm[2] );
-    
-    // DCL - restore the original lighting in case we turned it off for water
-    output->setShade(save_shade);
-  }
-
-  if (col < 0 && !(features & DO_SMOOTH_COLOR)) {
-    sub_trifan( indices, v, n );
-  }
-}
-			    
-void MapMaker::draw_tristrip( const int_list &indices, vector<float*> &v, 
-                            vector<float*> &n, int col ) {
-  // Some btg airport files economize on normals. 
-  bool single_normal = false;
-  if(n.size() < v.size()) single_normal = true;
-  
-  int_list::const_iterator index = indices.begin();
-  int vert0 = *(index++), vert1 = *(index++), vert2;
-
-  sgVec3 t[3], nrm[3];
-  sgVec2 p[3];
-  sgVec4 color[3];
-
-  sgCopyVec3( t[0], v[vert0] );
-  sgCopyVec3( t[1], v[vert1] );
-  sgCopyVec3( nrm[0], (single_normal ? *(n.begin()) : n[vert0]) );
-  sgCopyVec3( nrm[1], (single_normal ? *(n.begin()) : n[vert1]) );
-  sgSetVec2( p[0], scale(t[0][0], size, zoom), scale(t[0][1], size, zoom) );
-  sgSetVec2( p[1], scale(t[1][0], size, zoom), scale(t[1][1], size, zoom) );
-
-  while ( index != indices.end() ) {
-    bool smooth=false;
-    bool save_shade = output->getShade();
-    vert2 = *(index++);
-
-    sgCopyVec3( t[2], v[vert2] );
-    sgCopyVec3( nrm[2], (single_normal ? *(n.begin()) : n[vert2]) );
-    sgSetVec2( p[2], scale(t[2][0], size, zoom), scale(t[2][1], size, zoom) );
-
-    if (col == 12 || col == 13) {
-      // do not shade ocean/lake/etc.
-      output->setColor(palette[col]);
-      // DCL - and switch lighting off for water for now (see the Jan 2005 mailing list archives)
-      output->setShade(false);
-    } else {
-      int dcol;
-      if (col>=0) {
-         dcol = col;
-      } else {
-	dcol = elev2colour((int)((t[0][2] + t[1][2] + t[2][2]) / 3.0f));
-	if(features & DO_SMOOTH_COLOR) {
-	  elev2colour_smooth((int)t[0][2], color[0]);
-	  elev2colour_smooth((int)t[1][2], color[1]);
-	  elev2colour_smooth((int)t[2][2], color[2]);
-	  smooth=true;
-        }
-      }
-      output->setColor(palette[dcol]);
-    }
-
-    if(smooth)
-      output->drawTriangle( p, nrm, color );
-    else
-      output->drawTriangle( p, nrm );
-
-    // This scheme specifies triangles alternately clockwise and anti-clockwise.
-    // Is this OK in openGL?
-    sgCopyVec2( p[1], p[0] );
-    sgCopyVec3( t[1], t[0] );
-    sgCopyVec3( nrm[1], nrm[0] );
-    sgCopyVec2( p[0], p[2] );
-    sgCopyVec3( t[0], t[2] );
-    sgCopyVec3( nrm[0], nrm[2] );
-    
-    // DCL - restore the original lighting in case we turned it off for water
-    output->setShade(save_shade);
-  }
-
-  // DCL - I don't know what sub_trifan is meant to do, so haven't written a sub_tristrip
-  /*
-  if (col < 0 && !(features & DO_SMOOTH_COLOR)) {
-    sub_trifan( indices, v, n );
-  }
-  */
-}
-
-#else
-
+// Draws the given triangle, coloured according to its elevation.  If
+// the triangle spans more than one elevation level, and so needs more
+// than one colour, it is sliced and diced, so that each part occupies
+// only one level.  The triangle slices are temporary - no changes are
+// made to the v and n vectors.
 void MapMaker::draw_elevation_tri(int vert0, int vert1, int vert2,
+				  int norm0, int norm1, int norm2,
 				  vector<float*> &v, vector <float*> &n, 
 				  int col)
 {
     bool smooth = features & DO_SMOOTH_COLOR;
-    bool single_normal = false;
     sgVec3 t[3], nrm[3];
     sgVec2 p[3];
     int index[3];
 
-    if (n.size() < v.size()) {
-	single_normal = true;
-    }
-
     sgCopyVec3(t[0], v[vert0]);
     sgCopyVec3(t[1], v[vert1]);
     sgCopyVec3(t[2], v[vert2]);
-    sgCopyVec3(nrm[0], (single_normal ? *(n.begin()) : n[vert0]));
-    sgCopyVec3(nrm[1], (single_normal ? *(n.begin()) : n[vert1]));
-    sgCopyVec3(nrm[2], (single_normal ? *(n.begin()) : n[vert2]));
+    sgCopyVec3(nrm[0], n[norm0]);
+    sgCopyVec3(nrm[1], n[norm1]);
+    sgCopyVec3(nrm[2], n[norm2]);
     sgSetVec2(p[0], scale(t[0][0], size, zoom), scale(t[0][1], size, zoom));
     sgSetVec2(p[1], scale(t[1][0], size, zoom), scale(t[1][1], size, zoom));
     sgSetVec2(p[2], scale(t[2][0], size, zoom), scale(t[2][1], size, zoom));
     index[0] = elev2index(t[0][2]);
-//     printf("index[0] = %d (%f)\n", index[0], t[0][2]);
     index[1] = elev2index(t[1][2]);
-//     printf("index[1] = %d (%f)\n", index[1], t[1][2]);
     index[2] = elev2index(t[2][2]);
-//     printf("index[2] = %d (%f)\n", index[2], t[2][2]);
 
     // Triangle lies within one elevation level.  Draw it in one
     // colour.
@@ -679,517 +437,114 @@ void MapMaker::draw_elevation_tri(int vert0, int vert1, int vert2,
     // the vertices, so that vert0 points to the top vertex, vert1,
     // the middle, and vert2 the bottom.
     if (index[0] < index[1]) {
-// 	printf("index[0] (%d) < index[1] (%d)\n", index[0], index[1]);
-	int tmp = vert0;
-	vert0 = vert1;
-	vert1 = tmp;
-	tmp = index[0];
-	index[0] = index[1];
-	index[1] = tmp;
+	swap(vert0, vert1);
+	swap(norm0, norm1);
+	swap(index[0], index[1]);
     }
-    assert(index[0] >= index[1]);
-    if (index[0] > index[1]) {
-	assert(v[vert0][2] >= v[vert1][2]);
-    }
-    assert(elev2index(v[vert0][2]) >= elev2index(v[vert1][2]));
     if (index[0] < index[2]) {
-// 	printf("index[0] (%d) < index[2] (%d)\n", index[0], index[2]);
-	int tmp = vert0;
-	vert0 = vert2;
-	vert2 = tmp;
-	tmp = index[0];
-	index[0] = index[2];
-	index[2] = tmp;
+	swap(vert0, vert2);
+	swap(norm0, norm2);
+	swap(index[0], index[2]);
     }
-    assert(index[0] >= index[2]);
-    if (index[0] > index[2]) {
-	assert(v[vert0][2] >= v[vert2][2]);
-    }
-    assert(elev2index(v[vert0][2]) >= elev2index(v[vert2][2]));
     if (index[1] < index[2]) {
-// 	printf("index[1] (%d) < index[2] (%d)\n", index[1], index[2]);
-	int tmp = vert1;
-	vert1 = vert2;
-	vert2 = tmp;
-	tmp = index[1];
-	index[1] = index[2];
-	index[2] = tmp;
+	swap(vert1, vert2);
+	swap(norm1, norm2);
+	swap(index[1], index[2]);
     }
-    assert(index[1] >= index[2]);
-    if (v[vert1][2] < v[vert2][2]) {
-// 	printf("vert0 = %d, vert1 = %d, vert2 = %d\n", vert0, vert1, vert2);
-    }
-    if (index[1] > index[2]) {
-	assert(v[vert1][2] >= v[vert2][2]);
-    }
-    assert(elev2index(v[vert1][2]) >= elev2index(v[vert2][2]));
-
-    assert(index[0] >= index[1]);
-    assert(index[1] >= index[2]);
-    if (index[0] > index[1]) {
-	assert(v[vert0][2] >= v[vert1][2]);
-    }
-    if (index[1] > index[2]) {
-	assert(v[vert1][2] >= v[vert2][2]);
-    }
-    assert(elev2index(v[vert0][2]) >= elev2index(v[vert1][2]));
-    assert(elev2index(v[vert1][2]) >= elev2index(v[vert2][2]));
 
     // Now begin slicing the lines leading away from vert0 to vert1
     // and vert2.  Slicing a triangle can lead to new triangles, new
-    // quadrangles, and even new pentangles.  Because the triangle
+    // quadrilaterals, and even new pentagons.  Because the triangle
     // lies in a plane (by definition), we are assured that the new
     // figures are also planar.
-    int k, topCount;
+    int k, vertices;
     sgVec3 ts[5], nrms[5];
     sgVec2 ps[5];
 
     sgCopyVec3(ts[0], v[vert0]);
-    if (single_normal) {
-	assert(n.size() > 0);
-	sgCopyVec3(nrms[0], n[0]);
-    } else {
-	assert(vert0 < n.size());
-	sgCopyVec3(nrms[0], n[vert0]);
-    }
+    sgCopyVec3(nrms[0], n[norm0]);
     sgSetVec2(ps[0], 
 	      scale(ts[0][0], size, zoom), 
 	      scale(ts[0][1], size, zoom));
-
-    topCount = 1;
+    vertices = 1;
 
     for (k = index[0]; k > index[1]; k--) {
 	// Make a cut and draw the resulting figure.
 	double elevation = elev_height[k - 1]; // This is where we cut.
-	sgVec3 newPoint, newNorm;
-	double scaling;
 
 	// Get the point along the short line.
-	scaling = (elevation - v[vert1][2]) / (v[vert0][2] - v[vert1][2]);
-// 	if ((scaling > 1.0) || (0.0 > scaling)) {
-// 	    printf("scaling = %f\n", scaling);
-// 	    printf("\tindex[0] = %d, index[1] = %d, index[2] = %d\n", 
-// 		   index[0], index[1], index[2]);
-// 	    printf("\tk = %d, elevation = %f\n", k, elevation);
-// 	    printf("\tv[vert1][2] = %f, v[vert0][2] = %f\n", 
-// 		   v[vert1][2], v[vert0][2]);
-// 	    fflush(stdout);
-// 	    exit(0);
-// 	}
-	assert((scaling <= 1.0) && (0.0 <= scaling));
-
-	assert(vert0 < v.size());
-	assert(vert1 < v.size());
-	sgSubVec3(newPoint, v[vert0], v[vert1]);
-	sgScaleVec3(newPoint, scaling);
-	sgAddVec3(newPoint, v[vert1]);
-	if (single_normal) {
-	    assert(n.size() > 0);
-	    sgCopyVec3(newNorm, n[0]);
-	} else {
-	    assert(vert0 < n.size());
-	    assert(vert1 < n.size());
-	    sgSubVec3(newNorm, n[vert0], n[vert1]);
-	    sgScaleVec3(newNorm, scaling);
-	    sgAddVec3(newNorm, n[vert1]);
-	}
-
-	sgCopyVec3(ts[topCount], newPoint);
-	sgCopyVec3(nrms[topCount], newNorm);
-	sgSetVec2(ps[topCount], 
-		   scale(newPoint[0], size, zoom),
-		   scale(newPoint[1], size, zoom));
-
-	topCount++;
-	assert(topCount < 5);
-
+	create_sub_point(v[vert0], v[vert1], n[norm0], n[norm1], 
+			 vertices++, elevation, ts, nrms, ps);
 	// Get the point along the long line.
-	scaling = (elevation - v[vert2][2]) / (v[vert0][2] - v[vert2][2]);
-// 	if ((scaling > 1.0) || (scaling < 0.0)) {
-// 	    printf("scaling = %f\n", scaling);
-// 	    printf("\tindex[0] = %d, index[1] = %d, index[2] = %d\n", 
-// 		   index[0], index[1], index[2]);
-// 	    printf("\tk = %d, elevation = %f\n", k, elevation);
-// 	    printf("\tv[vert1][2] = %f, v[vert0][2] = %f\n", 
-// 		   v[vert1][2], v[vert0][2]);
-// 	    fflush(stdout);
-// 	    exit(0);
-// 	}
-	assert((scaling <= 1.0) && (0.0 <= scaling));
+	create_sub_point(v[vert0], v[vert2], n[norm0], n[norm2], 
+			 vertices++, elevation, ts, nrms, ps);
 
-	assert(vert0 < v.size());
-	assert(vert2 < v.size());
-	sgSubVec3(newPoint, v[vert0], v[vert2]);
-	sgScaleVec3(newPoint, scaling);
-	sgAddVec3(newPoint, v[vert2]);
-	if (single_normal) {
-	    assert(n.size() > 0);
-	    sgCopyVec3(newNorm, n[0]);
-	} else {
-	    assert(vert0 < n.size());
-	    assert(vert2 < n.size());
-	    sgSubVec3(newNorm, n[vert0], n[vert2]);
-	    sgScaleVec3(newNorm, scaling);
-	    sgAddVec3(newNorm, n[vert2]);
-	}
-
-	sgCopyVec3(ts[topCount], newPoint);
-	sgCopyVec3(nrms[topCount], newNorm);
-	sgSetVec2(ps[topCount], 
-		   scale(newPoint[0], size, zoom),
-		   scale(newPoint[1], size, zoom));
-
-	topCount++;
-	assert(topCount <= 5);
-
-	// Draw the figure.
-	if (topCount == 3) {
-// 	    printf("Got a triangle\n");
-	    if (smooth) {
-		sgVec4 color[3];
-		elev2colour_smooth((int)ts[0][2], color[0]);
-		elev2colour_smooth((int)ts[1][2], color[1]);
-		elev2colour_smooth((int)ts[2][2], color[2]);
-
-		output->drawTriangle( ps, nrms, color );
-	    } else {
-		output->setColor(palette[elev_colindex[k]]);
-		output->drawTriangle(ps, nrms);
-	    }
-	} else if (topCount == 4) {
-// 	    printf("Got a quadrangle\n");
-	    if (smooth) {
-		sgVec4 color[4];
-		elev2colour_smooth((int)ts[0][2], color[0]);
-		elev2colour_smooth((int)ts[1][2], color[1]);
-		elev2colour_smooth((int)ts[2][2], color[2]);
-		elev2colour_smooth((int)ts[3][2], color[3]);
-
-		output->drawQuad( ps, nrms, color );
-	    } else {
-		output->setColor(palette[elev_colindex[k]]);
-		output->drawQuad(ps, nrms);
-	    }
-	} else {
-// 	    printf("Got a pentangle!\n");
-	    // EYE - Draw it as two triangles?
-	    if (smooth) {
-		sgVec4 color[4];
-		elev2colour_smooth((int)ts[0][2], color[0]);
-		elev2colour_smooth((int)ts[1][2], color[1]);
-		elev2colour_smooth((int)ts[2][2], color[2]);
-		elev2colour_smooth((int)ts[3][2], color[3]);
-
-		output->drawQuad( ps, nrms, color );
-	    } else {
-		output->setColor(palette[elev_colindex[k]]);
-		output->drawQuad(ps, nrms);
-	    }
-
-	    sgCopyVec3(ts[1], ts[topCount - 2]);
-	    sgCopyVec3(nrms[1], nrms[topCount - 2]);
-	    sgCopyVec2(ps[1], ps[topCount - 2]);
-
-	    sgCopyVec3(ts[2], ts[topCount - 1]);
-	    sgCopyVec3(nrms[2], nrms[topCount - 1]);
-	    sgCopyVec2(ps[2], ps[topCount - 1]);
-
-	    if (smooth) {
-		sgVec4 color[3];
-		elev2colour_smooth((int)ts[0][2], color[0]);
-		elev2colour_smooth((int)ts[1][2], color[1]);
-		elev2colour_smooth((int)ts[2][2], color[2]);
-
-		output->drawTriangle( ps, nrms, color );
-	    } else {
-		output->drawTriangle(ps, nrms);
-	    }
-	}
+	draw_elevation_slice(vertices, smooth, k, ts, nrms, ps);
 
 	// The bottom will be the next top.  Reverse the order of the points.
-	sgCopyVec3(ts[0], ts[topCount - 1]);
-	sgCopyVec3(nrms[0], nrms[topCount - 1]);
-	sgCopyVec2(ps[0], ps[topCount - 1]);
+	sgCopyVec3(ts[0], ts[vertices - 1]);
+	sgCopyVec3(nrms[0], nrms[vertices - 1]);
+	sgCopyVec2(ps[0], ps[vertices - 1]);
 
-	sgCopyVec3(ts[1], ts[topCount - 2]);
-	sgCopyVec3(nrms[1], nrms[topCount - 2]);
-	sgCopyVec2(ps[1], ps[topCount - 2]);
+	sgCopyVec3(ts[1], ts[vertices - 2]);
+	sgCopyVec3(nrms[1], nrms[vertices - 2]);
+	sgCopyVec2(ps[1], ps[vertices - 2]);
 
-	topCount = 2;
+	vertices = 2;
     }
-    sgCopyVec3(ts[topCount], v[vert1]);
-    if (single_normal) {
-	assert(n.size() > 0);
-	sgCopyVec3(nrms[topCount], n[0]);
-    } else {
-	assert(vert1 < n.size());
-	sgCopyVec3(nrms[topCount], n[vert1]);
-    }
-    sgSetVec2(ps[topCount], 
-	      scale(ts[topCount][0], size, zoom), 
-	      scale(ts[topCount][1], size, zoom));
-
-    topCount++;
-    assert(topCount <= 5);
+    sgCopyVec3(ts[vertices], v[vert1]);
+    sgCopyVec3(nrms[vertices], n[norm1]);
+    sgSetVec2(ps[vertices], 
+	      scale(ts[vertices][0], size, zoom), 
+	      scale(ts[vertices][1], size, zoom));
+    vertices++;
+    assert(vertices <= 5);
 
     for (; k > index[2]; k--) {
 	// Make a cut and draw the resulting figure.
 	double elevation = elev_height[k - 1]; // This is where we cut.
-	sgVec3 newPoint, newNorm;
-	double scaling;
 
 	// Get the point along the short line.
-	scaling = (elevation - v[vert2][2]) / (v[vert1][2] - v[vert2][2]);
-	if ((scaling > 1.0) || (0.0 > scaling)) {
-	    printf("scaling = %f\n", scaling);
-	    printf("\tindex[0] = %d, index[1] = %d, index[2] = %d\n", 
-		   index[0], index[1], index[2]);
-	    printf("\tk = %d, elevation = %f\n", k, elevation);
-	    printf("\tv[vert2][2] = %f, v[vert1][2] = %f\n", 
-		   v[vert2][2], v[vert1][2]);
-	    fflush(stdout);
-	}
-	assert((scaling <= 1.0) && (0.0 <= scaling));
-
-	assert(vert1 < v.size());
-	assert(vert2 < v.size());
-	sgSubVec3(newPoint, v[vert1], v[vert2]);
-	sgScaleVec3(newPoint, scaling);
-	sgAddVec3(newPoint, v[vert2]);
-	if (single_normal) {
-	    assert(n.size() > 0);
-	    sgCopyVec3(newNorm, n[0]);
-	} else {
-	    assert(vert1 < n.size());
-	    assert(vert2 < n.size());
-	    sgSubVec3(newNorm, n[vert1], n[vert2]);
-	    sgScaleVec3(newNorm, scaling);
-	    sgAddVec3(newNorm, n[vert2]);
-	}
-
-	sgCopyVec3(ts[topCount], newPoint);
-	sgCopyVec3(nrms[topCount], newNorm);
-	sgSetVec2(ps[topCount], 
-		   scale(newPoint[0], size, zoom),
-		   scale(newPoint[1], size, zoom));
-
-	topCount++;
-	assert(topCount < 5);
-
+	create_sub_point(v[vert1], v[vert2], n[norm1], n[norm2], 
+			 vertices++, elevation, ts, nrms, ps);
 	// Get the point along the long line.
-	scaling = (elevation - v[vert2][2]) / (v[vert0][2] - v[vert2][2]);
-// 	if ((scaling > 1.0) || (scaling < 0.0)) {
-// 	    printf("scaling = %f\n", scaling);
-// 	    printf("\tindex[0] = %d, index[1] = %d, index[2] = %d\n", 
-// 		   index[0], index[1], index[2]);
-// 	    printf("\tk = %d, elevation = %f\n", k, elevation);
-// 	    printf("\tv[vert1][2] = %f, v[vert0][2] = %f\n", 
-// 		   v[vert1][2], v[vert0][2]);
-// 	    fflush(stdout);
-// 	}
-	assert((scaling <= 1.0) && (0.0 <= scaling));
+	create_sub_point(v[vert0], v[vert2], n[norm0], n[norm2], 
+			 vertices++, elevation, ts, nrms, ps);
 
-	assert(vert0 < v.size());
-	assert(vert2 < v.size());
-	sgSubVec3(newPoint, v[vert0], v[vert2]);
-	sgScaleVec3(newPoint, scaling);
-	sgAddVec3(newPoint, v[vert2]);
-	if (single_normal) {
-	    assert(n.size() > 0);
-	    sgCopyVec3(newNorm, n[0]);
-	} else {
-	    assert(vert0 < v.size());
-	    assert(vert2 < n.size());
-	    sgSubVec3(newNorm, n[vert0], n[vert2]);
-	    sgScaleVec3(newNorm, scaling);
-	    sgAddVec3(newNorm, n[vert2]);
-	}
-
-	sgCopyVec3(ts[topCount], newPoint);
-	sgCopyVec3(nrms[topCount], newNorm);
-	sgSetVec2(ps[topCount], 
-		   scale(newPoint[0], size, zoom),
-		   scale(newPoint[1], size, zoom));
-
-	topCount++;
-	assert(topCount <= 5);
-
-	// Draw the figure.
-	if (topCount == 3) {
-// 	    printf("Got a triangle\n");
-	    if (smooth) {
-		sgVec4 color[3];
-		elev2colour_smooth((int)ts[0][2], color[0]);
-		elev2colour_smooth((int)ts[1][2], color[1]);
-		elev2colour_smooth((int)ts[2][2], color[2]);
-
-		output->drawTriangle( ps, nrms, color );
-	    } else {
-		output->setColor(palette[elev_colindex[k]]);
-		output->drawTriangle(ps, nrms);
-	    }
-	} else if (topCount == 4) {
-// 	    printf("Got a quadrangle\n");
-	    if (smooth) {
-		sgVec4 color[4];
-		elev2colour_smooth((int)ts[0][2], color[0]);
-		elev2colour_smooth((int)ts[1][2], color[1]);
-		elev2colour_smooth((int)ts[2][2], color[2]);
-		elev2colour_smooth((int)ts[3][2], color[3]);
-
-		output->drawQuad( ps, nrms, color );
-	    } else {
-		output->setColor(palette[elev_colindex[k]]);
-		output->drawQuad(ps, nrms);
-	    }
-	} else {
-// 	    printf("Got a pentangle!\n");
-	    // EYE - Draw it as two triangles?
-	    if (smooth) {
-		sgVec4 color[4];
-		elev2colour_smooth((int)ts[0][2], color[0]);
-		elev2colour_smooth((int)ts[1][2], color[1]);
-		elev2colour_smooth((int)ts[2][2], color[2]);
-		elev2colour_smooth((int)ts[3][2], color[3]);
-
-		output->drawQuad( ps, nrms, color );
-	    } else {
-		output->setColor(palette[elev_colindex[k]]);
-		output->drawQuad(ps, nrms);
-	    }
-
-	    sgCopyVec3(ts[1], ts[topCount - 2]);
-	    sgCopyVec3(nrms[1], nrms[topCount - 2]);
-	    sgCopyVec2(ps[1], ps[topCount - 2]);
-
-	    sgCopyVec3(ts[2], ts[topCount - 1]);
-	    sgCopyVec3(nrms[2], nrms[topCount - 1]);
-	    sgCopyVec2(ps[2], ps[topCount - 1]);
-
-	    if (smooth) {
-		sgVec4 color[3];
-		elev2colour_smooth((int)ts[0][2], color[0]);
-		elev2colour_smooth((int)ts[1][2], color[1]);
-		elev2colour_smooth((int)ts[2][2], color[2]);
-
-		output->drawTriangle( ps, nrms, color );
-	    } else {
-		output->drawTriangle(ps, nrms);
-	    }
-	}
+	draw_elevation_slice(vertices, smooth, k, ts, nrms, ps);
 
 	// The bottom will be the next top.
-	sgCopyVec3(ts[0], ts[topCount - 1]);
-	sgCopyVec3(nrms[0], nrms[topCount - 1]);
-	sgCopyVec2(ps[0], ps[topCount - 1]);
+	sgCopyVec3(ts[0], ts[vertices - 1]);
+	sgCopyVec3(nrms[0], nrms[vertices - 1]);
+	sgCopyVec2(ps[0], ps[vertices - 1]);
 
-	sgCopyVec3(ts[1], ts[topCount - 2]);
-	sgCopyVec3(nrms[1], nrms[topCount - 2]);
-	sgCopyVec2(ps[1], ps[topCount - 2]);
+	sgCopyVec3(ts[1], ts[vertices - 2]);
+	sgCopyVec3(nrms[1], nrms[vertices - 2]);
+	sgCopyVec2(ps[1], ps[vertices - 2]);
 	
-	topCount = 2;
+	vertices = 2;
     }
     // Add the final vertex and draw the last figure.
-    sgCopyVec3(ts[topCount], v[vert2]);
-    if (single_normal) {
-	assert(n.size() > 0);
-	sgCopyVec3(nrms[topCount], n[0]);
-    } else {
-	assert(vert2 < n.size());
-	sgCopyVec3(nrms[topCount], n[vert2]);
-    }
-    sgSetVec2(ps[topCount], 
-	      scale(ts[topCount][0], size, zoom), 
-	      scale(ts[topCount][1], size, zoom));
+    sgCopyVec3(ts[vertices], v[vert2]);
+    sgCopyVec3(nrms[vertices], n[norm2]);
+    sgSetVec2(ps[vertices], 
+	      scale(ts[vertices][0], size, zoom), 
+	      scale(ts[vertices][1], size, zoom));
+    vertices++;
+    assert(vertices <= 5);
 
-    topCount++;
-    assert(topCount <= 5);
-
-    if (topCount == 3) {
-// 	printf("Got a triangle\n");
-	if (smooth) {
-	    sgVec4 color[3];
-	    elev2colour_smooth((int)ts[0][2], color[0]);
-	    elev2colour_smooth((int)ts[1][2], color[1]);
-	    elev2colour_smooth((int)ts[2][2], color[2]);
-
-	    output->drawTriangle( ps, nrms, color );
-	} else {
-	    output->setColor(palette[elev_colindex[k]]);
-	    output->drawTriangle(ps, nrms);
-	}
-    } else if (topCount == 4) {
-// 	printf("Got a quadrangle\n");
-	if (smooth) {
-	    sgVec4 color[4];
-	    elev2colour_smooth((int)ts[0][2], color[0]);
-	    elev2colour_smooth((int)ts[1][2], color[1]);
-	    elev2colour_smooth((int)ts[2][2], color[2]);
-	    elev2colour_smooth((int)ts[3][2], color[3]);
-
-	    output->drawQuad( ps, nrms, color );
-	} else {
-	    output->setColor(palette[elev_colindex[k]]);
-	    output->drawQuad(ps, nrms);
-	}
-    } else {
-// 	printf("Got a pentangle!\n");
-	// EYE - Draw it as two triangles?
-	if (smooth) {
-	    sgVec4 color[4];
-	    elev2colour_smooth((int)ts[0][2], color[0]);
-	    elev2colour_smooth((int)ts[1][2], color[1]);
-	    elev2colour_smooth((int)ts[2][2], color[2]);
-	    elev2colour_smooth((int)ts[3][2], color[3]);
-
-	    output->drawQuad( ps, nrms, color );
-	} else {
-	    output->setColor(palette[elev_colindex[k]]);
-	    output->drawQuad(ps, nrms);
-	}
-
-	sgCopyVec3(ts[1], ts[topCount - 2]);
-	sgCopyVec3(nrms[1], nrms[topCount - 2]);
-	sgCopyVec2(ps[1], ps[topCount - 2]);
-
-	sgCopyVec3(ts[2], ts[topCount - 1]);
-	sgCopyVec3(nrms[2], nrms[topCount - 1]);
-	sgCopyVec2(ps[2], ps[topCount - 1]);
-
-	if (smooth) {
-	    sgVec4 color[3];
-	    elev2colour_smooth((int)ts[0][2], color[0]);
-	    elev2colour_smooth((int)ts[1][2], color[1]);
-	    elev2colour_smooth((int)ts[2][2], color[2]);
-
-	    output->drawTriangle( ps, nrms, color );
-	} else {
-	    output->drawTriangle(ps, nrms);
-	}
-    }
+    draw_elevation_slice(vertices, smooth, k, ts, nrms, ps);
 }
 
+// Draws a single triangle defined by the given vertices and normals
+// (which are indexes into the v and n vectors).  If the triangle
+// defines an "elevation triangle" (a triangle that should be coloured
+// according to its elevation), then it's passed on to
+// draw_elevation_tri.
 void MapMaker::draw_a_tri(int vert0, int vert1, int vert2,
+			  int norm0, int norm1, int norm2,
 			  vector<float*> &v, vector <float*> &n, int col)
 {
-    bool single_normal = false;
-    sgVec3 t[3], nrm[3];
-    sgVec2 p[3];
-    
-    if (n.size() < v.size()) {
-	single_normal = true;
-    }
-
-    sgCopyVec3( t[0], v[vert0] );
-    sgCopyVec3( t[1], v[vert1] );
-    sgCopyVec3( t[2], v[vert2] );
-    sgCopyVec3( nrm[0], (single_normal ? *(n.begin()) : n[vert0]) );
-    sgCopyVec3( nrm[1], (single_normal ? *(n.begin()) : n[vert1]) );
-    sgCopyVec3( nrm[2], (single_normal ? *(n.begin()) : n[vert2]) );
-    sgSetVec2( p[0], scale(t[0][0], size, zoom), scale(t[0][1], size, zoom) );
-    sgSetVec2( p[1], scale(t[1][0], size, zoom), scale(t[1][1], size, zoom) );
-    sgSetVec2( p[2], scale(t[2][0], size, zoom), scale(t[2][1], size, zoom) );
-
     bool save_shade = output->getShade();
     
     if (col == 12 || col == 13) {
@@ -1202,15 +557,32 @@ void MapMaker::draw_a_tri(int vert0, int vert1, int vert2,
 	if (col >= 0) {
 	    dcol = col;
 	} else {
-	    dcol = elev2colour((int)((t[0][2] + t[1][2] + t[2][2]) / 3.0f));
+	    dcol = elev2colour((int)((v[vert0][2] + v[vert1][2] + v[vert2][2])
+				     / 3.0f));
 	}
 	output->setColor(palette[dcol]);
     }
 
     if (col >= 0) {
+	sgVec3 nrm[3];
+	sgVec2 p[3];
+    
+	sgCopyVec3(nrm[0], n[norm0]);
+	sgCopyVec3(nrm[1], n[norm1]);
+	sgCopyVec3(nrm[2], n[norm2]);
+	sgSetVec2(p[0], 
+		  scale(v[vert0][0], size, zoom), 
+		  scale(v[vert0][1], size, zoom));
+	sgSetVec2(p[1], 
+		  scale(v[vert1][0], size, zoom), 
+		  scale(v[vert1][1], size, zoom));
+	sgSetVec2(p[2], 
+		  scale(v[vert2][0], size, zoom), 
+		  scale(v[vert2][1], size, zoom));
+
 	output->drawTriangle( p, nrm );
     } else {
-	draw_elevation_tri(vert0, vert1, vert2, v, n, col);
+	draw_elevation_tri(vert0, vert1, vert2, norm0, norm1, norm2, v, n, col);
     }
     
     // DCL - restore the original lighting in case we turned it off for water
@@ -1218,54 +590,73 @@ void MapMaker::draw_a_tri(int vert0, int vert1, int vert2,
 }
 
 // Really should be draw_tris
-void MapMaker::draw_tri( const int_list &indices, vector<float*> &v,
-                         vector<float*> &n, int col) {
-    int_list::const_iterator index = indices.begin();
+void MapMaker::draw_tri(const int_list &vertex_indices, 
+			const int_list &normal_indices, 
+			vector<float*> &v, vector<float*> &n, int col) {
+    int i;
     int vert0, vert1, vert2;
-    unsigned int pos = 0;
+    int norm0, norm1, norm2;
 
     // EYE - can we assume indices.size() is divisible by 3?
-    assert((indices.size() % 3) == 0);
-    while (indices.size() - pos >= 3) {
-	vert0 = *(index++);
-	vert1 = *(index++);
-	vert2 = *(index++);
-	pos += 3;
-	draw_a_tri(vert0, vert1, vert2, v, n, col);
+    assert((vertex_indices.size() % 3) == 0);
+    for (i = 0; i < vertex_indices.size(); i += 3) {
+	vert0 = vertex_indices[i];
+	norm0 = normal_indices[i];
+	vert1 = vertex_indices[i + 1];
+	norm1 = normal_indices[i + 1];
+	vert2 = vertex_indices[i + 2];
+	norm2 = normal_indices[i + 2];
+
+	draw_a_tri(vert0, vert1, vert2, norm0, norm1, norm2, v, n, col);
     }
 }
 
-void MapMaker::draw_trifan( const int_list &indices, vector<float*> &v, 
-                            vector<float*> &n, int col ) {
-    int_list::const_iterator index = indices.begin();
+void MapMaker::draw_trifan(const int_list &vertex_indices, 
+			   const int_list &normal_indices, 
+			   vector<float*> &v, vector<float*> &n, int col ) {
+    int i;
     int cvert, vert1, vert2;
+    int cnorm, norm1, norm2;
 
-    cvert= *(index++);
-    vert1 = *(index++);
-    while (index != indices.end()) {
-	vert2 = *(index++);
-	draw_a_tri(cvert, vert1, vert2, v, n, col);
+    cvert = vertex_indices[0];
+    cnorm = normal_indices[0];
+    vert1 = vertex_indices[1];
+    norm1 = normal_indices[1];
+    for (i = 2; i < vertex_indices.size(); i++) {
+	vert2 = vertex_indices[i];
+	norm2 = normal_indices[i];
+
+	draw_a_tri(cvert, vert1, vert2, cnorm, norm1, norm2, v, n, col);
 
 	vert1 = vert2;
+	norm1 = norm2;
     }
 }
 			    
-void MapMaker::draw_tristrip( const int_list &indices, vector<float*> &v, 
-                            vector<float*> &n, int col ) {
-    int_list::const_iterator index = indices.begin();
+void MapMaker::draw_tristrip(const int_list &vertex_indices, 
+			     const int_list &normal_indices, 
+			     vector<float*> &v, vector<float*> &n, 
+			     int col) {
+    int i;
     int vert0, vert1, vert2;
+    int norm0, norm1, norm2;
 
-    vert0 = *(index++);
-    vert1 = *(index++);
-    while (index != indices.end()) {
-	vert2 = *(index++);
-	draw_a_tri(vert0, vert1, vert2, v, n, col);
+    vert0 = vertex_indices[0];
+    norm0 = normal_indices[0];
+    vert1 = vertex_indices[1];
+    norm1 = normal_indices[1];
+    for (i = 2; i < vertex_indices.size(); i++) {
+	vert2 = vertex_indices[i];
+	norm2 = normal_indices[i];
+
+	draw_a_tri(vert0, vert1, vert2, norm0, norm1, norm2, v, n, col);
 
 	vert1 = vert0;
+	norm1 = norm0;
 	vert0 = vert2;
+	norm0 = norm2;
     }
 }
-#endif 0
 
 int MapMaker::process_binary_file( char *tile_name, sgVec3 xyz ) {
   //cout << "tile name = " << tile_name << '\n';
@@ -1278,8 +669,7 @@ int MapMaker::process_binary_file( char *tile_name, sgVec3 xyz ) {
   SGBinObject tile;
 
   vector<float*> v, n;
-//   int verts = 0, normals = 0;
-    // EYE
+  // EYE - this is just used to test my assumptions about normals
   vector<int> norms;
 
   if ( !tile.read_bin( tile_name ) ) {
@@ -1314,8 +704,7 @@ int MapMaker::process_binary_file( char *tile_name, sgVec3 xyz ) {
     // altitude:
     nv[2] = pr - nv[2];
     v.push_back( nv );
-//     verts++;
-    // EYE
+    // EYE - remove this when I'm happy with my understaning of normals
     norms.push_back(-1);
   }
 
@@ -1332,21 +721,18 @@ int MapMaker::process_binary_file( char *tile_name, sgVec3 xyz ) {
     }
     
     n.push_back( nn );
-//     normals++;
   }
 
   const group_list tris = tile.get_tris_v();
   string_list tri_mats = tile.get_tri_materials();
+  const group_list tri_normals = tile.get_tris_n();
   const group_list fans = tile.get_fans_v();
   string_list fan_mats = tile.get_fan_materials();
+  const group_list fans_normals = tile.get_fans_n();
   const group_list strips = tile.get_strips_v();
   string_list strip_mats = tile.get_strip_materials();
-  
-  // EYE
-  const group_list tri_normals = tile.get_tris_n();
-  const group_list fans_normals = tile.get_fans_n();
   const group_list strips_normals = tile.get_strips_n();
-
+  
   // tris
   i = 0;
   for ( group_list::const_iterator tri = tris.begin(); 
@@ -1398,7 +784,12 @@ int MapMaker::process_binary_file( char *tile_name, sgVec3 xyz ) {
 	}
     }
 
-    draw_tri( *tri, v, n, material );
+    if (tri_normals[i].size() > 0) {
+	draw_tri(*tri, tri_normals[i], v, n, material);
+    } else {
+	draw_tri(*tri, *tri, v, n, material);
+    }
+
     i++;
   }
 
@@ -1454,7 +845,12 @@ int MapMaker::process_binary_file( char *tile_name, sgVec3 xyz ) {
 	}
     }
 
-    draw_trifan( *fan, v, n, material );
+    if (fans_normals[i].size() > 0) {
+	draw_trifan(*fan, fans_normals[i], v, n, material);
+    } else {
+	draw_trifan(*fan, *fan, v, n, material);
+    }
+
     i++;
   }
 	
@@ -1510,7 +906,12 @@ int MapMaker::process_binary_file( char *tile_name, sgVec3 xyz ) {
 	}
     }
 
-    draw_tristrip( *strip, v, n, material );
+    if (strips_normals[i].size() > 0) {
+	draw_tristrip( *strip, strips_normals[i], v, n, material );
+    } else {
+	draw_tristrip( *strip, *strip, v, n, material );
+    }
+
     i++;
   }
 	
@@ -1641,7 +1042,8 @@ int MapMaker::process_ascii_file( char *tile_name, sgVec3 xyz ) {
          }
          
          if ( !vertex_indices.empty() ) {
-          draw_trifan( vertex_indices, v, n, material );
+	     // EYE - fix this later
+//           draw_trifan( vertex_indices, v, n, material );
           polys++;
          }
       }
@@ -1671,7 +1073,8 @@ int MapMaker::process_ascii_file( char *tile_name, sgVec3 xyz ) {
          }
          
          if ( !vertex_indices.empty() ) {
-          draw_trifan( vertex_indices, v, n, material );
+	     // EYE - fix this later!
+//           draw_trifan( vertex_indices, v, n, material );
           polys++;
          }
       }

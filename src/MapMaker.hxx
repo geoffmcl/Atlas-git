@@ -133,7 +133,6 @@ protected:
   /* some info variables */
   int polys;
 
-//   inline int elev2colour( int elev ) {
   inline int elev2colour( double elev ) {
     int i;
     for (i = 0; i < number_elev_levels-1 && elev >= elev_height[i]; i++);
@@ -141,13 +140,18 @@ protected:
     return elev_colindex[i];
   }
 
-//   inline int elev2index( int elev ) {
   inline int elev2index( double elev ) {
     int i;
     for (i = 0; i < number_elev_levels-1 && elev >= elev_height[i]; i++);
   
     return i;
   }
+
+    inline void swap(int &a, int &b) {
+	int tmp = a;
+	a = b;
+	b = tmp;
+    }
 
 # define APPROX(Ca,Cb,X,D) ((Cb-Ca)/D*X+Ca)
     // EYE - check this!  And we need to clearly specify: if
@@ -201,18 +205,28 @@ protected:
     return fabs(sgScalarProductVec3( n, light_vector ));
   }
 
-  void sub_trifan( const int_list &indices, vector<float*> &v, 
-		   vector<float*> &n );
-  void draw_elevation_tri( int vert0, int vert1, int vert2,
-			   vector<float*> &v, vector <float*> &n, int col );
-  void draw_a_tri( int vert0, int vert1, int vert2,
-		    vector<float*> &v, vector <float*> &n, int col );
-  void draw_trifan( const int_list &indices, 
-		    vector<float*> &v, vector <float*> &n, int col );
-  void draw_tri( const int_list &indices, 
-		 vector<float*> &v, vector <float*> &n, int col );
-  void draw_tristrip( const int_list &indices, 
-		      vector<float*> &v, vector <float*> &n, int col );
+    void draw_elevation_slice(int vertices, bool smooth, int k,
+			      sgVec3 *ts, sgVec3 *nrms, sgVec2 *ps);
+    void create_sub_point(float *topVert, float *bottomVert, 
+			  float *topNorm, float *bottomNorm, 
+			  int dest, double elevation,
+			  sgVec3 *ts, sgVec3 *nrms, sgVec2 *ps);
+  void draw_elevation_tri(int vert0, int vert1, int vert2,
+			  int norm0, int norm1, int norm2,
+			  vector<float*> &v, vector <float*> &n, int col );
+  void draw_a_tri(int vert0, int vert1, int vert2,
+		  int norm0, int norm1, int norm2,
+		  vector<float*> &v, vector <float*> &n, int col);
+  void draw_trifan(const int_list &vertex_indices, 
+		   const int_list &normal_indices, 
+		    vector<float*> &v, vector <float*> &n, int col);
+  void draw_tri(const int_list &vertex_indices, 
+		const int_list &normal_indices, 
+		vector<float*> &v, vector <float*> &n, int col);
+  void draw_tristrip(const int_list &vertex_indices, 
+		     const int_list &normal_indices, 
+		     vector<float*> &v, vector <float*> &n, 
+		     int col);
 		    
   int process_directory( char *path, size_t plen, int lat, int lon, sgVec3 xyz );
   int process_binary_file( char *tile_name, sgVec3 xyz );
