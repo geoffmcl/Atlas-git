@@ -99,7 +99,7 @@ public:
   inline int getFeatures() { return features; }
 
   int createMap(GfxOutput *output, float theta, float alpha, 
-		string dirpath, float autoscale = 0.0f);
+		string dirpath, float autoscale = 0.0f, bool atlas = false);
 //   int drawOverlays(GfxOutput *output, float theta, float alpha, 
 // 		bool do_square = false, bool flipy = false );
 
@@ -138,11 +138,13 @@ protected:
     for (i = 0; i < number_elev_levels-1 && elev >= elev_height[i]; i++);
   
     return elev_colindex[i];
+//       return elev_colindex[elev2index(elev)];
   }
 
   inline int elev2index( double elev ) {
     int i;
     for (i = 0; i < number_elev_levels-1 && elev >= elev_height[i]; i++);
+//     for (i = 0; i < number_elev_levels && elev > elev_height[i]; i++);
   
     return i;
   }
@@ -193,17 +195,18 @@ protected:
     sgAddVec3(n, un);
   }
 
-  inline float shade( sgVec3 *t ) {
-    sgVec3 u, v, n;
+    // EYE - unused
+//   inline float shade( sgVec3 *t ) {
+//     sgVec3 u, v, n;
   
-    sgSubVec3( u, t[0], t[1] );
-    sgSubVec3( v, t[0], t[2] );
+//     sgSubVec3( u, t[0], t[1] );
+//     sgSubVec3( v, t[0], t[2] );
 
-    sgVectorProductVec3( n, u, v );
-    sgNormaliseVec3( n );
+//     sgVectorProductVec3( n, u, v );
+//     sgNormaliseVec3( n );
 
-    return fabs(sgScalarProductVec3( n, light_vector ));
-  }
+//     return fabs(sgScalarProductVec3( n, light_vector ));
+//   }
 
     void draw_elevation_slice(int vertices, bool smooth, int k,
 			      sgVec3 *ts, sgVec3 *nrms, sgVec2 *ps);
@@ -211,26 +214,26 @@ protected:
 			  float *topNorm, float *bottomNorm, 
 			  int dest, double elevation,
 			  sgVec3 *ts, sgVec3 *nrms, sgVec2 *ps);
-  void draw_elevation_tri(int vert0, int vert1, int vert2,
-			  int norm0, int norm1, int norm2,
-			  vector<float*> &v, vector <float*> &n, int col );
-  void draw_a_tri(int vert0, int vert1, int vert2,
-		  int norm0, int norm1, int norm2,
-		  vector<float*> &v, vector <float*> &n, int col);
-  void draw_trifan(const int_list &vertex_indices, 
-		   const int_list &normal_indices, 
-		    vector<float*> &v, vector <float*> &n, int col);
-  void draw_tri(const int_list &vertex_indices, 
-		const int_list &normal_indices, 
-		vector<float*> &v, vector <float*> &n, int col);
-  void draw_tristrip(const int_list &vertex_indices, 
+    void draw_elevation_tri(int vert0, int vert1, int vert2,
+			    int norm0, int norm1, int norm2,
+			    vector<float*> &v, vector<float*> &n, int col );
+    void draw_a_tri(int vert0, int vert1, int vert2,
+		    int norm0, int norm1, int norm2,
+		    vector<float*> &v, vector<float*> &n, int col);
+    void draw_trifan(const int_list &vertex_indices, 
 		     const int_list &normal_indices, 
-		     vector<float*> &v, vector <float*> &n, 
-		     int col);
+		     vector<float*> &v, vector<float*> &n, int col);
+    void draw_tri(const int_list &vertex_indices, 
+		  const int_list &normal_indices, 
+		  vector<float*> &v, vector<float*> &n, int col);
+    void draw_tristrip(const int_list &vertex_indices, 
+		       const int_list &normal_indices, 
+		       vector<float*> &v, vector<float*> &n, 
+		       int col);
 		    
-  int process_directory( char *path, size_t plen, int lat, int lon, sgVec3 xyz );
-  int process_binary_file( char *tile_name, sgVec3 xyz );
-  int process_ascii_file( char *tile_name, sgVec3 xyz );
+    int process_directory( char *path, size_t plen, int lat, int lon, sgVec3 xyz );
+    int process_binary_file( char *tile_name, sgVec3 xyz );
+    int process_ascii_file( char *tile_name, sgVec3 xyz );
   
 /*****************************************************************************/
 

@@ -123,7 +123,7 @@ void MapMaker::setPalette( char* filename ) {
 }
 
 int MapMaker::createMap(GfxOutput *output,float theta, float alpha, 
-                        string dirpath, float autoscale) {
+                        string dirpath, float autoscale, bool atlas) {
   this->output = output;
   
   modified = false;
@@ -232,16 +232,22 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
         //   ns(min_theta), abs(min_theta), ns(max_theta), abs(max_theta), 
         //   ew(min_alpha), abs(min_alpha), ew(max_alpha), abs(max_alpha) );
      
-      for (int k = min_theta; k <= max_theta; k++) {
-        for (int l = min_alpha; l <= max_alpha; l++) {
-          if (l > 179) {
-            process_directory( subdir, slen, k, l - 360, xyz );
-          } else if (l < -180) {
-            process_directory( subdir, slen, k, l + 360, xyz );
-          } else {
-            process_directory( subdir, slen, k, l, xyz );
-          }
-        }
+      if (!atlas) {
+	  for (int k = min_theta; k <= max_theta; k++) {
+	      for (int l = min_alpha; l <= max_alpha; l++) {
+		  if (l > 179) {
+		      process_directory( subdir, slen, k, l - 360, xyz );
+		  } else if (l < -180) {
+		      process_directory( subdir, slen, k, l + 360, xyz );
+		  } else {
+		      process_directory( subdir, slen, k, l, xyz );
+		  }
+	      }
+	  }
+      } else {
+	  int k = (int)floor(theta * SG_RADIANS_TO_DEGREES);
+	  int l = (int)floor(alpha * SG_RADIANS_TO_DEGREES);
+	  process_directory(subdir, slen, k, l, xyz);
       }
 
       delete[] subdir;
@@ -296,9 +302,10 @@ int MapMaker::createMap(GfxOutput *output,float theta, float alpha,
 //
 // We can assume that the vertices are given from top to bottom, and
 // that they move around the perimeter of the figure in the correct
-// order.  As well, we only need to guarantee that the last two points
-// remain unchanged - the calling function doesn't care about the
-// "upper" points.  (This is a *very* specialized routine).
+// order.  As well, we only need to guarantee that the last two
+// points, which form the bottom of the figure, remain unchanged - the
+// calling function doesn't care about the "upper" points.  (This is a
+// *very* specialized routine).
 void MapMaker::draw_elevation_slice(int vertices, bool smooth, int k,
 				    sgVec3 *ts, sgVec3 *nrms, sgVec2 *ps)
 {
@@ -345,14 +352,14 @@ void MapMaker::draw_elevation_slice(int vertices, bool smooth, int k,
 	sgCopyVec3(ts[1], ts[3]);
 	sgCopyVec3(nrms[1], nrms[3]);
 	sgCopyVec2(ps[1], ps[3]);
-	sgCopyVec4(color[1], color[3]);
 
 	sgCopyVec3(ts[2], ts[4]);
 	sgCopyVec3(nrms[2], nrms[4]);
 	sgCopyVec2(ps[2], ps[4]);
-	sgCopyVec4(color[2], color[4]);
 
 	if (smooth) {
+	    sgCopyVec4(color[1], color[3]);
+	    sgCopyVec4(color[2], color[4]);
 	    output->drawTriangle(ps, nrms, color);
 	} else {
 	    output->drawTriangle(ps, nrms);
@@ -364,6 +371,9 @@ void MapMaker::draw_elevation_slice(int vertices, bool smooth, int k,
 // lower vertex defining an edge, and an elevation at which to slice
 // the edge, creates a new point at that slice.  The new point is
 // added to the ts, nrms, and ps arrays at the index 'dest'.
+//
+// EYE - Why pass 'dest' - I should really just pass the vertex,
+// normal, and point to be set.
 void MapMaker::create_sub_point(float *topVert, float *bottomVert, 
 				float *topNorm, float *bottomNorm, 
 				int dest, double elevation,
@@ -395,7 +405,7 @@ void MapMaker::create_sub_point(float *topVert, float *bottomVert,
 // made to the v and n vectors.
 void MapMaker::draw_elevation_tri(int vert0, int vert1, int vert2,
 				  int norm0, int norm1, int norm2,
-				  vector<float*> &v, vector <float*> &n, 
+				  vector<float*> &v, vector<float*> &n, 
 				  int col)
 {
     bool smooth = features & DO_SMOOTH_COLOR;
@@ -409,9 +419,6 @@ void MapMaker::draw_elevation_tri(int vert0, int vert1, int vert2,
     sgCopyVec3(nrm[0], n[norm0]);
     sgCopyVec3(nrm[1], n[norm1]);
     sgCopyVec3(nrm[2], n[norm2]);
-    sgSetVec2(p[0], scale(t[0][0], size, zoom), scale(t[0][1], size, zoom));
-    sgSetVec2(p[1], scale(t[1][0], size, zoom), scale(t[1][1], size, zoom));
-    sgSetVec2(p[2], scale(t[2][0], size, zoom), scale(t[2][1], size, zoom));
     index[0] = elev2index(t[0][2]);
     index[1] = elev2index(t[1][2]);
     index[2] = elev2index(t[2][2]);
@@ -419,6 +426,9 @@ void MapMaker::draw_elevation_tri(int vert0, int vert1, int vert2,
     // Triangle lies within one elevation level.  Draw it in one
     // colour.
     if ((index[0] == index[1]) && (index[1] == index[2])) {
+	sgSetVec2(p[0], scale(t[0][0], size, zoom), scale(t[0][1], size, zoom));
+	sgSetVec2(p[1], scale(t[1][0], size, zoom), scale(t[1][1], size, zoom));
+	sgSetVec2(p[2], scale(t[2][0], size, zoom), scale(t[2][1], size, zoom));
 	if (smooth) {
 	    sgVec4 color[3];
 	    elev2colour_smooth((int)t[0][2], color[0]);
@@ -427,6 +437,7 @@ void MapMaker::draw_elevation_tri(int vert0, int vert1, int vert2,
 
 	    output->drawTriangle( p, nrm, color );
 	} else {
+	    output->setColor(palette[elev2colour(v[vert0][2])]);
 	    output->drawTriangle( p, nrm );
 	}
 
@@ -453,14 +464,48 @@ void MapMaker::draw_elevation_tri(int vert0, int vert1, int vert2,
     }
 
     // Now begin slicing the lines leading away from vert0 to vert1
-    // and vert2.  Slicing a triangle can lead to new triangles, new
+    // and vert2.  Slicing a triangle create new triangles, new
     // quadrilaterals, and even new pentagons.  Because the triangle
     // lies in a plane (by definition), we are assured that the new
     // figures are also planar.
+    //
+    // After each bit is sliced off the top, it is drawn and then
+    // discarded.  The process is then repeated on the remaining
+    // figure, until there's nothing left.
+    //
+    // This can be illustrated with the power of ASCII graphics.  If
+    // we have to make two cuts of the triangle ABC, we'll create 4
+    // new points, D, E, F, and G.  This creates 3 figures: ADE,
+    // EDBFG, and GFC.
+    //
+    //        A	       A	  	 
+    //       /|	      /|	  	 
+    //      / |	     / |	  	 
+    //  -->/  |	    D--E     D--E      D--E
+    //    /   |	   /   |    /   |     /   |
+    //   B    |	  B    |   B    |    B    |
+    //    \   |	   \   |    \   |     \   |
+    //     \  |	    \  |     \  |      \  |
+    //   -->\ |	  -->\ |   -->\ |       F-G       F-G
+    //       \|	      \|       \|        \|        \|
+    //        C	       C        C         C         C
+
     int k, vertices;
     sgVec3 ts[5], nrms[5];
     sgVec2 ps[5];
 
+    // Slicing creates new vertices and normals, so we need to keep
+    // track of actual points, not just their indices as before.  The
+    // array 'ts' keeps the vertices of the current figure, 'nrms' the
+    // norms, and 'ps' the scaled points.  At most we can generate a
+    // pentagon, so each array has 5 points.  The current number of
+    // points is given by 'vertices'.
+    //
+    // In the example above, the arrays will contain data for ADE,
+    // then DEBFG, and finally GFC.  Note that points are given in a
+    // counter-clockwise direction (as illustrated here).  This means
+    // that that when a bottom line (eg, DE in ADE) becomes a top line
+    // (ED in EDBFG), we reverse its order.
     sgCopyVec3(ts[0], v[vert0]);
     sgCopyVec3(nrms[0], n[norm0]);
     sgSetVec2(ps[0], 
@@ -472,16 +517,20 @@ void MapMaker::draw_elevation_tri(int vert0, int vert1, int vert2,
 	// Make a cut and draw the resulting figure.
 	double elevation = elev_height[k - 1]; // This is where we cut.
 
-	// Get the point along the short line.
+	// Cut along the short line (vert0 to vert1), and put the
+	// resulting vertex, normal, and point into ts, nrms, and ps.
 	create_sub_point(v[vert0], v[vert1], n[norm0], n[norm1], 
 			 vertices++, elevation, ts, nrms, ps);
-	// Get the point along the long line.
+	// Ditto for the long line (vert0 to vert2).
 	create_sub_point(v[vert0], v[vert2], n[norm0], n[norm2], 
 			 vertices++, elevation, ts, nrms, ps);
 
+	// Now draw the resulting figure.
 	draw_elevation_slice(vertices, smooth, k, ts, nrms, ps);
 
-	// The bottom will be the next top.  Reverse the order of the points.
+	// We're ready to move down and make the next slice.  The two
+	// points we just created will now be the top of the next
+	// slice.  We need to reverse the order of the points.
 	sgCopyVec3(ts[0], ts[vertices - 1]);
 	sgCopyVec3(nrms[0], nrms[vertices - 1]);
 	sgCopyVec2(ps[0], ps[vertices - 1]);
@@ -492,6 +541,8 @@ void MapMaker::draw_elevation_tri(int vert0, int vert1, int vert2,
 
 	vertices = 2;
     }
+
+    // Add the middle vertex.
     sgCopyVec3(ts[vertices], v[vert1]);
     sgCopyVec3(nrms[vertices], n[norm1]);
     sgSetVec2(ps[vertices], 
@@ -524,6 +575,7 @@ void MapMaker::draw_elevation_tri(int vert0, int vert1, int vert2,
 	
 	vertices = 2;
     }
+
     // Add the final vertex and draw the last figure.
     sgCopyVec3(ts[vertices], v[vert2]);
     sgCopyVec3(nrms[vertices], n[norm2]);
@@ -543,47 +595,42 @@ void MapMaker::draw_elevation_tri(int vert0, int vert1, int vert2,
 // draw_elevation_tri.
 void MapMaker::draw_a_tri(int vert0, int vert1, int vert2,
 			  int norm0, int norm1, int norm2,
-			  vector<float*> &v, vector <float*> &n, int col)
+			  vector<float*> &v, vector<float*> &n, int col)
 {
     bool save_shade = output->getShade();
     
+    // Elevation triangles get special treatment.
+    if (col == -1) {
+	draw_elevation_tri(vert0, vert1, vert2, norm0, norm1, norm2, v, n, col);
+	return;
+    }
+
+    // Non-elevation triangles are coloured according to col.  They
+    // are shaded (usually), but not smoothed.
+    output->setColor(palette[col]);
     if (col == 12 || col == 13) {
 	// do not shade ocean/lake/etc.
-	output->setColor(palette[col]);
 	// DCL - and switch lighting off for water for now (see the Jan 2005 mailing list archives)
 	output->setShade(false);
-    } else {
-	int dcol;
-	if (col >= 0) {
-	    dcol = col;
-	} else {
-	    dcol = elev2colour((int)((v[vert0][2] + v[vert1][2] + v[vert2][2])
-				     / 3.0f));
-	}
-	output->setColor(palette[dcol]);
     }
 
-    if (col >= 0) {
-	sgVec3 nrm[3];
-	sgVec2 p[3];
+    sgVec3 nrm[3];
+    sgVec2 p[3];
     
-	sgCopyVec3(nrm[0], n[norm0]);
-	sgCopyVec3(nrm[1], n[norm1]);
-	sgCopyVec3(nrm[2], n[norm2]);
-	sgSetVec2(p[0], 
-		  scale(v[vert0][0], size, zoom), 
-		  scale(v[vert0][1], size, zoom));
-	sgSetVec2(p[1], 
-		  scale(v[vert1][0], size, zoom), 
-		  scale(v[vert1][1], size, zoom));
-	sgSetVec2(p[2], 
-		  scale(v[vert2][0], size, zoom), 
-		  scale(v[vert2][1], size, zoom));
+    sgCopyVec3(nrm[0], n[norm0]);
+    sgCopyVec3(nrm[1], n[norm1]);
+    sgCopyVec3(nrm[2], n[norm2]);
+    sgSetVec2(p[0], 
+	      scale(v[vert0][0], size, zoom), 
+	      scale(v[vert0][1], size, zoom));
+    sgSetVec2(p[1], 
+	      scale(v[vert1][0], size, zoom), 
+	      scale(v[vert1][1], size, zoom));
+    sgSetVec2(p[2], 
+	      scale(v[vert2][0], size, zoom), 
+	      scale(v[vert2][1], size, zoom));
 
-	output->drawTriangle( p, nrm );
-    } else {
-	draw_elevation_tri(vert0, vert1, vert2, norm0, norm1, norm2, v, n, col);
-    }
+    output->drawTriangle(p, nrm);
     
     // DCL - restore the original lighting in case we turned it off for water
     output->setShade(save_shade);
@@ -592,7 +639,8 @@ void MapMaker::draw_a_tri(int vert0, int vert1, int vert2,
 // Really should be draw_tris
 void MapMaker::draw_tri(const int_list &vertex_indices, 
 			const int_list &normal_indices, 
-			vector<float*> &v, vector<float*> &n, int col) {
+			vector<float*> &v, vector<float*> &n, int col) 
+{
     int i;
     int vert0, vert1, vert2;
     int norm0, norm1, norm2;
@@ -613,7 +661,8 @@ void MapMaker::draw_tri(const int_list &vertex_indices,
 
 void MapMaker::draw_trifan(const int_list &vertex_indices, 
 			   const int_list &normal_indices, 
-			   vector<float*> &v, vector<float*> &n, int col ) {
+			   vector<float*> &v, vector<float*> &n, int col ) 
+{
     int i;
     int cvert, vert1, vert2;
     int cnorm, norm1, norm2;
@@ -636,7 +685,8 @@ void MapMaker::draw_trifan(const int_list &vertex_indices,
 void MapMaker::draw_tristrip(const int_list &vertex_indices, 
 			     const int_list &normal_indices, 
 			     vector<float*> &v, vector<float*> &n, 
-			     int col) {
+			     int col) 
+{
     int i;
     int vert0, vert1, vert2;
     int norm0, norm1, norm2;
@@ -659,18 +709,13 @@ void MapMaker::draw_tristrip(const int_list &vertex_indices,
 }
 
 int MapMaker::process_binary_file( char *tile_name, sgVec3 xyz ) {
-  //cout << "tile name = " << tile_name << '\n';
-  
-  //float cr;               // reference point (gbs)
   sgVec3 gbs, tmp;
-  //int scount = 0;
-  int material = 16;
+//   int material = 16;
+  int material;			// EYE - a colour, not a material
   unsigned int i;
   SGBinObject tile;
 
   vector<float*> v, n;
-  // EYE - this is just used to test my assumptions about normals
-  vector<int> norms;
 
   if ( !tile.read_bin( tile_name ) ) {
     return 0;
@@ -685,18 +730,28 @@ int MapMaker::process_binary_file( char *tile_name, sgVec3 xyz ) {
     gbs[i] = gbs_p[i];
   }
 
-  /* convert point_list of wgs84 nodes to a list of points transformed
-     into the maps local coordinate system */
+  // Although the method is called get_wgs84_nodes, it doesn't
+  // actually return WGS84 points.  It returns points in Cartesian
+  // coordinate space, with the origin at the center of the earth, the
+  // X axis going through 0 degrees latitude, 0 degrees longitude
+  // (near Africa), the Y axis going through 0 degrees latitude, 90
+  // degrees west latitude (in the Indian Ocean), and the Z axis going
+  // through the north pole.  Units are metres.  See
+  //
+  // http://www.flightgear.org/Docs/Scenery/CoordinateSystem/CoordinateSystem.html
+  //
+  // for more.
   const point_list wgs84_nodes = tile.get_wgs84_nodes();
   for ( point_list::const_iterator node = wgs84_nodes . begin(); 
 	node != wgs84_nodes . end();
 	node++ ) {
-
     float *nv = new sgVec3;
+
     for (i = 0; i < 3; i++) {
       tmp[i] = (*node)[i];
     }
     
+    // Convert <X, Y, Z> to WGS84 <lon, lat, elevation>.
     sgAddVec3(tmp, gbs);
     double pr = sgLengthVec3( tmp );
     ab_xy( tmp, xyz, nv );
@@ -704,8 +759,6 @@ int MapMaker::process_binary_file( char *tile_name, sgVec3 xyz ) {
     // altitude:
     nv[2] = pr - nv[2];
     v.push_back( nv );
-    // EYE - remove this when I'm happy with my understaning of normals
-    norms.push_back(-1);
   }
 
   // same as above for normals
@@ -716,10 +769,26 @@ int MapMaker::process_binary_file( char *tile_name, sgVec3 xyz ) {
     // Make a new normal
     float *nn = new sgVec3;
     
+    // BJS - One would think the normals should be transformed as
+    // well, but this appears not to be the case.  What seems to be
+    // happening is that the lighting is set up for the original,
+    // untransformed vertices (see createMap and the call to
+    // output->setLightVector).  That being the case, the lighting
+    // will work with the original, untransformed normals.  I think.
+    // The results certainly look okay.
+    //
+    // Assuming that my guess is correct, I think this approach could
+    // fail if a very large map (covering a significant part of the
+    // globe) was rendered.  Lighting that would be correct for the
+    // left edge of the map might be completely wrong for the right
+    // edge.  To be truly correct, the normals should really be
+    // transformed, and the lighting set for the transformed map.
+    // However, this situation is highly unlikely to occur, and so the
+    // current system is good enough (and simpler and faster).
     for (i = 0; i < 3; i++) {
       nn[i] = (*normal)[i];
     }
-    
+
     n.push_back( nn );
   }
 
@@ -750,40 +819,6 @@ int MapMaker::process_binary_file( char *tile_name, sgVec3 xyz ) {
       material = (*mat_it).second;
     }
 
-    assert(((*tri).size() == tile.get_tris_n()[i].size()) ||
-	   (v.size() == n.size()));
-
-    if (tri_normals[i].size() > 0) {
-	// These triangles have normals specified.
-	const int_list vertex_indices = *tri;
-	const int_list normal_indices = tri_normals[i];
-	for (int z = 0; z < vertex_indices.size(); z++) {
-	    int vertex_index = vertex_indices[z];
-	    int node_index = normal_indices[z];
-	    if (norms[vertex_index] == -1) {
-		norms[vertex_index] = node_index;
-	    } else if (norms[vertex_index] != normal_indices[node_index]) {
-		printf("Clash: TRIS: norms[%d] = %d, normal_indices[%d] = %d\n",
-		       vertex_index, norms[vertex_index],
-		       node_index, normal_indices[node_index]);
-	    }
-	}
-    } else {
-	// Use global list of normals.
-	const int_list vertex_indices = *tri;
-	for (int z = 0; z < vertex_indices.size(); z++) {
-	    int vertex_index = vertex_indices[z];
-	    int node_index = vertex_index;
-	    if (norms[vertex_index] == -1) {
-		norms[vertex_index] = node_index;
-	    } else if (norms[vertex_index] != node_index) {
-		printf("Clash: TRIS: norms[%d] = %d, node_index = %d\n",
-		       vertex_index, norms[vertex_index],
-		       node_index);
-	    }
-	}
-    }
-
     if (tri_normals[i].size() > 0) {
 	draw_tri(*tri, tri_normals[i], v, n, material);
     } else {
@@ -808,41 +843,6 @@ int MapMaker::process_binary_file( char *tile_name, sgVec3 xyz ) {
       material = -1;
     } else {
       material = (*mat_it).second;
-    }
-
-    // This seems to always be true.
-    assert(((*fan).size() == tile.get_fans_n()[i].size()) ||
-	   (v.size() == n.size()));
-
-    if (fans_normals[i].size() > 0) {
-	// These triangles have normals specified.
-	const int_list vertex_indices = *fan;
-	const int_list normal_indices = fans_normals[i];
-	for (int z = 0; z < vertex_indices.size(); z++) {
-	    int vertex_index = vertex_indices[z];
-	    int node_index = normal_indices[z];
-	    if (norms[vertex_index] == -1) {
-		norms[vertex_index] = node_index;
-	    } else if (norms[vertex_index] != normal_indices[node_index]) {
-		printf("Clash: FANS: norms[%d] = %d, normal_indices[%d] = %d\n",
-		       vertex_index, norms[vertex_index],
-		       node_index, normal_indices[node_index]);
-	    }
-	}
-    } else {
-	// Use global list of normals.
-	const int_list vertex_indices = *fan;
-	for (int z = 0; z < vertex_indices.size(); z++) {
-	    int vertex_index = vertex_indices[z];
-	    int node_index = vertex_index;
-	    if (norms[vertex_index] == -1) {
-		norms[vertex_index] = node_index;
-	    } else if (norms[vertex_index] != node_index) {
-		printf("Clash: FANS: norms[%d] = %d, node_index = %d\n",
-		       vertex_index, norms[vertex_index],
-		       node_index);
-	    }
-	}
     }
 
     if (fans_normals[i].size() > 0) {
@@ -871,41 +871,6 @@ int MapMaker::process_binary_file( char *tile_name, sgVec3 xyz ) {
       material = (*mat_it).second;
     }
 
-    // This seems to always be true.
-    assert(((*strip).size() == tile.get_strips_n()[i].size()) ||
-	   (v.size() == n.size()));
-
-    if (strips_normals[i].size() > 0) {
-	// These triangles have normals specified.
-	const int_list vertex_indices = *strip;
-	const int_list normal_indices = strips_normals[i];
-	for (int z = 0; z < vertex_indices.size(); z++) {
-	    int vertex_index = vertex_indices[z];
-	    int node_index = normal_indices[z];
-	    if (norms[vertex_index] == -1) {
-		norms[vertex_index] = node_index;
-	    } else if (norms[vertex_index] != normal_indices[node_index]) {
-		printf("Clash: STRIPS: norms[%d] = %d, normal_indices[%d] = %d\n",
-		       vertex_index, norms[vertex_index],
-		       node_index, normal_indices[node_index]);
-	    }
-	}
-    } else {
-	// Use global list of normals.
-	const int_list vertex_indices = *strip;
-	for (int z = 0; z < vertex_indices.size(); z++) {
-	    int vertex_index = vertex_indices[z];
-	    int node_index = vertex_index;
-	    if (norms[vertex_index] == -1) {
-		norms[vertex_index] = node_index;
-	    } else if (norms[vertex_index] != node_index) {
-		printf("Clash: STRIPS: norms[%d] = %d, node_index = %d\n",
-		       vertex_index, norms[vertex_index],
-		       node_index);
-	    }
-	}
-    }
-
     if (strips_normals[i].size() > 0) {
 	draw_tristrip( *strip, strips_normals[i], v, n, material );
     } else {
@@ -914,6 +879,7 @@ int MapMaker::process_binary_file( char *tile_name, sgVec3 xyz ) {
 
     i++;
   }
+
 	
   if(0) {
     cout << "Node_list sizes are nodes: " << wgs84_nodes.size() << " -- normals: " << m_norms.size() << '\n'; 
@@ -927,7 +893,6 @@ int MapMaker::process_binary_file( char *tile_name, sgVec3 xyz ) {
     delete[] n[i];
   }
   
-//   printf("process_binary_file: %s\n", tile_name);
   return 1;
 }
 
@@ -1042,8 +1007,7 @@ int MapMaker::process_ascii_file( char *tile_name, sgVec3 xyz ) {
          }
          
          if ( !vertex_indices.empty() ) {
-	     // EYE - fix this later
-//           draw_trifan( vertex_indices, v, n, material );
+	     draw_trifan(vertex_indices, vertex_indices, v, n, material);
           polys++;
          }
       }
@@ -1073,8 +1037,7 @@ int MapMaker::process_ascii_file( char *tile_name, sgVec3 xyz ) {
          }
          
          if ( !vertex_indices.empty() ) {
-	     // EYE - fix this later!
-//           draw_trifan( vertex_indices, v, n, material );
+          draw_trifan(vertex_indices, vertex_indices, v, n, material);
           polys++;
          }
       }

@@ -127,7 +127,7 @@ void redrawMap() {
     }
     OutputGL output( outp, mapobj.getSize(), smooth_shade, 
 		     textured_fonts, font_name, create_jpeg, jpeg_quality, rescale_factor );
-    mapobj.createMap( &output, clat, clon, scenerypath, autoscale );
+    mapobj.createMap(&output, clat, clon, scenerypath, autoscale, false);
     output.closeOutput();
     exit(0);
   } else {
@@ -210,7 +210,7 @@ void redrawMap() {
 
     OutputGL output(outname, s, smooth_shade, textured_fonts, font_name,
                     create_jpeg, jpeg_quality, rescale_factor);
-    mapobj.createMap( &output, clat, clon, fg_scenery[scenery_pos], 1.0f );
+    mapobj.createMap(&output, clat, clon, fg_scenery[scenery_pos], 1.0f, true);
     output.closeOutput();
     if (doublebuffer && !headless) {
       glutSwapBuffers();
