@@ -47,6 +47,10 @@ protected:
 
   char *filename;
   FILE *ps_file;
+
+  void drawCurrentColour();
+  int currentColour[3];
+  bool colourPrinted;
 };
 
 #endif

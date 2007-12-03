@@ -81,6 +81,12 @@ OutputPS::OutputPS( char *filename, int size, bool smooth_shading ) :
   //set font
   fprintf( ps_file, "/Helvetica-Bold findfont 10 scalefont setfont\n");
   
+  // Initialize the colour stuff - nothing has been printed, and the
+  // current colour is undefined.
+  colourPrinted = false;
+  currentColour[0] = -1;
+  currentColour[1] = -1;
+  currentColour[2] = -1;
 }
 
 OutputPS::~OutputPS() {
@@ -142,9 +148,53 @@ int OutputPS::quadrant(const sgVec2 p, bool checkoutside) {
     }
 }
 
+// Set the colour for the next object(s) to be drawn.  The simplest
+// way to implement this is just to print a colour command (eg, "10
+// 251 205 c").  This is often wasteful - this colour may be the same
+// as the previously set colour, or the object which follows may not
+// be drawn, because it lies outside the picture.
+//
+// The number of useless colour commands can actually be quite
+// significant (2/3 of the file), so in an effort to reduce file size,
+// we adopt this strategy: colour commands are only printed when it is
+// necessary: the colour has changed, *and* we have an object to draw
+// in that colour.
+//
+// So, the setColor command just checks the colour given.  If it is
+// different than the last printed colour, it saves it and notes that
+// it has yet to be printed to the file (colourPrinted = false).  If,
+// later, an object is drawn, then the colour will be actually sent to
+// the file.
 void OutputPS::setColor( const float *rgb ) {
-  fprintf( ps_file, "%i %i %i c\n", 
-	   (int)(rgb[0]*255.0f), (int)(rgb[1]*255.0f), (int)(rgb[2]*255.0f) );
+    int thisColour[3];
+    thisColour[0] = (int)(rgb[0] * 255.0f);
+    thisColour[1] = (int)(rgb[1] * 255.0f);
+    thisColour[2] = (int)(rgb[2] * 255.0f);
+    
+    // If we've never printed a colour to the file (currentColour ==
+    // -1), or this colour is new, then save it and make a note that
+    // it hasn't been printed to the file.
+    if ((currentColour[0] == -1) ||
+	(thisColour[0] != currentColour[0]) ||
+	(thisColour[1] != currentColour[1]) ||
+	(thisColour[2] != currentColour[2])) {
+	colourPrinted = false;
+	currentColour[0] = thisColour[0];
+	currentColour[1] = thisColour[1];
+	currentColour[2] = thisColour[2];
+    }
+}
+
+// Prints the current colour to the output file, if necessary (ie, if
+// it hasn't been printed already).  This should be called whenever an
+// object (triangle, quad, etc) is actually printed to the file.
+void OutputPS::drawCurrentColour()
+{
+    if (!colourPrinted) {
+	fprintf(ps_file, "%i %i %i c\n", 
+		currentColour[0], currentColour[1], currentColour[2]);
+	colourPrinted = true;
+    }
 }
 
 void OutputPS::drawTriangle(const sgVec2 *p, const sgVec3 *normals) {
@@ -161,6 +211,7 @@ void OutputPS::drawTriangle(const sgVec2 *p, const sgVec3 *normals) {
     }
   }
     
+  drawCurrentColour();
   fprintf( ps_file, "%.3f %.3f %.3f %.3f %.3f %.3f t\n", 
 	   (p[2][0]-p[1][0]), (p[2][1]-p[1][1]), 
 	   (p[1][0]-p[0][0]), (p[1][1]-p[0][1]), 
@@ -186,6 +237,7 @@ void OutputPS::drawQuad(const sgVec2 *p, const sgVec3 *normals) {
     }
   }
     
+  drawCurrentColour();
   fprintf( ps_file, "%.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f q\n", 
 	   (p[3][0]-p[2][0]), (p[3][1]-p[2][1]), 
 	   (p[2][0]-p[1][0]), (p[2][1]-p[1][1]), 
@@ -202,16 +254,19 @@ void OutputPS::drawLine( sgVec2 p1, sgVec2 p2 ) {
     }
   }
     
+  drawCurrentColour();
   fprintf( ps_file, "%.3f %.3f %.3f %.3f l\n", 
 	   (p2[0]-p1[0]), (p2[1]-p1[1]), 
 	   (p1[0]), (p1[1]) );
 }
 
 void OutputPS::drawText( sgVec2 p, char *s ) {
+  drawCurrentColour();
   fprintf(ps_file, "%.3f %.3f moveto\n(%s) show\n", p[0], p[1], s);
 }
 
 void OutputPS::drawCircle( sgVec2 p, int radius ) {
+  drawCurrentColour();
   fprintf(ps_file, "newpath %.3f %.3f %i 0 360 arc stroke\n",
 	  p[0], p[1], radius );
 }
