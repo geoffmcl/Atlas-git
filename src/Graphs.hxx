@@ -81,11 +81,11 @@ protected:
     Values _altitude;
     Values _rateOfClimb;
 
-    void _drawGraph(Values &values, int x, int y, char *label);
+    void _drawGraph(Values &values, int x, int y, const char *label);
 
     void _calcNiceIntervals(Values &values);
 
-    void _drawString(char *str, float x, float y);
+    void _drawString(const char *str, float x, float y);
 
     void _loadData();
     void _loadClimbRate();

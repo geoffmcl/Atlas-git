@@ -10,7 +10,7 @@ float OutputGL::circle_y[];
 
 const float OutputGL::BRIGHTNESS = 0.6f;
 
-OutputGL::OutputGL( char *filename, int size, bool smooth_shading, 
+OutputGL::OutputGL( const char *filename, int size, bool smooth_shading, 
 		    bool useTexturedFont, char *fontname, bool jpg, int q, int r ) : 
   GfxOutput(filename, size), filename(filename), 
   useTexturedFont(useTexturedFont), jpeg(jpg), jpeg_quality(q), rescale(r)

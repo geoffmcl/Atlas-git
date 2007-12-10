@@ -29,7 +29,7 @@
 
 class OutputPS : public GfxOutput {
 public:
-  OutputPS( char *filename, int size, bool smooth_shading = true );
+  OutputPS( const char *filename, int size, bool smooth_shading = true );
   virtual ~OutputPS();
 
   virtual void closeOutput();
@@ -45,7 +45,7 @@ public:
 protected:
   int quadrant( const sgVec2 p, bool checkoutside = true );
 
-  char *filename;
+  const char *filename;
   FILE *ps_file;
 
   void drawCurrentColour();

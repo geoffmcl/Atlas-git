@@ -12,7 +12,7 @@ using std::vector;
 
 class OutputGL : public GfxOutput {
 public:
-  OutputGL( char *filename, int size, bool smooth_shading,
+  OutputGL( const char *filename, int size, bool smooth_shading,
 	    bool useTexturedFont, char *fontname, bool jpg = false,
             int q = 75, int r = 1 );
   ~OutputGL();
@@ -45,7 +45,7 @@ protected:
   fntTexFont *font;
   fntRenderer textRenderer;
   puFont *glutFont;
-  char *filename;
+  const char *filename;
   bool useTexturedFont, shade, jpeg;
   int jpeg_quality, rescale;
   GLubyte * image;

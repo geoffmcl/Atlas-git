@@ -45,7 +45,7 @@ SG_USING_STD(string);
 typedef vector<string> string_list;
 
 float clat = -100.0f, clon = -100.0f;   // initialize to unreasonable values
-char *outp = "map.eps";                 // output file name
+const char *outp = "map.eps";                 // output file name
 bool autoscale = false, global = false;
 MapMaker mapobj;
 

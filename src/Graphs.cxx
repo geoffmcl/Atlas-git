@@ -252,7 +252,7 @@ void Graphs::setSmoothing(unsigned int s)
 // actual graph.  _drawGraph assumes that there is space around the
 // graph for labels, specifically _header pixels on the top and
 // bottom, and _margin pixels on the left and right.
-void Graphs::_drawGraph(Values &values, int x, int y, char *label)
+void Graphs::_drawGraph(Values &values, int x, int y, const char *label)
 {
     // Print the graph axes.
     glColor3f(0.0, 0.0, 0.0);
@@ -474,7 +474,7 @@ void Graphs::_calcNiceIntervals(Values &values)
 // Draws the given string starting at the given point, in the current
 // colour.
 // void Graphs::_drawString(char *str, int x, int y)
-void Graphs::_drawString(char *str, float x, float y)
+void Graphs::_drawString(const char *str, float x, float y)
 {
     glRasterPos2f(x, y);
     for (int i = 0; i < strlen(str); i++) {

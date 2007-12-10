@@ -137,7 +137,7 @@ protected:
 		   float tolerance = SG_DEGREES_TO_RADIANS / 3600.0f);
 
     char _calcChecksum(char *sentence);
-    void _splitAngle(float degrees, char direction[2], 
+    void _splitAngle(float degrees, const char direction[2], 
 		     int *d, float *m, char *c);
 };
 

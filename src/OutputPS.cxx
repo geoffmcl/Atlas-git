@@ -1,6 +1,6 @@
 #include "OutputPS.hxx"
 
-OutputPS::OutputPS( char *filename, int size, bool smooth_shading ) :
+OutputPS::OutputPS( const char *filename, int size, bool smooth_shading ) :
   GfxOutput( filename, size ), filename(filename) {
   ps_file = fopen( filename, "wb" );
   

@@ -74,9 +74,9 @@ typedef vector<string> string_list;
 
 float clat = -100.0f, clon = -100.0f;   // initialize to unreasonable values
 float autoscale = 0.0f;                 // 0.0f == no autoscale
-char *outp = 0;                         // output file name
-char *outpp = "map.png";                // output file name
-char *outpj = "map.jpg";                // output file name
+const char *outp = 0;                         // output file name
+const char *outpp = "map.png";                // output file name
+const char *outpj = "map.jpg";                // output file name
 bool global = false;
 bool doublebuffer = true, headless = false, create_jpeg = false;
 bool smooth_shade = true, textured_fonts = true;

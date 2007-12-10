@@ -691,7 +691,7 @@ char FlightTrack::_calcChecksum(char *sentence) {
 // angle is positive, and direction[1] when angle is negative), sets
 // 'd' to the value of the angle (in integer degrees), 'm' to the
 // value of the angle in minutes, and 'c' to the label.
-void FlightTrack::_splitAngle(float angle, char direction[2],
+void FlightTrack::_splitAngle(float angle, const char direction[2],
 			      int *d, float *m, char *c)
 {
     angle *= SG_RADIANS_TO_DEGREES;

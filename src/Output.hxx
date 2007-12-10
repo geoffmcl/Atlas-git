@@ -27,7 +27,7 @@
 
 class GfxOutput {
 public:
-  GfxOutput( char *filename, int size, bool smooth_shading = true );
+  GfxOutput( const char *filename, int size, bool smooth_shading = true );
   virtual ~GfxOutput();
 
   inline bool isOpen() { return open; }
