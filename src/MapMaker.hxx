@@ -66,7 +66,7 @@ public:
 	    int size = 256, int scale = 100000 );
   ~MapMaker();
 
-  void setFGRoot( char *path );
+  void setFGRoot( const char *path );
   void setPalette( char *path );
   inline void setAPFilter( char *filter ) { arp_filter = filter; }
   inline void setFeatures( int features) { this->features = features; }

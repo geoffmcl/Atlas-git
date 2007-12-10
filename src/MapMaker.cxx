@@ -97,7 +97,7 @@ MapMaker::~MapMaker() {
   delete[] fg_root;
 }
 
-void MapMaker::setFGRoot( char *fg_root ) {
+void MapMaker::setFGRoot( const char *fg_root ) {
   delete this->fg_root;
   if (fg_root == NULL) {
     fg_root = getenv("FG_ROOT");
