@@ -33,6 +33,7 @@
 #include SG_GLUT_H
 #include <plib/fnt.h>
 #include <plib/pu.h>
+#include <plib/puAux.h>
 #include <string>
 
 #include <map>
@@ -80,7 +81,7 @@ puObject *proj_item[MAX_NUM_PROJECTIONS];
 
 puButtonBox *button_box_info;
 // EYE - constant alert!  We should get '3' from Graphs.hxx somehow.
-char *button_box_labels[3];
+const char *button_box_labels[3];
 puSlider *smoother;
 
 // Synchronization and map generation interface.
@@ -100,7 +101,7 @@ Graphs *graphs;
 char lat_str[80], lon_str[80], alt_str[80], hdg_str[80], spd_str[80];
 
 // File save dialog.
-puFileSelector *saveDialog = NULL;
+puaFileSelector *saveDialog = NULL;
 
 SGPath lowrespath;
 int lowres_avlble;
@@ -350,7 +351,6 @@ void smoother_cb(puObject *dial)
 
     // Update the interface.
     glutSetWindow(main_window);
-    puDisplay(main_window);
     glutPostRedisplay();
 }
 
@@ -721,6 +721,7 @@ void graph_type_cb (puObject *cb)
     glutSetWindow(main_window);
 }
 
+// Called when the user presses OK or Cancel on the save file dialog.
 void file_cb(puObject *cb)
 {
     // If the user hit "Ok", then the string value of the save dialog
@@ -731,12 +732,19 @@ void file_cb(puObject *cb)
 	// the save dialog is active.
 	track->setFilePath(file);
 	track->save();
+
+	// Force the graphs window to update itself (in particular,
+	// its title).
 	glutSetWindow(graphs_window);
 	glutPostRedisplay();
     }
 
+    saveDialog->hide();
     puDeleteObject(saveDialog);
     saveDialog = NULL;
+
+    glutSetWindow(main_window);
+    glutPostRedisplay();
 }
 
 /*****************************************************************************
@@ -885,7 +893,7 @@ void init_gui(bool textureFonts) {
       button_box_labels[1] = "Speed";
       button_box_labels[2] = "Rate of Climb";
       button_box_info = 
-	  new puButtonBox(180, 0, 355, 90, button_box_labels, FALSE);
+	  new puButtonBox(180, 0, 355, 90, (char **)button_box_labels, FALSE);
       button_box_info->setCallback(graph_type_cb);
       smoother = new puSlider(360, 10, 100);
       smoother->setLabelPlace(PUPLACE_TOP_CENTERED);
@@ -1339,11 +1347,16 @@ void mouseMotion( int x, int y ) {
 	while ( longitude < -180.0f * SG_DEGREES_TO_RADIANS )
 	    longitude += (360.0f * SG_DEGREES_TO_RADIANS);
 	map_object->setLocation( latitude, longitude );
+
+	glutPostRedisplay();
     } else {
 	puMouse(x, y);
     }
 
-    glutPostRedisplay();
+    // EYE - This call meant the map was redrawn even when the user
+    // just moved the mouse.  Presumably it's safe to move it into the
+    // "if (dragmode)" section above.  Right?
+//     glutPostRedisplay();
 }
 
 void keyPressed( unsigned char key, int x, int y ) {
@@ -1451,7 +1464,7 @@ void keyPressed( unsigned char key, int x, int y ) {
 	} else if (saveDialog == NULL) {
 	    // Only start a new dialog if one isn't running already.
 	    glutSetWindow(main_window);
-	    saveDialog = new puFileSelector(250, 150, 500, 400, "");
+	    saveDialog = new puaFileSelector(250, 150, 500, 400, "");
 	    saveDialog->setCallback(file_cb);
 	    saveDialog->setUserData((void *)track);
 	    // EYE - how do I set the font of the file dialog?
