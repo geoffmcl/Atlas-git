@@ -395,7 +395,7 @@ bool Preferences::_loadPreferences(int argc, char *argv[])
 	case SOFTCURSOR_OPTION:
 	    softcursor = true;
 	    break;
-	case UDP_OPTION:
+	case UDP_OPTION: {
 	    // EYE - we need better documentation about how the UDP,
 	    // SERIAL, and BAUD options interact.
 
@@ -411,7 +411,8 @@ bool Preferences::_loadPreferences(int argc, char *argv[])
 	    }
 	    networkConnections.push_back(thisPort);
 	    break;
-	case SERIAL_OPTION:
+	}
+	case SERIAL_OPTION: {
 	    SerialConnection thisConnection;
 	    thisConnection.baud = _serial.baud;
 	    if (optarg) {
@@ -421,6 +422,7 @@ bool Preferences::_loadPreferences(int argc, char *argv[])
 	    }
 	    serialConnections.push_back(thisConnection);
 	    break;
+	}
 	case BAUD_OPTION:
 	    OPTION_CHECK(sscanf(optarg, "%u", &_serial.baud), 1, BAUD_OPTION);
 	    break;
