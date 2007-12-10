@@ -29,8 +29,9 @@ Atlas_SOURCES = \
 	Graphs.cxx Graphs.hxx
 
 Atlas_LDADD = \
-	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgserial -lsgdebug -lsgbucket\
-	-lsgxml -lplibsg -lplibpuaux -lplibpu -lplibul -lplibfnt -lplibnet \
+	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgserial -lsgdebug \
+	-lsgbucket -lsgxml -lsgstructure \
+	 -lplibsg -lplibpuaux -lplibpu -lplibul -lplibfnt -lplibnet \
 	$(opengl_LIBS) \
 	-lpng -lz -lpthread -ljpeg
 
@@ -47,7 +48,8 @@ Map_SOURCES = \
 
 Map_LDADD = \
 	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgserial -lsgdebug \
-	-lplibsg -lplibpu -lplibul -lplibfnt -lplibnet -lsgbucket -lsgscreen \
+	-lsgbucket -lsgscreen -lsgstructure \
+	-lplibsg -lplibpu -lplibul -lplibfnt -lplibnet \
 	$(opengl_LIBS) \
 	-lpng -lz -ljpeg
 
@@ -63,7 +65,7 @@ MapPS_SOURCES = \
 
 MapPS_LDADD = \
 	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgserial -lsgdebug \
-	-lplibsg -lplibnet -lsgbucket \
+	-lplibsg -lplibnet -lsgbucket -lsgstructure \
 	-lpng -lz
 
 GetMap_SOURCES = \
