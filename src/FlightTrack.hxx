@@ -32,9 +32,8 @@
 
 struct FlightData {
     time_t time;		// Time of record (in integral seconds)
-    // EYE - I might want to change these (especially lat and lon) to
-    // doubles.  Floats only have about 7 digits of precision.
-    float lat, lon, alt, hdg, spd;
+    double lat, lon;
+    float alt, hdg, spd;
     float nav1_freq, nav1_rad;
     float nav2_freq, nav2_rad;
     float adf_freq;
@@ -133,7 +132,7 @@ protected:
     void _adjustOffsetsAround(int i);
 
     bool _readFlightFile(const char *path);
-    bool _parse_nmea(char *buf, FlightData *d);
+    bool _parse_message(char *buf, FlightData *d);
     void _addPoint(FlightData *data, 
 		   float tolerance = SG_DEGREES_TO_RADIANS / 3600.0f);
 

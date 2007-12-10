@@ -170,7 +170,7 @@ bool FlightTrack::checkForInput()
 	// If we managed to read data, then we'll assume we need to
 	// add some flight data.
 	FlightData tmp;
-	if (_parse_nmea(buffer, &tmp)) {
+	if (_parse_message(buffer, &tmp)) {
 	    result = true;
 
 	    // Record point.
@@ -295,7 +295,7 @@ void FlightTrack::save()
 	    // EYE - need some kind of error code?
 	    return;
 	}
-	for (int i = 0; i < _track.size(); i++) {
+	for (unsigned int i = 0; i < _track.size(); i++) {
 	    FlightData *d = _track[i];
 
 	    // Do the hard stuff first.
@@ -333,7 +333,10 @@ void FlightTrack::save()
 
 	    // $PATLA
 	    asprintf(&buf, "PATLA,%.2f,%.1f,%.2f,%.1f,%.0f",
-		     d->nav1_freq, d->nav1_rad, d->nav2_freq, d->nav2_rad, 
+		     d->nav1_freq, 
+		     d->nav1_rad * SG_RADIANS_TO_DEGREES, 
+		     d->nav2_freq, 
+		     d->nav2_rad * SG_RADIANS_TO_DEGREES, 
 		     d->adf_freq);
 	    checksum = _calcChecksum(buf);
 	    fprintf(f, "$%s*%02X\n", buf, checksum);
@@ -418,21 +421,21 @@ bool FlightTrack::_readFlightFile(const char *path)
 {
     // We assume that the file consists of triplets of lines: $GPRMC,
     // $GPGGA, and $PATLA lines.  We read in the file three lines at a
-    // time, passing them off to _parse_nmea.
+    // time, passing them off to _parse_message.
     std::ifstream rc(path);
     if (!rc.is_open()) {
 	return false;
     }
 
     std::string aLine;	// Used for reading the file.
-    char *lines = NULL;	// This is what we pass to _parse_nmea.
+    char *lines = NULL;	// This is what we pass to _parse_message.
     size_t totalLength = 1;	// Total length of 'lines' (plus space
 				// for a terminating '\0').
     int count = 0;		// Counts how many lines we see.
 
     while (!rc.eof()) {
 	// Note that C++ getline() chops off the trailing newline, but
-	// _parse_nmea wants them, so we add it in later.
+	// _parse_message wants them, so we add it in later.
 	getline(rc, aLine);
 	size_t length = aLine.length();
 
@@ -445,11 +448,11 @@ bool FlightTrack::_readFlightFile(const char *path)
 	lines[totalLength - 2] = '\n';
 	count++;
 
-	// If we've read 3 lines, send them off to _parse_nmea.
+	// If we've read 3 lines, send them off to _parse_message.
 	if (count == 3) {
 	    lines[totalLength - 1] = '\0';
 	    FlightData tmp;
-	    if (!_parse_nmea(lines, &tmp)) {
+	    if (!_parse_message(lines, &tmp)) {
 		// EYE - should we delete all the points we've added?
 		return false;
 	    }
@@ -474,30 +477,56 @@ bool FlightTrack::_readFlightFile(const char *path)
     return true;
 }
 
-// Parses one *complete* message.  A message consists of 3 lines,
-// separated by linefeeds.  The first should be a "$GPRMC" line, the
-// second a "$GPGGA" line, and the third a "$PATLA" line, although we
-// actually don't enforce this.
-bool FlightTrack::_parse_nmea(char *buf, FlightData *d) 
+// Parses one *complete* message.  We accept two different protocols:
+// atlas and nmea.  In both cases, a message consists of 3 lines,
+// separated by linefeeds.  Although lines arrive in a fixed order, we
+// don't enforce this.
+//
+// atlas: The first line should be a "$GPRMC" sentence, the second a
+//        "$GPGGA" sentence, and the third a "$PATLA" sentence.
+//
+// nmea: The first line should be a "$GPRMC" sentence, the second a
+//       "$GPGGA" sentence, and the third a "$GPGSA" sentence.
+//
+// Although both atlas and nmea protocols transmit $GPRMC sentences,
+// they differ in several ways:
+//
+// - atlas sends a 12-field $GPRMC sentence, whereas nmea's is 13
+//   fields long (it adds a "mode indicator" field, which it always
+//   sets to 'A').
+//
+// - nmea sends the magnetic variation; atlas leaves the field blank
+//
+// - nmea calculates heading using the north and east components of
+//   the aircraft speed.  If the aircraft isn't moving, the heading is
+//   undefined.  atlas uses what seems to be a more reliable method.
+bool FlightTrack::_parse_message(char *buf, FlightData *d) 
 {
+    // Set the flight data to some reasonable initial values.
+    d->time = 0;
+    d->lat = d->lon = d->alt = d->hdg = d->spd = 0.0;
+    d->nav1_freq = d->nav1_rad = d->nav2_freq = d->nav2_rad = 0.0;
+    d->adf_freq = 0.0;
+
     // The buffer should consist of 3 lines, so first divide it by
     // newlines.
     char *aLine;
     while ((aLine = strsep(&buf, "\n\r")) != NULL) {
 	// Tokens in each line are separated by commas.  We can get at
-	// most 15 tokens (in $GPGGA).
+	// most 18 tokens (in $GPGSA).
 	char *aToken;
-	char *tokens[15];
+	char *tokens[18];
 	int tokenCount = 0;
 	while ((aToken = strsep(&aLine, ",")) != NULL) {
-	    if (tokenCount >= 15) {
-		// We got more than 15 tokens.  Bail.
+	    if (tokenCount >= 18) {
+		// We got more than 18 tokens.  Bail.
 		return false;
 	    }
 	    tokens[tokenCount++] = aToken;
 	}
 
-	if ((strcmp(tokens[0], "$GPRMC") == 0) && (tokenCount == 12)) {
+	if ((strcmp(tokens[0], "$GPRMC") == 0) && 
+	    ((tokenCount == 12) || (tokenCount == 13))) {
 	    // Time and date
 	    char *utc = tokens[1]; // HHMMSS
 	    char *date = tokens[9];    // DDMMYYY (YY = years since 1900)
@@ -550,13 +579,16 @@ bool FlightTrack::_parse_nmea(char *buf, FlightData *d)
 	} else if ((strcmp(tokens[0], "$GPGGA") == 0) && (tokenCount == 15))  {
 	    // GPGGA also includes the UTC time, latitude, and
 	    // longitude.  However, since GPRMC also contains that
-	    // information, we just ignore it here.  This begs the
-	    // question: why are they included twice?
+	    // information, we just ignore it here.  From our point of
+	    // view, the only interesting field is altitude.
 
 	    // Altitude
 	    sscanf(tokens[9], "%f", &d->alt);
-	    char *units = tokens[10];	// 'F' or 'M' (always 'F' at the moment)
-	    assert(strcmp(units, "F") == 0);
+	    char *units = tokens[10];	// 'F' or 'M'
+	    // If units are metres, convert them to feet.
+	    if (strcmp(units, "M") == 0) {
+		d->alt *= SG_METER_TO_FEET;
+	    }
 	} else if ((strcmp(tokens[0], "$PATLA") == 0) && (tokenCount == 6)) {
 	    // NAV1, NAV2 and ADF
 	    sscanf(tokens[1], "%f", &d->nav1_freq);
@@ -566,6 +598,9 @@ bool FlightTrack::_parse_nmea(char *buf, FlightData *d)
 	    sscanf(tokens[5], "%f", &d->adf_freq);
 	    d->nav1_rad *= SG_DEGREES_TO_RADIANS;
 	    d->nav2_rad *= SG_DEGREES_TO_RADIANS;
+	} else if ((strcmp(tokens[0], "$GPGSA") == 0) && (tokenCount == 18)) {
+	    // This is sent in an nmea protocal message.  It contains
+	    // no useful information.
 	} else if ((strcmp(tokens[0], "") == 0) && (tokenCount == 1)) {
 	    // This is what an empty line is parsed as.
 	} else {
