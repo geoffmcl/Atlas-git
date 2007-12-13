@@ -49,12 +49,16 @@ public:
     // tested the latter).
     FlightTrack(const char *filePath);
     FlightTrack(int port, unsigned int max_buffer = 2000);
-    FlightTrack(char *device, int baud, unsigned int max_buffer = 2000);
+    FlightTrack(const char *device, int baud, unsigned int max_buffer = 2000);
     ~FlightTrack();
+
+    bool isNetwork();
+    bool isSerial();
 
     int port();
     const char *device();
     int baud();
+    unsigned int maxBufferSize();
 
     void clear();
     bool empty();
@@ -128,6 +132,8 @@ protected:
     int _port;			// For socket-based tracks.
     string _device;		// For serial-based tracks.
     int _baud;
+
+    bool _isNetwork, _isSerial;
 
     void _adjustOffsetsAround(int i);
 

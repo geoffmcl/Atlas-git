@@ -42,6 +42,8 @@ FlightTrack::FlightTrack(const char *filePath) :
     _device = "";
     _baud = -1;
 
+    _isNetwork = _isSerial = false;
+
     _versionAtLastSave = _version = 0;
 }
 
@@ -61,10 +63,13 @@ FlightTrack::FlightTrack(int port, unsigned int max_buffer) :
     _device = "";
     _baud = -1;
 
+    _isNetwork = true;
+    _isSerial = false;
+
     _versionAtLastSave = _version = 0;
 }
 
-FlightTrack::FlightTrack(char *device, int baud, unsigned int max_buffer) : 
+FlightTrack::FlightTrack(const char *device, int baud, unsigned int max_buffer) : 
     _max_buffer(max_buffer), _mark(-1), _live(true)
 {
     char *baudStr;
@@ -80,6 +85,9 @@ FlightTrack::FlightTrack(char *device, int baud, unsigned int max_buffer) :
     _device = device;
     _baud = baud;
 
+    _isNetwork = false;
+    _isSerial = true;
+
     _versionAtLastSave = _version = 0;
 }
 
@@ -90,6 +98,16 @@ FlightTrack::~FlightTrack()
     if (_input_channel) {
 	_input_channel->close();
     }
+}
+
+bool FlightTrack::isNetwork()
+{
+    return _isNetwork;
+}
+
+bool FlightTrack::isSerial()
+{
+    return _isSerial;
 }
 
 int FlightTrack::port()
@@ -105,6 +123,11 @@ const char *FlightTrack::device()
 int FlightTrack::baud()
 {
     return _baud;
+}
+
+unsigned int FlightTrack::maxBufferSize()
+{
+    return _max_buffer;
 }
 
 void FlightTrack::clear() 
@@ -137,6 +160,7 @@ void FlightTrack::detach()
 	_input_channel = NULL;
     }
     _live = false;
+    _isNetwork = _isSerial = false;
 }
 
 // The "version" of the flight track begins at 0, and is incremented
@@ -287,8 +311,6 @@ void FlightTrack::save()
 {
     // EYE - if we do this test, we must be sure to keep it up to
     // date.
-    // EYE - we need a good way to decide if it's a file, network,
-    // and/or serial connection.
     if (hasFile() && modified()) {
 	FILE *f = fopen(_file.c_str(), "w");
 	if (f == NULL) {
