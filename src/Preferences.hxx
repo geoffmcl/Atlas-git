@@ -53,6 +53,9 @@
 //
 // (6) Give it a default value in Preferences::Preferences
 //
+// (7) Add an entry for it in savePreferences (this is not very
+//     important, used for debugging at the moment)
+//
 // Easy!
 
 // Note: We use getopt to make our option-parsing life easier.  A

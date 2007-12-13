@@ -338,6 +338,7 @@ void Preferences::savePreferences()
     printf("%d\n", max_track);
     printf("%d\n", terrasync_mode);
     printf("%d\n", concurrency);
+    printf("%d\n", autocenter_mode);
 
     for (int i = 0; i < flightFiles.size(); i++) {
 	printf("%s\n", flightFiles[i].c_str());
