@@ -29,6 +29,18 @@
 
 #include "Preferences.hxx"
 
+// A Tile represents the scenery in one of the subdirectories of the
+// scenery tree.  Generally this is an area with a north-south extent
+// of 1 degree of latitude and an east-west extent of 1 degree of
+// longitude, but at extreme latitudes (83 degrees or higher), one
+// subdirectory can contain scenery for 1x2, 1x4, 1x8, or even 1x360
+// degree areas.  
+//
+// The last case, 1x360 tiles, occurs from 89 degrees latitude to the
+// poles.  It is particularly taxing for software: each "tile" is
+// actually a donut, with the last one being a circle.  In addition,
+// they have no center, since any longitude will serve equally well as
+// a center.
 class Tile {
 public:
     enum TaskState {NOT_STARTED, 
@@ -47,7 +59,7 @@ public:
 
     // The "standard" name of the tile (eg, "w128n37").  Always 7
     // characters long.
-    char *name();
+    const char *name();
 
     // Returns the latitude and longitude of the center of the tile.
     float lat();

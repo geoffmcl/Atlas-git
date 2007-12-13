@@ -164,7 +164,7 @@ void Tile::nextTask()
     _taskState = NOT_STARTED;
 }
 
-char* Tile::name()
+const char* Tile::name()
 {
     return _name;
 }
@@ -542,6 +542,8 @@ void Tile::_startMapping()
     // EYE - when Map is called, Atlas moves to the background (since
     // Map is a windowed app, although without a window?).  It would
     // be nice if Map had a truly non-windowed version.
+
+    // EYE - we need to allow more options to be passed to Map.
 
     if (currentTask() == GENERATE_HIRES_MAP) {
 	size = _prefs.map_size;

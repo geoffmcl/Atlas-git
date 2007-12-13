@@ -53,21 +53,23 @@ void TileManager::checkScenery()
     while (dir10 && (ent10 = ulReadDir(dir10))) {
 	// At the top level, we'll be getting the 10-degree scenery
 	// directories.  We need to go down to the next level to get
-	// the actual 1-degree scenery directories.  The directories
-	// should be of the form [ew]dd0[ns]d0.
+	// the actual 1-degree scenery directories.  The 10-degree
+	// directories should be of the form [ew]dd0[ns]d0, where 'd'
+	// is a decimal digit, and the 1-degree directories
+	// [ew]ddd[ns]dd.
 	int lat, lon;
 	SGPath scenery10 = scenery;
 	ulDir *dir1;
 	ulDirEnt *ent1;
 
 	if (ent10->d_isdir && 
-	    (sscanf(ent10->d_name, "%*1c%2d0%*1c%1d0", &lat, &lon) == 2)) {
+ 	    (sscanf(ent10->d_name, "%*1c%2d0%*1c%1d0", &lon, &lat) == 2)) {
 	    // Go through the subdirectory.
 	    scenery10.append(ent10->d_name);
 	    dir1 = ulOpenDir(scenery10.c_str());
 	    while (dir1 && (ent1 = ulReadDir(dir1))) {
 		if (ent1->d_isdir &&
-		    (sscanf(ent1->d_name, "%*1c%3d%*1c%2d", &lat, &lon) == 2)) {
+ 		    (sscanf(ent1->d_name, "%*1c%3d%*1c%2d", &lon, &lat) == 2)) {
 		    // Whew!  Looks like we've got ourselves a scenery
 		    // directory!  Add the tile to our "database" if
 		    // it has pending work (ie, no hires or lowres
@@ -163,7 +165,7 @@ Tile *TileManager::tileAtLatLon(float lat, float lon)
 }
 
 // Returns the tile with the given name, NULL if there is none.
-Tile *TileManager::tileWithName(char *name)
+Tile *TileManager::tileWithName(const char *name)
 {
     std::list<Tile *>::iterator i;
 

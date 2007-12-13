@@ -45,7 +45,7 @@ public:
     int noOfTiles();
     Tile *nthTile(int n);
     Tile *tileAtLatLon(float lat, float lon);
-    Tile *tileWithName(char *name);
+    Tile *tileWithName(const char *name);
 
     static void latLonToTileInfo(float latitude, float longitude,
 				 char *name, char *dir,
