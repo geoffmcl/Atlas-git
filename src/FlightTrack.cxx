@@ -179,6 +179,7 @@ bool FlightTrack::checkForInput()
     bool result = false;
     const int bufferSize = 512;
     char buffer[bufferSize];
+    int noOfBytes;
 
     if (!live()) {
 	return false;
@@ -190,10 +191,11 @@ bool FlightTrack::checkForInput()
     // in one go (perhaps we sample slower than it's produced, perhaps
     // the network is slow/fast, etc), so we keep reading until
     // there's nothing.
-    while (_input_channel->read(buffer, bufferSize) > 0) {
+    while ((noOfBytes = _input_channel->read(buffer, bufferSize)) > 0) {
 	// If we managed to read data, then we'll assume we need to
 	// add some flight data.
 	FlightData tmp;
+	buffer[noOfBytes] = '\0';
 	if (_parse_message(buffer, &tmp)) {
 	    result = true;
 
