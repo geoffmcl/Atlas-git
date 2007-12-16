@@ -193,7 +193,10 @@ void searchTimer(int value)
 
     str = search_interface->searchString();
     if (map_object->getOverlays()->findMatches(str, maxMatches)) {
-	// Show the new items.
+	// Show the new items.  Ensure that the main window is the
+	// current window.
+	glutSetWindow(main_window);
+
 	search_interface->reloadData();
 	glutPostRedisplay();
 
@@ -505,11 +508,19 @@ void updateSyncInterface() {
     static std::string tile_name_str, files_str, bytes_str;
     std::ostringstream nbuf, fbuf, bbuf;
 
+    // Ensure that the main window is the current window.
+    glutSetWindow(main_window);
+
     // Used to drive the progress meter.
     static int progress = 0;
 
-    Tile *t = tileManager->nthTile(nthTile);
+    // nthTile points to the currently displayed tile.  However, it
+    // may become invalid.  Check and see.
+    if (nthTile >= tileManager->noOfTiles()) {
+	nthTile = tileManager->noOfTiles() - 1;
+    }
 
+    Tile *t = tileManager->nthTile(nthTile);
     if (t == NULL) {
 	sync_interface->hide();
 	return;
@@ -1164,6 +1175,9 @@ void specialGraphs(int key, int x, int y)
 
 // Called periodically to check for input on network and serial ports.
 void timer(int value) {
+    // Ensure that the main window is the current window.
+    glutSetWindow(main_window);
+
     // Check for input on all live tracks.
     for (int i = 0; i < tracks.size(); i++) {
 	if (tracks[i]->live() && tracks[i]->checkForInput()) {
@@ -1204,6 +1218,9 @@ void tileTimer(int value) {
     int i;
     int concurrency;
     Tile *t;
+
+    // Ensure that the main window is the current window.
+    glutSetWindow(main_window);
 
     // Get our concurrency level.  0 indicates maximum concurrency.
     concurrency = prefs.concurrency;
