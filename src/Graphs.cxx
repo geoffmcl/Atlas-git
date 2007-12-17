@@ -45,7 +45,7 @@ void Graphs::draw()
     glutSetWindow(_window);
 
     // Set our title.
-    glutSetWindowTitle(_generateName());
+    glutSetWindowTitle(name());
 
     // Clear everything to white.
     glClearColor(1.0, 1.0, 1.0, 0.0);
@@ -586,61 +586,51 @@ void Graphs::_addPoint(float p, Values &v)
     v.data.push_back(p);
 }
 
-// <name> - file, saved
-// <name>* - file, unsaved
 // network (5500) - live network, no file
 // network (5500, <name>) - live network, file
 // network (5500, <name>*) - live network, file, unsaved
-// network (detached) - network, detached, no file
 // serial (/dev/foo, 9600) - live serial, no file
 // serial (/dev/foo, 9600, <name>) - live serial, file, saved
 // serial (/dev/foo, 9600, <name>*) - live serial, file, unsaved
-// serial (detached) - serial, detached, no file
-const char *Graphs::_generateName()
+// <name> - file, saved
+// <name>* - file, unsaved
+// detached, no file - detached, no file (duh!)
+const char *Graphs::name()
 {
     // EYE - don't use fixed-length buffer?
     static char buf[512];
-    // EYE - rather dubious way to check for network vs serial vs file
-    if (_track->port() > 0) {
-	if (_track->live()) {
-	    if (_track->hasFile()) {
-		if (_track->modified()) {
-		    sprintf(buf, "network (%d, %s*)", 
-			    _track->port(), _track->fileName());
-		} else {
-		    sprintf(buf, "network (%d, %s)",
-			    _track->port(), _track->fileName());
-		}
-	    } else {
-		sprintf(buf, "network (%d)", _track->port());
-	    }
-	} else if (!_track->hasFile()) {
-	    sprintf(buf, "network (detached)");
-	} else {
+    if (_track->isNetwork()) {
+	if (_track->hasFile()) {
 	    if (_track->modified()) {
-		sprintf(buf, "%s *", _track->fileName());
+		sprintf(buf, "network (%d, %s*)", 
+			_track->port(), _track->fileName());
 	    } else {
-		sprintf(buf, "%s", _track->fileName());
+		sprintf(buf, "network (%d, %s)",
+			_track->port(), _track->fileName());
 	    }
-	}
-    } else if (_track->baud() > 0) {
-	if (_track->live()) {
-	    sprintf(buf, "serial (%s, %d)", _track->device(), _track->port());
-	} else if (!_track->hasFile()) {
-	    sprintf(buf, "serial (detached)");
 	} else {
-	    if (_track->modified()) {
-		sprintf(buf, "%s *", _track->fileName());
-	    } else {
-		sprintf(buf, "%s", _track->fileName());
-	    }
+	    sprintf(buf, "network (%d)", _track->port());
 	}
-    } else {
+    } else if (_track->isSerial()) {
+	if (_track->hasFile()) {
+	    if (_track->modified()) {
+		sprintf(buf, "serial (%s, %d, %s*)", 
+			_track->device(), _track->baud(), _track->fileName());
+	    } else {
+		sprintf(buf, "serial (%s, %d, %s)",
+			_track->device(), _track->baud(), _track->fileName());
+	    }
+	} else {
+	    sprintf(buf, "serial (%s, %d)", _track->device(), _track->baud());
+	}
+    } else if (_track->hasFile()) {
 	if (_track->modified()) {
-	    sprintf(buf, "%s *", _track->fileName());
+	    sprintf(buf, "%s*", _track->fileName());
 	} else {
 	    sprintf(buf, "%s", _track->fileName());
 	}
+    } else {
+	sprintf(buf, "detached, no file");
     }
 
     return buf;

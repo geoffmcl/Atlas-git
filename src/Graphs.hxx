@@ -59,6 +59,8 @@ public:
     FlightTrack *flightTrack();
     void setFlightTrack(FlightTrack *t);
 
+    const char *name();
+
     unsigned int smoothing();
     void setSmoothing(unsigned int s);
 protected:
@@ -90,8 +92,6 @@ protected:
     void _loadData();
     void _loadClimbRate();
     void _addPoint(float p, Values &v);
-
-    const char *_generateName();
 };
 
 #endif        // __GRAPH_H__
