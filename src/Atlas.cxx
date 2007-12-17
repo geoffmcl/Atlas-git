@@ -100,8 +100,13 @@ Graphs *graphs;
 
 char lat_str[80], lon_str[80], alt_str[80], hdg_str[80], spd_str[80];
 
-// File save dialog.
-puaFileSelector *saveDialog = NULL;
+// File dialog.
+puaFileSelector *fileDialog = NULL;
+
+// By default, when we show a flight track, we display the information
+// window and graphs window.  If this is false (this can be toggled by
+// the user), then we don't show them.
+bool showGraphWindow = true;
 
 SGPath lowrespath;
 int lowres_avlble;
@@ -355,6 +360,61 @@ void smoother_cb(puObject *dial)
     // Update the interface.
     glutSetWindow(main_window);
     glutPostRedisplay();
+}
+
+void redrawGraphs();
+
+// Sets the current flight track to the given flight track (which is
+// an index in the tracks vector.  It also deals with propagating the
+// change to the graphs object, and the graphs window.  It trackNo is
+// out of range, then it sets things to no flight track at all.
+void setFlightTrack(int trackNo)
+{
+    if ((trackNo < 0) || (trackNo >= tracks.size())) {
+	currentFlightTrack = -1;
+	track = NULL;
+    } else {
+	currentFlightTrack = trackNo;
+	track = tracks[currentFlightTrack];
+    }
+
+    graphs->setFlightTrack(track);
+    map_object->setFlightTrack(track);
+
+    if (!track) {
+	// No tracks, so hide everything.
+	glutSetWindow(graphs_window);
+	glutHideWindow();
+
+	glutSetWindow(main_window);
+	info_interface->hide();
+
+	glutPostRedisplay();
+    } else {
+	glutSetWindow(graphs_window);
+	if (showGraphWindow) {
+	    glutShowWindow();
+	}
+	// EYE - Sometimes I have to force the call to redrawGraphs(),
+	// even though a glutPostRedisplay() should be enough.
+	// There's something funny going on here (or somewhere else).
+	// The case where it's necessary is: start Atlas clean (no
+	// tracks), then load in a track.  Without redrawGraphs(), the
+	// graphs window will pop up empty.  If I then move the graphs
+	// window around, the graphs will be drawn (but the title,
+	// curiously, will not).  If I click in the Atlas window, the
+	// title will then appear.
+	redrawGraphs();
+// 	glutPostRedisplay();	// This should be enough.
+
+	glutSetWindow(main_window);
+	if (showGraphWindow) {
+	    info_interface->reveal();
+	}
+	centerMapOnAircraft();
+	smoother_cb(smoother);
+	glutPostRedisplay();
+    }
 }
 
 /******************************************************************************
@@ -715,7 +775,6 @@ void projection_cb (puObject *cb) {
       
 // EYE - this counts on the Graphs type values being same as the
 // corresponding entries in the button box.
-void redrawGraphs();
 void graph_type_cb (puObject *cb) 
 {
     glutSetWindow(graphs_window);
@@ -733,12 +792,15 @@ void graph_type_cb (puObject *cb)
 }
 
 // Called when the user presses OK or Cancel on the save file dialog.
-void file_cb(puObject *cb)
+void save_file_cb(puObject *cb)
 {
     // If the user hit "Ok", then the string value of the save dialog
     // will be non-empty.
-    char *file = saveDialog->getStringValue();
+    char *file = fileDialog->getStringValue();
     if (strcmp(file, "") != 0) {
+	// EYE - we should warn the user if they're overwriting an
+	// existing file.
+
 	// Note: it's important that we don't let 'track' change while
 	// the save dialog is active.
 	track->setFilePath(file);
@@ -750,12 +812,40 @@ void file_cb(puObject *cb)
 	glutPostRedisplay();
     }
 
-    saveDialog->hide();
-    puDeleteObject(saveDialog);
-    saveDialog = NULL;
+    // Unfortunately, being a subclass of puDialogBox, a hidden
+    // puaFileSelector will continue to grab all mouse events.  So, it
+    // must be deleted, not hidden when we're finished.  This is
+    // unfortunate because we can't "start up from where we left off"
+    // - each time it's created, it's created anew.
+    puDeleteObject(fileDialog);
+    fileDialog = NULL;
+}
 
-    glutSetWindow(main_window);
-    glutPostRedisplay();
+// Called when the user presses OK or Cancel on the load file dialog.
+void load_file_cb(puObject *cb)
+{
+    // If the user hit "Ok", then the string value of the save dialog
+    // will be non-empty.
+    char *file = fileDialog->getStringValue();
+    if (strcmp(file, "") != 0) {
+	FlightTrack *aTrack;
+	try {
+	    // EYE - if we've already opened this file before, we
+	    // shouldn't open it again, should we?
+	    aTrack = new FlightTrack(file);
+	    // Set the mark aircraft to the beginning of the track.
+	    aTrack->setMark(0);
+	    // Add track to end of tracks vector and display it.
+	    tracks.push_back(aTrack);
+	    setFlightTrack(tracks.size() - 1);
+	} catch (runtime_error e) {
+	    // EYE - beep? dialog box? console message?
+	    printf("Failed to read flight file '%s'\n", file);
+	}
+    }
+
+    puDeleteObject(fileDialog);
+    fileDialog = NULL;
 }
 
 /*****************************************************************************
@@ -889,38 +979,34 @@ void init_gui(bool textureFonts) {
   //
   // This gives information about the current aircraft position, and
   // is also used to manage aircraft flight tracks.
-  if (tracks.size() > 0) {
-      info_interface = new puPopup(260, 20);
-      info_frame = new puFrame(0, 0, 470, 90);
-      txt_info_spd = new puText(5, 0);
-      txt_info_hdg = new puText(5, 15);
-      txt_info_alt = new puText(5, 30);
-      txt_info_lon = new puText(5, 45);
-      txt_info_lat = new puText(5, 60);
+  info_interface = new puPopup(260, 20);
+  info_frame = new puFrame(0, 0, 500, 90);
+  txt_info_spd = new puText(5, 0);
+  txt_info_hdg = new puText(5, 15);
+  txt_info_alt = new puText(5, 30);
+  txt_info_lon = new puText(5, 45);
+  txt_info_lat = new puText(5, 60);
 
-      // EYE - Perhaps we should get these from Graphs.hxx (if not the
-      // actual text, at least the number).
-      button_box_labels[0] = "Altitude";
-      button_box_labels[1] = "Speed";
-      button_box_labels[2] = "Rate of Climb";
-      button_box_info = 
-	  new puButtonBox(180, 0, 355, 90, (char **)button_box_labels, FALSE);
-      button_box_info->setCallback(graph_type_cb);
-      smoother = new puSlider(360, 10, 100);
-      smoother->setLabelPlace(PUPLACE_TOP_CENTERED);
-      // EYE - fix this font stuff.
-      font = new puFont(texfont, 12.0f);
-      smoother->setLegendFont(*font);
-      smoother->setLabelFont(*font);
-      smoother->setLabel("Smoothing (s)");
-      smoother->setMinValue(0.0);	// 0.0 = no smoothing
-      smoother->setMaxValue(60.0);	// 60.0 = smooth over a 60s interval
-      smoother->setStepSize(1.0);
-      smoother->setCallback(smoother_cb);
+  // EYE - Perhaps we should get these from Graphs.hxx (if not the
+  // actual text, at least the number).
+  button_box_labels[0] = "Altitude";
+  button_box_labels[1] = "Speed";
+  button_box_labels[2] = "Rate of Climb";
+  button_box_info = 
+      new puButtonBox(180, 0, 355, 90, (char **)button_box_labels, FALSE);
+  button_box_info->setCallback(graph_type_cb);
 
-      info_interface->close();
-      info_interface->reveal();
-  }
+  smoother = new puSlider(360, 10, 130);
+  smoother->setLabelPlace(PUPLACE_TOP_CENTERED);
+  smoother->setLegendFont(*font);
+  smoother->setLabelFont(*font);
+  smoother->setLabel("Smoothing (s)");
+  smoother->setMinValue(0.0);	// 0.0 = no smoothing
+  smoother->setMaxValue(60.0);	// 60.0 = smooth over a 60s interval
+  smoother->setStepSize(1.0);
+  smoother->setCallback(smoother_cb);
+
+  info_interface->close();
 
   //////////////////////////////////////////////////////////////////////
   //
@@ -1001,6 +1087,13 @@ void reshapeMap( int _width, int _height ) {
 void redrawMap() {
   char buf[256];
   
+  if (track) {
+      sprintf(buf, "Atlas - %s", graphs->name());
+      glutSetWindowTitle(buf);
+  } else {
+      glutSetWindowTitle("Atlas");
+  }
+
   glClearColor( 0.643f, 0.714f, 0.722f, 0.0f );
   glClear( GL_COLOR_BUFFER_BIT );
 
@@ -1080,8 +1173,10 @@ void redrawMap() {
 
 // Display function for the graphs window.
 void redrawGraphs() {
-    graphs->draw();
-    glutSwapBuffers();
+    if (track) {
+	graphs->draw();
+	glutSwapBuffers();
+    }
 }
 
 // Called when the graphs window is resized.
@@ -1101,12 +1196,14 @@ void motionGraphs(int x, int y)
     if (!track->live()) {
 	graphs->setMark(x);
 
+	glutSetWindow(main_window);
 	if (prefs.autocenter_mode) {
 	    centerMapOnAircraft();
 	}
-
 	glutPostRedisplay();
-	glutPostWindowRedisplay(main_window);
+
+	glutSetWindow(graphs_window);
+	glutPostRedisplay();
     }
 }
 
@@ -1125,14 +1222,11 @@ void keyboardGraphs(unsigned char key, int x, int y)
 {
     // EYE - keyPressed does a call to puKeyboard.  Is this okay
     // (especially if we do the same in the future)?
+    glutSetWindow(main_window);
     keyPressed(key, x, y);
-    glutPostRedisplay();
-    glutPostWindowRedisplay(main_window);
+    glutSetWindow(graphs_window);
 }
 
-// EYE - we assume that the current window is the graphs window when
-// this and the other event functions are called.  Is this assumption
-// correct?
 // Called when the user presses a "special" key in the graphs window,
 // where "special" includes directional keys.
 void specialGraphs(int key, int x, int y) 
@@ -1143,15 +1237,26 @@ void specialGraphs(int key, int x, int y)
 	return;
     }
 
+    int offset = 1;
+    if (glutGetModifiers() & GLUT_ACTIVE_SHIFT) {
+	// If the user presses the shift key, right and left arrow
+	// clicks move 10 times as far.
+	offset *= 10;
+    }
+
     switch (key + PU_KEY_GLUT_SPECIAL_OFFSET) {
     case PU_KEY_LEFT:
-	if (track->mark() > 0) {
-	    track->setMark(track->mark() - 1);
+	if (track->mark() >= offset) {
+	    track->setMark(track->mark() - offset);
+	} else {
+	    track->setMark(0);
 	}
 	break;
     case PU_KEY_RIGHT:
-	if (track->mark() < (track->size() - 1)) {
-	    track->setMark(track->mark() + 1);
+	if (track->mark() < (track->size() - offset)) {
+	    track->setMark(track->mark() + offset);
+	} else {
+	    track->setMark(track->size() - 1);
 	}
 	break;
     case PU_KEY_HOME:
@@ -1164,13 +1269,14 @@ void specialGraphs(int key, int x, int y)
 	return;
     }
 
+    glutSetWindow(main_window);
     if (prefs.autocenter_mode) {
 	centerMapOnAircraft();
     }
-
-    // EYE - is there a better way?
     glutPostRedisplay();
-    glutPostWindowRedisplay(main_window);
+
+    glutSetWindow(graphs_window);
+    glutPostRedisplay();
 }
 
 // Called periodically to check for input on network and serial ports.
@@ -1321,30 +1427,31 @@ void tileManagerTimer(int value) {
 // }
 
 void mouseClick( int button, int state, int x, int y ) {
-  if ( !puMouse( button, state, x, y ) ) {
-    // PUI didn't consume this event
-    if (button == GLUT_LEFT_BUTTON) {
-      switch (state) {
-      case GLUT_DOWN:
-	dragmode = true;
-	drag_x = x;
-	drag_y = y;
-	copy_lat = latitude;
-	copy_lon = longitude;
+    if ( !puMouse( button, state, x, y ) ) {
+	// PUI didn't consume this event
+	if (button == GLUT_LEFT_BUTTON) {
+	    switch (state) {
+	    case GLUT_DOWN:
+		dragmode = true;
+		drag_x = x;
+		drag_y = y;
+		copy_lat = latitude;
+		copy_lon = longitude;
 
-	// EYE - huh?
-	// If we don't do this and some widget is currently active,
-	// subsequent mouse moves will be swallowed by PUI.
-// 	puSetActiveWidget(NULL, 0, 0);
-	break;
-      default:
-	dragmode = false;
+		// EYE - huh?
+		// If we don't do this and some widget is currently active,
+		// subsequent mouse moves will be swallowed by PUI.
+		// 	puSetActiveWidget(NULL, 0, 0);
+		break;
+	    default:
+		dragmode = false;
+	    }
+	} else {
+	    dragmode = false;
+	}
+    } else {
+	glutPostRedisplay();
     }
-    } else
-      dragmode = false;
-  } else {
-    glutPostRedisplay();
-  }
 }
 
 
@@ -1367,7 +1474,11 @@ void mouseMotion( int x, int y ) {
 
 	glutPostRedisplay();
     } else {
-	puMouse(x, y);
+	// EYE - which policy is correct?
+// 	puMouse(x, y);
+	if (puMouse(x, y)) {
+	    puDisplay();
+	}
     }
 
     // EYE - This call meant the map was redrawn even when the user
@@ -1377,154 +1488,209 @@ void mouseMotion( int x, int y ) {
 }
 
 void keyPressed( unsigned char key, int x, int y ) {
-  if (!puKeyboard(key, PU_DOWN)) {
-    switch (key) {
-    case '+':
-      zoom_cb(zoomin);
-      break;
-    case '-':
-      zoom_cb(zoomout);
-      break;
-    case 'D':
-    case 'd':
-      // Hide/show the info interface and the graphs window.
-      if (tracks.size() > 0) {
-	if (!info_interface->isVisible()) {
-	  info_interface->reveal();
-	  glutSetWindow(graphs_window);
-	  glutShowWindow();
-	  glutSetWindow(main_window);
-	} else {
-	  info_interface->hide();
-	  glutSetWindow(graphs_window);
-	  glutHideWindow();
-	  glutSetWindow(main_window);
-	}
-	glutPostRedisplay();
-      }
-      break;
-    case 'A':
-    case 'a':
-      show_arp->setValue(!show_arp->getValue());
-      show_cb(show_arp);
-      break;
-    case 'C':
-      // Toggle auto-centering.
-      prefs.autocenter_mode = !prefs.autocenter_mode;
-      if (prefs.autocenter_mode) {
-	  centerMapOnAircraft();
-      }
-      break;
-    case 'c':
-      centerMapOnAircraft();
-      break;
-    case 'F':
-    case 'f':
-	// Select the next ('f') or previous ('F') flight track.
+    if (!puKeyboard(key, PU_DOWN)) {
+	switch (key) {
+	case '+':
+	    zoom_cb(zoomin);
+	    break;
+	case '-':
+	    zoom_cb(zoomout);
+	    break;
+	case 'A':
+	case 'a':
+	    show_arp->setValue(!show_arp->getValue());
+	    show_cb(show_arp);
+	    break;
+	case 'C':
+	    // Toggle auto-centering.
+	    prefs.autocenter_mode = !prefs.autocenter_mode;
+	    if (prefs.autocenter_mode) {
+		centerMapOnAircraft();
+	    }
+	    break;
+	case 'c':
+	    centerMapOnAircraft();
+	    break;
+	case 'D':
+	case 'd':
+	    // Hide/show the info interface and the graphs window.
+	    if (tracks.size() > 0) {
+		if (!info_interface->isVisible()) {
+		    glutSetWindow(graphs_window);
+		    glutShowWindow();
 
-	// If there's a save track dialog present, then don't do anything.
-	// EYE - beep?
-	if (saveDialog) {
-	    return;
-	}
-	if (key == 'f') {
-	    currentFlightTrack = (currentFlightTrack + 1) % tracks.size();
-	} else {
-	    currentFlightTrack = 
-		(currentFlightTrack + tracks.size() - 1) % tracks.size();
-	}
-	track = tracks[currentFlightTrack];
+		    glutSetWindow(main_window);
+		    info_interface->reveal();
 
-	// Update the graphs window.
-	glutSetWindow(graphs_window);
-	graphs->setFlightTrack(track);
-	glutPostRedisplay();
+		    showGraphWindow = true;
+		} else {
+		    glutSetWindow(graphs_window);
+		    glutHideWindow();
 
-	// Update the main window.
-	glutSetWindow(main_window);
-	map_object->setFlightTrack(track);
-	centerMapOnAircraft();
+		    glutSetWindow(main_window);
+		    info_interface->hide();
 
-	break;
-    case 'J':
-    case 'j':
-      // Toggle the search interface.
-      if (search_interface->isVisible()) {
-	  search_interface->hide();
-      } else {
-	  search_interface->reveal();
-      }
-      glutPostRedisplay();
-      break;
-    case 'L':
-      // Show the next downloading tile.
-      nextTile();
-      break;
-    case 'l':
-      // Schedule or deschedule the 1x1 tile at our current lat/lon
-      // for updating.
-      toggleTile(latitude * SG_RADIANS_TO_DEGREES,
-		 longitude * SG_RADIANS_TO_DEGREES);
-      break;
-    case 'N':
-    case 'n':
-      show_nav->setValue(!show_nav->getValue());
-      show_cb(show_nav);
-      break;    
-    case 'S':
-    case 's':
-	// We should warn the user if Atlas quits with unsaved tracks.
-	// However, I don't think GLUT gives us a way to catch program
-	// exits.  Let the user beware!
-	if (track->hasFile()) {
-	    track->save();
-	} else if (saveDialog == NULL) {
-	    // Only start a new dialog if one isn't running already.
-	    glutSetWindow(main_window);
-	    saveDialog = new puaFileSelector(250, 150, 500, 400, "");
-	    saveDialog->setCallback(file_cb);
-	    saveDialog->setUserData((void *)track);
-	    // EYE - how do I set the font of the file dialog?
-// 	    saveDialog->setLegendFont(PUFONT_HELVETICA_10);
-// 	    saveDialog->setLabelFont(PUFONT_HELVETICA_10);
-// 	    puFont *f = new puFont(PUFONT_HELVETICA_10);
-// 	    saveDialog->setLegendFont(*f);
+		    showGraphWindow = false;
+		}
+		glutPostRedisplay();
+	    }
+	    break;
+	case 'F':
+	case 'f':
+	    // Select the next ('f') or previous ('F') flight track.
+
+	    // If there's an active track dialog, then don't do anything.
+	    // EYE - beep?
+	    if (fileDialog != NULL) {
+		return;
+	    }
+
+	    // If there are no tracks, don't do anything.
+	    if (tracks.size() == 0) {
+		return;
+	    }
+
+	    if (key == 'f') {
+		setFlightTrack((currentFlightTrack + 1) % tracks.size());
+	    } else {
+		setFlightTrack((currentFlightTrack + tracks.size() - 1) 
+			       % tracks.size());
+	    }
+	    break;
+	case 'J':
+	case 'j':
+	    // Toggle the search interface.
+	    if (search_interface->isVisible()) {
+		search_interface->hide();
+	    } else {
+		search_interface->reveal();
+	    }
+	    glutPostRedisplay();
+	    break;
+	case 'L':
+	    // Show the next downloading tile.
+	    nextTile();
+	    break;
+	case 'l':
+	    // Schedule or deschedule the 1x1 tile at our current lat/lon
+	    // for updating.
+	    toggleTile(latitude * SG_RADIANS_TO_DEGREES,
+		       longitude * SG_RADIANS_TO_DEGREES);
+	    break;
+	case 'N':
+	case 'n':
+	    show_nav->setValue(!show_nav->getValue());
+	    show_cb(show_nav);
+	    break;    
+	case 'O':
+	case 'o':
+	    // Open a flight file (unless the file dialog is already
+	    // active doing something else).
+	    if (fileDialog == NULL) {
+		fileDialog = new puaFileSelector(250, 150, 500, 400, "",
+						 "Open Flight Track");
+		fileDialog->setCallback(load_file_cb);
+		glutPostRedisplay();
+	    }
+	    break;
+	case 'S':
+	case 's':
+	    // We should warn the user if Atlas quits with unsaved tracks.
+	    // However, I don't think GLUT gives us a way to catch program
+	    // exits.  Let the user beware!
+	    // EYE - maybe we should add a 'q' command which will
+	    // check for unsaved tracks.
+	    if (!track) {
+		break;
+	    }
+	    if (track->hasFile()) {
+		track->save();
+		glutPostWindowRedisplay(graphs_window);
+	    } else if (fileDialog == NULL) {
+		fileDialog = 
+		    new puaFileSelector(250, 150, 500, 400, "",
+					"Save Flight Track");
+		fileDialog->setCallback(save_file_cb);
+		glutPostRedisplay();
+	    }
+	    break;
+	case 'T':
+	case 't':
+	    map_object->setTextured( !map_object->getTextured() );
+	    glutPostRedisplay();
+	    break;
+	case 'W':
+	case 'w':
+	    // EYE - we should warn the user if the track is unsaved.
+	    // Close the current track.
+	    if (track) {
+		tracks.erase(tracks.begin() + currentFlightTrack);
+		delete track;
+
+		// If we still have some tracks, make the next track the
+		// current track.
+		if (tracks.size() > 0) {
+		    setFlightTrack(currentFlightTrack % tracks.size());
+		} else {
+		    setFlightTrack(-1);
+		}
+	    }
+	    break;
+	case 'U':
+	case 'u':
+	    // 'u'nattach (ie, detach)
+	    if (track->live()) {
+		// If we detach a track, we replace it by a new track
+		// listening to the same I/O channel.
+		if (track->isNetwork()) {
+		    int port = track->port();
+		    unsigned int maxSize = track->maxBufferSize();
+
+		    // Detach the old track.
+		    track->detach();
+		    track->setMark(0);
+
+		    // Create a replacement.
+		    FlightTrack* newTrack = new FlightTrack(port, maxSize);
+		    tracks.push_back(newTrack);
+		} else if (track->isSerial()) {
+		    const char *device = track->device();
+		    int baud = track->baud();
+		    unsigned int maxSize = track->maxBufferSize();
+
+		    // Detach the old track.
+		    track->detach();
+		    track->setMark(0);
+
+		    // Create a replacement.
+		    FlightTrack* newTrack = new FlightTrack(device, baud, maxSize);
+		    tracks.push_back(newTrack);
+		} else {
+		    assert(false);
+		}
+
+		glutPostWindowRedisplay(graphs_window);
+	    }
+	    break;
+	case 'V':
+	case 'v':
+	    show_name->setValue(!show_name->getValue());
+	    show_cb(show_name);
+	    break;
+	case ' ':
+	    if (!main_interface->isVisible()) {
+		main_interface->reveal();
+		minimized->hide();
+	    } else {
+		main_interface->hide();
+		minimized->hide();
+	    }
 	    glutPostRedisplay();
 	}
-	break;
-    case 'T':
-    case 't':
-      map_object->setTextured( !map_object->getTextured() );
-      glutPostRedisplay();
-      break;
-    case 'U':
-    case 'u':
-	// 'u'nattach (ie, detach)
-	if (track->live()) {
-	    track->detach();
-	    track->setMark(0);
-	    glutSetWindow(graphs_window);
-	    glutPostRedisplay();
-	}
-	break;
-    case 'V':
-    case 'v':
-      show_name->setValue(!show_name->getValue());
-      show_cb(show_name);
-      break;
-    case ' ':
-      if (!main_interface->isVisible()) {
-	main_interface->reveal();
-	minimized->hide();
-      } else {
-	main_interface->hide();
-	minimized->hide();
-      }
-      glutPostRedisplay();
+    } else {
+	// EYE - really?
+	glutPostRedisplay();
     }
-  } else {
-    glutPostRedisplay();
-  }
 }
 
 void specPressed(int key, int x, int y) {
@@ -1571,6 +1737,11 @@ int main(int argc, char **argv) {
 
   glutReshapeFunc( reshapeMap );
   glutDisplayFunc( redrawMap );
+  glutMotionFunc ( mouseMotion );
+  glutPassiveMotionFunc( mouseMotion );
+  glutMouseFunc  ( mouseClick  );
+  glutKeyboardFunc( keyPressed  );
+  glutSpecialFunc( specPressed );
 
   mapsize = (float)( (prefs.width>prefs.height)?prefs.width:prefs.height );
   map_object = new MapBrowser( 0.0f, 0.0f, mapsize, 
@@ -1620,32 +1791,12 @@ int main(int argc, char **argv) {
 			  prefs.max_track);
       tracks.push_back(f);
   }
-  if (tracks.size() == 0) {
-      currentFlightTrack = -1;
-      track = NULL;
-  } else {
-      currentFlightTrack = 0;
-      track = tracks[currentFlightTrack];
-      FlightData *pos = track->getCurrentPoint();
-      if (pos) {
-	  // EYE - what if user specified latitude/longitude on command line?
-	  latitude = pos->lat;
-	  longitude = pos->lon;
-      }
-  }
-  map_object->setFlightTrack(track);
 
   // Check network connections and serial connections periodically (as
   // specified by the "update" user preference).
   if ((prefs.networkConnections.size() + prefs.serialConnections.size()) > 0) {
       glutTimerFunc((int)(prefs.update * 1000.0f), timer, 0);
   }
-
-  glutMotionFunc       ( mouseMotion );
-  glutPassiveMotionFunc( mouseMotion );
-  glutMouseFunc        ( mouseClick  );
-  glutKeyboardFunc     ( keyPressed  );
-  glutSpecialFunc      ( specPressed );
 
   printf("Please wait while loading databases ... "); fflush(stdout);
   map_object->loadDb();
@@ -1660,8 +1811,6 @@ int main(int argc, char **argv) {
       printf("Unable to find airport %s.\n", prefs.icao);
     }
   }
-  
-  map_object->setLocation( latitude, longitude );
   
   init_gui(prefs.textureFonts);
 
@@ -1680,52 +1829,55 @@ int main(int argc, char **argv) {
 //   map_object->setFlightTrack(ai_track);
 //   glutTimerFunc(1000, otherAircraftTimer, 0);
 
-  // EYE - if we allow users to load files from the command line, we
-  // need to always create the second window.
+  // Create the graphs window, placed below the main.  First, get the
+  // position of the first window.  We must do this now, because the
+  // glutGet call works on the current window.
+  int x, y, h;
+  x = glutGet(GLUT_WINDOW_X);
+  y = glutGet(GLUT_WINDOW_Y);
+  h = glutGet(GLUT_WINDOW_HEIGHT);
 
-  // Create a second window, placed below the first.
+  graphs_window = glutCreateWindow("-- graphs --");
+  glutDisplayFunc(redrawGraphs);
+  glutReshapeFunc(reshapeGraphs);
+  glutMotionFunc(motionGraphs);
+  glutMouseFunc(mouseGraphs);
+  glutKeyboardFunc(keyboardGraphs);
+  glutSpecialFunc(specialGraphs);
+
+  // EYE - add keyboard function: space (play in real time, pause)
+
+  glutReshapeWindow(800, 200);
+  // EYE - this kind of works, but neglects the border OS X adds
+  // around the window (and perhaps other effects too), so there
+  // is some overlap.
+  glutPositionWindow(x, y + h);
+
+  graphs = new Graphs(graphs_window);
+  graphs->setAircraftColor(map_object->getOverlays()->aircraftColor());
+  graphs->setMarkColor(map_object->getOverlays()->aircraftMarkColor());
+
+  // EYE - this counts on the Graphs type values being same as the
+  // corresponding entries in the button box.  As well, is there a
+  // cleaner way to do this?  Is there a way to force the call to the
+  // callback without calling it explicitly?
+  button_box_info->setValue(Graphs::ALTITUDE | 
+			    Graphs::SPEED | 
+			    Graphs::CLIMB_RATE);
+  graphs->setGraphTypes(button_box_info->getValue());
+  smoother->setValue((int)graphs->smoothing());
+      
+  // EYE - I wonder if all this setup stuff should be done in a
+  // visibility callback?  (see glutVisibilityFunc()).
+  glutSetWindow(main_window);
   if (tracks.size() > 0) {
-      // First, get the position of the first window.  We must do this
-      // now, because the glutGet call works on the current window.
-      int x, y, h;
-      x = glutGet(GLUT_WINDOW_X);
-      y = glutGet(GLUT_WINDOW_Y);
-      h = glutGet(GLUT_WINDOW_HEIGHT);
-
-      graphs_window = glutCreateWindow("-- graphs --");
-      glutDisplayFunc(redrawGraphs);
-      glutReshapeFunc(reshapeGraphs);
-      glutMotionFunc(motionGraphs);
-      glutMouseFunc(mouseGraphs);
-      glutKeyboardFunc(keyboardGraphs);
-      glutSpecialFunc(specialGraphs);
-
-      // EYE - tutorial.text flight is not handled correctly, but
-      // maybe there's no way to fix it
-
-      // EYE - add keyboard function: space (play in real time, pause)
-
-      glutReshapeWindow(800, 200);
-      // EYE - this kind of works, but neglects the border OS X adds
-      // around the window (and perhaps other effects too), so there
-      // is some overlap.
-      glutPositionWindow(x, y + h);
-
-      graphs = new Graphs(graphs_window);
-      graphs->setAircraftColor(map_object->getOverlays()->aircraftColor());
-      graphs->setMarkColor(map_object->getOverlays()->aircraftMarkColor());
-      graphs->setFlightTrack(track);
-
-      // EYE - this counts on the Graphs type values being same as the
-      // corresponding entries in the button box.  As well, is there a
-      // cleaner way to do this?  Is there a way to force the call to
-      // the callback without calling it explicitly?
-      button_box_info->setValue(Graphs::ALTITUDE | 
-				Graphs::SPEED | 
-				Graphs::CLIMB_RATE);
-      graph_type_cb(button_box_info);
-      smoother->setValue((int)graphs->smoothing());
-      smoother_cb(smoother);
+      // If we've loaded some tracks, display the first one.
+      setFlightTrack(0);
+  } else {
+      // Otherwise, display nothing and set our latitude and longitude
+      // to the default values.
+      setFlightTrack(-1);
+      map_object->setLocation(latitude, longitude);
   }
 
   glutMainLoop();
