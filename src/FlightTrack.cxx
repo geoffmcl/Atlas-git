@@ -356,10 +356,10 @@ void FlightTrack::save()
 	    free(buf);
 
 	    // $PATLA
-	    asprintf(&buf, "PATLA,%.2f,%.1f,%.2f,%.1f,%.0f",
-		     d->nav1_freq, 
+	    asprintf(&buf, "PATLA,%.2f,%.1f,%.2f,%.1f,%d",
+		     d->nav1_freq / 100.0, 
 		     d->nav1_rad * SG_RADIANS_TO_DEGREES, 
-		     d->nav2_freq, 
+		     d->nav2_freq / 100.0, 
 		     d->nav2_rad * SG_RADIANS_TO_DEGREES, 
 		     d->adf_freq);
 	    checksum = _calcChecksum(buf);
@@ -529,8 +529,8 @@ bool FlightTrack::_parse_message(char *buf, FlightData *d)
     // Set the flight data to some reasonable initial values.
     d->time = 0;
     d->lat = d->lon = d->alt = d->hdg = d->spd = 0.0;
-    d->nav1_freq = d->nav1_rad = d->nav2_freq = d->nav2_rad = 0.0;
-    d->adf_freq = 0.0;
+    d->nav1_rad = d->nav2_rad = 0.0;
+    d->nav1_freq = d->nav2_freq = d->adf_freq = 0;
 
     // The buffer should consist of 3 lines, so first divide it by
     // newlines.
@@ -615,12 +615,17 @@ bool FlightTrack::_parse_message(char *buf, FlightData *d)
 	    }
 	} else if ((strcmp(tokens[0], "$PATLA") == 0) && (tokenCount == 6)) {
 	    // NAV1, NAV2 and ADF
-	    sscanf(tokens[1], "%f", &d->nav1_freq);
+	    float nav1_freq, nav2_freq;
+	    sscanf(tokens[1], "%f", &nav1_freq);
 	    sscanf(tokens[2], "%f", &d->nav1_rad);
-	    sscanf(tokens[3], "%f", &d->nav2_freq);
+	    sscanf(tokens[3], "%f", &nav2_freq);
 	    sscanf(tokens[4], "%f", &d->nav2_rad);
-	    sscanf(tokens[5], "%f", &d->adf_freq);
+	    sscanf(tokens[5], "%d", &d->adf_freq);
+	    // VOR frequencies are transmitted in the PATLA line as
+	    // floats (eg, 112.30), but we store them as ints (11230).
+	    d->nav1_freq = (int)(nav1_freq * 100);
 	    d->nav1_rad *= SG_DEGREES_TO_RADIANS;
+	    d->nav2_freq = (int)(nav2_freq * 100);
 	    d->nav2_rad *= SG_DEGREES_TO_RADIANS;
 	} else if ((strcmp(tokens[0], "$GPGSA") == 0) && (tokenCount == 18)) {
 	    // This is sent in an nmea protocal message.  It contains

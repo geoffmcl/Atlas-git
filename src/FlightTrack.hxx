@@ -34,9 +34,11 @@ struct FlightData {
     time_t time;		// Time of record (in integral seconds)
     double lat, lon;
     float alt, hdg, spd;
-    float nav1_freq, nav1_rad;
-    float nav2_freq, nav2_rad;
-    float adf_freq;
+    float nav1_rad, nav2_rad;
+    // Frequencies are stored as integers, following Robin Peel's
+    // navigation database.  This means, for example, that a VOR
+    // frequency of 110.90 is stored as the integer 11090.
+    int nav1_freq, nav2_freq, adf_freq;
     float est_t_offset;		// Estimated time offset from first
 				// point in flight track.  This is a
 				// derived value.
