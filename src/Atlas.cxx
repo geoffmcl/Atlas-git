@@ -123,9 +123,6 @@ TileManager *tileManager;
 // represents the first tile.
 unsigned int nthTile = 0;
 
-// SGIOChannel *ai_aircraft;
-// FlightTrack *ai_track = NULL;
-
 /*****************************************************************************/
 /* Convert degrees to dd mm'ss.s" (DMS-Format)                               */
 /*****************************************************************************/
@@ -311,26 +308,29 @@ char *matchAtIndex(Search *s, int i)
 	    switch (n->navtype) {
 	    case Overlays::NAV_VOR:
 		asprintf(&result, "VOR: %s %s (%.2f)", 
-			 n->id, cleanString(n->name), n->freq);
+			 n->id, cleanString(n->name), n->freq / 100.0);
 		break;
 	    case Overlays::NAV_DME:
 		asprintf(&result, "DME: %s %s (%.2f)", 
-			 n->id, cleanString(n->name), n->freq);
+			 n->id, cleanString(n->name), n->freq / 100.0);
 		break;
 	    case Overlays::NAV_NDB:
-		asprintf(&result, "NDB: %s %s (%.0f)", 
+		asprintf(&result, "NDB: %s %s (%d)", 
 			 n->id, cleanString(n->name), n->freq);
 		break;
 	    case Overlays::NAV_ILS:
 		asprintf(&result, "ILS: %s %s (%.2f)", 
-			 n->id, cleanString(n->name), n->freq);
+			 n->id, cleanString(n->name), n->freq / 100.0);
 		break;
 	    case Overlays::NAV_FIX:
 		// Fixes have no separate id and name (they are identical).
 		asprintf(&result, "FIX: %s", n->id);
 		break;
 	    default:
-		assert(true);
+		fprintf(stderr,
+			"Token points to unknown record type: %d (%s)\n", 
+			t.t, cleanString(n->name));
+		assert(false);
 		break;
 	    }
 	}
@@ -808,8 +808,7 @@ void save_file_cb(puObject *cb)
 
 	// Force the graphs window to update itself (in particular,
 	// its title).
-	glutSetWindow(graphs_window);
-	glutPostRedisplay();
+	glutPostWindowRedisplay(graphs_window);
     }
 
     // Unfortunately, being a subclass of puDialogBox, a hidden
@@ -1144,7 +1143,7 @@ void redrawMap() {
       if (p) {
 	  sprintf(hdg_str, "HDG: %.0f*", p->hdg < 0.0 ? p->hdg + 360.0 : p->hdg);    
 	  sprintf(alt_str, "ALT: %.0f ft MSL", p->alt);
-	  sprintf(spd_str, "SPD: %.0f KIAS", p->spd);
+	  sprintf(spd_str, "SPD: %.0f kt GS", p->spd);
 	  sprintf(lat_str, "%c%s", 
 		  (p->lat < 0) ? 'S':'N',
 		  dmshh_format(p->lat * SG_RADIANS_TO_DEGREES, buf));
@@ -1299,6 +1298,8 @@ void timer(int value) {
 		centerMapOnAircraft();
 	    }
 
+	    // EYE - be consistent! i == currentFlightTrack or
+	    // tracks[i] == track?
 	    // And update our graphs if we're displaying this track.
 	    if (i == currentFlightTrack) {
 		glutSetWindow(graphs_window);
@@ -1398,33 +1399,6 @@ void tileManagerTimer(int value) {
     // Check again in 60 seconds.
     glutTimerFunc(1000 * 60, tileManagerTimer, value);
 }
-
-// Get information about "other" aircraft.
-// void otherAircraftTimer(int value) {
-//     char buf[256];
-//     printf("otherAircraftTimer: %d\n", value);
-
-//     int length = 0;
-//     while ((length = ai_aircraft->readline(buf, 256)) > 0) {
-// 	float lat, lon, alt, hdg, spd;
-// 	FlightData *d = new FlightData;
-
-// 	sscanf(buf, "%f,%f,%f,%f,%f", &lat, &lon, &alt, &hdg, &spd);
-// 	printf("ai aircraft: %.1f, %.1f, %.1f, %.1f, %.1f\n",
-// 	       lat, lon, alt, hdg, spd);
-
-// 	d->lat = lat * SG_DEGREES_TO_RADIANS;
-// 	d->lon = lon * SG_DEGREES_TO_RADIANS;
-// 	d->alt = alt;
-// 	d->hdg = hdg;
-// 	d->spd = spd;
-// 	ai_track->addPoint(d);
-// // 	map_object->setLocation(lat, lon);
-// 	glutPostRedisplay();
-//     }
-
-//     glutTimerFunc(1000, otherAircraftTimer, 0);
-// }
 
 void mouseClick( int button, int state, int x, int y ) {
     if ( !puMouse( button, state, x, y ) ) {
@@ -1669,6 +1643,7 @@ void keyPressed( unsigned char key, int x, int y ) {
 		    assert(false);
 		}
 
+		glutPostWindowRedisplay(main_window);
 		glutPostWindowRedisplay(graphs_window);
 	    }
 	    break;
@@ -1821,13 +1796,6 @@ int main(int argc, char **argv) {
   tileManager = new TileManager(prefs);
   glutTimerFunc(0, tileManagerTimer, 0);
   printf("done.\n");
-
-  // Listen for any AI aircraft, updating once per second.
-//   ai_aircraft = new SGSocket("", "5400", "udp");
-//   ai_aircraft->open(SG_IO_IN);
-//   ai_track = new FlightTrack(100);
-//   map_object->setFlightTrack(ai_track);
-//   glutTimerFunc(1000, otherAircraftTimer, 0);
 
   // Create the graphs window, placed below the main.  First, get the
   // position of the first window.  We must do this now, because the
