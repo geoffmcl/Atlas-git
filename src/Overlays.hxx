@@ -147,7 +147,9 @@ public:
   struct NAV {
     char name[64], id[6];
     NavType navtype;
-    float lat, lon, freq, magvar;
+    float lat, lon;
+    int freq;
+    float magvar;
     int range;
   };
 
@@ -168,7 +170,7 @@ public:
   // Find an airport by ICAO code
   ARP* findAirportByCode( const char* id );
   NAV* findNav    ( const char* name );
-  NAV* findNav    ( float lat, float lon, float freq );
+  NAV* findNav    ( float lat, float lon, int freq );
 
   bool recordMatches(int i, vector<string> completeSearchTokens, 
 		     string partialSearchToken);

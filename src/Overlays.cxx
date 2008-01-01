@@ -103,7 +103,7 @@ Overlays::Overlays( const char *fg_root, float scale,
   setAirportColor( airport_color1, airport_color2 );
   setNavaidColor( navaid_color );
   setVorToColor( static_vor_to_color );
-  setVorFromColor( static_vor_to_color );
+  setVorFromColor( static_vor_from_color );
   setIlsColor( static_ils_color );
   setNdbColor( static_ndb_color );
   setGridColor( grid_color );
@@ -395,15 +395,6 @@ void Overlays::airport_labels(float theta, float alpha,
       sgSetVec2( p, ::scale(xyr[0], output->getSize(), scale), 
 		 ::scale(xyr[1], output->getSize(), scale) );
 	    
-      if (ap->name[0] != 0) {
-	output->setColor( arp_color1 );
-	p[0] += 10; p[1] -= 5;
-	if (features & OVERLAY_IDS) output->drawText( p, ap->id );
-	p[1] += 10;
-	if (features & OVERLAY_NAMES) output->drawText( p, ap->name );
-	p[0] -= 10; p[1] -= 5;
-      }
-
       sgVec2 *outlines = new sgVec2[ap->rwys.size()*4];
       sgVec2 *insides = new sgVec2[ap->rwys.size()*4];
       int oc = 0, ic = 0;
@@ -446,6 +437,15 @@ void Overlays::airport_labels(float theta, float alpha,
       
       delete[] insides;
       delete[] outlines;
+
+      if (ap->name[0] != 0) {
+	output->setColor( arp_color1 );
+	p[0] += 10; p[1] -= 5;
+	if (features & OVERLAY_IDS) output->drawText( p, ap->id );
+	p[1] += 10;
+	if (features & OVERLAY_NAMES) output->drawText( p, ap->name );
+	p[0] -= 10; p[1] -= 5;
+      }
     }
   }
 
@@ -475,7 +475,11 @@ void Overlays::draw_navaids( float theta, float alpha,
 
       switch (n->navtype) {
       case NAV_VOR:
-      case NAV_DME:
+//       case NAV_DME:
+	  // EYE - DME != VOR!
+	  // EYE - note: on approach plates (and IFR charts?  VFR
+	  // charts?), DMEs don't seem to be indicated in isolation.
+	  // With another navaid, they are indicated by a square.
 	if (features & OVERLAY_NAVAIDS_VOR) draw_vor(n, p);
 	break;
       case NAV_NDB:
@@ -498,13 +502,13 @@ void Overlays::draw_navaids( float theta, float alpha,
 void Overlays::draw_ndb( NAV *n, sgVec2 p ) {
   static const int RADIUS = 10;
   char freqbuf[20];
-  sprintf( freqbuf, "%.0f", n->freq );
+  sprintf( freqbuf, "%d", n->freq );
 
   FlightData *pos = NULL;
   if (flight_track) {
       pos = flight_track->getCurrentPoint();
   }
-  if (pos && (fabs(n->freq - pos->adf_freq) < SG_EPSILON)) {
+  if (pos && (n->freq == pos->adf_freq)) {
       sgVec3 xyr;
       sgVec2 p1;
       projection->ab_lat(pos->lat, pos->lon, lat, lon, xyr );
@@ -512,18 +516,17 @@ void Overlays::draw_ndb( NAV *n, sgVec2 p ) {
       sgSetVec2( p1, ::scale(xyr[0], output->getSize(), scale), 
 		 ::scale(xyr[1], output->getSize(), scale) );
 
-      output->setColor(static_ndb_color);
+      output->setColor(ndb_color);
       output->drawLine(p, p1);
 
-      // The ADF just shows the direction to the NDB, so it's
-      // independent of magnetic variation.
-      float absoluteBearing, relativeBearing;
+      float absoluteBearing, magneticBearing, relativeBearing;
       absoluteBearing = 
 	  atan2(p[1] - p1[1], p[0] - p1[0]) * SG_RADIANS_TO_DEGREES;
       absoluteBearing = -(absoluteBearing - 90.0);
       if (absoluteBearing < 0.0) {
 	  absoluteBearing += 360.0;
       }
+
       // Note that pos->hdg gives the aircraft's true (not magnetic)
       // heading.
       relativeBearing = absoluteBearing - pos->hdg;
@@ -534,7 +537,13 @@ void Overlays::draw_ndb( NAV *n, sgVec2 p ) {
       // Tag the aircraft with the absolute and relative bearings to
       // the NDB.  MB = Magnetic Bearing, RB = Relative Bearing.
       char *tag;
-      asprintf(&tag, "MB: %.0f\nRB: %.0f", absoluteBearing, relativeBearing);
+      magneticBearing = absoluteBearing - (n->magvar * SG_RADIANS_TO_DEGREES);
+      if (magneticBearing < 0.0) {
+	  magneticBearing += 360.0;
+      } else if (magneticBearing > 360.0) {
+	  magneticBearing -= 360.0;
+      }
+      asprintf(&tag, "MB: %.0f\nRB: %.0f", magneticBearing, relativeBearing);
       // Draw the text a little away from the aircraft.
       p1[0] += 5;
       output->drawText(p1, tag);
@@ -555,7 +564,7 @@ void Overlays::draw_ndb( NAV *n, sgVec2 p ) {
 // Draw one specified ILS
 void Overlays::draw_ils( NAV *n, sgVec2 p ) {
   char freqbuf[20];
-  sprintf( freqbuf, "%.2f", n->freq );
+  sprintf( freqbuf, "%.2f", n->freq / 100.0);
   float ilsSize = 3000.0f;
   ilsSize *= scale;  // Clip the min/max size?
   // n->magvar is true heading for ILS
@@ -589,7 +598,7 @@ void Overlays::draw_vor( NAV *n, sgVec2 p ) {
   static const int RADIUS = 15;
 
   char freqbuf[20];
-  sprintf( freqbuf, "%.2f", n->freq );
+  sprintf( freqbuf, "%.2f", n->freq / 100.0 );
 
   output->setColor( nav_color );
   output->drawCircle( p, RADIUS );
@@ -623,7 +632,7 @@ void Overlays::draw_vor( NAV *n, sgVec2 p ) {
   // EYE - draw VOR1 and VOR2 differently?
 
   // if this nav is selected, draw radial
-  if (pos && (fabs(n->freq - pos->nav1_freq) < SG_EPSILON)) {
+  if (pos && (n->freq == pos->nav1_freq)) {
       sgVec2 end;
       sgSetVec2( end,
 		 p[0] + sin(pos->nav1_rad + n->magvar) * 500,
@@ -636,7 +645,7 @@ void Overlays::draw_vor( NAV *n, sgVec2 p ) {
       output->setColor( static_vor_to_color );
       output->drawLine(p, end);
   }
-  if (pos && (fabs(n->freq - pos->nav2_freq) < SG_EPSILON)) {
+  if (pos && (n->freq == pos->nav2_freq)) {
       sgVec2 end;
       sgSetVec2( end,
 		 p[0] + sin(pos->nav2_rad + n->magvar) * 500,
@@ -1104,15 +1113,12 @@ void Overlays::load_new_navaids() {
 
     int nameStart;
     
-    if ( sscanf(line, "%d %f %f %d %f %d %f %s %n",
+    if ( sscanf(line, "%d %f %f %d %d %d %f %s %n",
 		&iNavtype, &n->lat, &n->lon, &elev, &n->freq, &n->range, &n->magvar, n->id, &nameStart) == 8 ) {
 	strcpy(n->name, line + nameStart);
-	n->freq /= 100.0f;
 	bool bNavaid = true;
 	switch (iNavtype) {
-	case 2: n->navtype = NAV_NDB;
-	    n->freq *= 100.0f;
-	    break;
+	case 2: n->navtype = NAV_NDB; break;
 	case 3: n->navtype = NAV_VOR; break;
 	case 4: n->navtype = NAV_ILS; break;	// code 4 is for localisers as part of full ILS - might also consider 5 (LDA & SDF) and 6 (glideslope).
 	case 12: n->navtype = NAV_DME; break;
@@ -1146,8 +1152,10 @@ void Overlays::load_new_navaids() {
 	    */
 	    if(n->navtype == NAV_ILS) {
 	      // The magvar is the inbound heading - keep it.
+	    } else if (n->navtype == NAV_NDB) {
+		n->magvar = sgGetMagVar(n->lon, n->lat, elev, time_params->getJD());
 	    } else {
-	      n->magvar = sgGetMagVar(n->lon, n->lat, elev, time_params->getJD());
+		n->magvar *= SG_DEGREES_TO_RADIANS;
 	    }
 	    // cout << "navid = " << n->id << " magvar = " << n->magvar * RAD_TO_DEG
 	    //      << endl;
@@ -1382,12 +1390,12 @@ Overlays::NAV *Overlays::findNav( const char *name ) {
   return NULL;
 }
 
-Overlays::NAV *Overlays::findNav( float lat, float lon, float freq ) {
+Overlays::NAV *Overlays::findNav( float lat, float lon, int freq ) {
   NAV   *closest = NULL;
   float closest_dist = 1e12f;
 
   for (vector<NAV*>::const_iterator i = navaids.begin(); i < navaids.end(); i++) {
-    if ( fabs(freq - (*i)->freq) < 0.01f ) {
+    if (freq == (*i)->freq) {
       // ugly distance metric -- could (should?) be replaced by
       // great circle distance, but works ok for now
       float dist = fabs(lat - (*i)->lat) + fabs(wrap_angle(lon - (*i)->lon));
@@ -1684,7 +1692,7 @@ void Overlays::tokenizeLocation(LocationType lType, void *loc,
     TOKEN t;
     char *id;
     char *name;
-    float freq;
+    int freq;
     bool isNDB;
     
     if (lType == AIRPORT) {
@@ -1722,11 +1730,11 @@ void Overlays::tokenizeLocation(LocationType lType, void *loc,
 	// NDB frequencies are written as whole numbers; others are
 	// written with 2 significant digits after the decimal point.
 	if (isNDB) {
-	    buf.precision(0);
+	    buf << fixed << freq;
 	} else {
 	    buf.precision(2);
+	    buf << fixed << (freq / 100.0);
 	}
-	buf << fixed << freq;
 	t.token = buf.str();
 	t.t = lType;
 	t.locAddr = loc;
