@@ -278,6 +278,7 @@ void Graphs::_drawGraph(Values &values, int x, int y, const char *label)
 	// To avoid problems with increasing round-off errors, we use
 	// an integer to control the loop.
 	int intervals = rint((values.last - values.first) / values.d);
+	int majorTicks = 0;
 	for (int i = 1; i <= intervals; i++) {
 	    float tick = values.first + (i * values.d);
 	    glColor3f(0.0, 0.0, 0.0);
@@ -289,6 +290,8 @@ void Graphs::_drawGraph(Values &values, int x, int y, const char *label)
 		glColor3f(0.5, 0.5, 0.5);
 		glVertex2f(x + 10, tick);
 		glVertex2f(x + _times.pixels, tick);
+		
+		majorTicks++;
 	    } else {
 		// Minor tick.
 		glVertex2f(x + 5, tick);
@@ -311,16 +314,11 @@ void Graphs::_drawGraph(Values &values, int x, int y, const char *label)
 	    // user to know the scale.
 	    //
 	    // So, we label this tick if: (a) it's major, or (b) it's
-	    // the last one and we haven't labelled at least two so
-	    // far.
-	    //
-	    // And yes, it's possible to get to the end and not have
-	    // any major ticks at all, but if that's the case, the
-	    // graph will be *so* tiny that nothing will be readable
-	    // anyway.
+	    // the first or last one and there are fewer than 2 major
+	    // ticks.
 	    if ((fabs(remainderf(tick, values.D)) < 0.00001) ||
-		((tickCount < 2) && (i == intervals))) {
-		tickCount++;
+		((majorTicks < 2) && (i == 0)) ||
+		((majorTicks < 2) && (i == intervals))) {
 		glColor3f(0.0, 0.0, 0.0);
 		char *buf;
 		asprintf(&buf, format, tick);
@@ -429,12 +427,25 @@ void Graphs::_calcNiceIntervals(Values &values)
     const int minimum = 10;	// Minimum small interval, in pixels.
     float actual;		// Actual interval, if min is placed
 				// at 0 and max at pixels.
+    const float var = 10.0;	// Used as an arbitrary variation,
+				// when all the data values are
+				// identical (ie, no variation or
+				// range).
 
     // First, get the actual situation: the actual value of an
     // interval of 'minimum' pixels, assuming we plot the minimum
     // value at the start of the range, and the maximum value at the
-    // end.  Break it down into an exponent (base-10) and mantissa.
-    actual = (values.max - values.min) / values.pixels * minimum;
+    // end.  
+    if (values.max != values.min) {
+	actual = (values.max - values.min) / values.pixels * minimum;
+    } else {
+	// Special case: if actual = 0.0, that means there is no
+	// variation in values, and it's impossible to derive a range
+	// for them.  So we supply one arbitrarily via 'var'.
+	actual = var / values.pixels * minimum;
+    }
+
+    // Break it down into an exponent (base-10) and mantissa.
     int exponent = floor(log10(actual));
     float mantissa = actual / pow(10, exponent);
 
@@ -456,8 +467,15 @@ void Graphs::_calcNiceIntervals(Values &values)
     // find the largest nice value less than our minimum real value,
     // and the smallest nice value greater than our maximum real
     // value.
-    values.first = floor(values.min / values.d) * values.d;
-    values.last = ceil(values.max / values.d) * values.d;
+    if (values.min != values.max) {
+	values.first = floor(values.min / values.d) * values.d;
+	values.last = ceil(values.max / values.d) * values.d;
+    } else {
+	// Special case again.  If there's no variation in values, we
+	// use the variation given by 'var'.
+	values.first = floor((values.min - var / 2.0) / values.d) * values.d;
+	values.last = ceil((values.max + var / 2.0) / values.d) * values.d;
+    }
 
     // This code is pretty cheezy.  There's probably a cleaner way to
     // do this.  And this code fails on very small intervals (ie, less
