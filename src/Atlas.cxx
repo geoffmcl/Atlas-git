@@ -1141,9 +1141,16 @@ void redrawMap() {
       FlightData *p = track->getCurrentPoint();
 
       if (p) {
-	  sprintf(hdg_str, "HDG: %.0f*", p->hdg < 0.0 ? p->hdg + 360.0 : p->hdg);    
+	  if (track->isAtlas()) {
+	      sprintf(hdg_str, "HDG: %.0f* true", 
+		      p->hdg < 0.0 ? p->hdg + 360.0 : p->hdg);    
+	      sprintf(spd_str, "SPD: %.0f kt EAS", p->spd);
+	  } else {
+	      sprintf(hdg_str, "TRK: %.0f* true", 
+		      p->hdg < 0.0 ? p->hdg + 360.0 : p->hdg);    
+	      sprintf(spd_str, "SPD: %.0f kt GS", p->spd);
+	  }
 	  sprintf(alt_str, "ALT: %.0f ft MSL", p->alt);
-	  sprintf(spd_str, "SPD: %.0f kt GS", p->spd);
 	  sprintf(lat_str, "%c%s", 
 		  (p->lat < 0) ? 'S':'N',
 		  dmshh_format(p->lat * SG_RADIANS_TO_DEGREES, buf));
@@ -1613,7 +1620,7 @@ void keyPressed( unsigned char key, int x, int y ) {
 	case 'U':
 	case 'u':
 	    // 'u'nattach (ie, detach)
-	    if (track->live()) {
+	    if (track && track->live()) {
 		// If we detach a track, we replace it by a new track
 		// listening to the same I/O channel.
 		if (track->isNetwork()) {

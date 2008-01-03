@@ -33,6 +33,10 @@
 struct FlightData {
     time_t time;		// Time of record (in integral seconds)
     double lat, lon;
+    // Heading and speed represent different things, depending on
+    // whether they come from the atlas or nmea protocols.
+    // atlas: hdg = true heading, spd = KEAS
+    // nmea: hdg = true track, spd = GS
     float alt, hdg, spd;
     float nav1_rad, nav2_rad;
     // Frequencies are stored as integers, following Robin Peel's
@@ -53,6 +57,10 @@ public:
     FlightTrack(int port, unsigned int max_buffer = 2000);
     FlightTrack(const char *device, int baud, unsigned int max_buffer = 2000);
     ~FlightTrack();
+
+    bool isAtlas();		// Returns true if this track has
+				// atlas-protocol data, false if
+				// nmea-protocol.
 
     bool isNetwork();
     bool isSerial();
@@ -125,6 +133,10 @@ protected:
     // Initially 0, thereafter set to the current version whenever the
     // track is saved.
     int _versionAtLastSave;
+
+    // True if we have an atlas-protocol flight track, false if nmea.
+    // Undefined until at least one record is read.
+    bool _isAtlas;
 
     // For files read from or saved to a file.
     SGPath _file;		

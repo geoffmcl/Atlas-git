@@ -100,6 +100,11 @@ FlightTrack::~FlightTrack()
     }
 }
 
+bool FlightTrack::isAtlas()
+{
+    return _isAtlas;
+}
+
 bool FlightTrack::isNetwork()
 {
     return _isNetwork;
@@ -356,12 +361,17 @@ void FlightTrack::save()
 	    free(buf);
 
 	    // $PATLA
-	    asprintf(&buf, "PATLA,%.2f,%.1f,%.2f,%.1f,%d",
-		     d->nav1_freq / 100.0, 
-		     d->nav1_rad * SG_RADIANS_TO_DEGREES, 
-		     d->nav2_freq / 100.0, 
-		     d->nav2_rad * SG_RADIANS_TO_DEGREES, 
-		     d->adf_freq);
+	    if (isAtlas()) {
+		asprintf(&buf, "PATLA,%.2f,%.1f,%.2f,%.1f,%d",
+			 d->nav1_freq / 100.0, 
+			 d->nav1_rad * SG_RADIANS_TO_DEGREES, 
+			 d->nav2_freq / 100.0, 
+			 d->nav2_rad * SG_RADIANS_TO_DEGREES, 
+			 d->adf_freq);
+	    } else {
+		asprintf(&buf,
+			 "GPGSA,A,3,01,02,03,,05,,07,,09,,11,12,0.9,0.9,2.0");
+	    }
 	    checksum = _calcChecksum(buf);
 	    fprintf(f, "$%s*%02X\n", buf, checksum);
 	    free(buf);
@@ -627,9 +637,14 @@ bool FlightTrack::_parse_message(char *buf, FlightData *d)
 	    d->nav1_rad *= SG_DEGREES_TO_RADIANS;
 	    d->nav2_freq = (int)(nav2_freq * 100);
 	    d->nav2_rad *= SG_DEGREES_TO_RADIANS;
+
+	    // This identifies this record (and track) as atlas-based.
+	    _isAtlas = true;
 	} else if ((strcmp(tokens[0], "$GPGSA") == 0) && (tokenCount == 18)) {
 	    // This is sent in an nmea protocal message.  It contains
-	    // no useful information.
+	    // no useful information (except to tell us that it's
+	    // nmea).
+	    _isAtlas = false;
 	} else if ((strcmp(tokens[0], "") == 0) && (tokenCount == 1)) {
 	    // This is what an empty line is parsed as.
 	} else {
