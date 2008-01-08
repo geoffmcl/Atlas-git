@@ -116,14 +116,12 @@ void MapBrowser::setMapPath( const char *path ) {
 
 void MapBrowser::changeResolution(const char *path) {
   MapTile *tile;
-  list<MapTile*>::iterator i = tiles.end(),
-                           itmp;
-  i--;
-  while (tiles.begin() != tiles.end()) {
+  list<MapTile*>::iterator i = tiles.begin();
+
+  while (i != tiles.end()) {
      tile =*i;
      glDeleteTextures( 1, &tile->texture_handle );
-     itmp = i--;
-     tiles.erase( itmp );
+     i = tiles.erase(i);
      tiletable.erase(tile->c);
      delete tile;
   }
@@ -241,7 +239,8 @@ void MapBrowser::update() {
   if (max_lat >  90) max_lat =  90;
   int num_lat = (max_lat - min_lat) + 1, num_lon = (max_lon - min_lon) + 1;
 
-  for (list<MapTile*>::iterator it = tiles.begin(); it != tiles.end(); it++) {
+  list<MapTile*>::iterator it = tiles.begin();
+  while (it != tiles.end()) {
     MapTile *tile = *it;
 
     // remove old tiles
@@ -250,14 +249,12 @@ void MapBrowser::update() {
          tile->c.lon < min_lon - CACHE_LIMIT || 
          tile->c.lon > max_lon + CACHE_LIMIT) {
  
-      list<MapTile*>::iterator tmp = it; tmp++;
       if ( tile->tex ) {
         glDeleteTextures( 1, &tile->texture_handle );
       }
-      tiles.erase( it );
+      it = tiles.erase( it );
       tiletable.erase( tile->c );
       delete tile;
-      it = tmp;
     } else {
       // update tiles position
       sgVec3 xyr;
@@ -283,6 +280,8 @@ void MapBrowser::update() {
       projection->ab_lat( rad((float) tile->c.lat), rad(tile->c.lon+dx), clat, clon, 
             xyr );
       scale( xyr[0], xyr[1], &tile->xso, &tile->yso );
+
+      it++;
     }
   }
   
