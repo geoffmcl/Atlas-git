@@ -26,6 +26,8 @@
 #include <fstream>
 #include <stdexcept>
 
+#include <simgear/timing/sg_time.hxx>
+
 #include "FlightTrack.hxx"
 
 // EYE - create a common initializer?
@@ -563,23 +565,16 @@ bool FlightTrack::_parse_message(char *buf, FlightData *d)
 	    ((tokenCount == 12) || (tokenCount == 13))) {
 	    // Time and date
 	    char *utc = tokens[1]; // HHMMSS
-	    char *date = tokens[9];    // DDMMYYY (YY = years since 1900)
+	    char *date = tokens[9];    // DDMMYYY (YYY = years since 1900)
 	    int hours, minutes, seconds;
 	    int day, month, year;
-	    struct tm t;
 
 	    // EYE - we really should check the return values of the
 	    // sscanf() calls.
 	    sscanf(utc, "%2d%2d%2d", &hours, &minutes, &seconds);
 	    sscanf(date, "%2d%2d%d", &day, &month, &year);
-	    t.tm_sec = seconds;
-	    t.tm_min = minutes;
-	    t.tm_hour = hours;
-	    t.tm_mday = day;
-	    t.tm_mon = month - 1;
-	    t.tm_year = year;
-	    t.tm_isdst = 0;
-	    d->time = timegm(&t);
+	    d->time = sgTimeGetGMT(year, month - 1, day, 
+				   hours, minutes, seconds);
 
 	    // Latitude
 	    char *lat = tokens[3]; // DDMM.MMM
@@ -686,28 +681,33 @@ void FlightTrack::_addPoint(FlightData *data, float tolerance)
 	(fabs(data->spd) < 0.001) &&
 	(fabs(data->hdg) < 0.001) &&
 	(fabs(data->alt) < 0.001)) {
+	delete data;
 	return;
     }
 
-    // Add the point if it's different enough from the last point.
-    if (fabs(lastlat - data->lat) > tolerance || 
-	fabs(lastlon - data->lon) > tolerance) {
-	if ((_max_buffer != 0) && (_track.size() > _max_buffer)) {
-	    // We're over our buffer limit.  Delete the first point.
-	    delete _track.front();
-	    _track.pop_front();
-
-	    // Recalculate time offsets from the start onwards.
-	    _adjustOffsetsAround(0);
-	}
-
-	// Add point.
-	_track.push_back(data);
-	_adjustOffsetsAround(_track.size() - 1);
-
-	// Mark us as changed.
-	_version++;
+    // Only add the point if it's different enough from the last
+    // point.
+    if (fabs(lastlat - data->lat) < tolerance &&
+	fabs(lastlon - data->lon) < tolerance) {
+	delete data;
+	return;
     }
+
+    if ((_max_buffer != 0) && (_track.size() > _max_buffer)) {
+	// We're over our buffer limit.  Delete the first point.
+	delete _track.front();
+	_track.pop_front();
+
+	// Recalculate time offsets from the start onwards.
+	_adjustOffsetsAround(0);
+    }
+
+    // Add point.
+    _track.push_back(data);
+    _adjustOffsetsAround(_track.size() - 1);
+
+    // Mark us as changed.
+    _version++;
 }
 
 // Lifted bodily from FlightGear's atlas.cxx.
