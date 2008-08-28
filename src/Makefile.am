@@ -23,7 +23,6 @@ Atlas_SOURCES = \
 	Projection.cxx Projection.hxx \
 	Tile.cxx Tile.hxx \
 	TileManager.cxx TileManager.hxx \
-	fg_mkdir.cxx fg_mkdir.hxx \
 	Search.cxx Search.hxx \
 	Preferences.cxx Preferences.hxx \
 	Graphs.cxx Graphs.hxx
@@ -43,8 +42,7 @@ Map_SOURCES = \
 	OutputGL.cxx OutputGL.hxx \
 	Overlays.cxx Overlays.hxx \
 	Projection.cxx Projection.hxx \
-	Scenery.cxx Scenery.hxx \
-	fg_mkdir.cxx fg_mkdir.hxx
+	Scenery.cxx Scenery.hxx
 
 Map_LDADD = \
 	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgserial -lsgdebug \

@@ -59,7 +59,6 @@
 #endif
 #include "MapMaker.hxx"
 #include "OutputGL.hxx"
-#include "fg_mkdir.hxx"
 #include <simgear/misc/sg_path.hxx>
 #include <simgear/screen/extensions.hxx>
 #include <simgear/screen/RenderTexture.h>
@@ -463,7 +462,9 @@ int main( int argc, char **argv ) {
     // Check that the path to store the images exists
     dir1 = ulOpenDir(outp);
     if(NULL == dir1) {
-      fg_mkdir((const char*)outp);
+	SGPath d(outp);
+	d.concat("/");
+	d.create_dir(0755);
     }
     dir1 = ulOpenDir(outp);
     if(NULL == dir1) {

@@ -31,7 +31,6 @@
 
 #include "Tile.hxx"
 #include "TileManager.hxx"
-#include "fg_mkdir.hxx"
 
 // Creates a structure representing the tile which covers the given
 // latitude and longitude (must be in degrees).
@@ -472,10 +471,15 @@ void Tile::_startSyncing()
     }
     source = source + _dir + "/" + _name;
     dest.append(_dir);
+    // SGPath insists that, for a component to be treated as a
+    // directory, it must end in a path separator.
+    dest.concat("/");
 
     // First, make sure there's a parent directory into which we can
-    // put things.
-    fg_mkdir(dest.c_str());
+    // put things.  We give everyone read and execute access, but only
+    // the owner has write access (this will be modified by the user's
+    // umask).
+    dest.create_dir(0755);
 
     // Now start the actual rsync.  We ask for double verbosity (-v
     // -v) because we want it to tell us about all files being
