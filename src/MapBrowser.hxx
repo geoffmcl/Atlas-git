@@ -27,10 +27,12 @@
 #include "FlightTrack.hxx"
 #include "Projection.hxx"
 #include <simgear/compiler.h>
-#include SG_GL_H
+//#include SG_GL_H
 #include <math.h>
 #include <list>
 #include <map>
+
+using std::map;
 
 class MapBrowser {
 public:

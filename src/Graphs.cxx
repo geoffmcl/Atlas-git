@@ -21,7 +21,8 @@
   ---------------------------------------------------------------------------*/
 
 #include <simgear/compiler.h>
-#include SG_GLUT_H
+//#include SG_GLUT_H
+#include<GL/glut.h>
 
 #include "Graphs.hxx"
 

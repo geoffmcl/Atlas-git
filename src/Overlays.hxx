@@ -37,6 +37,8 @@
 #include "FlightTrack.hxx"
 #include "Projection.hxx"
 
+using std::list;
+
 class Overlays {
 public:
   static const int OVERLAY_AIRPORTS    = 1 << 0;

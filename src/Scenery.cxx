@@ -3,8 +3,8 @@
 
 #include "MapMaker.hxx"
 
-SG_USING_STD(vector);
-SG_USING_STD(string);
+//SG_USING_STD(vector);
+//SG_USING_STD(string);
 
 typedef vector<string> string_list;
 

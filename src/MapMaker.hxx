@@ -31,14 +31,14 @@
 #include <vector>
 #include <list>
 #include <map>
-#include STL_STRING
+//#include STL_STRING
 
 #include "Output.hxx"
 #include "Overlays.hxx"
 #include "Geodesy.hxx"
 
-SG_USING_STD(vector);
-SG_USING_STD(string);
+//SG_USING_STD(vector);
+//SG_USING_STD(string);
 
 // Utility function that I needed to put somewhere - this probably isn't the best place for it.
 // Appends a path separator to a directory path if not present.

@@ -39,7 +39,7 @@
 #include <plib/ul.h>
 
 #include <simgear/compiler.h>
-#include SG_GL_H
+//#include SG_GL_H
 #ifdef UL_GLX
 #  define GLX_GLXEXT_PROTOTYPES
 #  ifdef __APPLE__
@@ -50,7 +50,7 @@
 #elif defined UL_WIN32
 #  include <windows.h>
 #endif
-#include SG_GLUT_H
+//#include SG_GLUT_H
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/stat.h>
@@ -64,10 +64,14 @@
 #include <simgear/screen/RenderTexture.h>
 #include "Scenery.hxx"
 #include <vector>
-#include STL_STRING
+#include <iostream>
+//#include STL_STRING
 
-SG_USING_STD(vector);
-SG_USING_STD(string);
+//SG_USING_STD(vector);
+//SG_USING_STD(string);
+
+using std::cout;
+using std::cin;
 
 typedef vector<string> string_list;
 

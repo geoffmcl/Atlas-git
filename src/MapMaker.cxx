@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <iostream>
 #include <math.h>
 #include <zlib.h>
 #ifndef _MSC_VER
@@ -33,6 +34,8 @@
 #include <plib/ul.h>
 
 #include "MapMaker.hxx"
+
+using std::cout;
 /*#include <simgear/magvar/magvar.hxx>*/
 
 // Utility function that I needed to put somewhere - this probably isn't the best place for it.
@@ -741,8 +744,8 @@ int MapMaker::process_binary_file( char *tile_name, sgVec3 xyz ) {
   // http://www.flightgear.org/Docs/Scenery/CoordinateSystem/CoordinateSystem.html
   //
   // for more.
-  const point_list wgs84_nodes = tile.get_wgs84_nodes();
-  for ( point_list::const_iterator node = wgs84_nodes . begin(); 
+  const std::vector<SGVec3d> wgs84_nodes = tile.get_wgs84_nodes();
+  for ( std::vector<SGVec3d>::const_iterator node = wgs84_nodes . begin(); 
 	node != wgs84_nodes . end();
 	node++ ) {
     float *nv = new sgVec3;
@@ -762,8 +765,8 @@ int MapMaker::process_binary_file( char *tile_name, sgVec3 xyz ) {
   }
 
   // same as above for normals
-  const point_list m_norms = tile.get_normals();
-  for ( point_list::const_iterator normal = m_norms.begin(); 
+  const std::vector<SGVec3f> m_norms = tile.get_normals();
+  for ( std::vector<SGVec3f>::const_iterator normal = m_norms.begin(); 
 	normal != m_norms.end();
 	normal++ ) {
     // Make a new normal

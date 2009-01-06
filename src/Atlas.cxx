@@ -30,7 +30,7 @@
 #include <stdio.h>
 
 #include <simgear/compiler.h>
-#include SG_GLUT_H
+//#include SG_GLUT_H
 #include <plib/fnt.h>
 #include <plib/pu.h>
 #include <plib/puAux.h>
@@ -49,6 +49,8 @@
 #include "Graphs.hxx"
 
 #define SCALECHANGEFACTOR 1.3f
+
+using std::runtime_error;
 
 // User preferences (including command-line arguments).
 Preferences prefs;

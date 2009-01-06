@@ -2,7 +2,7 @@
 #define __OUTPUTGL_H__
 
 #include <simgear/compiler.h>
-#include SG_GLUT_H
+//#include SG_GLUT_H
 #include <plib/fnt.h>
 #include <plib/pu.h>
 #include "Output.hxx"

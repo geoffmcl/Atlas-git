@@ -29,10 +29,18 @@
 
 #include <iostream>
 #include <sstream>
+#include <algorithm>
 
-SG_USING_STD(map);
+using std::min;
+using std::max;
+using std::map;
+using std::istringstream;
+using std::ostringstream;
+using std::fixed;
+
 
 #ifdef _MSC_VER
+
 
 double rint( double x) 
 // Copyright (C) 2001 Tor M. Aamodt, University of Toronto 
