@@ -5,19 +5,20 @@
 
   Copyright (C) 2007 Brian Schack
 
-  This program is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation; either version 2 of the License, or
+  This file is part of Atlas.
+
+  Atlas is free software: you can redistribute it and/or modify it
+  under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
   (at your option) any later version.
 
-  This program is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
+  Atlas is distributed in the hope that it will be useful, but WITHOUT
+  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+  or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+  License for more details.
 
   You should have received a copy of the GNU General Public License
-  along with this program; if not, write to the Free Software
-  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+  along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
 #include "Search.hxx"
@@ -85,8 +86,6 @@ char *Search::searchString()
 // and redisplay (which means we'll call the size and data callbacks).
 void Search::reloadData()
 {
-    int i;
-
     _setSelected(-1, true);
 }
 
@@ -169,24 +168,24 @@ int Search::checkKey(int key, int updown)
     }
 
     switch (key) {
-    case PU_KEY_HOME:
+      case PU_KEY_HOME:
 	_setSelected(0);
 	break;
-    case PU_KEY_END:
+      case PU_KEY_END:
 	if (_size_cb != NULL) {
 	    _setSelected(_size_cb(this) - 1);
 	}
 	break;
-    case PU_KEY_UP:
+      case PU_KEY_UP:
 	_setSelected(_selected - 1);
 	break;
-    case PU_KEY_DOWN:
+      case PU_KEY_DOWN:
 	_setSelected(_selected + 1);
 	break;
-    case PU_KEY_PAGE_UP:
+      case PU_KEY_PAGE_UP:
 	_setSelected(_selected - _realLines());
 	break;
-    case PU_KEY_PAGE_DOWN:
+      case PU_KEY_PAGE_DOWN:
 	if (_selected != -1) {
 	    _setSelected(_selected + _realLines());
 	} else {
@@ -197,12 +196,12 @@ int Search::checkKey(int key, int updown)
 	    _setSelected(_selected + _realLines() + 1);
 	}
 	break;
-    case 13:
+      case 13:
 	// Return.  We notify the user, then hide ourselves.
 	if (_cb != NULL) {
-	    if ((_selected == -1) && (_realLines() == 1)) {
-		// Special case.  If there's only one match, then we
-		// interpret a return to mean "I want that one",
+	    if ((_selected == -1) && (_realLines() > 0)) {
+		// Special case.  If nothing is selected, then we
+		// interpret a return to mean "I want the first one",
 		// regardless of whether it's selected or not.
 		_cb(this, _top);
 	    } else {
@@ -211,7 +210,7 @@ int Search::checkKey(int key, int updown)
 	}
 	hide();
 	break;
-    case 27:
+      case 27:
 	// Escape.  We tell the user there's no selection, then hide
 	// ourselves.
 	if (_cb != NULL) {
@@ -219,7 +218,7 @@ int Search::checkKey(int key, int updown)
 	}
 	hide();
 	break;
-    default:
+      default:
 	char *before = strdup(searchString());
 	bool result = _input->checkKey(key, updown);
 	// Hack!  PUI will "turn off" the input field if it isn't
