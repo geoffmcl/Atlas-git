@@ -3,7 +3,7 @@ dnl working configure script.
 dnl
 dnl $Id$
 
-AC_INIT([Atlas], [0.3.1])
+AC_INIT([Atlas], [0.4.0])
 AC_CONFIG_SRCDIR([src/Atlas.cxx])
 
 dnl Initialize the automake stuff
@@ -239,9 +239,7 @@ AC_CHECK_HEADER(simgear/version.h)
 if test "x$ac_cv_header_simgear_version_h" != "xyes"; then
     echo
     echo "You *must* have the SimGear support library installed on your system"
-    echo "to build the FGFS simulator!"
-    echo
-    echo "Please see README.SimGear for more details."
+    echo "to build Atlas!"
     echo
     echo "configure aborted."
     exit
@@ -296,9 +294,7 @@ AC_CHECK_HEADER(plib/pu.h)
 if test "x$ac_cv_header_plib_pu_h" != "xyes"; then
     echo
     echo "You *must* have the plib library installed on your system to build"
-    echo "the FGFS simulator!"
-    echo
-    echo "Please see README.plib for more details."
+    echo "Atlas!"
     echo
     echo "configure aborted."
     exit
@@ -320,8 +316,8 @@ AC_STRUCT_TM
 dnl Checks for library functions.
 AC_TYPE_SIGNAL
 AC_FUNC_VPRINTF
-AC_CHECK_FUNCS( ftime gettimeofday timegm memcpy bcopy mktime strstr rand \
-	random setitimer getitimer signal GetLocalTime rint getrusage )
+AC_CHECK_FUNCS( strstr strspn strcspn tolower vsnprintf \
+		sqrt rint fabs fmod floor ceil )
 
 dnl Check for optreset variable.
 AC_CACHE_CHECK([for optreset], atlas_cv_var_optreset, [
