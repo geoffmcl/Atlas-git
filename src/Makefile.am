@@ -2,7 +2,7 @@ SUBDIRS = data
 
 EXTRA_DIST = buildmaps.sh AtlasPalette
 
-bin_PROGRAMS = Atlas Map MapPS
+bin_PROGRAMS = Atlas Map
 
 if HAVE_CURL
 bin_PROGRAMS += GetMap
@@ -11,60 +11,55 @@ endif
 bin_SCRIPTS = buildmaps.sh
 
 Atlas_SOURCES = \
+	Notifications.cxx Notifications.hxx \
 	Atlas.cxx \
 	FlightTrack.hxx FlightTrack.cxx \
-	Geodesy.hxx \
-	LoadPng.cxx LoadPng.hxx \
-	LoadJpg.cxx LoadJpg.hxx \
-	MapBrowser.cxx MapBrowser.hxx \
-	Output.cxx Output.hxx \
-	OutputGL.cxx OutputGL.hxx \
+	Image.cxx Image.hxx \
 	Overlays.cxx Overlays.hxx \
-	Projection.cxx Projection.hxx \
-	Tile.cxx Tile.hxx \
-	TileManager.cxx TileManager.hxx \
+	AirportsOverlay.hxx AirportsOverlay.cxx \
+	AirwaysOverlay.hxx AirwaysOverlay.cxx \
+	FixesOverlay.hxx FixesOverlay.cxx \
+	NavaidsOverlay.hxx NavaidsOverlay.cxx \
+	FlightTracksOverlay.hxx FlightTracksOverlay.cxx \
+	CrosshairsOverlay.hxx CrosshairsOverlay.cxx \
+	Tiles.cxx Tiles.hxx \
+	Searcher.cxx Searcher.hxx \
 	Search.cxx Search.hxx \
 	Preferences.cxx Preferences.hxx \
-	Graphs.cxx Graphs.hxx
+	Graphs.cxx Graphs.hxx \
+	Culler.cxx Culler.hxx \
+	Scenery.cxx Scenery.hxx \
+	Cache.cxx Cache.hxx \
+	LayoutManager.cxx LayoutManager.hxx \
+	Bucket.cxx Bucket.hxx \
+	Subbucket.cxx Subbucket.hxx \
+	Palette.cxx Palette.hxx \
+	misc.cxx misc.hxx \
+	Globals.cxx Globals.hxx
 
 Atlas_LDADD = \
 	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgserial -lsgdebug \
-	-lsgbucket -lsgxml -lsgstructure \
+	-lsgbucket -lsgstructure -lsgmath \
 	 -lplibsg -lplibpuaux -lplibpu -lplibul -lplibfnt -lplibnet \
-	$(opengl_LIBS) \
-	-lpng -lz -lpthread -ljpeg
-
-Map_SOURCES = \
-	Map.cxx \
-	FlightTrack.hxx FlightTrack.cxx \
-	MapMaker.cxx MapMaker.hxx \
-	Output.cxx Output.hxx \
-	OutputGL.cxx OutputGL.hxx \
-	Overlays.cxx Overlays.hxx \
-	Projection.cxx Projection.hxx \
-	Scenery.cxx Scenery.hxx
-
-Map_LDADD = \
-	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgserial -lsgdebug \
-	-lsgbucket -lsgscreen -lsgstructure \
-	-lplibsg -lplibpu -lplibul -lplibfnt -lplibnet \
 	$(opengl_LIBS) \
 	-lpng -lz -ljpeg
 
-MapPS_SOURCES = \
-	MapPS.cxx \
-	FlightTrack.hxx FlightTrack.cxx \
-	MapMaker.cxx MapMaker.hxx \
-	Output.cxx Output.hxx \
-	OutputPS.cxx OutputPS.hxx \
-	Overlays.cxx Overlays.hxx \
-	Projection.cxx Projection.hxx \
-	Scenery.cxx Scenery.hxx
+Map_SOURCES = \
+	Map.cxx \
+	Tiles.cxx Tiles.hxx \
+	TileMapper.cxx TileMapper.hxx \
+	Bucket.cxx Bucket.hxx \
+	Subbucket.cxx Subbucket.hxx \
+	Palette.cxx Palette.hxx \
+	Image.cxx Image.hxx \
+	misc.cxx misc.hxx
 
-MapPS_LDADD = \
-	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgserial -lsgdebug \
-	-lplibsg -lplibnet -lsgbucket -lsgstructure \
-	-lpng -lz
+Map_LDADD = \
+	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgdebug \
+	-lsgbucket -lsgstructure -lsgmath -lsgscreen \
+	-lplibfnt -lplibsg \
+	$(opengl_LIBS) \
+	-lpng -lz -ljpeg
 
 GetMap_SOURCES = \
 	GetMap.cxx
