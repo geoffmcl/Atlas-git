@@ -5,37 +5,40 @@
 
   Copyright (C) 2007 Brian Schack
 
-  This program is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation; either version 2 of the License, or
+  This file is part of Atlas.
+
+  Atlas is free software: you can redistribute it and/or modify it
+  under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
   (at your option) any later version.
 
-  This program is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
+  Atlas is distributed in the hope that it will be useful, but WITHOUT
+  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+  or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+  License for more details.
 
   You should have received a copy of the GNU General Public License
-  along with this program; if not, write to the Free Software
-  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+  along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
 #include <stdlib.h>
 #include <getopt.h>
 #include "config.h"
 #include "libgen.h"
+#include <stdarg.h>
+
 #include <fstream>
 
 // This is a space-saving macro used when parsing command-line
 // arguments.  The function 'f' is assumed to be sscanf().
 #define OPTION_CHECK(f,n,t) if ((f) != (n)) {\
 	fprintf(stderr, "%s: bad option argument\n", basename(argv[0]));\
-	print_help_for(t);						\
+	print_help_for(t, "   ");					\
 	return false;	  \
     }
 
 #include "Preferences.hxx"
-#include "MapBrowser.hxx"
+#include "misc.hxx"
 
 // Preferences file.
 const char *atlasrc = ".atlasrc";
@@ -45,23 +48,45 @@ const char *atlasrc = ".atlasrc";
 // *must* come last, and the option *cannot* have the value 63 (ASCII
 // '?').  Other than that, you can do anything you want. :-)
 enum {FIRST_OPTION, 
-      LAT_OPTION, LON_OPTION, AIRPORT_OPTION, PATH_OPTION, 
-      FG_ROOT_OPTION, GLUTFONTS_OPTION, GEOMETRY_OPTION, 
-      SOFTCURSOR_OPTION, UDP_OPTION, SERIAL_OPTION, BAUD_OPTION, 
-      SQUARE_OPTION, FG_SCENERY_OPTION, SERVER_OPTION, MAP_PATH_OPTION, 
-      SIZE_OPTION, LOWRES_SIZE_OPTION, MAX_TRACK_OPTION, 
-      TERRASYNC_MODE_OPTION, CONCURRENCY_OPTION, UPDATE_OPTION,
-      AUTO_CENTER_MODE_OPTION, VERSION_OPTION, HELP_OPTION,
+      FG_ROOT_OPTION, 
+      FG_SCENERY_OPTION,
+      PATH_OPTION, 
+      PALETTE_OPTION, 
+      LAT_OPTION, 
+      LON_OPTION, 
+      AIRPORT_OPTION, 
+      ZOOM_OPTION, 
+      GLUTFONTS_OPTION,
+      GEOMETRY_OPTION,
+      SOFTCURSOR_OPTION,
+      UDP_OPTION,
+      SERIAL_OPTION,
+      BAUD_OPTION,
+      MAX_TRACK_OPTION,
+      UPDATE_OPTION,
+      AUTO_CENTER_MODE_OPTION,
+      DISCRETE_CONTOURS_OPTION,
+      SMOOTH_CONTOURS_OPTION,
+      LIGHTING_ON_OPTION,
+      LIGHTING_OFF_OPTION,
+      SMOOTH_SHADING_OPTION,
+      FLAT_SHADING_OPTION,
+      LIGHT_POSITION_OPTION,
+      VERSION_OPTION,
+      HELP_OPTION,
       LAST_OPTION
 };
 
 // Used by getopt_long()
 static struct option long_options[] = {
+    {"fg-root", required_argument, 0, FG_ROOT_OPTION},
+    {"fg-scenery", required_argument, 0, FG_SCENERY_OPTION},
+    {"atlas", required_argument, 0, PATH_OPTION},
+    {"palette", required_argument, 0, PALETTE_OPTION},
     {"lat", required_argument, 0, LAT_OPTION},
     {"lon", required_argument, 0, LON_OPTION},
     {"airport", required_argument, 0, AIRPORT_OPTION},
-    {"path", required_argument, 0, PATH_OPTION},
-    {"fg-root", required_argument, 0, FG_ROOT_OPTION},
+    {"zoom", required_argument, 0, ZOOM_OPTION},
     {"glutfonts", no_argument, 0, GLUTFONTS_OPTION},
     {"geometry", required_argument, 0, GEOMETRY_OPTION},
     {"softcursor", no_argument, 0, SOFTCURSOR_OPTION},
@@ -69,117 +94,173 @@ static struct option long_options[] = {
     {"serial", optional_argument, 0, SERIAL_OPTION},
     {"baud", required_argument, 0, BAUD_OPTION},
     {"update", required_argument, 0, UPDATE_OPTION},
-    {"square", no_argument, 0, SQUARE_OPTION},
-    {"fg-scenery", required_argument, 0, FG_SCENERY_OPTION},
-    {"server", required_argument, 0, SERVER_OPTION},
-    {"map-executable", required_argument, 0, MAP_PATH_OPTION},
-    {"size", required_argument, 0, SIZE_OPTION},
-    {"lowres-size", required_argument, 0, LOWRES_SIZE_OPTION},
     {"max-track", required_argument, 0, MAX_TRACK_OPTION},
-    {"terrasync-mode", no_argument, 0, TERRASYNC_MODE_OPTION},
-    {"concurrency", required_argument, 0, CONCURRENCY_OPTION},
     {"autocenter-mode", no_argument, 0, AUTO_CENTER_MODE_OPTION},
+    {"discrete-contours", no_argument, 0, DISCRETE_CONTOURS_OPTION},
+    {"smooth-contours", no_argument, 0, SMOOTH_CONTOURS_OPTION},
+    {"lighting", no_argument, 0, LIGHTING_ON_OPTION},
+    {"no-lighting", no_argument, 0, LIGHTING_OFF_OPTION},
+    {"smooth-shading", no_argument, 0, SMOOTH_SHADING_OPTION},
+    {"flat-shading", no_argument, 0, FLAT_SHADING_OPTION},
+    {"light", required_argument, 0, LIGHT_POSITION_OPTION},
     {"version", no_argument, 0, VERSION_OPTION},
     {"help", no_argument, 0, HELP_OPTION},
     {0, 0, 0, 0}
 };
 
-static void print_short_help(char *name) {
-    printf("usage: %s [--lat=<x>] [--lon=<x>] [--airport=<icao>] [--path=<path>]\n", name);
-    printf("\t[--fg-root=<path>] [--glutfonts] [--geometry=<w>x<h>]\n");
+static void print_short_help(char *name) 
+{
+    printf("usage: %s [--atlas=<path>] [--fg-root=<path>] [--fg-scenery=<path>]\n", 
+	   name);
+    printf("\t[--palette=<path>] [--lat=<x>] [--lon=<x>] [--zoom=<m/pixel>]\n");
+    printf("\t[--airport=<icao>] [--glutfonts] [--geometry=<w>x<h>]\n");
     printf("\t[--softcursor] [--udp[=<port>]] [--serial=[<dev>]] [--baud=<rate>]\n");
-    printf("\t[--square] [--fg-scenery=<path>] [--server=<addr>]\n");
-    printf("\t[--map-executable=<path>] [--size=<pixels>] [--lowres-size=<pixels>]\n");
-    printf("\t[--max-track=<x>] [--terrasync-mode] [--concurrency=<n>]\n");
-    printf("\t[--update=<s>] [--autocenter-mode] [--version]\n");
+    printf("\t[--autocenter-mode] [--discrete-contour] [--smooth-contour]\n");
+    printf("\t[--lighting] [--no-lighting] [--light=azim,elev] [--smooth-shading]\n");
+    printf("\t[--flat-shading] [--version]\n");
     printf("\t[--help] [<flight file>] ...\n");
 }
 
-// Prints a long entry for the give option.
-static void print_help_for(int option) 
+// Formats the given strings as follows:
+//
+// (a) Each line starts with 'indent'.
+//
+// (b) The first line has 'option', left-justified, occupying 20
+//     spaces, then 'str'.
+//
+// (c) Subsequent lines have 20 spaces, then subsequent strings from
+//     the varargs list.
+//
+// (d) The end of the list (ie, the last argument) must be NULL.
+static void printOne(char *indent, char *option, char *str, ...)
+{
+    const int width = 20;
+    globalString.printf("%%s%%-%ds%%s\n", width);
+    printf(globalString.str(), indent, option, str);
+
+    va_list ap;
+    char *s;
+    va_start(ap, str);
+    while ((s = va_arg(ap, char *)) != NULL) {
+	printf(globalString.str(), indent, "", s);
+    }
+    va_end(ap);
+}
+
+// Prints a long entry for the given option.
+static void print_help_for(int option, char *indent)
 {
     switch(option) {
-    case LAT_OPTION:
-	printf("--lat=<x>\tStart browsing at latitude x (deg. south i neg.)\n");
+      case FG_ROOT_OPTION:
+	printOne(indent, "--fg-root=<path>", 
+		 "Overrides FG_ROOT environment variable", NULL);
 	break;
-    case LON_OPTION:
-	printf("--lon=<x>\tStart browsing at longitude x (deg. west i neg.)\n");
+      case FG_SCENERY_OPTION:
+	printOne(indent, "--fg-scenery=<path>", 
+		 "Overrides FG_SCENERY environment variable", NULL);
 	break;
-    case AIRPORT_OPTION:
-	printf("--airport=<icao>\tStart browsing at an airport specified by ICAO code icao\n");
+      case PATH_OPTION:
+	printOne(indent, "--atlas=<path>", "Set path for map images", NULL);
 	break;
-    case PATH_OPTION:
-	printf("--path=<path>\tSet path for map images\n");
+      case PALETTE_OPTION:
+	printOne(indent, "--palette=<path>", "Specify location of Atlas palette", NULL);
 	break;
-    case FG_ROOT_OPTION:
-	printf("--fg-root=<path>\tOverrides FG_ROOT environment variable\n");
+      case LAT_OPTION:
+	printOne(indent, "--lat=<x>", 
+		 "Start browsing at latitude x (south is neg.)", NULL);
 	break;
-    case GLUTFONTS_OPTION:
-	printf("--glutfonts\tUse GLUT bitmap fonts (fast for software rendering)\n");
+      case LON_OPTION:
+	printOne(indent, "--lon=<x>",
+		 "Start browsing at longitude x (west is neg.)", NULL);
 	break;
-    case GEOMETRY_OPTION:
-	printf("--geometry=<w>x<h>\tSet initial window size\n");
+      case AIRPORT_OPTION:
+	printOne(indent, "--airport=<str>", 
+		 "Start browsing at an airport specified by ICAO code", 
+		 "or airport name", NULL);
 	break;
-    case SOFTCURSOR_OPTION:
-	printf("--softcursor\tDraw mouse cursor using OpenGL (for fullscreen Voodoo cards)\n");
+      case ZOOM_OPTION:
+	printOne(indent, "--zoom=<x>", "Set zoom level to x metres/pixel", NULL);
 	break;
-    case UDP_OPTION:
-	printf("--udp[=<port>]\tInput read from UDP socket at specified port\n");
-	printf("\t(defaults to 5500)\n");
+      case GLUTFONTS_OPTION:
+	printOne(indent, "--glutfonts", 
+		 "Use GLUT bitmap fonts (fast for software rendering)", NULL);
 	break;
-    case SERIAL_OPTION:
-	printf("--serial[=<dev>]\tInput read from serial port with specified device\n");
-	printf("\t(defaults to /dev/ttyS0)\n");
+      case GEOMETRY_OPTION:
+	printOne(indent, "--geometry=<w>x<h>", "Set initial window size", NULL);
 	break;
-    case BAUD_OPTION:
-	printf("--baud=<rate>\tSet serial port baud rate (defaults to 4800)\n");
+      case SOFTCURSOR_OPTION:
+	printOne(indent, "--softcursor", 
+		 "Draw mouse cursor using OpenGL (for fullscreen Voodoo",
+		 " cards)", NULL);
 	break;
-    case UPDATE_OPTION:
-	printf("--update=<s>\tCheck for position updates every x seconds (defaults to 1.0)\n");
+      case UDP_OPTION:
+	// EYE - should fill in default from Preferences::defaultPort
+	printOne(indent, "--udp[=<port>]",
+		 "Input read from UDP socket at specified port", 
+		 "(defaults to 5500)", NULL);
 	break;
-    case SQUARE_OPTION:
-	printf("--square\tSet square mode (map 1x1 degree area on the whole image)\n");
-	printf("\tto be compatible with images retrieved by GetMap\n");
+      case SERIAL_OPTION:
+	// EYE - should fill in default from Preferences::defaultSerialDevice
+	printOne(indent, "--serial[=<dev>]", 
+		 "Input read from serial port with specified device",
+		 "(defaults to /dev/ttyS0)", NULL);
 	break;
-    case FG_SCENERY_OPTION:
-	printf("--fg-scenery=<path>\tLocation of FlightGear scenery (defaults to\n");
-	printf("\t<fg-root>/Scenery-Terrasync)\n");
+      case BAUD_OPTION:
+	// EYE - should fill in default from Preferences::defaultBaudRate
+	printOne(indent, "--baud=<rate>",
+		 "Set serial port baud rate (defaults to 4800)", NULL);
 	break;
-    case SERVER_OPTION:
-	printf("--server=<addr>\tRsync scenery server (defaults to\n");
-	printf("\t'scenery.flightgear.org')\n");
+      case UPDATE_OPTION:
+	printOne(indent, "--update=<s>", 
+		 "Check for position updates every x seconds (defaults to",
+		 "1.0)", NULL);
 	break;
-    case MAP_PATH_OPTION:
-	printf("--map-executable=<path>\tLocation of Map executable (defaults to 'Map')\n");
+      case MAX_TRACK_OPTION:
+	printOne(indent, "--max-track=<x>",
+		 "Maximum number of points to record while tracking a",
+		 "flight (defaults to 2000, 0 = unlimited)", NULL);
 	break;
-    case SIZE_OPTION:
-	printf("--size=<pixels>\tCreate maps of size pixels*pixels (default 256)\n");
+      case AUTO_CENTER_MODE_OPTION:
+	printOne(indent, "--autocenter-mode",
+		 "Automatically center map on aircraft (default is",
+		 "to not auto-center)", NULL);
 	break;
-    case LOWRES_SIZE_OPTION:
-	printf("--lowres-size=<pixels>\tCreate lowres maps of size pixels*pixels\n");
-	printf("\t(defaults to 0, meaning don't generate lowres maps)\n");
+      case DISCRETE_CONTOURS_OPTION:
+	printOne(indent, "--discrete-contours",
+		 "Don't blend contour colours on live maps (default)", NULL);
 	break;
-    case MAX_TRACK_OPTION:
-	printf("--max-track=<x>\tMaximum number of points to record while tracking a\n");
-	printf("\tflight (defaults to 2000, 0 = unlimited)\n");
+      case SMOOTH_CONTOURS_OPTION:
+	printOne(indent, "--smooth-contours",
+		 "Blend contour colours on live maps", NULL);
 	break;
-    case TERRASYNC_MODE_OPTION:
-	printf("--terrasync-mode\tDownload scenery while tracking a flight (default is\n");
-	printf("\tto not download)\n");
+      case LIGHTING_ON_OPTION:
+	printOne(indent, "--lighting",
+		 "Light the terrain on live maps (default)", NULL);
 	break;
-    case CONCURRENCY_OPTION:
-	printf("--concurrency=<n>\tNumber of tiles to simultaneously update (defaults to\n");
-	printf("\t1, 0 = unlimited)\n");
+      case LIGHTING_OFF_OPTION:
+	printOne(indent, "--no-lighting",
+		 "Don't light the terrain on live maps (flat light)", NULL);
 	break;
-    case AUTO_CENTER_MODE_OPTION:
-	printf("--autocenter-mode\tAutomatically center map on aircraft (default is\n");
-	printf("\tto not auto-center)\n");
+      case SMOOTH_SHADING_OPTION:
+	printOne(indent, "--smooth-shading",
+		 "Smooth polygons on live maps (default)", NULL);
 	break;
-    case VERSION_OPTION:
-	printf("--version\tPrint version number\n");
+      case FLAT_SHADING_OPTION:
+	printOne(indent, "--flat-shading",
+		 "Don't smooth polygons on live maps", NULL);
 	break;
-    case HELP_OPTION:
-	printf("--help\tPrint this help\n");
+      case LIGHT_POSITION_OPTION:
+	printOne(indent, "--light=azim,elev",
+		 "Set light position for live maps (default = 315,55)", 
+		 "Azimuth is light direction (0 = north, 90 = east, ...)",
+		 "Elevation is height above horizon (90 = overhead)",
+		 NULL);
+	break;
+      case VERSION_OPTION:
+	printOne(indent, "--version", "Print version number", NULL);
+	break;
+      case HELP_OPTION:
+	printOne(indent, "--help", "Print this help", NULL);
 	break;
     }
 }
@@ -191,23 +272,36 @@ static void print_help() {
   // EYE - use executable name here?
   printf("Atlas <options> [<flight file>] ...\n\n");
   for (int i = FIRST_OPTION + 1; i < LAST_OPTION; i++) {
-      printf("   ");
-      print_help_for(i);
+//       printf("   ");
+      print_help_for(i, "   ");
   }
 }
+
+const unsigned int Preferences::defaultPort = 5500;
+const char *Preferences::defaultSerialDevice = "/dev/ttyS0";
+const int Preferences::defaultBaudRate = 4800;
 
 // All preferences should be given default values here.
 Preferences::Preferences()
 {
     latitude = 37.5;
     longitude = -122.25;
+    zoom = 125.0;		// metres/pixel
     icao = strdup("");
 
     char *env = getenv("FG_ROOT");
     if (env == NULL) {
+	// EYE - can this not be defined?
 	fg_root.set(FGBASE_DIR);
     } else {
 	fg_root.set(env);
+    }
+
+    env = getenv("FG_SCENERY");
+    if (env == NULL) {
+	scenery_root.set(fg_root.str());
+    } else {
+	scenery_root.set(env);
     }
 
     if (fg_root.str().length() != 0) {
@@ -217,30 +311,27 @@ Preferences::Preferences()
     }
     path.append("Atlas");
 
+    palette.set(path.str());
+    palette.append("Palettes");
+    palette.append("default");
+
     textureFonts = true;
     width = 800;
     height = 600;
     softcursor = false;
-//     port = strdup("5500");
-//     device = strdup("/dev/ttyS0");
-//     baud = strdup("4800");
     _port = 5500;
     _serial.device = strdup("/dev/ttyS0");
     _serial.baud = 4800;
     update = 1.0;
-    mode = MapBrowser::ATLAS;
-
-    scenery_root.set(fg_root.str());
-    scenery_root.append("Scenery-Terrasync");
-
-    rsync_server = strdup("scenery.flightgear.org");
-    map_executable.set("Map");
-    map_size = 256;
-    lowres_map_size = 0;
     max_track = 2000;
-    terrasync_mode = false;
-    concurrency = 1;
     autocenter_mode = false;
+
+    // Lighting and rendering stuff.
+    discreteContours = true;
+    lightingOn = true;
+    smoothShading = true;
+    azimuth = 315;
+    elevation = 55;
 }
 
 // First loads preferences from ~/.atlasrc (if it exists), then checks
@@ -314,33 +405,33 @@ void Preferences::savePreferences()
 {
     printf("%.2f\n", latitude);
     printf("%.2f\n", longitude);
+    printf("%.2f\n", zoom);
     printf("%s\n", icao);
     printf("%s\n", path.c_str());
     printf("%s\n", fg_root.c_str());
+    printf("%s\n", palette.c_str());
     printf("%d\n", textureFonts);
     printf("%d\n", width);
     printf("%d\n", height);
     printf("%d\n", softcursor);
-    for (int i = 0; i < networkConnections.size(); i++) {
+    for (unsigned int i = 0; i < networkConnections.size(); i++) {
 	printf("net: %u\n", networkConnections[i]);
     }
-    for (int i = 0; i < serialConnections.size(); i++) {
+    for (unsigned int i = 0; i < serialConnections.size(); i++) {
 	printf("serial: %s@%u\n", 
 	       serialConnections[i].device, serialConnections[i].baud);
     }
     printf("%.1f\n", update);
-    printf("%d\n", mode);
     printf("%s\n", scenery_root.c_str());
-    printf("%s\n", rsync_server);
-    printf("%s\n", map_executable.c_str());
-    printf("%d\n", map_size);
-    printf("%d\n", lowres_map_size);
     printf("%d\n", max_track);
-    printf("%d\n", terrasync_mode);
-    printf("%d\n", concurrency);
     printf("%d\n", autocenter_mode);
 
-    for (int i = 0; i < flightFiles.size(); i++) {
+    printf("%d\n", discreteContours);
+    printf("%d\n", lightingOn);
+    printf("%d\n", smoothShading);
+    printf("<%.1f, %.1f>", azimuth, elevation);
+
+    for (unsigned int i = 0; i < flightFiles.size(); i++) {
 	printf("%s\n", flightFiles[i].c_str());
     }						
 }
@@ -367,13 +458,16 @@ bool Preferences::_loadPreferences(int argc, char *argv[])
     while ((c = getopt_long(argc, argv, "", long_options, &option_index)) 
 	   != -1) {
 	switch (c) {
-	case LAT_OPTION:
+	  case LAT_OPTION:
 	    OPTION_CHECK(sscanf(optarg, "%f", &latitude), 1, LAT_OPTION);
 	    break;
-	case LON_OPTION:
+	  case LON_OPTION:
 	    OPTION_CHECK(sscanf(optarg, "%f", &longitude), 1, LON_OPTION);
 	    break;
-	case AIRPORT_OPTION:
+	  case ZOOM_OPTION:
+	    OPTION_CHECK(sscanf(optarg, "%f", &zoom), 1, ZOOM_OPTION);
+	    break;
+	  case AIRPORT_OPTION:
 	    free(icao);
 	    icao = strdup(optarg);
 	    // Make sure it's in uppercase only.
@@ -381,101 +475,113 @@ bool Preferences::_loadPreferences(int argc, char *argv[])
 		icao[i] = toupper(icao[i]);
 	    }
 	    break;
-	case PATH_OPTION:
+	  case PATH_OPTION:
 	    path.set(optarg);
 	    break;
-	case FG_ROOT_OPTION:
+	  case FG_ROOT_OPTION:
 	    fg_root.set(optarg);
 	    break;
-	case GLUTFONTS_OPTION:
+	  case PALETTE_OPTION:
+	    palette.set(optarg);
+	    break;
+	  case GLUTFONTS_OPTION:
 	    textureFonts = false;
 	    break;
-	case GEOMETRY_OPTION:
+	  case GEOMETRY_OPTION:
 	    OPTION_CHECK(sscanf(optarg, "%dx%d", &width, &height), 2, GEOMETRY_OPTION);
 	    break;
-	case SOFTCURSOR_OPTION:
+	  case SOFTCURSOR_OPTION:
 	    softcursor = true;
 	    break;
-	case UDP_OPTION: {
-	    // EYE - we need better documentation about how the UDP,
-	    // SERIAL, and BAUD options interact.
+	  case UDP_OPTION: {
+	      // EYE - we need better documentation about how the UDP,
+	      // SERIAL, and BAUD options interact.
 
-	    // Whenever a unique --udp appears on the command line, we
-	    // create an entry for it in networkConnections.  Whenever
-	    // a unique --serial appears, we create an entry for it
-	    // (using the current baud rate).  Whenever --baud
-	    // appears, we just change the baud variable.  It does not
-	    // affect --serial's that appear before it.
-	    unsigned int thisPort = _port;
-	    if (optarg) {
-		OPTION_CHECK(sscanf(optarg, "%u", &thisPort), 1, UDP_OPTION);
-	    }
-	    networkConnections.push_back(thisPort);
-	    break;
-	}
-	case SERIAL_OPTION: {
-	    SerialConnection thisConnection;
-	    thisConnection.baud = _serial.baud;
-	    if (optarg) {
-		thisConnection.device = strdup(optarg);
-	    } else {
-		thisConnection.device = strdup(_serial.device);
-	    }
-	    serialConnections.push_back(thisConnection);
-	    break;
-	}
-	case BAUD_OPTION:
+	      // Whenever a unique --udp appears on the command line, we
+	      // create an entry for it in networkConnections.  Whenever
+	      // a unique --serial appears, we create an entry for it
+	      // (using the current baud rate).  Whenever --baud
+	      // appears, we just change the baud variable.  It does not
+	      // affect --serial's that appear before it.
+	      unsigned int thisPort = _port;
+	      if (optarg) {
+		  OPTION_CHECK(sscanf(optarg, "%u", &thisPort), 1, UDP_OPTION);
+	      }
+	      networkConnections.push_back(thisPort);
+	      break;
+	  }
+	  case SERIAL_OPTION: {
+	      SerialConnection thisConnection;
+	      thisConnection.baud = _serial.baud;
+	      if (optarg) {
+		  thisConnection.device = strdup(optarg);
+	      } else {
+		  thisConnection.device = strdup(_serial.device);
+	      }
+	      serialConnections.push_back(thisConnection);
+	      break;
+	  }
+	  case BAUD_OPTION:
 	    OPTION_CHECK(sscanf(optarg, "%u", &_serial.baud), 1, BAUD_OPTION);
 	    break;
-	case UPDATE_OPTION:
+	  case UPDATE_OPTION:
 	    OPTION_CHECK(sscanf(optarg, "%f", &update), 1, UPDATE_OPTION);
 	    break;
-	case SQUARE_OPTION:
-	    mode = MapBrowser::SQUARE;
-	    break;
-	case FG_SCENERY_OPTION:
+	  case FG_SCENERY_OPTION:
 	    scenery_root.set(optarg);
 	    break;
-	case SERVER_OPTION:
-	    free(rsync_server);
-	    rsync_server = strdup(optarg);
-	    break;
-	case MAP_PATH_OPTION:
-	    map_executable.set(optarg);
-	    break;
-	case SIZE_OPTION:
-	    OPTION_CHECK(sscanf(optarg, "%d", &map_size), 1, SIZE_OPTION);
-	    break;
-	case LOWRES_SIZE_OPTION:
-	    OPTION_CHECK(sscanf(optarg, "%d", &lowres_map_size), 1, LOWRES_SIZE_OPTION);
-	    break;
-	case MAX_TRACK_OPTION:
+	  case MAX_TRACK_OPTION:
 	    OPTION_CHECK(sscanf(optarg, "%d", &max_track), 1, MAX_TRACK_OPTION);
 	    break;
-	case TERRASYNC_MODE_OPTION:
-	    terrasync_mode = true;
+	  case DISCRETE_CONTOURS_OPTION:
+	    discreteContours = true;
 	    break;
-	case CONCURRENCY_OPTION:
-	    OPTION_CHECK(sscanf(optarg, "%d", &concurrency), 1, CONCURRENCY_OPTION);
+	  case SMOOTH_CONTOURS_OPTION:
+	    discreteContours = false;
 	    break;
-	case AUTO_CENTER_MODE_OPTION:
+	  case LIGHTING_ON_OPTION:
+	    lightingOn = true;
+	    break;
+	  case LIGHTING_OFF_OPTION:
+	    lightingOn = false;
+	    break;
+	  case SMOOTH_SHADING_OPTION:
+	    smoothShading = true;
+	    break;
+	  case FLAT_SHADING_OPTION:
+	    smoothShading = false;
+	    break;
+	  case LIGHT_POSITION_OPTION:
+	    OPTION_CHECK(sscanf(optarg, "%f, %f", &azimuth, &elevation), 
+			 2, LIGHT_POSITION_OPTION);
+	    // Azimuths are normalized to 0 <= azimuth < 360.
+	    azimuth = normalizeHeading(azimuth);
+	    // Elevation values are clamped to 0 <= elevation <= 90.
+	    if (elevation < 0.0) {
+		elevation = 0.0;
+	    }
+	    if (elevation > 90.0) {
+		elevation = 90.0;
+	    }
+	    break;
+	  case AUTO_CENTER_MODE_OPTION:
 	    autocenter_mode = true;
 	    break;
-	case HELP_OPTION:
+	  case HELP_OPTION:
 	    print_help();
 	    return false;
 	    break;
-	case VERSION_OPTION:
+	  case VERSION_OPTION:
 	    printf("%s version %s\n", basename(argv[0]), VERSION);
 	    return false;
 	    break;
-	case '?':
+	  case '?':
 	    // Note: We must make sure our _OPTION variables don't
 	    // equal '?' (63).
 	    print_short_help(basename(argv[0]));
 	    return false;
 	    break;
-	default:
+	  default:
 	    // We should never get here.
 	    assert(false);
 	}
