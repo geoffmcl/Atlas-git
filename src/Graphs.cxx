@@ -1,150 +1,182 @@
 /*-------------------------------------------------------------------------
   Graphs.cxx
 
-  Written by Brian Schack, started August 2007.
+  Written by Brian Schack
 
   Copyright (C) 2007 Brian Schack
 
-  This program is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation; either version 2 of the License, or
+  This file is part of Atlas.
+
+  Atlas is free software: you can redistribute it and/or modify it
+  under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
   (at your option) any later version.
 
-  This program is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
+  Atlas is distributed in the hope that it will be useful, but WITHOUT
+  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+  or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+  License for more details.
 
   You should have received a copy of the GNU General Public License
-  along with this program; if not, write to the Free Software
-  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+  along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
 #include <simgear/compiler.h>
-//#include SG_GLUT_H
-#include<GL/glut.h>
+#include <simgear/sg_inlines.h>
 
 #include "Graphs.hxx"
+#include "misc.hxx"
+#include "NavaidsOverlay.hxx"
+#include "Globals.hxx"
 
-Graphs::Graphs(int window) : _window(window)
+// EYE - eventually these should be placed in preferences
+extern float vor1Colour[];
+extern float vor2Colour[];
+
+float axisColour[4] = {0.0, 0.0, 0.0, 1.0};
+float labelColour[4] = {0.0, 0.0, 0.0, 1.0};
+float majorTickColour[4] = {0.5, 0.5, 0.5, 1.0};
+float minorTickColour[4] = {0.75, 0.75, 0.75, 1.0};
+float graphColour[4] = {1.0, 0.0, 0.0, 1.0};
+float glideslopeOutlineColour[4] = {0.75, 0.75, 0.75, 1.0};
+
+Graphs::Graphs(int window): 
+    _window(window), _track(NULL), _graphTypes(0), _smoothing(10),
+    _shouldRerender(false), _shouldReload(false), _graphDL(0)
 {
-    _track = NULL;
-    _graphTypes = 0;
-    _smoothing = 10;
-
     // Default mark and live aircraft colours are black.
     GLfloat black[4] = {0.0, 0.0, 0.0, 1.0};
     setAircraftColor(black);
     setMarkColor(black);
+
+    subscribe(Notification::AircraftMoved);
+    subscribe(Notification::FlightTrackModified);
+    subscribe(Notification::NewFlightTrack);
+}
+
+Graphs::~Graphs()
+{
+    for (unsigned int i = 0; i < _GSs.size(); i++) {
+	delete _GSs[i];
+    }
 }
 
 // Draws all of our graphs (as given by graphTypes) into our window.
 // Graphs span the window horizontally, and each graph gets equal
-// space vertically.  Assumes that _track is valid.
+// space vertically.  The variables _shouldRerender and _shouldReload
+// determine what work is actually performed.
+//
+// Assumes that _track is valid and that the _graphTypes value is
+// correct.
 void Graphs::draw()
 {
-    glutSetWindow(_window);
+    assert(glutGetWindow() == _window);
 
-    // Set our title.
-    glutSetWindowTitle(name());
+    if (_shouldRerender) {
+	if (_shouldReload) {
+	    _loadData();
 
-    // Clear everything to white.
-    glClearColor(1.0, 1.0, 1.0, 0.0);
-    glClear(GL_COLOR_BUFFER_BIT);
+	    // Set our title.
+	    glutSetWindowTitle(_track->niceName());
+	}
 
-    // What graphs do we need to plot?
-    int graphCount = 0;
-    if (graphTypes() & Graphs::ALTITUDE) {
-	graphCount++;
-    }
-    if (graphTypes() & Graphs::SPEED) {
-	graphCount++;
-    }
-    if (graphTypes() & Graphs::CLIMB_RATE) {
-	graphCount++;
+	glDeleteLists(_graphDL, 1);
+	_graphDL = glGenLists(1);
+	assert(_graphDL != 0);
+	glNewList(_graphDL, GL_COMPILE); {
+	    // Clear everything to white.
+	    glClearColor(1.0, 1.0, 1.0, 0.0);
+	    glClear(GL_COLOR_BUFFER_BIT);
+
+	    // What graphs do we need to plot?
+	    int graphCount = 0;
+	    if (graphTypes() & Graphs::ALTITUDE) {
+		graphCount++;
+	    }
+	    if (graphTypes() & Graphs::SPEED) {
+		graphCount++;
+	    }
+	    if (graphTypes() & Graphs::CLIMB_RATE) {
+		graphCount++;
+	    }
+
+	    // No graphs to plot.  Just return.
+	    if (graphCount == 0) {
+		return;
+	    }
+
+	    glPushAttrib(GL_ENABLE_BIT); {
+		// Now draw the graphs.  x and y designates the
+		// lower-left corner of the actual graph, ignoring
+		// labels.
+		int x = _margin, y = _header;
+
+		_times.pixels = _w - (_margin * 2);
+		_calcNiceIntervals(_times);
+		if (graphTypes() & Graphs::CLIMB_RATE) {
+		    _rateOfClimb.pixels = (_h / graphCount) - (_header * 2);
+		    _calcNiceIntervals(_rateOfClimb);
+		    _drawGraph(_rateOfClimb, x, y, "Climb Rate (ft/min)");
+		    y += _rateOfClimb.pixels + (2 * _header);
+		}
+		if (graphTypes() & Graphs::SPEED) {
+		    _speed.pixels = (_h / graphCount) - (_header * 2);
+		    _calcNiceIntervals(_speed);
+		    _drawGraph(_speed, x, y, "Speed (kt)");
+		    y += _speed.pixels + (2 * _header);
+		}
+		if (graphTypes() & Graphs::ALTITUDE) {
+		    _altitude.pixels = (_h / graphCount) - (_header * 2);
+		    _calcNiceIntervals(_altitude);
+		    _drawGS(x, y);
+		    _drawGraph(_altitude, x, y, "Altitude (ft)");
+		}
+	    }
+	    glPopAttrib();
+	}
+	glEndList();
     }
 
-    // No graphs to plot.  Just return.
-    if (graphCount == 0) {
-	return;
-    }
+    glCallList(_graphDL);
 
-    // Get viewport size.
-    GLint viewport[4];
-    GLint x, y;
-    GLsizei w, h;
-    glGetIntegerv(GL_VIEWPORT, viewport);
-    x = viewport[0];
-    y = viewport[1];
-    w = viewport[2];
-    h = viewport[3];
-
-    // Reload our data if it has changed.
-    if (_lastVersion < _track->version()) {
-	// The track has changed, so reload the data.  Loading the
-	// data will set 'data', 'min', and 'max' in the Values
-	// records.
-	_loadData();
-	_lastVersion = _track->version();
-    }
-
-    // Now draw the graphs.  x and y designates the lower-left corner
-    // of the actual graph, ignoring labels.
-    y = _header;
-    x += _margin;
-    _times.pixels = w - (_margin * 2);
-    _calcNiceIntervals(_times);
-    if (graphTypes() & Graphs::CLIMB_RATE) {
-	_rateOfClimb.pixels = (h / graphCount) - (_header * 2);
-	_calcNiceIntervals(_rateOfClimb);
-	_drawGraph(_rateOfClimb, x, y, "Climb Rate (ft/min)");
-	y += _rateOfClimb.pixels + (2 * _header);
-    }
-    if (graphTypes() & Graphs::SPEED) {
-	_speed.pixels = (h / graphCount) - (_header * 2);
-	_calcNiceIntervals(_speed);
-	_drawGraph(_speed, x, y, "Speed (kt)");
-	y += _speed.pixels + (2 * _header);
-    }
-    if (graphTypes() & Graphs::ALTITUDE) {
-	_altitude.pixels = (h / graphCount) - (_header * 2);
-	_calcNiceIntervals(_altitude);
-	_drawGraph(_altitude, x, y, "Altitude (ft)");
-    }
+    // EYE - we no longer maintain a live mark!
 
     // Draw current mark and, if it's live, current aircraft position
     // (which is always at the end of the track, but it's drawn just
     // to reinforce the fact that it's live).
-    if ((_track->mark() >= 0) || _track->live()) {
-	// Draw the mark using time coordinates in the x-axis, pixel
-	// coordinates in the y-axis.  Note to self - the
-	// transformations happen in reverse of the way they're given.
-	// In other words, the raw time is first translated by
-	// -times.first, then scaled, then translated by x.
-	// EYE - is that really right?
-	glPushMatrix();
-
-	glTranslatef(x, 0.0, 0.0);
+    assert((_track->mark() >= 0) || _track->live());
+    // Draw the mark using time coordinates in the x-axis,
+    // pixel coordinates in the y-axis.  Note to self - the
+    // transformations happen in reverse of the way they're
+    // given.  In other words, the raw time is first
+    // translated by -times.first, then scaled, then
+    // translated by x.  EYE - is that really right?
+    glPushMatrix(); {
+	glTranslatef(_margin, 0.0, 0.0);
 	glScalef(_times.pixels / (_times.last - _times.first), 1.0, 0.0);
 	glTranslatef(-_times.first, 0.0, 0.0);
 
 	if (_track->mark() >= 0) {
-	    glBegin(GL_LINES);
-	    glColor4fv(_markColour);
-	    glVertex2f(_times.data[_track->mark()], 0.0);
-	    glVertex2f(_times.data[_track->mark()], (float)h);
+	    glBegin(GL_LINES); {
+		glColor4fv(_markColour);
+		glVertex2f(_times.data[_track->mark()], 0.0);
+		glVertex2f(_times.data[_track->mark()], (float)_h);
+	    }
 	    glEnd();
 	}
 	if (_track->live()) {
-	    glBegin(GL_LINES);
-	    glColor4fv(_aircraftColour);
-	    glVertex2f(_times.max, 0.0);
-	    glVertex2f(_times.max, (float)h);
+	    glBegin(GL_LINES); {
+		glColor4fv(_aircraftColour);
+		glVertex2f(_times.max, 0.0);
+		glVertex2f(_times.max, (float)_h);
+	    }
 	    glEnd();
 	}
-
-	glPopMatrix();
     }
+
+    glPopMatrix();
+
+    _shouldRerender = _shouldReload = false;
 }
 
 void Graphs::setAircraftColor(const float *color)
@@ -157,15 +189,20 @@ void Graphs::setMarkColor(const float *color)
     memcpy(_markColour, color, sizeof(float) * 4);
 }
 
-// Sets the mark (the current record in the flight track) based on an
-// x coordinate in the window.  Because time is irregular, finding the
-// corresponding point in the flight track requires a search.  We're
-// stupid and just do a linear search from the beginning - we really
-// should be a bit smarter about it.
-void Graphs::setMark(int x)
+// Finds and returns index of the record in the flight track closest
+// to the given x coordinate in the window.  Because time is
+// irregular, finding the corresponding point in the flight track
+// requires a search.  We're stupid and just do a linear search from
+// the beginning - we really should be a bit smarter about it.
+int Graphs::pixelToPoint(int x)
 {
-    // EYE - should we do this?  (Also in draw())
-    glutSetWindow(_window);
+    assert(glutGetWindow() == _window);
+
+    // Reload our data if necessary.
+    if (_shouldReload) {
+	_loadData();
+	_shouldReload = false;
+    }
 
     // Figure out how to transform window values to graph values.  Our
     // graph has a regular scale - each pixel corresponds to a fixed
@@ -185,13 +222,12 @@ void Graphs::setMark(int x)
     // Note that we may not have an exact match, so we try to find the
     // closest.
     float time = (x - left) * scale + _times.min;
-    for (int i = 0; i < _times.data.size(); i++) {
+    for (unsigned int i = 0; i < _times.data.size(); i++) {
 	if (_times.data[i] > time) {
 	    // We've passed the cutoff.  Check if the point we're at
 	    // is better than the point we just passed.
 	    if (i == 0) {
-		_track->setMark(i);
-		return;
+		return i;
 	    }
 	    // Note that this bit of code assumes that time increases,
 	    // which isn't always true.  On the other hand, we don't
@@ -200,15 +236,23 @@ void Graphs::setMark(int x)
 	    float time0 = _times.data[i] - time;
 	    float time1 = time - _times.data[i - 1];
 	    if (time0 < time1) {
-		_track->setMark(i);
-		return;
+		return i;
 	    } else {
-		_track->setMark(i - 1);
-		return;
+		return (i - 1);
 	    }
 	}
     }
-    _track->setMark(_track->size() - 1);
+
+    // At the end.
+    return (_track->size() - 1);
+}
+
+void Graphs::reshape(int w, int h)
+{
+    _shouldRerender = true;
+
+    _w = w;
+    _h = h;
 }
 
 int Graphs::graphTypes()
@@ -219,6 +263,7 @@ int Graphs::graphTypes()
 void Graphs::setGraphTypes(int types)
 {
     _graphTypes = types;
+    _shouldRerender = true;
 }
 
 FlightTrack *Graphs::flightTrack()
@@ -228,10 +273,14 @@ FlightTrack *Graphs::flightTrack()
 
 void Graphs::setFlightTrack(FlightTrack *t)
 {
-    _track = t;
-    if (_track) {
-	_lastVersion = -1;
+    if (_track == t) {
+	// If the new flight track is the same as the old, don't do
+	// anything.
+	return;
     }
+
+    _track = t;
+    _shouldRerender = _shouldReload = true;
 }
 
 unsigned int Graphs::smoothing()
@@ -242,8 +291,44 @@ unsigned int Graphs::smoothing()
 // EYE - make smoothing a float?
 void Graphs::setSmoothing(unsigned int s)
 {
+    if (s == _smoothing) {
+	return;
+    }
+
     _smoothing = s;
-    _loadData();
+
+    // We need to reload the data because the rate of climb graph data
+    // depends on the smoothing interval.
+    _shouldRerender = _shouldReload = true;
+}
+
+// This routine receives notifications of events that we've subscribed
+// to.  Basically it translates from some outside event, like the
+// flight track being modified, to some internal action or future
+// action (eg, setting _shouldRerender to true).
+//
+// In general, we try to postpone as much work as possible, merely
+// recording the fact that work needs to be done.  Later, in the
+// draw() routine, we actually do some real work (which means that
+// someone, somewhere has to call draw(), because we never do it
+// ourselves).  The reason for this strategy is that we can
+// potentially receive many notifications per drawing request.
+bool Graphs::notification(Notification::type n)
+{
+    if (n == Notification::AircraftMoved) {
+	// At the moment we don't do anything when informed of
+	// aircraft movement, since we unconditionally draw the
+	// aircraft mark.
+    } else if (n == Notification::FlightTrackModified) {
+	_shouldRerender = true;
+	_shouldReload = true;
+    } else if (n == Notification::NewFlightTrack) {
+	setFlightTrack(globals.track());
+    } else {
+	assert(false);
+    }
+
+    return true;
 }
 
 // The workhorse routine.  This does the actual plotting of a set of
@@ -256,11 +341,12 @@ void Graphs::setSmoothing(unsigned int s)
 void Graphs::_drawGraph(Values &values, int x, int y, const char *label)
 {
     // Print the graph axes.
-    glColor3f(0.0, 0.0, 0.0);
-    glBegin(GL_LINE_STRIP);
-    glVertex2i(x, y + values.pixels);
-    glVertex2i(x, y);
-    glVertex2i(x + _times.pixels, y);
+    glColor4fv(axisColour);
+    glBegin(GL_LINE_STRIP); {
+	glVertex2i(x, y + values.pixels);
+	glVertex2i(x, y);
+	glVertex2i(x + _times.pixels, y);
+    }
     glEnd();
 
     // EYE - use vertex arrays?  See
@@ -275,31 +361,32 @@ void Graphs::_drawGraph(Values &values, int x, int y, const char *label)
 	glScalef(1.0, values.pixels / (values.last - values.first), 0.0);
 	glTranslatef(0.0, -values.first, 0.0);
 
-	glBegin(GL_LINES);
 	// To avoid problems with increasing round-off errors, we use
 	// an integer to control the loop.
 	int intervals = rint((values.last - values.first) / values.d);
 	int majorTicks = 0;
-	for (int i = 1; i <= intervals; i++) {
-	    float tick = values.first + (i * values.d);
-	    glColor3f(0.0, 0.0, 0.0);
-	    glVertex2f(x, tick);
-	    if (fabs(remainderf(tick, values.D)) < 0.00001) {
-		// Major tick.
-		glVertex2f(x + 10, tick);
+	glBegin(GL_LINES); {
+	    for (int i = 1; i <= intervals; i++) {
+		float tick = values.first + (i * values.d);
+		glColor4fv(axisColour);
+		glVertex2f(x, tick);
+		if (fabs(remainderf(tick, values.D)) < 0.00001) {
+		    // Major tick.
+		    glVertex2f(x + 10, tick);
 
-		glColor3f(0.5, 0.5, 0.5);
-		glVertex2f(x + 10, tick);
-		glVertex2f(x + _times.pixels, tick);
+		    glColor4fv(majorTickColour);
+		    glVertex2f(x + 10, tick);
+		    glVertex2f(x + _times.pixels, tick);
 		
-		majorTicks++;
-	    } else {
-		// Minor tick.
-		glVertex2f(x + 5, tick);
+		    majorTicks++;
+		} else {
+		    // Minor tick.
+		    glVertex2f(x + 5, tick);
 
-		glColor3f(0.75, 0.75, 0.75);
-		glVertex2f(x + 5, tick);
-		glVertex2f(x + _times.pixels, tick);
+		    glColor4fv(minorTickColour);
+		    glVertex2f(x + 5, tick);
+		    glVertex2f(x + _times.pixels, tick);
+		}
 	    }
 	}
 	glEnd();
@@ -307,7 +394,8 @@ void Graphs::_drawGraph(Values &values, int x, int y, const char *label)
 	// Now label the y axis.
 	char format[10];
 	sprintf(format, "%%.%df", values.decimals);
-	for (int i = 0, tickCount = 0; i <= intervals; i++) {
+	AtlasString buf;
+	for (int i = 0; i <= intervals; i++) {
 	    float tick = values.first + (i * values.d);
 	    // In general, we just label major ticks.  However, there
 	    // are cases where there is only one major tick.  Just
@@ -320,11 +408,9 @@ void Graphs::_drawGraph(Values &values, int x, int y, const char *label)
 	    if ((fabs(remainderf(tick, values.D)) < 0.00001) ||
 		((majorTicks < 2) && (i == 0)) ||
 		((majorTicks < 2) && (i == intervals))) {
-		glColor3f(0.0, 0.0, 0.0);
-		char *buf;
-		asprintf(&buf, format, tick);
-		_drawString(buf, x - _margin, tick);
-		free(buf);
+		glColor4fv(axisColour);
+		buf.printf(format, tick);
+		_drawString(buf.str(), x - _margin, tick);
 	    }
 	}
 
@@ -342,26 +428,27 @@ void Graphs::_drawGraph(Values &values, int x, int y, const char *label)
 	glScalef(_times.pixels / (_times.last - _times.first), 1.0, 0.0);
 	glTranslatef(-_times.first, 0.0, 0.0);
 
-	glBegin(GL_LINES);
-	intervals = rint((_times.last - _times.first) / _times.d);
-	for (int i = 1; i <= intervals; i++) {
-	    float tick = _times.first + (i * _times.d);
-	    glColor3f(0.0, 0.0, 0.0);
-	    glVertex2f(tick, y);
-	    if (fabs(remainderf(tick, _times.D)) < 0.00001) {
-		// Major tick.
-		glVertex2f(tick, y + 10);
+	glBegin(GL_LINES); {
+	    intervals = rint((_times.last - _times.first) / _times.d);
+	    for (int i = 1; i <= intervals; i++) {
+		float tick = _times.first + (i * _times.d);
+		glColor4fv(axisColour);
+		glVertex2f(tick, y);
+		if (fabs(remainderf(tick, _times.D)) < 0.00001) {
+		    // Major tick.
+		    glVertex2f(tick, y + 10);
 
-		glColor3f(0.5, 0.5, 0.5);
-		glVertex2f(tick, y + 10);
-		glVertex2f(tick, y + values.pixels);
-	    } else {
-		// Minor tick.
-		glVertex2f(tick, y + 5);
+		    glColor4fv(majorTickColour);
+		    glVertex2f(tick, y + 10);
+		    glVertex2f(tick, y + values.pixels);
+		} else {
+		    // Minor tick.
+		    glVertex2f(tick, y + 5);
 
-		glColor3f(0.75, 0.75, 0.75);
-		glVertex2f(tick, y + 5);
-		glVertex2f(tick, y + values.pixels);
+		    glColor4fv(minorTickColour);
+		    glVertex2f(tick, y + 5);
+		    glVertex2f(tick, y + values.pixels);
+		}
 	    }
 	}
 	glEnd();
@@ -373,39 +460,120 @@ void Graphs::_drawGraph(Values &values, int x, int y, const char *label)
 	    if ((fabs(remainderf(tick, _times.D)) < 0.00001) ||
 		((tickCount < 2) && (i == intervals))) {
 		tickCount++;
-		glColor3f(0.0, 0.0, 0.0);
-		char *buf;
-		asprintf(&buf, format, tick);
-		_drawString(buf, tick, y - _header);
-		free(buf);
+		glColor4fv(axisColour);
+		buf.printf(format, tick);
+		_drawString(buf.str(), tick, y - _header);
 	    }
 	}
 
 	glPopMatrix();
 
 	// Plot the graph.  This time we transform both x and y values.
-	glPushMatrix();
-	glTranslatef(x, y, 0.0);
-	glScalef(_times.pixels / (_times.last - _times.first), 
-		 values.pixels / (values.last - values.first), 0.0);
-	glTranslatef(-_times.first, -values.first, 0.0);
+	glPushMatrix(); {
+	    glTranslatef(x, y, 0.0);
+	    glScalef(_times.pixels / (_times.last - _times.first), 
+		     values.pixels / (values.last - values.first), 0.0);
+	    glTranslatef(-_times.first, -values.first, 0.0);
 
-	int point = 0;
-	glColor3f(1.0, 0.0, 0.0);
-	glBegin(GL_LINE_STRIP);
-	for (int i = 0; i < values.data.size(); i++) {
-	    glVertex2f(_times.data[i], values.data[i]);
-	    point++;
+	    int point = 0;
+	    glColor4fv(graphColour);
+	    glBegin(GL_LINE_STRIP); {
+		for (unsigned int i = 0; i < values.data.size(); i++) {
+		    glVertex2f(_times.data[i], values.data[i]);
+		    point++;
+		}
+	    }
+	    glEnd();
 	}
-	glEnd();
-
 	glPopMatrix();
     }
 
     // Print a header (actually a "center", since we print it in the
     // middle).
-    glColor3f(0.0, 0.0, 0.0);
+    glColor4fv(labelColour);
     _drawString(label, x + _times.pixels / 2, y + values.pixels / 2);
+}
+
+// Draws any glideslope indications on the altitude graph.  We assume
+// that _altitude.pixels is correct.
+void Graphs::_drawGS(int x, int y)
+{
+    if (_GSs.size() == 0) {
+	// No glideslope chunks to draw.
+	return;
+    }
+
+    // The glideslope may be far above or below the altitude track,
+    // outside of the graphing area.  Rather than testing whether
+    // points of the glideslope are outside the graph, we just set a
+    // scissor rectangle and let OpenGL do the work for us.
+    glScissor(x, y, _times.pixels, _altitude.pixels);
+    glEnable(GL_SCISSOR_TEST);
+
+    glPushMatrix(); {
+	glTranslatef(x, y, 0.0);
+	glScalef(_times.pixels / (_times.last - _times.first), 
+		 _altitude.pixels / (_altitude.last - _altitude.first), 
+		 0.0);
+	glTranslatef(-_times.first, -_altitude.first, 0.0);
+
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	for (unsigned int i = 0; i < _GSs.size(); i++) {
+	    GSSection *s = _GSs[i];
+
+	    float *c;
+	    if (s->radio == NAV1) {
+		c = vor1Colour;
+	    } else {
+		assert(s->radio == NAV2);
+		c = vor2Colour;
+	    }
+
+	    glBegin(GL_QUAD_STRIP); {
+		for (unsigned int j = 0; j < s->vals.size(); j++) {
+		    GSValue& v = s->vals[j];
+
+		    glColor4f(c[0], c[1], c[2], v.opacity);
+		    glVertex2d(_times.data[v.x], v.bottom);
+		    glVertex2d(_times.data[v.x], v.top);
+		}
+	    }
+	    glEnd();
+	}
+	glDisable(GL_BLEND);
+
+	// Now draw lines representing the top, centre, and bottom
+	// of the glideslope.
+	glColor4fv(glideslopeOutlineColour);
+	for (unsigned int i = 0; i < _GSs.size(); i++) {
+	    GSSection *s = _GSs[i];
+
+	    glBegin(GL_LINE_STRIP); {
+		for (unsigned int j = 0; j < s->vals.size(); j++) {
+		    GSValue& v = s->vals[j];
+		    glVertex2d(_times.data[v.x], v.top);
+		}
+	    }
+	    glEnd();
+	    glBegin(GL_LINE_STRIP); {
+		for (unsigned int j = 0; j < s->vals.size(); j++) {
+		    GSValue& v = s->vals[j];
+		    glVertex2d(_times.data[v.x], v.middle);
+		}
+	    }
+	    glEnd();
+	    glBegin(GL_LINE_STRIP); {
+		for (unsigned int j = 0; j < s->vals.size(); j++) {
+		    GSValue& v = s->vals[j];
+		    glVertex2d(_times.data[v.x], v.bottom);
+		}
+	    }
+	    glEnd();
+	}
+    }
+    glPopMatrix();
+    glDisable(GL_SCISSOR_TEST);
 }
 
 // Calculates "nice" intervals for a given set of data values.  The
@@ -492,11 +660,11 @@ void Graphs::_calcNiceIntervals(Values &values)
 
 // Draws the given string starting at the given point, in the current
 // colour.
-// void Graphs::_drawString(char *str, int x, int y)
 void Graphs::_drawString(const char *str, float x, float y)
 {
     glRasterPos2f(x, y);
-    for (int i = 0; i < strlen(str); i++) {
+    for (unsigned int i = 0; i < strlen(str); i++) {
+	// EYE - magic "number"
 	glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, str[i]);
     }
 }
@@ -520,6 +688,17 @@ void Graphs::_loadData()
 
     // Climb rate is not so easy, so we give it its own routine.
     _loadClimbRate();
+    
+    // Ditto for glideslopes.
+
+    // EYE - this is inefficient (and not just for glideslopes),
+    // because _loadData potentially gets called for each new point
+    // added.  We need a better way.  Maybe this data should be
+    // maintained in the FlightTrack (perhaps with the exception of
+    // rate of climb, and maybe some derived data for glideslopes).
+    // On the other hand, this is only an issue for live tracks -
+    // file-based tracks will call _loadData once only.
+    _loadGSs();
 }
 
 // Calculating climb rate values is tough, so we have a special method
@@ -591,6 +770,245 @@ void Graphs::_loadClimbRate()
     }
 }
 
+// This is used to store some pre-calculated information about a
+// glideslope beam - the bottom, middle and top planes comprising the
+// glideslope.
+struct __Planes {
+    sgdVec4 bottom, middle, top;
+};
+
+// Extracts the heading and slope from a glideslope.
+static void __extractHeadingSlope(NAV *n, double *heading, double *slope)
+{
+    // The glideslope's heading is given by the lower 3 digits of the
+    // magvar variable.  The thousands and above give slope:
+    // ssshhh.hhh.
+    *heading = fmod(n->magvar, 1000.0);
+    *slope = (n->magvar - *heading) / 1e5;
+}
+
+// Calculates the planes for the given glideslope.
+static void __createPlanes(NAV *n, __Planes *planes)
+{
+    // Glideslopes have a vertical angular width of 0.7 degrees above
+    // and below the centre of the glideslope (FAA AIM).
+    const float glideSlopeWidth = 0.7;
+
+    // The glideslope can be thought of as a plane tilted to the
+    // earth's surface.  The top and bottom are given by planes tilted
+    // 0.7 degrees more and less than the glideslope, respectively.
+    double gsHeading, gsSlope;
+    __extractHeadingSlope(n, &gsHeading, &gsSlope);
+
+    // The 'rot' matrix will rotate from a standard orientation (up =
+    // positive y-axis, ahead = positive z-axis, and right = negative
+    // x-axis) to the navaid's actual orientation.
+    sgdMat4 rot, mat;
+    sgdMakeRotMat4(rot, n->lon - 90.0, n->lat, -gsHeading + 180.0);
+    sgdMakeTransMat4(mat, n->bounds.center);
+    sgdPreMultMat4(mat, rot);
+
+    ////////////
+    // Bottom plane of glideslope.
+    sgdVec3 a, b, c;
+    double tilt = (gsSlope - glideSlopeWidth) * SG_DEGREES_TO_RADIANS;
+
+    // We create the plane by specifying 3 points, then rotating to
+    // the correct orientation.  Note that we only rotate the normal
+    // of the plane (the first 3 values in the vector - A, B, C).
+
+    // EYE - make this a routine - sgdXformVec4?
+    sgdSetVec3(a, 1.0, 0.0, 0.0);
+    sgdSetVec3(b, 0.0, 0.0, 0.0);
+    sgdSetVec3(c, 0.0, sin(tilt), cos(tilt));
+    sgdXformPnt3(a, mat);
+    sgdXformPnt3(b, mat);
+    sgdXformPnt3(c, mat);
+    sgdMakePlane(planes->bottom, a, b, c);
+
+    ////////////
+    // Middle plane of glideslope.
+    tilt = gsSlope * SG_DEGREES_TO_RADIANS;
+    sgdSetVec3(a, 1.0, 0.0, 0.0);
+    sgdSetVec3(b, 0.0, 0.0, 0.0);
+    sgdSetVec3(c, 0.0, sin(tilt), cos(tilt));
+    sgdXformPnt3(a, mat);
+    sgdXformPnt3(b, mat);
+    sgdXformPnt3(c, mat);
+    sgdMakePlane(planes->middle, a, b, c);
+
+    ////////////
+    // Top plane of glideslope.
+    tilt = (gsSlope + glideSlopeWidth) * SG_DEGREES_TO_RADIANS;
+    sgdSetVec3(a, 1.0, 0.0, 0.0);
+    sgdSetVec3(b, 0.0, 0.0, 0.0);
+    sgdSetVec3(c, 0.0, sin(tilt), cos(tilt));
+    sgdXformPnt3(a, mat);
+    sgdXformPnt3(b, mat);
+    sgdXformPnt3(c, mat);
+    sgdMakePlane(planes->top, a, b, c);
+}
+
+// Fills the _GSs structure based on the current flight track.  We
+// want to create 'chunks' - continguous sections of glideslope
+// information for a single radio.  This means that different radios
+// will have different chunks, and that a given radio can be composed
+// of different chunks if we go in and out of radio range.
+void Graphs::_loadGSs()
+{
+    // We plot a glideslope if the aircraft is within 35 degrees
+    // either side of its heading.  The figure is fairly arbitrary; I
+    // just chose it so that we only show the glideslope when we're
+    // reasonably close to the localizer.  The 35 degree figure *does*
+    // correspond to the localizer limits at 10nm (FAA AIM).
+    const float maxRange = 35.0;
+
+    for (unsigned int i = 0; i < _GSs.size(); i++) {
+	delete _GSs[i];
+    }
+    _GSs.clear();
+
+    // Only Atlas flight tracks have navaid information, so quit early
+    // if it's NMEA.
+    if (!_track->isAtlasProtocol()) {
+	return;
+    }
+
+    // At each point in the track, we look at the tuned in-range
+    // navaids.  If a navaid is a glideslope, and is "ahead" of us,
+    // then we want to draw it.
+
+    // Glideslope data is divided into "sections", where a section
+    // contains data for a single transmitter, continuously in range
+    // during that time.  There can be many sections in the course of
+    // a single flight, but at a single moment, there can only be as
+    // many sections as there are radios (well, theoretically a radio
+    // could be tuned into several navaids, but we're ignoring that).
+    // Any new data we get will be added to those active sections.
+    // Radio 'r' is inactive if active[r] == NULL.
+    GSSection *active[_RADIO_COUNT];
+    for (int i = 0; i < _RADIO_COUNT; i++) {
+	active[i] = NULL;
+    }
+    // For each active glideslope, we create 3 planes (the
+    // mathematical ones, not the flying ones) representing the
+    // bottom, middle, and top of the glideslope beam.  This is what
+    // we draw on the graph.
+    __Planes planes[_RADIO_COUNT];
+
+    // Now step through the flight track.
+    for (int i = 0; i < _track->size(); i++) {
+	FlightData *p = _track->dataAtPoint(i);
+
+	// Check each active navaid to see if: (a) it's a glideslope,
+	// (b) it's in our "cone of interest" (as defined by
+	// 'maxRange').  If it is, then we need to graph it.
+	const vector<NAV *>& navaids = p->navaids();
+	for (unsigned int j = 0; j < navaids.size(); j++) {
+	    NAV *n = navaids[j];
+
+	    //////////////////////////////////////////////////
+	    // (a) Is it a glideslope?
+	    if (n->navtype != NAV_GS) {
+		// Nope.  Go on to the next navaid.
+		continue;
+	    }
+
+	    //////////////////////////////////////////////////
+	    // (b) Is it within the cone of interest?
+	    double gsHeading, heading, junk, distance;
+
+	    // First get the navaid's heading.
+	    __extractHeadingSlope(n, &gsHeading, &junk);
+
+	    // Calculate the heading from the navaid to the aircraft.
+	    geo_inverse_wgs_84(n->lat, n->lon, p->lat, p->lon,
+			       &heading, &junk, &distance);
+	    heading -= 180.0;
+
+	    // Within the cone of interest?
+	    if (fabs(normalizeHeading(heading - gsHeading, true, 180.0)) 
+		> maxRange) {
+		// Nope.  Go on to the next navaid.
+		continue;
+	    }
+
+	    //////////////////////////////////////////////////
+	    // We need to do something.  What radio is it?
+	    Radio radio;
+	    if (p->nav1_freq == n->freq) {
+		radio = NAV1;
+	    } else if (p->nav2_freq == n->freq) {
+		radio = NAV2;
+	    }
+
+	    // Check to see if the radio is part of an active section.
+	    // If not, create a new active section.
+	    if (!active[radio]) {
+		active[radio] = new GSSection;
+		active[radio]->radio = radio;
+		_GSs.push_back(active[radio]);
+		__createPlanes(n, &(planes[radio]));
+	    }
+
+	    // At this point, 'active[radio]' points to our currently
+	    // active section and 'planes[radio]' are the planes
+	    // defining the glideslope.  Now fill in the data for our
+	    // new glideslope point.
+	    GSValue gs;
+
+	    // Data point index and glide slope opacity.
+	    gs.x = i;
+	    gs.opacity = 1.0 - distance / n->range;
+
+	    // Calculate the intersection of the planes with the line
+	    // going straight up through the aircraft.  We specify the
+	    // line with a point (the aircraft's current position) and
+	    // a normal (calculated from the aircraft's latitude and
+	    // longitude).
+	    sgdVec3 pNorm;
+	    double lat = p->lat * SGD_DEGREES_TO_RADIANS;
+	    double lon = p->lon * SGD_DEGREES_TO_RADIANS;
+	    sgdSetVec3(pNorm, 
+		       cos(lon) * cos(lat), sin(lon) * cos(lat), sin(lat));
+
+	    // Bottom plane of glideslope.
+	    sgdVec3 intersection;
+	    sgdIsectInfLinePlane(intersection, p->cart, pNorm, 
+				 planes[radio].bottom);
+	    double iLat, iLon, alt;
+	    sgCartToGeod(intersection, &iLat, &iLon, &alt);
+	    gs.bottom = alt * SG_METER_TO_FEET;
+
+	    // Middle plane of glideslope.
+	    sgdIsectInfLinePlane(intersection, p->cart, pNorm, 
+				 planes[radio].middle);
+	    sgCartToGeod(intersection, &iLat, &iLon, &alt);
+	    gs.middle = alt * SG_METER_TO_FEET;
+
+	    // Top plane of glideslope.
+	    sgdIsectInfLinePlane(intersection, p->cart, pNorm, 
+				 planes[radio].top);
+	    sgCartToGeod(intersection, &iLat, &iLon, &alt);
+	    gs.top = alt * SG_METER_TO_FEET;
+	    
+	    // Add the point to our vector.
+	    active[radio]->vals.push_back(gs);
+	}
+
+	// After processing all the navaids for this point, check to
+	// see which sections have become inactive (ie, didn't have
+	// any data added in this iteration).
+	for (int s = 0; s < _RADIO_COUNT; s++) {
+	    // If the index of the last point added is not the current
+	    // index, then it's inactive.
+	    if (active[s] && (active[s]->vals.back().x != i)) {
+		active[s] = NULL;
+	    }
+	}
+    }
+}
+
 // Adds a single point to the vector in v, updating its min and max
 // variables as well.
 void Graphs::_addPoint(float p, Values &v)
@@ -603,54 +1021,4 @@ void Graphs::_addPoint(float p, Values &v)
 	v.max = p;
     }
     v.data.push_back(p);
-}
-
-// network (5500) - live network, no file
-// network (5500, <name>) - live network, file
-// network (5500, <name>*) - live network, file, unsaved
-// serial (/dev/foo, 9600) - live serial, no file
-// serial (/dev/foo, 9600, <name>) - live serial, file, saved
-// serial (/dev/foo, 9600, <name>*) - live serial, file, unsaved
-// <name> - file, saved
-// <name>* - file, unsaved
-// detached, no file - detached, no file (duh!)
-const char *Graphs::name()
-{
-    // EYE - don't use fixed-length buffer?
-    static char buf[512];
-    if (_track->isNetwork()) {
-	if (_track->hasFile()) {
-	    if (_track->modified()) {
-		sprintf(buf, "network (%d, %s*)", 
-			_track->port(), _track->fileName());
-	    } else {
-		sprintf(buf, "network (%d, %s)",
-			_track->port(), _track->fileName());
-	    }
-	} else {
-	    sprintf(buf, "network (%d)", _track->port());
-	}
-    } else if (_track->isSerial()) {
-	if (_track->hasFile()) {
-	    if (_track->modified()) {
-		sprintf(buf, "serial (%s, %d, %s*)", 
-			_track->device(), _track->baud(), _track->fileName());
-	    } else {
-		sprintf(buf, "serial (%s, %d, %s)",
-			_track->device(), _track->baud(), _track->fileName());
-	    }
-	} else {
-	    sprintf(buf, "serial (%s, %d)", _track->device(), _track->baud());
-	}
-    } else if (_track->hasFile()) {
-	if (_track->modified()) {
-	    sprintf(buf, "%s*", _track->fileName());
-	} else {
-	    sprintf(buf, "%s", _track->fileName());
-	}
-    } else {
-	sprintf(buf, "detached, no file");
-    }
-
-    return buf;
 }
