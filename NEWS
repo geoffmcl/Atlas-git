@@ -1,3 +1,77 @@
+New in 0.4.0
+== Atlas ==
+* The world is now rendered as a sphere, rather than a flat map.
+* Atlas now directly reads FlightGear scenery when zoomed in close.
+  Pre-rendered maps are still used when zoomed out.  When using "live"
+  scenery, Atlas displays the surface elevation (in addition to
+  latitude and longitude).  
+* The minimum elevation figure (MEF) in a rectangular block (the size
+  depends on the zoom level) is overlaid on the block.  This is useful
+  for quickly determining safe altitudes.  For live scenery, this is
+  automatic.  Pre-rendered maps have to be created with the new
+  version of Map to have this feature.
+* Atlas can have an arbitrary number of map sizes (before there were
+  at most two: hires and, optionally, lowres).  The directory
+  structure used to store them has thus changed.  Before, hires maps
+  were stored in the Atlas directory, and lowres maps in a
+  subdirectory called 'lowres'.  Now, maps are stored in a directory
+  in the Atlas directory labelled with their size (eg, 1024x1024 maps
+  are stored in the directory '10', since 2^10 = 1024).  So, to create
+  maps at the sizes 16x16, 128x128, and 1024x1024, create 3
+  directories, '4', '7', and '10'.  Map will automatically generate
+  maps of the correct sizes, and Atlas will automatically load maps
+  from the right directories at the right zoom levels.  Minimum map
+  sizes are 1x1 ('0'), maximum are 32768x32768 ('15').
+* Maps are now rendered slightly differently.  Before they had a
+  trapezoidal shape, which caused small sub-pixel gaps to appear
+  between the west and east edges of adjacent tiles.  Now they are
+  rectangular, which lets them align exactly.
+* Navaids are rendered better.  Navaid labels show Morse identifiers.
+  VORs have compass roses, properly oriented.  VORs, VORTACs, TACANs,
+  VOR-DMEs, and NDBs use standard icons.  ILSs are correctly
+  positioned.  ILSs show localizer headings.  ILSs without glideslopes
+  are drawn in a different colour than those with glideslopes.
+* Atlas now displays airways.
+* Airports show taxiways and aprons (this just required adding a
+  colour for those materials in the Atlas palette file).  When zoomed
+  in close, they also show frequencies (tower, ATIS, ...), runway
+  lengths (in 100's of feet), airport elevation, and whether the
+  airport has lighting.  Towered airports are drawn in blue;
+  non-towered in purple.  A beacon symbol is drawn if the airport has
+  one.
+* Atlas can show angles in decimal degrees or degrees/minutes/seconds.
+  Headings can be magnetic or true.
+* Atlas now has a proper degree symbol.  However, this required
+  creating a special font, so currently the number of font choices is
+  ... one.  This will increase in the future if requested.
+* Atlas has a search interface for navaids and airports.
+* In addition to connecting to a live FlightGear instance, Atlas can
+  read and write flight files.  In addition, the flight profile
+  (speeed, altitude, and vertical speed) can be displayed in a
+  separate graphs window.  Elevation graphs show glide slopes (if any
+  are tuned in).
+== Map ==
+* Map is now solely dedicated to producing maps for Atlas; it no
+  longer can create arbitrarily-sized maps, nor show navaids and
+  airports.  These features may be added in again if demand is
+  sufficient.
+* Map has some new command line parameters (--png, --discrete-color,
+  --nice-shading); others have been removed (--lat, --lon, --size,
+  --scale, --airport-filter, --enable-airports, --enable-navaids,
+  --singlebuffer, --headless, --glutfonts).
+== MapPS ==
+* MapPS is no longer (but may be replaced by - by a MapPDF? - if time
+  and demand warrants).
+== Atlas Palette ==
+* Colours in the Atlas palette file can be labelled with arbitrary
+  names, rather than just numbers.  There is no longer any requirement
+  to specify elevations in sorted order.  Elevations can be given in
+  metres (the default) or feet.
+* Fixed bug in Atlas palette format - 'Material Elevation_<x>
+  <colour>' now really does mean "everything at <x> and above is
+  <colour>" (before it mistakenly meant "everything below <x> is
+  <colour>").
+
 New in 0.3.1
 * New GetMap utility to fetch map image from wms servers ( landsat and al. ).
 * Add a new --square option to Atlas to display square 1x1 degree image chunks.
