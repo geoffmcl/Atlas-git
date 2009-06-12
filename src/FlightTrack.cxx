@@ -4,20 +4,22 @@
   Written by Per Liedman, started July 2000.
 
   Copyright (C) 2000 Per Liedman, liedman@home.se
+  Copyright (C) 2009 Brian Schack
 
-  This program is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation; either version 2 of the License, or
+  This file is part of Atlas.
+
+  Atlas is free software: you can redistribute it and/or modify it
+  under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
   (at your option) any later version.
 
-  This program is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
+  Atlas is distributed in the hope that it will be useful, but WITHOUT
+  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+  or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+  License for more details.
 
   You should have received a copy of the GNU General Public License
-  along with this program; if not, write to the Free Software
-  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+  along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
 #include <math.h>
@@ -27,15 +29,51 @@
 #include <stdexcept>
 
 #include <simgear/timing/sg_time.hxx>
+#include <simgear/math/sg_geodesy.hxx>
 
 #include "FlightTrack.hxx"
+#include "Overlays.hxx"
+#include "Globals.hxx"
+
+using namespace std;
+
+FlightData::FlightData(): _navaidsLoaded(false)
+{
+}
+
+FlightData::~FlightData()
+{
+}
+
+// We force users to access the navaids vector via this method because
+// we want to avoid searching for navaids if we can.  The alternative
+// is searching for navaids for the entire flight track when we load
+// it in, which can be prohibitively slow.
+const vector<NAV *>& FlightData::navaids()
+{
+    if (!_navaidsLoaded) {
+	// Look up the navaids we're tuned into.  Note that we must
+	// have a valid cartesian location for the call to getNavaids.
+	const vector<Cullable *>& results = 
+	    globals.overlays->navaidsOverlay()->getNavaids(this);
+	for (unsigned int i = 0; i < results.size(); i++) {
+	    NAV *n = dynamic_cast<NAV *>(results[i]);
+	    assert(n);
+	    _navaids.push_back(n);
+	}
+	
+	_navaidsLoaded = true;
+    }
+
+    return _navaids;
+}
 
 // EYE - create a common initializer?
 FlightTrack::FlightTrack(const char *filePath) : 
-    _max_buffer(0), _mark(-1), _input_channel(NULL), _live(false)
+    _max_buffer(0), _mark(-1), _live(false), _input_channel(NULL)
 {
     if (!_readFlightFile(filePath)) {
-	throw std::runtime_error("flight file open failure");
+	throw runtime_error("flight file open failure");
     }
 
     _file.set(filePath);
@@ -52,12 +90,11 @@ FlightTrack::FlightTrack(const char *filePath) :
 FlightTrack::FlightTrack(int port, unsigned int max_buffer) : 
     _max_buffer(max_buffer), _mark(-1), _live(true)
 {
-    char *portStr;
+    AtlasString portStr;
 
-    asprintf(&portStr, "%d", port);
-    _input_channel = new SGSocket("", portStr, "udp");
+    portStr.printf("%d", port);
+    _input_channel = new SGSocket("", portStr.str(), "udp");
     _input_channel->open(SG_IO_IN);
-    free(portStr);
 
     _file.set("");
 
@@ -74,12 +111,11 @@ FlightTrack::FlightTrack(int port, unsigned int max_buffer) :
 FlightTrack::FlightTrack(const char *device, int baud, unsigned int max_buffer) : 
     _max_buffer(max_buffer), _mark(-1), _live(true)
 {
-    char *baudStr;
+    AtlasString baudStr;
 
-    asprintf(&baudStr, "%d", baud);
-    _input_channel = new SGSerial(device, baudStr);
+    baudStr.printf("%d", baud);
+    _input_channel = new SGSerial(device, baudStr.str());
     _input_channel->open(SG_IO_IN);
-    free(baudStr);
 
     _file.set("");
 
@@ -102,9 +138,9 @@ FlightTrack::~FlightTrack()
     }
 }
 
-bool FlightTrack::isAtlas()
+bool FlightTrack::isAtlasProtocol()
 {
-    return _isAtlas;
+    return _isAtlasProtocol;
 }
 
 bool FlightTrack::isNetwork()
@@ -135,6 +171,33 @@ int FlightTrack::baud()
 unsigned int FlightTrack::maxBufferSize()
 {
     return _max_buffer;
+}
+
+// Adjusts the maximum size of the flight points buffer.  This may
+// result in data being deleted.  If the track is not live, we don't
+// do anything.
+void FlightTrack::setMaxBufferSize(unsigned int size)
+{
+    // We can only do this for live tracks.
+    if (!live()) {
+	return;
+    }
+
+    // If the new size is is bigger than the current size, we don't
+    // need to delete anything, so we can return right away.
+    _max_buffer = size;
+    if ((_max_buffer == 0) || (_track.size() <= _max_buffer)) {
+	return;
+    }
+
+    // We need to delete points.
+    while (_track.size() > _max_buffer) {
+	delete _track.front();
+	_track.pop_front();
+    }
+
+    _version++;
+    _adjustOffsetsAround(0);
 }
 
 void FlightTrack::clear() 
@@ -204,15 +267,13 @@ bool FlightTrack::checkForInput()
 	FlightData tmp;
 	buffer[noOfBytes] = '\0';
 	if (_parse_message(buffer, &tmp)) {
-	    result = true;
-
 	    // Record point.
 	    FlightData *d = new FlightData;
 	    *d = tmp;
 
 	    // EYE - I add the point unconditionally (before it was only
 	    // added if the change was more than 1 arc second).
-	    _addPoint(d, -1.0);
+	    result = _addPoint(d, -1.0);
 	}
     }
 
@@ -290,16 +351,23 @@ bool FlightTrack::hasFile()
 // EYE - return as string?
 const char *FlightTrack::fileName()
 {
-    // EYE - Work around bug in SGPath.  If a path has no path
+    // SGPath has a bug in the file() method.  If a path has no path
     // separators (eg, "foo.text", as opposed to something like
     // "dir/foo.text"), file() returns "", rather than "foo.text".
-    const char *name = _file.file().c_str();
-    if (strcmp(name, "") == 0) {
+    //
+    // Also, it returns a copy of the string, but we want to return a
+    // char *.  Since it returns a (temporary) copy, we can't just
+    // return the c_str() of the resulting string, because it will
+    // disappear when we return.  Yeesh.  So, we do the work
+    // ourselves.  This code assumes that SGPath always uses '/' as
+    // the path separator.
+    const char *name = strrchr(_file.c_str(), '/');
+    if (name == NULL) {
 	name = _file.c_str();
+    } else {
+	name++;
     }
     return name;
-
-//     return _file.file().c_str();
 }
 
 const char *FlightTrack::filePath()
@@ -307,11 +375,69 @@ const char *FlightTrack::filePath()
     return _file.c_str();
 }
 
+// Creates a nicely formatted name for the flight track.  The returned
+// string should be copied if you want to save it.  Here are examples
+// of what it returns:
+//
+// 'network (<port>)' - live network, no file
+// 'network (<port>, <name>)' - live network, with file
+// 'network (<port>, <name>*)' - live network, with file, unsaved
+// 'serial (<device>, <baud>)' - live serial, no file
+// 'serial (<device>, <baud>, <name>)' - live serial, with file, saved
+// 'serial (<device>, <baud>, <name>*)' - live serial, with file, unsaved
+// '<name>' - file, saved
+// '<name>*' - file, unsaved
+// 'detached, no file' - no network or serial connection, no file
+const char *FlightTrack::niceName()
+{
+    // We don't save the name because it could change as the status of
+    // the flight track changes.  It's easier just to generate it anew
+    // each time its requested (presumably this will not happen very
+    // often).
+
+    // EYE - do we get re-called when we should?
+    if (isNetwork()) {
+	if (hasFile()) {
+	    if (modified()) {
+		_name.printf("network (%d, %s*)", port(), fileName());
+	    } else {
+		_name.printf("network (%d, %s)", port(), fileName());
+	    }
+	} else {
+	    _name.printf("network (%d)", port());
+	}
+    } else if (isSerial()) {
+	if (hasFile()) {
+	    if (modified()) {
+		_name.printf("serial (%s, %d, %s*)", 
+			   device(), baud(), fileName());
+	    } else {
+		_name.printf("serial (%s, %d, %s)", 
+			   device(), baud(), fileName());
+	    }
+	} else {
+	    _name.printf("serial (%s, %d)", device(), baud());
+	}
+    } else if (hasFile()) {
+	if (modified()) {
+	    _name.printf("%s*", fileName());
+	} else {
+	    _name.printf("%s", fileName());
+	}
+    } else {
+	_name.printf("detached, no file");
+    }
+
+    return _name.str();
+}
+
 void FlightTrack::setFilePath(char *path)
 {
     // EYE - check for existing name?  overwriting?
     // EYE - call this (and other accessors) from constructors?
     _file.set(path);
+    // We count this as a change.
+    _version++;
     _versionAtLastSave = 0;
 }
 
@@ -330,58 +456,61 @@ void FlightTrack::save()
 	    FlightData *d = _track[i];
 
 	    // Do the hard stuff first.
-	    char *time, *date;
+	    AtlasString time, date;
 	    struct tm *t = gmtime(&(d->time));
-	    asprintf(&time, "%02d%02d%02d", t->tm_hour, t->tm_min, t->tm_sec);
-	    asprintf(&date, "%02d%02d%02d", 
-		     t->tm_mday, t->tm_mon + 1, t->tm_year);
+	    time.printf("%02d%02d%02d", t->tm_hour, t->tm_min, t->tm_sec);
+	    if (isAtlasProtocol()) {
+		date.printf("%02d%02d%02d", 
+			    t->tm_mday, t->tm_mon + 1, t->tm_year);
+	    } else {
+		// NMEA has a buggy notion of the current year, but we
+		// need to record it faithfully.
+		date.printf("%02d%02d%02d", 
+			    t->tm_mday, t->tm_mon + 1, t->tm_year % 100);
+	    }
 
-	    char *lat, *lon;
+	    AtlasString lat, lon;
 	    int degrees;
 	    float minutes;
 	    char c;
 	    _splitAngle(d->lat, "NS", &degrees, &minutes, &c);
-	    asprintf(&lat, "%02d%06.3f,%c", degrees, minutes, c);
+	    lat.printf("%02d%06.3f,%c", degrees, minutes, c);
 	    _splitAngle(d->lon, "EW", &degrees, &minutes, &c);
-	    asprintf(&lon, "%03d%06.3f,%c", degrees, minutes, c);
+	    lon.printf("%03d%06.3f,%c", degrees, minutes, c);
 
-	    char *buf;
+	    AtlasString buf;
 	    char checksum;
 
 	    // $GPRMC
-	    asprintf(&buf, "GPRMC,%s,A,%s,%s,%05.1f,%05.1f,%s,0.000,E",
-		     time, lat, lon, d->spd, d->hdg, date);
-	    checksum = _calcChecksum(buf);
-	    fprintf(f, "$%s*%02X\n", buf, checksum);
-	    free(buf);
+	    buf.printf("GPRMC,%s,A,%s,%s,%05.1f,%05.1f,%s,0.000,E",
+		       time.str(), lat.str(), lon.str(), d->spd, d->hdg, 
+		       date.str());
+	    if (!isAtlasProtocol()) {
+		// NMEA adds a little ",A" to the end.
+		buf.appendf(",A");
+	    }
+	    checksum = _calcChecksum(buf.str());
+	    fprintf(f, "$%s*%02X\n", buf.str(), checksum);
 
 	    // $GPGGA
-	    asprintf(&buf, "GPGGA,%s,%s,%s,1,,,%.0f,F,,,,", 
-		     time, lat, lon, d->alt);
-	    checksum = _calcChecksum(buf);
-	    fprintf(f, "$%s*%02X\n", buf, checksum);
-	    free(buf);
+	    buf.printf("GPGGA,%s,%s,%s,1,,,%.0f,F,,,,", 
+		       time.str(), lat.str(), lon.str(), d->alt);
+	    checksum = _calcChecksum(buf.str());
+	    fprintf(f, "$%s*%02X\n", buf.str(), checksum);
 
 	    // $PATLA
-	    if (isAtlas()) {
-		asprintf(&buf, "PATLA,%.2f,%.1f,%.2f,%.1f,%d",
-			 d->nav1_freq / 100.0, 
-			 d->nav1_rad * SG_RADIANS_TO_DEGREES, 
-			 d->nav2_freq / 100.0, 
-			 d->nav2_rad * SG_RADIANS_TO_DEGREES, 
-			 d->adf_freq);
+	    if (isAtlasProtocol()) {
+		buf.printf("PATLA,%.2f,%.1f,%.2f,%.1f,%d",
+			   d->nav1_freq / 1000.0, 
+			   d->nav1_rad, 
+			   d->nav2_freq / 1000.0, 
+			   d->nav2_rad, 
+			   d->adf_freq);
 	    } else {
-		asprintf(&buf,
-			 "GPGSA,A,3,01,02,03,,05,,07,,09,,11,12,0.9,0.9,2.0");
+		buf.printf("GPGSA,A,3,01,02,03,,05,,07,,09,,11,12,0.9,0.9,2.0");
 	    }
-	    checksum = _calcChecksum(buf);
-	    fprintf(f, "$%s*%02X\n", buf, checksum);
-	    free(buf);
-
-	    free(time);
-	    free(date);
-	    free(lat);
-	    free(lon);
+	    checksum = _calcChecksum(buf.str());
+	    fprintf(f, "$%s*%02X\n", buf.str(), checksum);
 	}
 
 	fclose(f);
@@ -413,6 +542,10 @@ bool FlightTrack::modified()
 void FlightTrack::_adjustOffsetsAround(int i)
 {
     FlightData *data = dataAtPoint(i);
+
+    if (data == NULL) {
+	return;
+    }
 
     // Find the first point with the same absolute time value.
     FlightData *d = dataAtPoint(--i);
@@ -458,12 +591,12 @@ bool FlightTrack::_readFlightFile(const char *path)
     // We assume that the file consists of triplets of lines: $GPRMC,
     // $GPGGA, and $PATLA lines.  We read in the file three lines at a
     // time, passing them off to _parse_message.
-    std::ifstream rc(path);
+    ifstream rc(path);
     if (!rc.is_open()) {
 	return false;
     }
 
-    std::string aLine;	// Used for reading the file.
+    string aLine;	// Used for reading the file.
     char *lines = NULL;	// This is what we pass to _parse_message.
     size_t totalLength = 1;	// Total length of 'lines' (plus space
 				// for a terminating '\0').
@@ -571,14 +704,35 @@ bool FlightTrack::_parse_message(char *buf, FlightData *d)
 
 	    // EYE - we really should check the return values of the
 	    // sscanf() calls.
+
 	    sscanf(utc, "%2d%2d%2d", &hours, &minutes, &seconds);
 	    sscanf(date, "%2d%2d%d", &day, &month, &year);
+	    if (tokenCount == 13) {
+		// The nmea protocol forces all year values to be less
+		// than 100, which is wrong (2009, for example, should
+		// be 109, not 09).  This hack will correctly for for
+		// dates from 1990 to 2089.
+		if (year < 90) {
+		    year += 100;
+		}
+	    }
 	    d->time = sgTimeGetGMT(year, month - 1, day, 
 				   hours, minutes, seconds);
 
+	    // GPRMC also includes the latitude and longitude.
+	    // However, since GPGGA also contains that information, as
+	    // well as the altitude, we just ignore the latitude and
+	    // longitude here.
+
+	    // Speed and heading
+	    sscanf(tokens[7], "%f", &d->spd);
+	    sscanf(tokens[8], "%f", &d->hdg);
+
+	    // EYE - we should check the checksum (and do what?)
+	} else if ((strcmp(tokens[0], "$GPGGA") == 0) && (tokenCount == 15))  {
 	    // Latitude
-	    char *lat = tokens[3]; // DDMM.MMM
-	    char *latDir = tokens[4]; // 'N' or 'S'
+	    char *lat = tokens[2]; // DDMM.MMM
+	    char *latDir = tokens[3]; // 'N' or 'S'
 	    int deg;
 	    float min;
 	    
@@ -587,29 +741,16 @@ bool FlightTrack::_parse_message(char *buf, FlightData *d)
 	    if (strcmp(latDir, "S") == 0) {
 		d->lat = -d->lat;
 	    }
-	    d->lat *= SG_DEGREES_TO_RADIANS;
 
 	    // Longitude
-	    char *lon = tokens[5];    // DDDMM.MMM
-	    char *lonDir = tokens[6]; // 'E' or 'W'
+	    char *lon = tokens[4];    // DDDMM.MMM
+	    char *lonDir = tokens[5]; // 'E' or 'W'
 
 	    sscanf(lon, "%3d%f", &deg, &min);
 	    d->lon = deg + (min / 60.0);
 	    if (strcmp(lonDir, "W") == 0) {
 		d->lon = -d->lon;
 	    }
-	    d->lon *= SG_DEGREES_TO_RADIANS;
-
-	    // Speed and heading
-	    sscanf(tokens[7], "%f", &d->spd);
-	    sscanf(tokens[8], "%f", &d->hdg);
-
-	    // EYE - we should check the checksum (and do what?)
-	} else if ((strcmp(tokens[0], "$GPGGA") == 0) && (tokenCount == 15))  {
-	    // GPGGA also includes the UTC time, latitude, and
-	    // longitude.  However, since GPRMC also contains that
-	    // information, we just ignore it here.  From our point of
-	    // view, the only interesting field is altitude.
 
 	    // Altitude
 	    sscanf(tokens[9], "%f", &d->alt);
@@ -618,6 +759,13 @@ bool FlightTrack::_parse_message(char *buf, FlightData *d)
 	    if (strcmp(units, "M") == 0) {
 		d->alt *= SG_METER_TO_FEET;
 	    }
+
+	    // Since we have a lat, lon, and altitude, calculate the
+	    // cartesian coordinates of this point.
+	    sgGeodToCart(d->lat * SGD_DEGREES_TO_RADIANS, 
+			 d->lon * SGD_DEGREES_TO_RADIANS, 
+			 d->alt * SG_FEET_TO_METER, 
+			 d->cart);
 	} else if ((strcmp(tokens[0], "$PATLA") == 0) && (tokenCount == 6)) {
 	    // NAV1, NAV2 and ADF
 	    float nav1_freq, nav2_freq;
@@ -627,19 +775,17 @@ bool FlightTrack::_parse_message(char *buf, FlightData *d)
 	    sscanf(tokens[4], "%f", &d->nav2_rad);
 	    sscanf(tokens[5], "%d", &d->adf_freq);
 	    // VOR frequencies are transmitted in the PATLA line as
-	    // floats (eg, 112.30), but we store them as ints (11230).
-	    d->nav1_freq = (int)(nav1_freq * 100);
-	    d->nav1_rad *= SG_DEGREES_TO_RADIANS;
-	    d->nav2_freq = (int)(nav2_freq * 100);
-	    d->nav2_rad *= SG_DEGREES_TO_RADIANS;
+	    // floats (eg, 112.30), but we store them as ints (112300).
+	    d->nav1_freq = (int)(nav1_freq * 1000);
+	    d->nav2_freq = (int)(nav2_freq * 1000);
 
 	    // This identifies this record (and track) as atlas-based.
-	    _isAtlas = true;
+	    _isAtlasProtocol = true;
 	} else if ((strcmp(tokens[0], "$GPGSA") == 0) && (tokenCount == 18)) {
 	    // This is sent in an nmea protocal message.  It contains
 	    // no useful information (except to tell us that it's
 	    // nmea).
-	    _isAtlas = false;
+	    _isAtlasProtocol = false;
 	} else if ((strcmp(tokens[0], "") == 0) && (tokenCount == 1)) {
 	    // This is what an empty line is parsed as.
 	} else {
@@ -657,7 +803,9 @@ bool FlightTrack::_parse_message(char *buf, FlightData *d)
 // `tolerance' degrees (N-S or E-W).  Default tolerance is 1 arc
 // second.  To force it to accept all points unconditionally, set
 // tolerance to a negative number.
-void FlightTrack::_addPoint(FlightData *data, float tolerance)
+//
+// Returns true if the point actually got added.
+bool FlightTrack::_addPoint(FlightData *data, float tolerance)
 {
     float lastlat, lastlon;
 
@@ -682,7 +830,7 @@ void FlightTrack::_addPoint(FlightData *data, float tolerance)
 	(fabs(data->hdg) < 0.001) &&
 	(fabs(data->alt) < 0.001)) {
 	delete data;
-	return;
+	return false;
     }
 
     // Only add the point if it's different enough from the last
@@ -690,10 +838,10 @@ void FlightTrack::_addPoint(FlightData *data, float tolerance)
     if (fabs(lastlat - data->lat) < tolerance &&
 	fabs(lastlon - data->lon) < tolerance) {
 	delete data;
-	return;
+	return false;
     }
 
-    if ((_max_buffer != 0) && (_track.size() > _max_buffer)) {
+    if ((_max_buffer != 0) && (_track.size() >= _max_buffer)) {
 	// We're over our buffer limit.  Delete the first point.
 	delete _track.front();
 	_track.pop_front();
@@ -708,10 +856,13 @@ void FlightTrack::_addPoint(FlightData *data, float tolerance)
 
     // Mark us as changed.
     _version++;
+
+    return true;
 }
 
 // Lifted bodily from FlightGear's atlas.cxx.
-char FlightTrack::_calcChecksum(char *sentence) {
+char FlightTrack::_calcChecksum(const char *sentence) 
+{
     unsigned char sum = 0;
     int i, len;
 
@@ -726,11 +877,11 @@ char FlightTrack::_calcChecksum(char *sentence) {
 
 // A very, very, very specialized and odd little routine used by
 // save() when printing a latitude or longitude.  It helps us convert
-// an angle in radians to a string of the form "3728.308,N" (37
+// an angle in degrees to a string of the form "37 28.308 N" (37
 // degrees and 28.308 minutes north).  Note that it doesn't create the
 // final string - it just gives us the pieces.
 //
-// Given a number representing an angle (in radians), and a
+// Given a number representing an angle (in degrees), and a
 // "direction" (where direction[0] is a label to be applied when the
 // angle is positive, and direction[1] when angle is negative), sets
 // 'd' to the value of the angle (in integer degrees), 'm' to the
@@ -738,7 +889,6 @@ char FlightTrack::_calcChecksum(char *sentence) {
 void FlightTrack::_splitAngle(float angle, const char direction[2],
 			      int *d, float *m, char *c)
 {
-    angle *= SG_RADIANS_TO_DEGREES;
     if (angle < 0) {
 	*c = direction[1];
 	angle = -angle;

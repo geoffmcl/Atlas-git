@@ -4,20 +4,27 @@
   Written by Per Liedman, started July 2000.
 
   Copyright (C) 2000 Per Liedman, liedman@home.se
+  Copyright (C) 2009 Brian Schack
 
-  This program is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation; either version 2 of the License, or
+  A flight track contains the data for a FlightGear session.  It
+  includes things like the aircraft's position, speed, altitude, etc.
+  Flight tracks can be loaded and saved to files, or imported from
+  running sessions of FlightGear over a network.
+
+  This file is part of Atlas.
+
+  Atlas is free software: you can redistribute it and/or modify it
+  under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
   (at your option) any later version.
 
-  This program is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
+  Atlas is distributed in the hope that it will be useful, but WITHOUT
+  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+  or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+  License for more details.
 
   You should have received a copy of the GNU General Public License
-  along with this program; if not, write to the Free Software
-  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+  along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
 #ifndef __FLIGHTTRACK_H__
@@ -30,26 +37,45 @@
 #include <simgear/io/sg_serial.hxx>
 #include <simgear/misc/sg_path.hxx>
 
-struct FlightData {
+#include "misc.hxx"
+
+// EYE - why do I need to do this?
+struct NAV;
+
+// EYE - it's wasteful to have the radio stuff in a FlightData struct,
+// since they change so infrequently.
+class FlightData {
+  public:
+    FlightData();
+    ~FlightData();
+
     time_t time;		// Time of record (in integral seconds)
-    double lat, lon;
+    double lat, lon;		// Latitude, longitude (in degrees)
     // Heading and speed represent different things, depending on
     // whether they come from the atlas or nmea protocols.
-    // atlas: hdg = true heading, spd = KEAS
-    // nmea: hdg = true track, spd = GS
-    float alt, hdg, spd;
-    float nav1_rad, nav2_rad;
-    // Frequencies are stored as integers, following Robin Peel's
-    // navigation database.  This means, for example, that a VOR
-    // frequency of 110.90 is stored as the integer 11090.
+    // atlas: hdg = true heading (degrees), spd = KEAS
+    // nmea: hdg = true track (degrees), spd = GS
+    float alt, hdg, spd;	// alt = altitude (in feet)
+    float nav1_rad, nav2_rad;	// VOR radial (in degrees)
+    // Frequencies are stored as integer kHz.  This means, for
+    // example, that a VOR frequency of 110.90 is stored as the
+    // integer 110900.
     int nav1_freq, nav2_freq, adf_freq;
+
+    // Derived values (ie, not passed explicitly from FlightGear)
     float est_t_offset;		// Estimated time offset from first
-				// point in flight track.  This is a
-				// derived value.
+				// point in flight track.
+    sgdVec3 cart;		// Cartesian coordinates of position.
+
+    const vector<NAV *>& navaids();
+
+  protected:
+    bool _navaidsLoaded;
+    vector<NAV *> _navaids;	// In-range tuned navaids.
 };
 
 class FlightTrack {
-public:
+  public:
     // Flight tracks can be loaded from files, by listening on a
     // socket, or by reading a serial device (I think - I've never
     // tested the latter).
@@ -58,7 +84,7 @@ public:
     FlightTrack(const char *device, int baud, unsigned int max_buffer = 2000);
     ~FlightTrack();
 
-    bool isAtlas();		// Returns true if this track has
+    bool isAtlasProtocol();	// Returns true if this track has
 				// atlas-protocol data, false if
 				// nmea-protocol.
 
@@ -69,6 +95,7 @@ public:
     const char *device();
     int baud();
     unsigned int maxBufferSize();
+    void setMaxBufferSize(unsigned int size);
 
     void clear();
     bool empty();
@@ -113,11 +140,12 @@ public:
     bool hasFile();		// True if file path is not empty
     const char *fileName();	// File name
     const char *filePath();	// Full path, including file
+    const char *niceName();	// Nicely formatted name
     void setFilePath(char *path);
     void save();
     bool modified();
 
-protected:
+  protected:
     unsigned int _max_buffer;
 
     std::deque<FlightData*> _track;
@@ -136,7 +164,7 @@ protected:
 
     // True if we have an atlas-protocol flight track, false if nmea.
     // Undefined until at least one record is read.
-    bool _isAtlas;
+    bool _isAtlasProtocol;
 
     // For files read from or saved to a file.
     SGPath _file;		
@@ -149,14 +177,15 @@ protected:
 
     bool _isNetwork, _isSerial;
 
+    AtlasString _name;
+
     void _adjustOffsetsAround(int i);
 
     bool _readFlightFile(const char *path);
     bool _parse_message(char *buf, FlightData *d);
-    void _addPoint(FlightData *data, 
-		   float tolerance = SG_DEGREES_TO_RADIANS / 3600.0f);
+    bool _addPoint(FlightData *data, float tolerance = 1.0 / 60.0 / 60.0);
 
-    char _calcChecksum(char *sentence);
+    char _calcChecksum(const char *sentence);
     void _splitAngle(float degrees, const char direction[2], 
 		     int *d, float *m, char *c);
 };
