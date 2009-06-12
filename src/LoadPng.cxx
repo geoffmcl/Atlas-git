@@ -25,7 +25,8 @@
 #include <stdio.h>
 
 // reads
-char *loadPng( char *filename, int *width, int *height ) {
+// char *loadPng( char *filename, int *width, int *height ) {
+char *loadPng( char *filename, int *width, int *height, int *depth ) {
   char *header[8];
 
   FILE *fp = fopen(filename, "rb");
@@ -70,23 +71,38 @@ char *loadPng( char *filename, int *width, int *height ) {
   double gamma;
   if ( png_get_gAMA(png_ptr, info_ptr, &gamma) ) {
     png_set_gamma( png_ptr, 2.0, gamma );
-  } else {
-    png_set_gamma( png_ptr, 2.0, 0.45455 );
+    // EYE - this was changing the colour values of map images we
+    // loaded in, making it impossible to match live and rendered
+    // scenery.
+//   } else {
+//     png_set_gamma( png_ptr, 2.0, 0.45455 );
   }
   
   if ( png_get_color_type(png_ptr, info_ptr) == PNG_COLOR_TYPE_PALETTE )
-    png_set_expand( png_ptr );
+//     png_set_expand( png_ptr );
+    png_set_palette_to_rgb( png_ptr );
 
   png_read_update_info( png_ptr, info_ptr );
 
   *width  = png_get_image_width (png_ptr, info_ptr);
   *height = png_get_image_height(png_ptr, info_ptr);
 
+  int color_type = png_get_color_type(png_ptr, info_ptr);
+  if (color_type == PNG_COLOR_TYPE_RGB) {
+      *depth = 3;
+  } else if (color_type == PNG_COLOR_TYPE_RGB_ALPHA) {
+      *depth = 4;
+  } else {
+      return NULL;
+  }
+
   // allocate image chunk
   png_bytep *rows = new png_bytep[*height];
-  char *image = new char[(*width) * (*height)*3];     // 24 bits per pixel
+//   char *image = new char[(*width) * (*height)*3];     // 24 bits per pixel
+  char *image = new char[(*width) * (*height) * (*depth)];
   for (int i = 0; i < *height; i++) {
-    rows[i] = (png_bytep)(image + i * (*width) * 3);
+//     rows[i] = (png_bytep)(image + i * (*width) * 3);
+      rows[i] = (png_bytep)(image + i * (*width) * (*depth));
   }
 
   png_read_image(png_ptr, rows);
