@@ -1,6 +1,6 @@
 SUBDIRS = data
 
-EXTRA_DIST = buildmaps.sh AtlasPalette
+EXTRA_DIST = AtlasPalette
 
 bin_PROGRAMS = Atlas Map
 
