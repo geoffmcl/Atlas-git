@@ -333,7 +333,6 @@ AM_CONFIG_HEADER(src/config.h)
 AC_CONFIG_FILES([ \
 	Makefile \
 	src/Makefile \
-	src/buildmaps.sh \
 	src/data/Makefile
 ])
 AC_OUTPUT
