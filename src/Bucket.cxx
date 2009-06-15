@@ -25,6 +25,7 @@
 
 #include <GLUT/glut.h>		// Needed for gluPickMatrix().
 
+#include <cassert>
 #include <iostream>
 #include <sstream>
 #include <fstream>

@@ -27,6 +27,7 @@
 #include "libgen.h"
 #include <stdarg.h>
 
+#include <cassert>
 #include <fstream>
 
 // This is a space-saving macro used when parsing command-line

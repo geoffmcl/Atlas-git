@@ -33,6 +33,7 @@
 #include <plib/puAux.h>
 #include <string>
 
+#include <cassert>
 #include <map>
 #include <stdexcept>
 

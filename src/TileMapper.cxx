@@ -21,6 +21,7 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
+#include <cassert>
 #include <stdexcept>
 
 #include <plib/pu.h>

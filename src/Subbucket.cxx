@@ -23,6 +23,8 @@
 
 #include <OpenGL/gl.h>
 
+#include <cassert>
+
 #include "Subbucket.hxx"
 
 using namespace std;

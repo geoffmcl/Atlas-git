@@ -27,6 +27,8 @@
 #include <simgear/math/sg_geodesy.hxx>
 #include <simgear/math/SGMisc.hxx>
 
+#include <cassert>
+
 using namespace std;
 
 #include "Scenery.hxx"

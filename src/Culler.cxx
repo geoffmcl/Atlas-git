@@ -26,6 +26,7 @@ using namespace std;
 #include "Culler.hxx"
 #include "Globals.hxx"
 
+#include <cassert>
 #include <vector>
 
 #include <simgear/math/sg_geodesy.hxx>

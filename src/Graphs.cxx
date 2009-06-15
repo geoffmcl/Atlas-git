@@ -24,6 +24,8 @@
 #include <simgear/compiler.h>
 #include <simgear/sg_inlines.h>
 
+#include <cassert>
+
 #include "Graphs.hxx"
 #include "misc.hxx"
 #include "NavaidsOverlay.hxx"

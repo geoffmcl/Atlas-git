@@ -24,6 +24,8 @@
 #include <OpenGL/gl.h>
 #include <GLUT/glut.h>
 
+#include <cassert>
+
 #include <simgear/misc/sg_path.hxx>
 #include <simgear/math/sg_geodesy.hxx>
 

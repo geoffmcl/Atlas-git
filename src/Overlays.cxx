@@ -24,6 +24,7 @@
 #include <OpenGL/gl.h>
 #include <GLUT/glut.h>
 
+#include <cassert>
 #include <sstream>
 
 #include "Globals.hxx"

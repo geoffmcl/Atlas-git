@@ -26,6 +26,7 @@
 
 #include <stdarg.h>
 
+#include <cassert>
 #include <sstream>
 
 #include <simgear/misc/sg_path.hxx>

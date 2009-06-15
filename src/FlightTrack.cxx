@@ -24,6 +24,7 @@
 
 #include <math.h>
 
+#include <cassert>
 #include <string>
 #include <fstream>
 #include <stdexcept>
