@@ -287,8 +287,6 @@ Scenery *scenery;
 // True if we want to label scenery tiles with a MEF.
 bool elevationLabels = true;
 
-// // The palette is used to determine how to colour maps.
-// Palette *palette;
 // We keep a list of all palettes.  Initially this is set to the
 // installed palettes in Atlas' Palettes directory, but it can expand
 // if the user loads custom palettes of her own.
@@ -959,8 +957,7 @@ void close_ok_cb(puObject *widget)
     puDeleteObject(dialogBox);
     dialogBox = NULL;
     if (okay) {
-	// EYE - this is ugly, because it has to duplicate code in the
-	// keyPressed() function.
+	// Unload the track with extreme prejudice.
 	unload_cb(NULL);
     }
 }
@@ -2535,7 +2532,6 @@ HelpUI::HelpUI(int x, int y, Preferences& prefs, TileManager& tm)
     _generalText = strdup(globalString.str());
 
     // Keyboard shortcuts.
-    // EYE - we really need a fixed-width font for this
     AtlasString fmt;
     fmt.printf("%%-%ds%%s\n", 8);
     globalString.printf(fmt.str(), "C-x c", "discrete/smooth contours");
@@ -3629,16 +3625,18 @@ void load_cb(puObject *cb)
     }
 }
 
+// Unloads the current flight track.  Note the special calling
+// convention: if cb is NULL, we unload the current flight track
+// silently, even if it hasn't been saved.  If you want the user to be
+// warned, cb should be non-NULL.
 void unload_cb(puObject *cb)
 {
-    // EYE - we should warn the user if the track is unsaved.  
-    // EYE - this is called again by close_ok_cb - we either need to
-    // pass a flag saying it must be closed, or have yet another
-    // routine to do the real unloading.
-    if (globals.track() && globals.track()->modified()) {
-	// EYE - put this warning in the callback itself?
-	makeDialog("The current track is unsaved.\nIf you close it, the track data will be lost.\nDo you want to close it?\n", close_ok_cb);
-	return;
+    if (cb != NULL) {
+	if (globals.track() && globals.track()->modified()) {
+	    // EYE - put this warning in the callback itself?
+	    makeDialog("The current track is unsaved.\nIf you close it, the track data will be lost.\nDo you want to close it?\n", close_ok_cb);
+	    return;
+	}
     }
 
     // Close the current track.
@@ -3841,19 +3839,6 @@ int main(int argc, char **argv)
     }
 
     // Load the preferred palette.
-//     palette = palettes->load(prefs.palette.c_str());
-//     if (!palette) {
-// 	// Try tacking the palette directory on the front and see what
-// 	// happens.
-// 	paletteDir.append(prefs.palette.str());
-// 	palette = palettes->load(paletteDir.c_str());
-// 	if (!palette) {
-// 	    printf("%s: Failed to read palette file '%s'\n", 
-// 		   argv[0], prefs.palette.c_str());
-// 	    // EYE - exit?
-// 	    exit(0);
-// 	}
-//     }
     globals.palette = palettes->load(prefs.palette.c_str());
     if (!globals.palette) {
 	// Try tacking the palette directory on the front and see what
@@ -3881,13 +3866,19 @@ int main(int argc, char **argv)
 
     // Load our scenery fonts.
     // EYE - put in preferences
-    char *fontFile = "Helvetica.100.txf";
-    globals.regularFont = new atlasFntTexFont;
-    assert(globals.regularFont->load(fontFile) == TRUE);
+    SGPath fontDir, fontFile;
+    fontDir = prefs.path;
+    fontDir.append("Fonts");
 
-    fontFile = "Helvetica-Bold.100.txf";
+    fontFile = fontDir;
+    fontFile.append("Helvetica.100.txf");
+    globals.regularFont = new atlasFntTexFont;
+    assert(globals.regularFont->load(fontFile.c_str()) == TRUE);
+
+    fontFile = fontDir;
+    fontFile.append("Helvetica-Bold.100.txf");
     globals.boldFont = new atlasFntTexFont;
-    assert(globals.boldFont->load(fontFile) == TRUE);
+    assert(globals.boldFont->load(fontFile.c_str()) == TRUE);
 
     globals.regular();
 
