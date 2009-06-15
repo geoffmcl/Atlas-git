@@ -59,14 +59,18 @@ char *loadJPEG(const char *filename, int *width, int *height, float *maxElev)
     *width = cinfo.image_width;
     *height = cinfo.image_height;
 
-    *maxElev = -1e6;
-    jpeg_saved_marker_ptr marker;
-    for (marker = cinfo.marker_list; marker != NULL; marker = marker->next) {
-	if ((marker->marker == JPEG_APP0 + 1) &&
-	    (sscanf((const char *)marker->data, 
-		    "Map Maximum Elevation %f", maxElev) == 1)) {
-	    // Note that a JOCTET is 8 bits, so the cast is safe.
-	    break;
+    if (maxElev) {
+	*maxElev = -1e6;
+	jpeg_saved_marker_ptr marker;
+	for (marker = cinfo.marker_list; 
+	     marker != NULL; 
+	     marker = marker->next) {
+	    if ((marker->marker == JPEG_APP0 + 1) &&
+		(sscanf((const char *)marker->data, 
+			"Map Maximum Elevation %f", maxElev) == 1)) {
+		// Note that a JOCTET is 8 bits, so the cast is safe.
+		break;
+	    }
 	}
     }
 

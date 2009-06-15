@@ -3130,12 +3130,6 @@ void keyPressed(unsigned char key, int x, int y)
 	    // Rotate camera so that north is up.
 	    rotateEye();
 	    break;
-	    // EYE - move these to loadMap.cxx?  Scenery.cxx?
-	    //     case '':
-	    // 	// Reload colour map.
-	    // 	read_materials(NULL);
-	    // 	glutPostRedisplay();
-	    // 	break;
 
 	  case 'o':
 	    // Open a flight file (unless the file dialog is already
@@ -3223,18 +3217,16 @@ void keyPressed(unsigned char key, int x, int y)
     }
 }
 
-// EYE - why do we have this?
+// Called when 'special' keys are pressed.
 void specPressed(int key, int x, int y) 
 {
-//   if (puKeyboard(key + PU_KEY_GLUT_SPECIAL_OFFSET, PU_DOWN)) {
-//     glutPostRedisplay();
-//   }
-    // At the moment, the only special keys we deal with are the arrow
-    // keys, as well as HOME and END.  These all are used by the
-    // graphs window, so we just pass this to the graphs special key
-    // handler.
-    if (globals.track()) {
-	specialGraphs(key, x, y);
+    // We give our widgets a shot at the key first, via puKeyboard.
+    // If it returns FALSE (ie, none of the widgets eat the key), and
+    // if there's a track being displayed, then pass it on to the
+    // special key handler of the graph window and give it a shot.
+    if (!puKeyboard(key + PU_KEY_GLUT_SPECIAL_OFFSET, PU_DOWN) && 
+	globals.track()) {
+    	specialGraphs(key, x, y);
     }
 }
 
@@ -3252,10 +3244,12 @@ void setLighting()
 void init()
 {
     // Initalize scenery object.
-//     scenery = new Scenery(tileManager, palette);
     scenery = new Scenery(tileManager);
-    // EYE - magic "number"
-    scenery->setBackgroundImage("./Whole_world_-_land_and_oceans_1024");
+
+    // Background map image.
+    SGPath world = prefs.path;
+    world.append("Whole_world_-_land_and_oceans_1024");
+    scenery->setBackgroundImage(world);
 
     globals.overlays = new Overlays(prefs.fg_root.str());
 

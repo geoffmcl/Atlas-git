@@ -66,7 +66,7 @@ class Scenery: public Subscriber {
     Scenery(TileManager *tm);
     ~Scenery();
 
-    void setBackgroundImage(const string& s);
+    void setBackgroundImage(const SGPath& f);
 
     void move(const sgdMat4 modelViewMatrix);
     void zoom(const sgdFrustum& frustum, double metresPerPixel);

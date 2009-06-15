@@ -732,10 +732,9 @@ Scenery::~Scenery()
 // Loads the image to be used as the "background world".  The
 // background world is a single texture draped over the globe, used as
 // a background where there is no FlightGear scenery.
-void Scenery::setBackgroundImage(const string& s)
+void Scenery::setBackgroundImage(const SGPath& f)
 {
     // Load the file into a Texture object.
-    SGPath f(s);
     _world.load(f);
 
     // Create display list for background world.  
