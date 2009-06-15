@@ -278,16 +278,25 @@ void cleanup()
 ////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char **argv)
 {
-    if (argc == 0) {
-	print_help();
-    }
-  
     appName = argv[0];
 
-    // Read the FG_SCENERY env variable before processing .atlasmaprc
-    // and command args, so that we can override it if necessary.
-    fg_root.set(getenv("FG_ROOT"));
-    fg_scenery.set(getenv("FG_SCENERY"));
+    // Read the FG_ROOT and FG_SCENERY environment variables before
+    // processing .atlasmaprc and command args, so that we can
+    // override them if necessary.
+    char *env = getenv("FG_ROOT");
+    if (env == NULL) {
+	// EYE - is it possible for this to not be defined?
+	fg_root.set(FGBASE_DIR);
+    } else {
+	fg_root.set(env);
+    }
+
+    env = getenv("FG_SCENERY");
+    if (env == NULL) {
+	fg_scenery.set(fg_root.str());
+    } else {
+	fg_scenery.set(env);
+    }
 
     // Process ~/.atlasmaprc.
     char* homedir = getenv("HOME");
