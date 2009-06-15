@@ -25,8 +25,8 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
-#ifndef __TILEMAPPER_H__
-#define __TILEMAPPER_H__
+#ifndef _TILEMAPPER_H_
+#define _TILEMAPPER_H_
 
 #include <plib/pu.h>
 
@@ -84,4 +84,4 @@ class TileMapper {
     vector<Bucket *> _buckets;
 };
 
-#endif	// __TILEMAPPER_H__
+#endif	// _TILEMAPPER_H_

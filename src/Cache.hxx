@@ -121,4 +121,4 @@ class Cache {
     bool _running;
 };
 
-#endif _CACHE_H_
+#endif // _CACHE_H_

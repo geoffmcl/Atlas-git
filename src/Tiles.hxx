@@ -25,8 +25,8 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
-#ifndef __TILES_H__
-#define __TILES_H__
+#ifndef _TILES_H_
+#define _TILES_H_
 
 #include <string>
 #include <map>
@@ -154,4 +154,4 @@ protected:
     int _lat, _lon, _width;
 };
 
-#endif        // __TILEMANAGER_H__
+#endif	// _TILES_H_

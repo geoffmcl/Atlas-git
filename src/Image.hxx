@@ -24,8 +24,8 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
-#ifndef __IMAGE_H__
-#define __IMAGE_H__
+#ifndef _IMAGE_H_
+#define _IMAGE_H_
 
 enum ImageType {PNG, JPEG};
 

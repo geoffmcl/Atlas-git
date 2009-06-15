@@ -23,8 +23,8 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
-#ifndef __PREFERENCES_H__
-#define __PREFERENCES_H__
+#ifndef _PREFERENCES_H_
+#define _PREFERENCES_H_
 
 #include <vector>
 #include <simgear/misc/sg_path.hxx>
@@ -123,4 +123,4 @@ protected:
     SerialConnection _serial;
 };
 
-#endif        // __PREFERENCES_H__
+#endif	// _PREFERENCES_H_

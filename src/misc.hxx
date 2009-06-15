@@ -24,8 +24,8 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
-#ifndef __MISC_H__
-#define __MISC_H__
+#ifndef _MISC_H_
+#define _MISC_H_
 
 #include <zlib.h>
 

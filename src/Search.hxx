@@ -23,8 +23,8 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
-#ifndef __SEARCH_H__
-#define __SEARCH_H__
+#ifndef _SEARCH_H_
+#define _SEARCH_H_
 
 #include <plib/pu.h>
 
@@ -97,4 +97,4 @@ protected:
     int _realLines();
 };
 
-#endif        // __SEARCH_H__
+#endif	// _SEARCH_H_

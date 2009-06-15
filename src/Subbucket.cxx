@@ -271,7 +271,7 @@ static void rotate(sgVec3 to, const sgVec3 from, const sgVec3 by)
 // 	       from[0], from[1], from[2], to[0], to[1], to[2]);
 //     }
 }
-#endif ROTATE_NORMALS
+#endif // ROTATE_NORMALS
 
 static void drawTriangle(const sgVec3 *p, const sgVec3 *normals)
 {
@@ -287,7 +287,7 @@ static void drawTriangle(const sgVec3 *p, const sgVec3 *normals)
 	rotate(newNormal, normals[i], p[i]);
 	glNormal3fv(newNormal); glVertex3fv(p[i]);
     }
-#endif ROTATE_NORMALS
+#endif // ROTATE_NORMALS
     glEnd();
 }
 
@@ -306,7 +306,7 @@ static void drawTriangle(const sgVec3 *p, const sgVec3 *normals,
 	rotate(newNormal, normals[i], p[i]);
 	glColor4fv(color[i]); glNormal3fv(newNormal); glVertex3fv(p[i]);
     }
-#endif ROTATE_NORMALS
+#endif // ROTATE_NORMALS
     glEnd();
 }
 
@@ -327,7 +327,7 @@ static void drawTriangle(const float* p0, const float* p1, const float* p2,
     glNormal3fv(newNormal); glVertex3fv(p1);
     rotate(newNormal, n2, p2);
     glNormal3fv(newNormal); glVertex3fv(p2);
-#endif ROTATE_NORMALS
+#endif // ROTATE_NORMALS
     glEnd();
 }
 
@@ -349,7 +349,7 @@ static void drawTriangle(const float* p0, const float* p1, const float* p2,
     glColor4fv(c1); glNormal3fv(newNormal); glVertex3fv(p1);
     rotate(newNormal, n2, p2);
     glColor4fv(c2); glNormal3fv(newNormal); glVertex3fv(p2);
-#endif ROTATE_NORMALS
+#endif // ROTATE_NORMALS
     glEnd();
 }
 
@@ -374,7 +374,7 @@ static void drawTriangleFan(const int_list &vertexIndices,
 		   vertices[vertexIndices[i]]);
 	    glNormal3fv(newNormal);
 	    glVertex3fv(vertices[vertexIndices[i]]);
-#endif ROTATE_NORMALS
+#endif // ROTATE_NORMALS
 	}
     }
     glEnd();
@@ -395,7 +395,7 @@ static void drawQuad(const sgVec3 *p, const sgVec3 *normals)
 	rotate(newNormal, normals[i], p[i]);
 	glNormal3fv(newNormal); glVertex3fv(p[i]);
     }
-#endif ROTATE_NORMALS
+#endif // ROTATE_NORMALS
     glEnd();
 }
 
@@ -414,7 +414,7 @@ static void drawQuad(const sgVec3 *p, const sgVec3 *normals, const sgVec4 *color
 	rotate(newNormal, normals[i], p[i]);
 	glColor4fv(color[i]); glNormal3fv(newNormal); glVertex3fv(p[i]);
     }
-#endif ROTATE_NORMALS
+#endif // ROTATE_NORMALS
     glEnd();
 }
 

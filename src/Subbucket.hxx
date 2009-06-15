@@ -32,8 +32,8 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
 ---------------------------------------------------------------------------*/
 
-#ifndef __SUBBUCKET_H__
-#define __SUBBUCKET_H__
+#ifndef _SUBBUCKET_H_
+#define _SUBBUCKET_H_
 
 #include <simgear/misc/sg_path.hxx>
 #include <simgear/io/sg_binobj.hxx>
@@ -78,4 +78,4 @@ class Subbucket {
     vector<float> _elevations;
 };
 
-#endif __SUBBUCKET_H__
+#endif // _SUBBUCKET_H_

@@ -27,8 +27,8 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
-#ifndef __FLIGHTTRACK_H__
-#define __FLIGHTTRACK_H__
+#ifndef _FLIGHTTRACK_H_
+#define _FLIGHTTRACK_H_
 
 #include <deque>
 #include <plib/sg.h>
@@ -192,4 +192,3 @@ class FlightTrack {
 
 
 #endif
-

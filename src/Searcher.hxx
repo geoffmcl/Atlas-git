@@ -140,4 +140,4 @@ class Searcher {
     SearchableLessThan _comparator;
 };
 
-#endif _SEARCHER_H_
+#endif // _SEARCHER_H_

@@ -29,8 +29,8 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
 ---------------------------------------------------------------------------*/
 
-#ifndef __BUCKET_H__
-#define __BUCKET_H__
+#ifndef _BUCKET_H_
+#define _BUCKET_H_
 
 #include <OpenGL/gl.h>
 
@@ -85,4 +85,4 @@ public:
     bool _loaded, _dirty;
 };
 
-#endif __BUCKET_H__
+#endif // _BUCKET_H_

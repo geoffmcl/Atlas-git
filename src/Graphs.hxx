@@ -23,8 +23,8 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
-#ifndef __GRAPH_H__
-#define __GRAPH_H__
+#ifndef _GRAPH_H_
+#define _GRAPH_H_
 
 #include <OpenGL/gl.h>
 #include <GLUT/glut.h>
@@ -138,4 +138,4 @@ protected:
     void _addPoint(float p, Values &v);
 };
 
-#endif        // __GRAPH_H__
+#endif // _GRAPH_H_
