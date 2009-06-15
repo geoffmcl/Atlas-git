@@ -8,8 +8,6 @@ if HAVE_CURL
 bin_PROGRAMS += GetMap
 endif
 
-bin_SCRIPTS = buildmaps.sh
-
 Atlas_SOURCES = \
 	Notifications.cxx Notifications.hxx \
 	Atlas.cxx \

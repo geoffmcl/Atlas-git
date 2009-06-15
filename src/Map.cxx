@@ -162,8 +162,6 @@ void print_help()
 	   rescaleFactor);
     printf("  --discrete-contour Don't blend contour colours (default)\n");
     printf("  --smooth-contour   Blend contour colours\n");
-//     printf("  --light=x,y,z      Set light vector for shading (default = <%.1f, %.1f, %.1f>)\n",
-// 	   lightPosition[0], lightPosition[1], lightPosition[2]);
     printf("  --light=azim,elev  Set light position (default = <%.0f, %.0f>)\n",
 	   azimuth, elevation);
     printf("  --lighting         Light the terrain (default)\n");
@@ -178,8 +176,6 @@ void print_help()
 
 bool parse_arg(char* arg) 
 {
-//     float x, y, z;
-
     if (strncmp(arg, "--fg-root=", 10) == 0) {
 	fg_root.set(arg + 10);
     } else if (strncmp(arg, "--fg-scenery=", 13) == 0) {
@@ -200,8 +196,6 @@ bool parse_arg(char* arg)
 	discreteContours = false;
     } else if (sscanf(arg, "--aafactor=%d", &rescaleFactor) == 1) {
 	;
-//     } else if (sscanf(arg, "--light=%f, %f, %f", &x, &y, &z) == 3) {
-// 	sgSetVec4(lightPosition, x, y, z, 0.0);
     } else if (sscanf(arg, "--light=%f, %f", &azimuth, &elevation) == 2) {
 	// Force them to be in range.
 	azimuth = normalizeHeading(azimuth);
