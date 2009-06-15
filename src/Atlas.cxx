@@ -977,10 +977,10 @@ void makeDialog(const char *str, puCallback cb)
 	return;
     }
 
-    GLfloat viewport[4];
-    glGetFloatv(GL_VIEWPORT, viewport);
-    GLfloat windowWidth = viewport[2];
-    GLfloat windowHeight = viewport[3];
+    GLint viewport[4];
+    glGetIntegerv(GL_VIEWPORT, viewport);
+    GLint windowWidth = viewport[2];
+    GLint windowHeight = viewport[3];
     // EYE - magic numbers (and many others later).
     const int dialogWidth = 300;
     const int dialogHeight = 100;
@@ -1083,7 +1083,7 @@ MainUI::MainUI(int x, int y): _dirty(true)
     flightTracksFrame = new puFrame(0, cury, width, cury + flightTracksHeight);
     cury += bigSpace;
 
-    const int trackButtonWidth = (width - 4 * bigSpace) / 3.0;
+    const int trackButtonWidth = (width - 4 * bigSpace) / 3;
 
     // Track size and track size limit.
     curx = bigSpace;
@@ -1165,7 +1165,7 @@ MainUI::MainUI(int x, int y): _dirty(true)
     tracksComboBox->setCallback(track_select_cb);
     curx += guiWidth - buttonHeight;
     prevTrackButton = new puArrowButton(curx,
-					cury + buttonHeight / 2.0,
+					cury + buttonHeight / 2,
 					curx + buttonHeight,
 					cury + buttonHeight,
 					PUARROW_UP);
@@ -1174,7 +1174,7 @@ MainUI::MainUI(int x, int y): _dirty(true)
     nextTrackButton = new puArrowButton(curx,
 					cury,
 					curx + buttonHeight,
-					cury + buttonHeight / 2.0,
+					cury + buttonHeight / 2,
 					PUARROW_DOWN);
     nextTrackButton->setCallback(track_select_cb);
     nextTrackButton->greyOut();
@@ -1257,7 +1257,7 @@ MainUI::MainUI(int x, int y): _dirty(true)
     // airways, and labels.
     cury -= navaidsHeight;
     cury += bigSpace;
-    curx += guiWidth / 2.0;
+    curx += guiWidth / 2;
 
     MEFToggle = new puButton(curx, cury, 
 				 curx + checkHeight, cury + checkHeight);
@@ -1322,7 +1322,7 @@ MainUI::MainUI(int x, int y): _dirty(true)
     cury += buttonHeight;
 
     cury += bigSpace;
-    curx -= guiWidth / 2.0;
+    curx -= guiWidth / 2;
 
     //////////////////////////////////////////////////////////////////////
     // Location information
@@ -3145,10 +3145,12 @@ void keyPressed(unsigned char key, int x, int y)
 
 	  case 'P':
 	    // Toggle auto-centering.
-	    puObject *toggle = mainUI->trackAircraftToggle;
-	    toggle->setValue(!toggle->getIntegerValue());
-	    track_aircraft_cb(toggle);
-	    glutPostRedisplay();
+	      {
+		  puObject *toggle = mainUI->trackAircraftToggle;
+		  toggle->setValue(!toggle->getIntegerValue());
+		  track_aircraft_cb(toggle);
+		  glutPostRedisplay();
+	      }
 	    break;
 
 	  case 'p':
