@@ -36,6 +36,9 @@ using namespace std;
 // EYE - for debugging only
 extern int main_window;
 
+// Static map between Cache instance ID's and their addresses.
+map<int, Cache *> Cache::__map;
+
 CacheObject::CacheObject(): _dist(0.0)
 {
 }
@@ -68,10 +71,18 @@ Cache::Cache(unsigned int cacheSize,
     _cacheSize(cacheSize), _workTime(workTime),
     _interval(interval), _callbackPending(false), _running(false)
 {
+    // Get a valid id for ourselves and add ourselves to the map.
+    // This is a bit inefficient, but caches won't be created very
+    // often, nor will there be very many.
+    for (_id = 0; __map.find(_id) != __map.end(); _id++) {
+    }
+    __map[_id] = this;
 }
 
 Cache::~Cache()
 {
+    // Remove ourselves from the map.
+    __map.erase(_id);
 }
 
 const set<CacheObject *> operator-(const set<CacheObject *>& a, 
@@ -167,19 +178,20 @@ void Cache::go()
 
     // If the timer isn't going already, then start things going.
     if (!_callbackPending) {
-	// EYE - is this a safe cast?
 	// EYE - use idle timer instead?  (And in search stuff?)
-	glutTimerFunc(_interval, _cacheTimer, (int)this);
+	glutTimerFunc(_interval, _cacheTimer, _id);
 	_callbackPending = true;
     }
 
     _running = true;
 }
 
-void _cacheTimer(int value)
+// Called periodically by the glutTimerFunc().
+void Cache::_cacheTimer(int id)
 {
-    // EYE - is this a safe cast?
-    Cache *c = (Cache *)value;
+    // Look up the id in the id->address map and call _load().
+    assert(__map.find(id) != __map.end());
+    Cache *c = __map[id];
     c->_load();
 }
 
@@ -213,6 +225,6 @@ void Cache::_load()
 	t2.stamp();
     } while ((_toBeLoaded.size() > 0) && ((t2 - t1) < microSeconds));
 
-    glutTimerFunc(_interval, _cacheTimer, (int)this);
+    glutTimerFunc(_interval, _cacheTimer, _id);
     _callbackPending = true;
 }

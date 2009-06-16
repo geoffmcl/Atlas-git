@@ -35,6 +35,7 @@
 
 #include <set>
 #include <deque>
+#include <map>
 
 #include <plib/sg.h>
 
@@ -86,7 +87,7 @@ class Cache {
   protected:
     // Called periodically to load 1 or more tiles
     void _load();
-    friend void _cacheTimer(int value);
+    static void _cacheTimer(int id);
 
     // All loaded objects.
     std::set<CacheObject *> _all;
@@ -119,6 +120,10 @@ class Cache {
     bool _callbackPending;
     // True if we are active.
     bool _running;
+
+    // Used to map between Cache instances and their address.
+    static std::map<int, Cache *> __map;
+    int _id;
 };
 
 #endif // _CACHE_H_
