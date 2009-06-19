@@ -367,15 +367,16 @@ void AirwaysOverlay::_checkEnd(AwyLabel &end, bool isLow)
 	}
     }
 
-    if (distance == 1e12) {
-	fprintf(stderr, "_findEnd: can't find any match for '%s' <%lf, %lf>\n",
-		end.id.c_str(), end.lat, end.lon);
-    } else {
-	fprintf(stderr, "_findEnd: closest match for '%s' <%lf, %lf> is\n",
-		end.id.c_str(), end.lat, end.lon);
-	fprintf(stderr, "\t%.0f metres away <%lf, %lf>\n",
-		distance, latitude, longitude);
-    }
+    // EYE - we need some kind of logging facility.
+//     if (distance == 1e12) {
+// 	fprintf(stderr, "_findEnd: can't find any match for '%s' <%lf, %lf>\n",
+// 		end.id.c_str(), end.lat, end.lon);
+//     } else {
+// 	fprintf(stderr, "_findEnd: closest match for '%s' <%lf, %lf> is\n",
+// 		end.id.c_str(), end.lat, end.lon);
+// 	fprintf(stderr, "\t%.0f metres away <%lf, %lf>\n",
+// 		distance, latitude, longitude);
+//     }
 }
 
 // EYE - we need to be very careful about OpenGL state changes.  Here,
