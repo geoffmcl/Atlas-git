@@ -115,7 +115,6 @@ class BucketCO: public CacheObject {
     Bucket *_b;
 };
 
-// class SceneryTile: public Cullable {
 class SceneryTile: public Cullable, Subscriber {
   public:
     SceneryTile(TileInfo *t);
@@ -123,6 +122,9 @@ class SceneryTile: public Cullable, Subscriber {
 
     void addTexture(unsigned int level, Cache *cache);
     void addBuckets(Cache *cache, Culler::FrustumSearch& frustum);
+
+    // True if the map exists and the texture has been loaded.
+    bool textureLoaded(unsigned int level);
 
     // Draws a texture appropriate to the given level.
     void drawTexture(unsigned int level);
@@ -380,9 +382,10 @@ SceneryTile::SceneryTile(TileInfo *ti):
     _buckets(NULL)
 {
     // Create a texture object for each level at which we have maps.
-    // EYE - actually, this does levels for which we *want* maps.
+    // EYE - since we only do this at creation, we won't notice new maps
+    const bitset<TileManager::MAX_MAP_LEVEL>& missing = _ti->missingMaps();
     for (unsigned int i = 0; i < _levels.size(); i++) {
-	if (_levels[i]) {
+	if (_levels[i] && !missing[i]) {
 	    char str[3];
 	    sprintf(str, "%d", i);
 
@@ -414,12 +417,16 @@ SceneryTile::~SceneryTile()
     }
 }
 
-// Adds the texture at the given level to the given cache.  This tells
-// the cache that the texture is visible and needs to be loaded.
+// Adds the texture at the given level, if it exists, to the given
+// cache.  This tells the cache that the texture is visible and needs
+// to be loaded.
 void SceneryTile::addTexture(unsigned int level, Cache *cache)
 {
-    assert(_textures.find(level) != _textures.end());
-    cache->add(_textures[level]);
+    // EYE - should we look for the best match?  In that case, we'd
+    // need access to other caches.
+    if (_textures.find(level) != _textures.end()) {
+	cache->add(_textures[level]);
+    }
 }
 
 // Adds any visible buckets to the given cache.  This tells the cache
@@ -439,6 +446,13 @@ void SceneryTile::addBuckets(Cache *cache, Culler::FrustumSearch& frustum)
     }
 }
 
+// Returns true if there's a texture object at that level, *and* it
+// has loaded its texture.
+bool SceneryTile::textureLoaded(unsigned int i)
+{
+    return ((_textures.find(i) != _textures.end()) && _textures[i]->loaded());
+}
+
 // Draws the texture that best matches the given level, where "best"
 // means the first texture we find at this level or below.  Failing
 // that, we choose the first one we find above this level.
@@ -449,7 +463,7 @@ void SceneryTile::drawTexture(unsigned int level)
     // values down to 0.  However, if it's 0 and we subtract 1, it
     // will become very large.  Thus the test.  Tricky (and scary).
     for (unsigned int l = level; l < _levels.size(); l--) {
-	if (_levels[l] && _textures[l]->loaded()) {
+	if (textureLoaded(l)) {
 	    _textures[l]->draw();
 	    return;
 	}
@@ -458,7 +472,7 @@ void SceneryTile::drawTexture(unsigned int level)
     // No textures at this level or below?  Okay then, how about
     // above this level?
     for (unsigned int l = level + 1; l < _levels.size(); l++) {
-	if (_levels[l] && _textures[l]->loaded()) {
+	if (textureLoaded(l)) {
 	    _textures[l]->draw();
 	    return;
 	}
@@ -586,7 +600,7 @@ void SceneryTile::label(Culler::FrustumSearch& frustum, double metresPerPixel,
 	    // until we find one with a valid maximum elevation
 	    // figure, then quit.
 	    for (unsigned int i = 0; i < _levels.size(); i++) {
-		if (_levels[i] && _textures[i]->loaded()) {
+		if (textureLoaded(i)) {
 		    double m = _textures[i]->maximumElevation();
 		    if (m != NO_ELEVATION) {
 			_maxElevation = m;
@@ -696,7 +710,6 @@ Scenery::Scenery(TileManager *tm):
 	tile->setBounds(bounds);
 
 	_tiles.push_back(tile);
-// 	_culler->addObject(tile, _tileType, bounds);
 	_culler->addObject(tile);
     }
 
