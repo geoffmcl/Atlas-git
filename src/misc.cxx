@@ -459,6 +459,9 @@ const char *AtlasString::appendf(const char *fmt, ...)
 
 const char *AtlasString::_appendf(const char *fmt, va_list ap)
 {
+    va_list ap_copy;
+    va_copy(ap_copy, ap);
+
     size_t newLen = vsnprintf(_buf + _strlen, _size - _strlen, fmt, ap);
     if ((newLen + 1) > (_size - _strlen)) {
 	// This just finds the next multiple of _increment greater
@@ -467,12 +470,14 @@ const char *AtlasString::_appendf(const char *fmt, va_list ap)
 	_size = (_strlen + newLen + 1 + _increment) / _increment * _increment;
 	char *newBuf;
 	if ((newBuf = (char *)realloc(_buf, _size)) == NULL) {
+	    va_end(ap_copy);
 	    return NULL;
 	}
 	_buf = newBuf;
-	vsnprintf(_buf + _strlen, _size - _strlen, fmt, ap);
+	vsnprintf(_buf + _strlen, _size - _strlen, fmt, ap_copy);
     }
     _strlen += newLen;
+    va_end(ap_copy);
 
     return _buf;
 }
