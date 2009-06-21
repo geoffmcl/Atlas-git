@@ -314,7 +314,7 @@ Preferences::Preferences()
 
     palette.set(path.str());
     palette.append("Palettes");
-    palette.append("default");
+    palette.append("default.ap");
 
     textureFonts = true;
     width = 800;
