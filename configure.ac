@@ -333,7 +333,9 @@ AM_CONFIG_HEADER(src/config.h)
 AC_CONFIG_FILES([ \
 	Makefile \
 	src/Makefile \
-	src/data/Makefile
+	src/data/Makefile \
+	src/data/Fonts/Makefile \
+	src/data/Palettes/Makefile
 ])
 AC_OUTPUT
 
