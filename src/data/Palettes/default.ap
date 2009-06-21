@@ -1,0 +1,129 @@
+# ATLAS PALETTE
+
+# An Atlas palette file describes how to colour a map.  It consists of
+# a number of colours, elevations, and materials.  A colour must be
+# defined before it is used by an elevation or material.
+
+# A colour consists of the keyword "Colour" or "Color", a descriptive
+# name, and red, green, blue, alpha values.  Names can be anything you
+# want, with the condition that they not contain whitespace.
+
+# A material consists of the keyword "Material", a material name, and
+# a colour name.  The material names are case-sensitive, and have to
+# match the ones used in the FlightGear scenery files.  If a material
+# uses a non-existent colour, it will be (silently) ignored.  If a
+# material is specified twice, a warning will be printed, and the
+# first definition will be used.  There is no requirement to specify
+# any materials.  If a material's colour is not given, it will be
+# coloured according to its elevation.
+
+# Elevations are a special kind of "material".  Their names are of the
+# form "Elevation_<elev>", where <elev> is the elevation.  The
+# elevation must be an integer, and can be negative.  The entry means
+# "everything at <elev> and above uses this colour".
+
+# By default, elevations are in metres, but they can be set explicitly
+# with the "Units" command.  If given the keyword "feet" or "ft", then
+# feet are used; if given "metres", "meters", or "m", then metres are
+# used.  Note that the units given only apply to *subsequent*
+# elevations in the file.
+
+# This isn't necessary, since metres are the default - it's just for
+# illustration purposes.  
+Units m
+
+#============================================================
+# Elevation colours
+#============================================================
+
+# Colour names can be arbitrary, but it's best to use descriptive
+# ones.
+Colour E_-100 	0.647 0.729 0.647 1.0 
+Colour E_0	0.859 0.906 0.804 1.0 
+Colour E_100	0.753 0.831 0.682 1.0
+Colour E_200	0.949 0.933 0.757 1.0 
+Colour E_500	0.941 0.871 0.608 1.0 
+Colour E_1000	0.878 0.725 0.486 1.0 
+Colour E_1500	0.816 0.616 0.443 1.0 
+Colour E_2000	0.776 0.529 0.341 1.0 
+#Colour E_3000	0.750 0.725 0.600 1.0 
+#Colour E_5000	0.824 0.863 0.824 1.0 
+Colour E_3000	0.824 0.863 0.824 1.0 
+
+#============================================================
+# Elevations
+#============================================================
+Material Elevation_-100		E_-100
+Material Elevation_0		E_0
+Material Elevation_100		E_100
+Material Elevation_200		E_200
+Material Elevation_500		E_500
+Material Elevation_1000		E_1000
+Material Elevation_1500		E_1500
+Material Elevation_2000		E_2000
+#Material Elevation_3000		E_3000
+#Material Elevation_5000		E_5000
+Material Elevation_3000		E_3000
+
+#============================================================
+# Physical feature colours
+#============================================================
+# Water
+Colour water		0.671 0.737 0.745 1.0
+
+# Cities
+Colour city		1.000 0.973 0.459 1.0
+
+# Transportation
+Colour road		0.250 0.250 0.250 1.0
+Colour railroad		1.000 0.000 0.000 1.0
+
+# Airports
+Colour runway		0.0   0.0   0.0	  1.0
+Colour taxiway		0.5   0.5   0.5   1.0
+
+# Useful colours (not used at the moment, but you're free to define
+# whatever colours you like, and not required to use them).
+Colour red		1.0   0.0   0.0	  1.0
+Colour green		0.0   1.0   0.0	  1.0
+Colour blue		0.0   0.0   1.0	  1.0
+Colour cyan		0.0   1.0   1.0	  1.0
+Colour magenta		1.0   0.0   1.0	  1.0
+Colour yellow		1.0   1.0   0.0	  1.0
+
+#============================================================
+# Physical features
+#============================================================
+
+# Note the use of the "undefined" colour.  We have no colour named
+# "undefined", so these materials will only be coloured according to
+# their elevations.  This may seem silly - after all, it has the same
+# effect as just not specifying the material at all - but it could be
+# useful for temporarily drawing certain kinds of materials.  For
+# example, if you want to show glaciers, just change the "Glacier"
+# colour from "undefined" to a colour that is defined, like "blue".
+
+Material Lake			water
+Material IntermittentLake	water
+Material DryLake		undefined 
+Material Reservoir		water
+Material IntermittentReservoir	water 
+Material Stream			water
+Material Ocean			water
+
+Material Urban			city
+Material Town			city
+Material BuiltUpCover		city
+
+Material Glacier		undefined
+Material Marsh			undefined
+Material Grass			undefined
+
+Material Road                   road
+Material Freeway                road
+Material Railroad               railroad
+
+Material pa_taxiway		taxiway
+Material pa_tiedown		taxiway
+Material pc_taxiway		taxiway
+Material pc_tiedown		taxiway
