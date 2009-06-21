@@ -1,7 +1,5 @@
 SUBDIRS = data
 
-EXTRA_DIST = AtlasPalette
-
 bin_PROGRAMS = Atlas Map
 
 if HAVE_CURL
