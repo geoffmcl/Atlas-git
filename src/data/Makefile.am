@@ -1,1 +1,3 @@
-EXTRA_DIST = helvetica_medium.txf
+SUBDIRS = Fonts Palettes
+
+EXTRA_DIST = background.jpg
