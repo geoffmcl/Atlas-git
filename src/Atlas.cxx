@@ -3166,6 +3166,9 @@ void keyPressed(unsigned char key, int x, int y)
 		      // Create a warning dialog.
 		      makeDialog("You have unsaved tracks.\nIf you exit now, they will be lost.\nDo you want to exit?", exit_ok_cb);
 		  } else {
+		      // EYE - we should delete allocated objects
+		      // first!  This is another argument for a
+		      // AtlasController object.
 		      exit(0);
 		  }
 	      }
@@ -3248,7 +3251,7 @@ void init()
 
     // Background map image.
     SGPath world = prefs.path;
-    world.append("Whole_world_-_land_and_oceans_1024");
+    world.append("background");
     scenery->setBackgroundImage(world);
 
     globals.overlays = new Overlays(prefs.fg_root.str());
