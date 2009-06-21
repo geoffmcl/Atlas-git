@@ -23,7 +23,14 @@
 
 using namespace std;
 
-#include <GLUT/glut.h>		// Needed for gluOrtho2D.
+#if defined( __APPLE__)
+#  include <GLUT/glut.h>	// Needed for gluOrtho2D().
+#else
+#  ifdef WIN32
+#    include <windows.h>
+#  endif
+#  include <GL/glut.h>
+#endif
 
 #include "CrosshairsOverlay.hxx"
 

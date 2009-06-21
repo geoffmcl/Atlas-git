@@ -26,9 +26,6 @@
 #ifndef _GRAPH_H_
 #define _GRAPH_H_
 
-#include <OpenGL/gl.h>
-#include <GLUT/glut.h>
-
 #include <vector>
 
 #include "FlightTrack.hxx"

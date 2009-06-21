@@ -23,7 +23,14 @@
 
 #include "Bucket.hxx"
 
-#include <GLUT/glut.h>		// Needed for gluPickMatrix().
+#if defined( __APPLE__)
+#  include <GLUT/glut.h>	// Needed for gluPickMatrix().
+#else
+#  ifdef WIN32
+#    include <windows.h>
+#  endif
+#  include <GL/glut.h>
+#endif
 
 #include <cassert>
 #include <iostream>

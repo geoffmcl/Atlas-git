@@ -21,9 +21,6 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
-#include <OpenGL/gl.h>
-#include <GLUT/glut.h>
-
 #include <stdarg.h>
 
 #include <cassert>

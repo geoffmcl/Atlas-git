@@ -32,8 +32,6 @@
 #ifndef _BUCKET_H_
 #define _BUCKET_H_
 
-#include <OpenGL/gl.h>
-
 #include <plib/sg.h>
 #include <simgear/misc/sg_path.hxx>
 #include <simgear/io/sg_binobj.hxx>
