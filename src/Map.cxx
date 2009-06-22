@@ -403,7 +403,7 @@ int main(int argc, char **argv)
 	palette.set(fg_root.str());
 	palette.append("Atlas");
 	palette.append("Palettes");
-	palette.append("default");
+	palette.append("default.ap");
     } else {
 	fprintf(stderr, "%s: No palette specified.", appName);
 	fprintf(stderr, "\tUse --palette= or --fg-root= to specify palette location.\n");
