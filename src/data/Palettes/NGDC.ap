@@ -1,0 +1,70 @@
+# ATLAS PALETTE
+#
+# Contour colours based on National Geophysical Data Center's DEM,
+# appearing in Wikipedia:
+#
+# http://en.wikipedia.org/wiki/File:AYool_topography_15min.png
+#
+
+#
+# Colours from NGDC's DEM (my own intervals though)
+#
+Colour E_0	0.000 0.627 0.000 1.000
+Colour E_250	0.000 0.682 0.000 1.000
+Colour E_500	0.388 0.722 0.063 1.000
+Colour E_750	0.757 0.773 0.169 1.000
+Colour E_1000	0.992 1.000 0.380 1.000
+Colour E_1500	0.890 0.859 0.333 1.000
+Colour E_2000	0.784 0.714 0.294 1.000
+Colour E_2500	0.682 0.573 0.247 1.000
+Colour E_3000	0.580 0.439 0.204 1.000
+Colour E_3500	0.482 0.310 0.169 1.000
+Colour E_4000	0.388 0.192 0.129 1.000
+Colour E_4500	0.298 0.082 0.090 1.000
+Colour E_5000	0.831 0.278 0.773 1.000
+Colour E_5500 	0.867 0.475 0.820 1.000
+Colour E_6000	0.910 0.690 0.882 1.000
+
+# We really need a "below sea level" colour.
+Material Elevation_0		E_0
+Material Elevation_250		E_250
+Material Elevation_500		E_500
+Material Elevation_750		E_750
+Material Elevation_1000		E_1000
+Material Elevation_1500		E_1500
+Material Elevation_2000		E_2000
+Material Elevation_2500		E_2500
+Material Elevation_3000		E_3000
+Material Elevation_3500		E_3500
+Material Elevation_4000		E_4000
+Material Elevation_4500		E_4500
+Material Elevation_5000		E_5000
+Material Elevation_5500		E_5500
+Material Elevation_6000		E_6000
+
+Colour water		0.671 0.737 0.745 1.0
+Colour city		1.000 0.973 0.459 1.0
+Colour road		0.250 0.250 0.250 1.0
+Colour railroad		1.000 0.000 0.000 1.0
+Colour runway		0.0   0.0   0.0	  1.0
+Colour taxiway		0.5   0.5   0.5   1.0
+
+Material Lake			water
+Material IntermittentLake	water
+Material Reservoir		water
+Material IntermittentReservoir	water 
+Material Stream			water
+Material Ocean			water
+
+Material Urban			city
+Material Town			city
+Material BuiltUpCover		city
+
+Material Road                   road
+Material Freeway                road
+Material Railroad               railroad
+
+Material pa_taxiway		taxiway
+Material pa_tiedown		taxiway
+Material pc_taxiway		taxiway
+Material pc_tiedown		taxiway

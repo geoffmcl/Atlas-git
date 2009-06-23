@@ -1,0 +1,135 @@
+# ATLAS PALETTE
+#
+# Contour colours based on California Dry ("cd-a"):
+#
+# http://soliton.vm.bytemark.co.uk/pub/cpt-city/jm/cd/tn/cd-a.png.index.html
+#
+# Range is documented as 0 - 4320 (metres, I presume).
+
+#
+# Colours and elevations from cd-a
+#
+Colour E_0	0.094 0.776 0.792 1.0
+Colour E_90	0.200 0.843 0.694 1.0
+Colour E_180	0.318 0.894 0.612 1.0
+Colour E_270	0.447 0.945 0.573 1.0
+Colour E_360	0.592 0.996 0.588 1.0
+Colour E_450	0.639 0.996 0.604 1.0
+Colour E_540	0.686 0.996 0.616 1.0
+Colour E_630	0.729 0.996 0.631 1.0
+Colour E_720	0.773 0.996 0.647 1.0
+Colour E_810	0.812 0.996 0.663 1.0
+Colour E_900	0.847 0.996 0.675 1.0
+Colour E_990	0.882 0.996 0.690 1.0
+Colour E_1080	0.914 0.996 0.706 1.0
+Colour E_1170	0.941 0.996 0.722 1.0
+Colour E_1260	0.969 0.996 0.733 1.0
+Colour E_1350	0.992 0.996 0.749 1.0
+Colour E_1440	1.000 0.984 0.765 1.0
+Colour E_1530	0.996 0.976 0.737 1.0
+Colour E_1620	0.996 0.969 0.710 1.0
+Colour E_1710	0.996 0.961 0.686 1.0
+Colour E_1800	0.996 0.953 0.659 1.0
+Colour E_1890	0.996 0.933 0.608 1.0
+Colour E_1980	0.996 0.910 0.557 1.0
+Colour E_2070	0.996 0.878 0.502 1.0
+Colour E_2160	0.996 0.847 0.451 1.0
+Colour E_2250	0.984 0.843 0.475 1.0
+Colour E_2340	0.969 0.835 0.502 1.0
+Colour E_2430	0.953 0.831 0.525 1.0
+Colour E_2520	0.937 0.824 0.545 1.0
+Colour E_2610	0.922 0.820 0.569 1.0
+Colour E_2700	0.906 0.812 0.588 1.0
+Colour E_2790	0.890 0.808 0.608 1.0
+Colour E_2880	0.875 0.800 0.624 1.0
+Colour E_2970	0.863 0.792 0.643 1.0
+Colour E_3060	0.847 0.788 0.659 1.0
+Colour E_3150	0.831 0.780 0.675 1.0
+Colour E_3240	0.816 0.776 0.690 1.0
+Colour E_3330	0.800 0.769 0.702 1.0
+Colour E_3420	0.784 0.761 0.714 1.0
+Colour E_3510	0.769 0.757 0.725 1.0
+Colour E_3600	0.800 0.784 0.757 1.0
+Colour E_3690	0.827 0.816 0.792 1.0
+Colour E_3780	0.855 0.847 0.824 1.0
+Colour E_3870	0.882 0.875 0.859 1.0
+Colour E_3960	0.914 0.906 0.894 1.0
+Colour E_4050	0.941 0.937 0.929 1.0
+Colour E_4140	0.969 0.969 0.961 1.0
+Colour E_4230	1.000 1.000 1.000 1.0
+
+Material Elevation_0	E_0
+Material Elevation_90	E_90
+Material Elevation_180	E_180
+Material Elevation_270	E_270
+Material Elevation_360	E_360
+Material Elevation_450	E_450
+Material Elevation_540	E_540
+Material Elevation_630	E_630
+Material Elevation_720	E_720
+Material Elevation_810	E_810
+Material Elevation_900	E_900
+Material Elevation_990	E_990
+Material Elevation_1080	E_1080
+Material Elevation_1170	E_1170
+Material Elevation_1260	E_1260
+Material Elevation_1350	E_1350
+Material Elevation_1440	E_1440
+Material Elevation_1530	E_1530
+Material Elevation_1620	E_1620
+Material Elevation_1710	E_1710
+Material Elevation_1800	E_1800
+Material Elevation_1890	E_1890
+Material Elevation_1980	E_1980
+Material Elevation_2070	E_2070
+Material Elevation_2160	E_2160
+Material Elevation_2250	E_2250
+Material Elevation_2340	E_2340
+Material Elevation_2430	E_2430
+Material Elevation_2520	E_2520
+Material Elevation_2610	E_2610
+Material Elevation_2700	E_2700
+Material Elevation_2790	E_2790
+Material Elevation_2880	E_2880
+Material Elevation_2970	E_2970
+Material Elevation_3060	E_3060
+Material Elevation_3150	E_3150
+Material Elevation_3240	E_3240
+Material Elevation_3330	E_3330
+Material Elevation_3420	E_3420
+Material Elevation_3510	E_3510
+Material Elevation_3600	E_3600
+Material Elevation_3690	E_3690
+Material Elevation_3780	E_3780
+Material Elevation_3870	E_3870
+Material Elevation_3960	E_3960
+Material Elevation_4050	E_4050
+Material Elevation_4140	E_4140
+Material Elevation_4230	E_4230
+
+Colour water		0.671 0.737 0.745 1.0
+Colour city		1.000 0.973 0.459 1.0
+Colour road		0.250 0.250 0.250 1.0
+Colour railroad		1.000 0.000 0.000 1.0
+Colour runway		0.0   0.0   0.0	  1.0
+Colour taxiway		0.5   0.5   0.5   1.0
+
+Material Lake			water
+Material IntermittentLake	water
+Material Reservoir		water
+Material IntermittentReservoir	water 
+Material Stream			water
+Material Ocean			water
+
+Material Urban			city
+Material Town			city
+Material BuiltUpCover		city
+
+Material Road                   road
+Material Freeway                road
+Material Railroad               railroad
+
+Material pa_taxiway		taxiway
+Material pa_tiedown		taxiway
+Material pc_taxiway		taxiway
+Material pc_tiedown		taxiway
