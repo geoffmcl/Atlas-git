@@ -266,6 +266,7 @@ void cleanup()
 	delete tileManager;
     }
     if (rt2) {
+	rt2->EndCapture();
 	delete rt2;
     }
     if (mapper) {
