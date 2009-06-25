@@ -117,7 +117,13 @@ class SceneryTile: public Cullable, Subscriber {
     SceneryTile(TileInfo *t);
     ~SceneryTile();
 
+    // Adds the appropriate TextureCO object to the given cache for
+    // loading.
     void addTexture(unsigned int level, Cache *cache);
+    // Ditto for buckets.  The FrustumSearch object is passed to check
+    // of the bucket is really visible (a scenery tile is usually
+    // composed of many buckets, so a visible tile may have
+    // non-visible buckets).
     void addBuckets(Cache *cache, Culler::FrustumSearch& frustum);
 
     // True if the map exists and the texture has been loaded.
@@ -160,6 +166,10 @@ class SceneryTile: public Cullable, Subscriber {
     atlasSphere _bounds;
 };
 
+const int Texture::__defaultSize;
+GLubyte Texture::__defaultImage[Texture::__defaultSize][Texture::__defaultSize][3];
+GLuint Texture::__defaultTexture = 0;
+
 Texture::Texture(): _name(0)
 {
     assert(glutGetWindow() == main_window);
@@ -171,11 +181,21 @@ Texture::~Texture()
     unload();
 }
 
+// Loads the given file, which is assumed to be a JPEG or PNG file.
+// On success, loaded() will return true.
 void Texture::load(SGPath f, float *maximumElevation)
 {
     GLubyte *data;
     int width, height;
 
+    // EYE - a bit of a hack - as I understand it, we need to make
+    // sure we've got the right OpenGL conext current before we load a
+    // texture.  We know at the moment that all our textures are
+    // displayed in the main window, so we make sure the main window
+    // is current (this assumes that main_window is up to date) before
+    // we load the texture.  I'm sure there must be a better way.
+    // Note that because texture loading is usually asynchronous, we
+    // can't be sure when load() will be called.
     int oldWindow = glutGetWindow();
     if (oldWindow != main_window) {
 	glutSetWindow(main_window);
@@ -197,7 +217,9 @@ void Texture::load(SGPath f, float *maximumElevation)
 	f.concat(".png");
 	data = (GLubyte *)loadPNG(f.c_str(), &width, &height, maximumElevation);
     }
-    assert(data != NULL);
+    if (data == NULL) {
+	return;
+    }
 
     // Create the texture.
     glGenTextures(1, &_name);
@@ -247,6 +269,53 @@ void Texture::unload()
     if (loaded()) {
 	glDeleteTextures(1, &_name);
 	_name = 0;
+    }
+}
+
+// Returns our texture (name).  If _name is 0 (ie, load() wasn't
+// called, or it had an error), we substitute a default texture, which
+// is a black and white checkerboard.
+GLuint Texture::name() const
+{
+    if (loaded()) {
+	return _name;
+    } else {
+	// Has our default texture been initialized?
+	if (__defaultTexture == 0) {
+	    // Nope.  Create it.
+	    for (int i = 0; i < __defaultSize; i ++) {
+		for (int j = 0; j < __defaultSize; j++) {
+		    bool c = ((((i & 0x1) == 0) ^ ((j & 0x1)) == 0));
+		    if (c) {
+			// Red square
+			__defaultImage[i][j][0] = 255;
+			__defaultImage[i][j][1] = 0;
+			__defaultImage[i][j][2] = 0;
+		    } else {
+			// White square
+			__defaultImage[i][j][0] = 255;
+			__defaultImage[i][j][1] = 255;
+			__defaultImage[i][j][2] = 255;
+		    }
+		}
+	    }
+
+	    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+	    glGenTextures(1, &__defaultTexture);
+	    assert(__defaultTexture != 0);
+	    glBindTexture(GL_TEXTURE_2D, __defaultTexture);
+
+	    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 
+			 __defaultSize, __defaultSize, 0, 
+			 GL_RGB, GL_UNSIGNED_BYTE, __defaultImage);
+	}
+
+	return __defaultTexture;
     }
 }
 
@@ -388,13 +457,14 @@ SceneryTile::SceneryTile(TileInfo *ti):
 
 	    SGPath f = _ti->mapsDir();
 	    f.append(str);
-	    f.append(_ti->sceneryDir().file());
+	    f.append(_ti->name());
 	    _textures[i] = new TextureCO(f, _ti->lat(), _ti->lon());
 	}
     }
 
-    // Subscribe to the discrete/smooth contour change notification.
-    // When we get it, we'll tell our buckets that they're dirty.
+    // Subscribe to the discrete/smooth contour change and palette
+    // change notifications.  When we get either, we'll tell our
+    // buckets that they're dirty.
     subscribe(Notification::DiscreteContours);
     subscribe(Notification::NewPalette);
 }

@@ -43,6 +43,13 @@
 // Handles loading and unloading of a single texture (ie, map).  The
 // texture doesn't know how to draw itself.
 class Texture {
+    // When name() is called and there's no texture, we substitute a
+    // default 8x8 checkerboard texture.  The data is in
+    // __defaultImage, and the texture name is in __defaultTexture.
+    static const int __defaultSize = 8;
+    static GLubyte __defaultImage[__defaultSize][__defaultSize][3];
+    static GLuint __defaultTexture;
+
   public:
     Texture();
     ~Texture();
@@ -54,7 +61,8 @@ class Texture {
     void unload();
     bool loaded() const { return _name != 0; }
 
-    GLuint name() const { return _name; }
+    // Texture name.
+    GLuint name() const;
 
   protected:
     GLuint _name;		// Texture name, initialized to 0.
