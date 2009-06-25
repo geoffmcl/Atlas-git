@@ -119,9 +119,12 @@ void Bucket::load(Projection projection)
 	    object.append(data);
 	    object.concat(".gz"); // EYE - always?
 	    Subbucket *sb = new Subbucket(object);
-	    // EYE - change to test rather than assertion
-	    assert(sb->load(projection));
-	    _chunks.push_back(sb);
+	    if (sb->load(projection)) {
+		_chunks.push_back(sb);
+	    } else {
+		fprintf(stderr, "'%s': object file '%s' not found\n", 
+			stg.c_str(), object.c_str());
+	    }
 	}
     }
 
