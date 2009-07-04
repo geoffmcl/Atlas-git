@@ -477,7 +477,7 @@ int main(int argc, char **argv)
     int mapSize = 0;
     const bitset<TileManager::MAX_MAP_LEVEL>& mapLevels = 
 	tileManager->mapLevels();
-    for (int i = TileManager::MAX_MAP_LEVEL; i >= 0; i--) {
+    for (int i = TileManager::MAX_MAP_LEVEL - 1; i >= 0; i--) {
 	if (mapLevels[i]) {
 	    mapSize = 1 << i;
 	    break;
