@@ -76,7 +76,7 @@ class Overlays {
     FlightTracksOverlay* flightTracksOverlay() { return _tracks; }
 
   protected:
-    std::bitset<_LAST - 1> _overlays;
+    std::bitset<_LAST> _overlays;
 
     AirportsOverlay *_airports;
     NavaidsOverlay *_navaids;
