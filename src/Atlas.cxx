@@ -323,7 +323,9 @@ Palettes::Palettes(const char *paletteDir): _i(0)
     ulDir *dir = ulOpenDir(paletteDir);
     ulDirEnt *entity;
     while (dir && (entity = ulReadDir(dir))) {
-	if (!entity->d_isdir) {
+	// All palettes should have the suffix ".ap".
+	char *suffix = entity->d_name + strlen(entity->d_name) - strlen(".ap");
+	if (!entity->d_isdir && (strcmp(suffix, ".ap") == 0)) {
 	    SGPath p(paletteDir);
 	    p.append(entity->d_name);
 
