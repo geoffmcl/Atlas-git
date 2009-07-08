@@ -2905,6 +2905,16 @@ void mouseClick(int button, int state, int x, int y)
 		dragging = false;
 	    }
 	    break;
+	  case 3:		// WM_MOUSEWHEEL (away)
+	    if (state == GLUT_DOWN) {
+		keyPressed('-', x, y);
+	    }
+	    break;
+	  case 4:		// WM_MOUSEWHEEL (towards)
+	    if (state == GLUT_DOWN) {
+		keyPressed('+', x, y);
+	    }
+	    break;
 	  default:
 	    break;
 	}
