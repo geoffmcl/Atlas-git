@@ -84,7 +84,7 @@ class CaseFreeLessThan {
 class SearchableLessThan {
   public:
     SearchableLessThan() { sgdZeroVec3(_centre); }
-    bool operator()(const Searchable *left, const Searchable *right) {
+    bool operator()(const Searchable *left, const Searchable *right) const {
 	return (left->distanceSquared(_centre) < 
 		right->distanceSquared(_centre));
     }
