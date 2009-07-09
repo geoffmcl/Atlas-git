@@ -28,9 +28,9 @@
 #include <sstream>
 #include <fstream>
 
-using namespace std;
-
 #include <simgear/constants.h>
+
+using namespace std;
 
 Palette::Palette(const char *path): _i(0)
 {

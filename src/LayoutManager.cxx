@@ -23,9 +23,9 @@
 
 #include <cassert>
 
-using namespace std;
-
 #include "LayoutManager.hxx"
+
+using namespace std;
 
 LayoutManager::LayoutManager(): _italics(0.0), _noOfChunks(0)
 {

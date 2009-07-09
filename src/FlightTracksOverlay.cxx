@@ -23,10 +23,10 @@
 
 #include <cassert>
 
-using namespace std;
-
 #include "FlightTracksOverlay.hxx"
 #include "Globals.hxx"
+
+using namespace std;
 
 FlightTracksOverlay::FlightTracksOverlay(Overlays& overlays):
     _overlays(overlays), _isDirty(false)

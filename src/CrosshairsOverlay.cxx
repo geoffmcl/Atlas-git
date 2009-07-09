@@ -21,8 +21,6 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
 ---------------------------------------------------------------------------*/
 
-using namespace std;
-
 #if defined( __APPLE__)
 #  include <GLUT/glut.h>	// Needed for gluOrtho2D().
 #else
@@ -33,6 +31,8 @@ using namespace std;
 #endif
 
 #include "CrosshairsOverlay.hxx"
+
+using namespace std;
 
 CrosshairsOverlay::CrosshairsOverlay(Overlays& overlays):
     _overlays(overlays)

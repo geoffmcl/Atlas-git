@@ -26,12 +26,12 @@
 #include <simgear/misc/sg_path.hxx>
 #include <simgear/math/sg_geodesy.hxx>
 
-using namespace std;
-
 #include "AirportsOverlay.hxx"
 #include "LayoutManager.hxx"
 #include "Globals.hxx"
 #include "misc.hxx"
+
+using namespace std;
 
 void airportLatLon(ARP *ap);
 void runwayExtents(RWY *rwy, float elev);

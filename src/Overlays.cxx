@@ -26,11 +26,11 @@
 
 #include "Globals.hxx"
 
-using namespace std;
-
 // #include <simgear/timing/timestamp.hxx> // SGTimeStamp
 
 #include "Overlays.hxx"
+
+using namespace std;
 
 multimap<string, NAVPOINT> navPoints;
 

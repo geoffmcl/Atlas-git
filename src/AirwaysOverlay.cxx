@@ -30,9 +30,9 @@
 #include "Globals.hxx"
 #include "misc.hxx"
 
-using namespace std;
-
 #include "AirwaysOverlay.hxx"
+
+using namespace std;
 
 // EYE - magic numbers and policies
 // const float maxHighAirway = 10000.0;

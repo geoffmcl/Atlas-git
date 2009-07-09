@@ -27,10 +27,10 @@
 #include <simgear/misc/sg_path.hxx>
 #include <simgear/math/sg_geodesy.hxx>
 
-using namespace std;
-
 #include "FixesOverlay.hxx"
 #include "Globals.hxx"
+
+using namespace std;
 
 // Above this level, no fixes are drawn.
 const float noLevel = 1250.0;

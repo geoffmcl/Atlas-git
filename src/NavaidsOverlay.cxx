@@ -34,9 +34,9 @@
 #include "Globals.hxx"
 #include "misc.hxx"
 
-using namespace std;
-
 #include "NavaidsOverlay.hxx"
+
+using namespace std;
 
 // From Atlas.cxx, used for colouring tuned-in navaids.
 // EYE - make part of preferences
