@@ -49,6 +49,7 @@ class Subbucket {
     bool load(Bucket::Projection p = Bucket::CARTESIAN);
     bool loaded() const { return _loaded; }
     void unload();
+    unsigned int size() { return _size; }
 
     double maximumElevation() const { return _maxElevation; }
 
@@ -76,6 +77,8 @@ class Subbucket {
     // EYE - change to SGVec3?
     vector<float *> _vertices, _normals;
     vector<float> _elevations;
+
+    unsigned int _size;	// Size of subbucket (approximately) in bytes.
 };
 
 #endif // _SUBBUCKET_H_

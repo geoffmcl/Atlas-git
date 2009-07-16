@@ -27,7 +27,7 @@
 
 using namespace std;
 
-Subbucket::Subbucket(const SGPath &p): _path(p), _loaded(false)
+Subbucket::Subbucket(const SGPath &p): _path(p), _loaded(false), _size(0)
 {
 }
 
@@ -43,6 +43,7 @@ Subbucket::~Subbucket()
 bool Subbucket::load(Bucket::Projection projection)
 {
     unload();
+    assert(_size == 0);
     if (!_chunk.read_bin(_path.c_str())) {
 	// EYE - throw an error?
 	return false;
@@ -120,6 +121,12 @@ bool Subbucket::load(Bucket::Projection projection)
     }
     _maxElevation *= SG_METER_TO_FEET;
 
+    // Estimate the size of the subbucket.  We just count the vertices
+    // and normals.  There are probably other bits we should count,
+    // but I think it's close enough.
+    _size = _vertices.size() * sizeof(sgVec3);
+    _size += _normals.size() * sizeof(sgVec3);
+    
     return true;
 }
 
@@ -137,6 +144,7 @@ void Subbucket::unload()
 
     _elevations.clear();
 
+    _size = 0;
     _loaded = false;
 }
 

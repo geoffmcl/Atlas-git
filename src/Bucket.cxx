@@ -53,7 +53,7 @@ using namespace std;
 // term for a part, and a tile is the 1/8 x 1/8 degree (or whatever)
 // bit corresponding to a single scenery file.
 Bucket::Bucket(const SGPath &p, long int index): 
-    _p(p), _index(index), _dlist(0), _loaded(false), _dirty(true)
+    _p(p), _index(index), _dlist(0), _loaded(false), _dirty(true), _size(0)
 {
     // Calculate bounds.
 
@@ -105,6 +105,7 @@ void Bucket::load(Projection projection)
     SGPath stg(_p);
     globalString.printf("%d.stg", _index);
     stg.append(globalString.str());
+    assert(_size == 0);
 
     ifstream in(stg.c_str());
     string buf;
@@ -118,8 +119,10 @@ void Bucket::load(Projection projection)
 	    SGPath object(_p);
 	    object.append(data);
 	    object.concat(".gz"); // EYE - always?
+
 	    Subbucket *sb = new Subbucket(object);
 	    if (sb->load(projection)) {
+		_size += sb->size();
 		_chunks.push_back(sb);
 	    } else {
 		fprintf(stderr, "'%s': object file '%s' not found\n", 
@@ -146,6 +149,7 @@ void Bucket::unload()
 	delete _chunks[i];
     }
     _chunks.clear();
+    _size = 0;
 
     _loaded = false;
 

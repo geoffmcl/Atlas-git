@@ -56,6 +56,7 @@ public:
     void load(Projection p = CARTESIAN);
     bool loaded() const { return _loaded; }
     void unload();
+    unsigned int size() { return _size; }
 
     double maximumElevation() const { return _maxElevation; }
 
@@ -81,6 +82,7 @@ public:
     GLuint _dlist;
 
     bool _loaded, _dirty;
+    unsigned int _size;		// Size of bucket (approximately) in bytes.
 };
 
 #endif // _BUCKET_H_
