@@ -44,42 +44,89 @@
 // is used when determining which objects to load and unload - nearer
 // ones are loaded before farther ones, and farther ones are unloaded
 // before nearer ones).
+//
+// A CacheObject must implement 5 routines:
+//
+// void calcDist() - set _dist to the distance between the CacheObject
+//   and the given point.
+//
+// bool shouldLoad() - this is called when a CacheObject is added to a
+//   Cache, but before loading starts.  Return true if you want your
+//   load() method to be called.
+//
+// bool load() - this is called when the Cache determines that the
+//   CacheObject should be loaded.  Return false if you want to be
+//   called again (eg, you've divided loading into multiple steps).
+//   Return true when loading is complete.
+// 
+// bool unload() - similar to load(), but for unloading.  Like load(),
+//   it should return true if it's done unloading.  It's probably
+//   silly to give it the same return-value semantics as load()
+//   (unloading should always be fast and never need to be broken down
+//   into multiple steps), but I didn't want to destroy the symmetry.
+//
+// unsigned int size() - size of CacheObject, in bytes.  Note that it
+//   isn't necessary to be completely accurate.  This is just used by
+//   the Cache to get a rough idea of how much it has loaded into
+//   memory.
+//
 class CacheObject {
   public:
+    friend class Cache;
+
     CacheObject();
     virtual ~CacheObject() = 0;
 
-    virtual void load() = 0;
-    virtual void unload() = 0;
+    virtual void calcDist(sgdVec3 centre) = 0;
+    virtual bool shouldLoad() = 0;
+    virtual bool load() = 0;
+    virtual bool unload() = 0;
+    // EYE - unsigned long?
+    virtual unsigned int size() = 0;
 
-    void setCentre(const sgdVec3 centre);
     float dist() const { return _dist; }
-    void calcDist(sgdVec3 from);
 
   protected:
-    sgdVec3 _centre;
+    // The distance from the centre of the Cache 'region' to the
+    // CacheObject.  This should be set in calcDist().
     float _dist;
+
+    // These are meant to be touched only by the Cache object - they
+    // help it keep track of who needs to be loaded and unloaded.
+    bool _toBeLoaded, _toBeUnloaded;
 };
 
 // Manages the loading and unloading of a set of objects of class
 // CacheObject.
 class Cache {
   public:
-    // Cache is unlimited if cacheSize is 0, all work is done in one
-    // go if workTime is 0, and interval is in milliseconds.
-    Cache(unsigned int cacheSize = 10, 
-	  unsigned int workTime = 10,
-	  unsigned int interval = 0);
+    // The maximum size of the cache (in bytes) is cacheSize,
+    // although it will exceed that limit if all objects are visible.
+    // If cacheSize is 0, there is no limit.  On each call to _load(),
+    // it works workTime milliseconds.  If workTime is 0, it will load
+    // everything in one go.  The number of milliseconds between calls
+    // to _load() is given by interval.
+    Cache(unsigned int cacheSize = 50 * 1024 * 1024, // 50 MB
+	  unsigned int workTime = 10,		     // 10 ms
+	  unsigned int interval = 0);		     // 0 ms
     ~Cache();
 
     // These are used, together, to tell the cache which objects are
-    // visible, and should be used in the order given.  The reset()
-    // call tells the cache the new centre of the displayed area (the
-    // cache needs to know this because it uses distance from centre
-    // to decide which tiles to load first).  The add() is used to add
-    // a single object - call this once for each object you want to
-    // load.  After adding all visible objects, call go() to tell the
-    // cache to begin loading.
+    // visible, and should be used in the order given.  
+    //
+    // The reset() call tells the cache the new centre of the
+    // displayed area (the cache needs to know this because it uses
+    // distance from centre to decide which tiles to load first).
+    // When called, the cache will stop all processing, and assume
+    // that no objects are visible.  It will *not* unload any objects
+    // however.
+    // 
+    // The add() is used to add a single object - call this once for
+    // each object you want to load (or, in other words, are visible).
+    //
+    // After adding all visible objects, call go() to tell the cache
+    // to begin loading.
+    //
     void reset(sgdVec3 centre);
     void add(CacheObject* c);
     void go();
@@ -89,28 +136,24 @@ class Cache {
     void _load();
     static void _cacheTimer(int id);
 
-    // All loaded objects.
+    // All loaded objects (or, to put it another way, all objects
+    // which have not been completely unloaded).
     std::set<CacheObject *> _all;
-    // Objects which are visible (and which, therefore, must not be
-    // unloaded).  These objects will either be in _all or in
-    // _toBeLoaded.
-    std::set<CacheObject *> _visible;
     // Objects which must still be loaded because they're visible
     // (_toBeLoaded) or unloaded because they're not visible, and
     // we've exceeded the cache size (_toBeUnloaded).  Objects in
-    // _toBeLoaded *must not* be in _all, and *must* be in _visible.
-    // Objects in _toBeUnloaded *must* be in _all, and *must not* be
-    // in _visible.
+    // _toBeUnloaded *must* be in _all.
     std::deque<CacheObject *> _toBeLoaded, _toBeUnloaded;
 
     // The centre of the area to be displayed.  We use this value to
     // decide which objects to load first.
     sgdVec3 _centre;
 
-    // _all will be the maximum of _cacheSize and _visible.size() (ie,
-    // we guarantee to load all visible objects, and then non-visible
-    // up to _cacheSize).  Set to 0 if cache size is unlimited.
-    unsigned int _cacheSize;
+    // _cacheSize is the maximum desired cache size; _objectsSize is
+    // the actual size of the objects we're managing.  We guarantee to
+    // load all visible objects, and then non-visible up to
+    // _cacheSize.  Set _cacheSize to 0 if cache size is unlimited.
+    unsigned int _cacheSize, _objectsSize;
     // How much time to spend in one call to _load() (in ms).
     unsigned int _workTime;
     // Time (in ms) between calls to _load().
@@ -121,7 +164,7 @@ class Cache {
     // True if we are active.
     bool _running;
 
-    // Used to map between Cache instances and their address.
+    // Used to map between Cache instances and their addresses.
     static std::map<int, Cache *> __map;
     int _id;
 };

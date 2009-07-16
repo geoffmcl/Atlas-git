@@ -42,25 +42,16 @@ using namespace std;
 // EYE - for debugging only
 extern int main_window;
 
-// Static map between Cache instance ID's and their addresses.
+// Static map between Cache instance ID's and their addresses.  This
+// is used to figure out which one to call when the GLUT timer fires.
 map<int, Cache *> Cache::__map;
 
-CacheObject::CacheObject(): _dist(0.0)
+CacheObject::CacheObject()
 {
 }
 
 CacheObject::~CacheObject()
 {
-}
-
-void CacheObject::setCentre(const sgdVec3 centre)
-{
-    sgdCopyVec3(_centre, centre);
-}
-
-void CacheObject::calcDist(sgdVec3 from)
-{
-    _dist = sgdDistanceSquaredVec3(from, _centre);
 }
 
 // More C++ hoops to jump through.
@@ -74,7 +65,7 @@ struct CacheObjectLessThan {
 Cache::Cache(unsigned int cacheSize, 
 	     unsigned int workTime, 
 	     unsigned int interval):
-    _cacheSize(cacheSize), _workTime(workTime),
+    _cacheSize(cacheSize), _objectsSize(0), _workTime(workTime),
     _interval(interval), _callbackPending(false), _running(false)
 {
     // Get a valid id for ourselves and add ourselves to the map.
@@ -91,34 +82,33 @@ Cache::~Cache()
     __map.erase(_id);
 }
 
-const set<CacheObject *> operator-(const set<CacheObject *>& a, 
-				   const set<CacheObject *>& b)
-{
-    set<CacheObject *> c;
-    set_difference(a.begin(), a.end(), b.begin(), b.end(), 
-		   inserter(c, c.begin()));
-
-    return c;
-}
-
-// Reset the cache.  This means that we forget everything we knew
-// about what's visible, what needs to be loaded, and what needs to be
-// unloaded.  We also stop all cache processing.  We do *not* unload
-// anything - all loaded objects will remain loaded for the
-// time-being.
+// Reset the cache in preparation for a new set of objects.  We update
+// all loaded objects and we forget everything we knew about what
+// needs to be loaded and what needs to be unloaded.  We also stop all
+// cache processing.  We do *not* unload anything - all loaded objects
+// will remain loaded for the time-being.
 void Cache::reset(sgdVec3 centre)
 {
-    _visible.clear();
+    sgdCopyVec3(_centre, centre);
+
+    set<CacheObject *>::const_iterator i;
+    for (i = _all.begin(); i != _all.end(); i++) {
+	(*i)->_toBeLoaded = false;
+	(*i)->_toBeUnloaded = true;
+	(*i)->calcDist(_centre);
+    }
+
     _toBeLoaded.clear();
     _toBeUnloaded.clear();
-
-    sgdCopyVec3(_centre, centre);
 
     _running = false;
 }
 
-// Add an object.  This should only be done between a reset() and a
-// go().  If this is done after go(), nothing is done.
+// Add an object for loading.  This should only be done between a
+// reset() and a go().  If this is done after go(), nothing is done.
+// When we add an object, we call its shouldLoad() method, which
+// should return true if the object wants its load() method to be
+// called.
 void Cache::add(CacheObject* c)
 {
     if (_running) {
@@ -126,61 +116,32 @@ void Cache::add(CacheObject* c)
 	return;
     }
 
-    // We set the distance to help us decide which objects to load
-    // (and unload) first.
-    c->calcDist(_centre);
-    _visible.insert(c);
-
-    // Schedule for loading if it hasn't been loaded already.
-    if (_all.find(c) == _all.end()) {
+    c->_toBeUnloaded = false;
+    if (c->shouldLoad()) {
+	c->calcDist(_centre);
+	c->_toBeLoaded = true;
 	_toBeLoaded.push_back(c);
     }
 }
 
-// Prepares the cache for loading to commence.
+// Prepares the cache for loading to commence.  We create the
+// _toBeLoaded and _toBeUnloaded deques (they probably don't need to
+// be deques, but it makes my life a bit easier), sort them by
+// distances, then start the timer.
 void Cache::go()
 {
-    assert(_visible.size() <= (_toBeLoaded.size() + _all.size()));
+    set<CacheObject *>::const_iterator i;
+    for (i = _all.begin(); i != _all.end(); i++) {
+	CacheObject *c = *i;
+	if (c->_toBeUnloaded) {
+	    _toBeUnloaded.push_back(c);
+	}
+    }
 
     // Sort things by decreasing distance from centre.  We load
     // central objects first.
     sort(_toBeLoaded.begin(), _toBeLoaded.end(), CacheObjectLessThan());
-
-    // These new objects might put us over our limit.
-    if (_cacheSize > 0) {
-	// Check if we're within our limits.  If not, find objects to
-	// delete.  First, figure out what we would grow to if we
-	// loaded all the new objects.
-	unsigned int maxSize = _toBeLoaded.size() + _all.size();
-	if (maxSize <= _cacheSize) {
-	    // Everything will fit.
-	} else if (_visible.size() == maxSize) {
-	    // Everything's visible - nothing can be deleted.
-	} else {
-	    // Find out which objects aren't visible (ie, are
-	    // candidates for unloading).
-	    set<CacheObject *>notVisible = _all - _visible;
-
-	    // Copy into _toBeUnloaded and sort by distance.
-	    copy(notVisible.begin(), notVisible.end(), 
-		 inserter(_toBeUnloaded, _toBeUnloaded.begin()));
-	    sort(_toBeUnloaded.begin(), _toBeUnloaded.end(), 
-		 CacheObjectLessThan());
-
-	    // Find out how much we can shrink.  We'd like to shrink
-	    // to _cacheSize, but only if we can keep all visible
-	    // objects.
-	    int minSize = max(_cacheSize, (unsigned int)_visible.size());
-	    for (int overrun = maxSize - minSize; overrun > 0; overrun--) {
-		// Unload farthest object.
-		CacheObject *c = _toBeUnloaded.back();
-		_toBeUnloaded.pop_back();
-
-		c->unload();
-		_all.erase(c);
-	    }
-	}
-    }
+    sort(_toBeUnloaded.begin(), _toBeUnloaded.end(), CacheObjectLessThan());
 
     // If the timer isn't going already, then start things going.
     if (!_callbackPending) {
@@ -201,13 +162,40 @@ void Cache::_cacheTimer(int id)
     c->_load();
 }
 
+// The routine that does the real work.  It is called periodically by
+// the timer callback (_cacheTimer).  Each time it is called, it
+// unloads as many objects as necessary (and possible) to bring us
+// under our limit (_cacheSize), then loads as many objects as it can
+// within our time limit (_workTime).
 void Cache::_load()
 {
     _callbackPending = false;
 
     // Don't do anything if _running is false (that means we're in the
-    // midst of adding new objects), or if there's nothing to load.
-    if ((!_running) || (_toBeLoaded.size() == 0)) {
+    // midst of adding new objects).
+    if (!_running) {
+	return;
+    }
+
+    // Unload what we can and should unload.  That means: unload stuff
+    // if we have a cache limit AND we are over the limit AND there is
+    // stuff to unload.
+    if (_cacheSize > 0) {
+	while ((_objectsSize > _cacheSize) && !_toBeUnloaded.empty()) {
+	    // Unload farthest object.
+	    CacheObject *c = _toBeUnloaded.back();
+
+	    _objectsSize -= c->size();
+	    if (c->unload()) {
+		_toBeUnloaded.pop_back();
+		_all.erase(c);
+	    }
+	    _objectsSize += c->size();
+	}
+    }
+
+    // If there's nothing left to load, we're done.
+    if (_toBeLoaded.empty()) {
 	return;
     }
 
@@ -218,10 +206,19 @@ void Cache::_load()
     do {
 	// Load nearest object.
 	CacheObject *c = _toBeLoaded.front();
-	_toBeLoaded.pop_front();
 
-	c->load();
+	// Note the slight difference from the logic in the unload
+	// section above.  If something is in _all, that means it is
+	// at least partially loaded and will need to be unloaded in
+	// the future.  So, we add it as soon as we can here, whereas
+	// in the unload section, we only remove it if it has been
+	// completely unloaded.
 	_all.insert(c);
+	_objectsSize -= c->size();
+	if (c->load()) {
+	    _toBeLoaded.pop_front();
+	}
+	_objectsSize += c->size();
 
 	// EYE - this assumes that we're drawing in main_window
 	// (should be parameterized somehow, or perhaps made into a
@@ -231,6 +228,9 @@ void Cache::_load()
 	t2.stamp();
     } while ((_toBeLoaded.size() > 0) && ((t2 - t1) < microSeconds));
 
+    // Set up the timer for another callback.  Note that we do this
+    // even if there's nothing to be loaded, as there may still be
+    // stuff to unload.
     glutTimerFunc(_interval, _cacheTimer, _id);
     _callbackPending = true;
 }
