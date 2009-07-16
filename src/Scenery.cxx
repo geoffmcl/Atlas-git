@@ -26,13 +26,13 @@
 
 #include <cassert>
 
-using namespace std;
-
 #include "Scenery.hxx"
 #include "Bucket.hxx"
 #include "Globals.hxx"
 #include "Image.hxx"
 #include "LayoutManager.hxx"
+
+using namespace std;
 
 // A nonsensical elevation value.  This is used to represent an unset
 // maximum elevation value for a scenery tile or bucket.
@@ -71,16 +71,17 @@ extern int main_window;
 extern sgdVec3 eye;
 
 // A cache object containing a texture.
-class TextureCO: public CacheObject {
+class MapTexture {
   public:
-    TextureCO(const SGPath &f, int lat, int lon);
-    ~TextureCO();
+    MapTexture(const SGPath &f, int lat, int lon);
+    ~MapTexture();
 
     // Load the texture, extracting its maximum elevation (embedded in
     // the file) if it has one.
     void load();
     void unload();
     bool loaded() const;
+    unsigned int size() { return _t.size(); }
 
     float maximumElevation() { return _maxElevation; }
 
@@ -94,40 +95,10 @@ class TextureCO: public CacheObject {
     float _maxElevation;	// Maximum elevation of the map.
 };
 
-// A cache object containing a bucket.  It doesn't do much except act
-// as a wrapper for a Bucket object, but adds CacheObject
-// capabilities.
-class BucketCO: public CacheObject {
+class SceneryTile: public Cullable, public CacheObject, Subscriber {
   public:
-    BucketCO(const SGPath& f, long int index);
-    ~BucketCO();
-
-    void load() { _b->load(); }
-    void unload() { _b->unload(); }
-    void setDirty() { _b->setDirty(); }
-
-    Bucket *bucket() const { return _b; }
-
-  protected:
-    Bucket *_b;
-};
-
-class SceneryTile: public Cullable, Subscriber {
-  public:
-    SceneryTile(TileInfo *t);
+    SceneryTile(TileInfo *t, Scenery *s);
     ~SceneryTile();
-
-    // Adds the appropriate TextureCO object to the given cache for
-    // loading.
-    void addTexture(unsigned int level, Cache *cache);
-    // Ditto for buckets.  The FrustumSearch object is passed to check
-    // of the bucket is really visible (a scenery tile is usually
-    // composed of many buckets, so a visible tile may have
-    // non-visible buckets).
-    void addBuckets(Cache *cache, Culler::FrustumSearch& frustum);
-
-    // True if the map exists and the texture has been loaded.
-    bool textureLoaded(unsigned int level);
 
     // Draws a texture appropriate to the given level.
     void drawTexture(unsigned int level);
@@ -138,8 +109,6 @@ class SceneryTile: public Cullable, Subscriber {
     void label(Culler::FrustumSearch& frustum, double metresPerPixel, 
 	       bool live);
 
-    void setCentre(const sgdVec3 centre);
-
     bool intersection(SGVec3<double> a, SGVec3<double> b,
 		      SGVec3<double> *c);
 	
@@ -149,28 +118,55 @@ class SceneryTile: public Cullable, Subscriber {
     double latitude() { return _ti->centreLat(); }
     double longitude() { return _ti->centreLon(); }
 
+    // CacheObject interface.
+    void calcDist(sgdVec3 centre);
+    bool shouldLoad();
+    bool load();
+    bool unload();
+    unsigned int size() { return _size; }
+
     // This will get called when we receive a notification.
     bool notification(Notification::type n);
 
   protected:
+    // Allocates and initializes the _buckets array, but doesn't load
+    // buckets.  It can be called multiple times without incurring any
+    // extra work.
     void _findBuckets();
 
     TileInfo *_ti;
+    Scenery *_scenery;
     const bitset<TileManager::MAX_MAP_LEVEL> &_levels;
 
     double _maxElevation;
-
-    map<int, TextureCO *> _textures; // Maps at various resolutions.
-    vector<BucketCO *> *_buckets;    // Buckets in this tile.
-
     atlasSphere _bounds;
+
+    // Maps at various resolutions.  Will be set to non-null at level
+    // l in the constructor if the TileManager indicates there is a
+    // map at that level.
+    MapTexture* _textures[TileManager::MAX_MAP_LEVEL];
+    vector<Bucket *> *_buckets;    // Buckets in this tile.
+
+    // Returns the level of the best available texture nearest
+    // 'level', whether it has been loaded or not.  If 'loaded' is
+    // true, it returns the level of the best texture nearest 'level'
+    // that has already been loaded.
+    unsigned int _calcBest(unsigned int level, bool loaded = false);
+    // The following are set in shouldLoad() and used in load().  They
+    // record what work we need to do at the behest of the cache.
+    unsigned int _mapToBeLoaded;	 // Map to be loaded.
+    vector<Bucket *> _bucketsToBeLoaded;  // Current buckets to be loaded.
+    // Sets _size, which is our approximation of how big we are in
+    // bytes (this figure is used by the cache).
+    void _calcSize();
+    unsigned int _size;
 };
 
 const int Texture::__defaultSize;
 GLubyte Texture::__defaultImage[Texture::__defaultSize][Texture::__defaultSize][3];
 GLuint Texture::__defaultTexture = 0;
 
-Texture::Texture(): _name(0)
+Texture::Texture(): _name(0), _size(0)
 {
     assert(glutGetWindow() == main_window);
 }
@@ -220,6 +216,8 @@ void Texture::load(SGPath f, float *maximumElevation)
     if (data == NULL) {
 	return;
     }
+    // EYE - we calculate this, but maybe loadJPEG/loadPNG should return it?
+    _size = width * height * 4;
 
     // Create the texture.
     glGenTextures(1, &_name);
@@ -265,10 +263,18 @@ void Texture::load(SGPath f, float *maximumElevation)
 
 void Texture::unload()
 {
+    int oldWindow = glutGetWindow();
+    if (oldWindow != main_window) {
+	glutSetWindow(main_window);
+    }
     assert(glutGetWindow() == main_window);
     if (loaded()) {
 	glDeleteTextures(1, &_name);
 	_name = 0;
+	_size = 0;
+    }
+    if (oldWindow != main_window) {
+	glutSetWindow(oldWindow);
     }
 }
 
@@ -322,12 +328,13 @@ GLuint Texture::name() const
 // Creates a texture cache object.  It's redundant to give the path
 // and the lat and lon, because the lat and lon can be extracted from
 // the path name, but it makes our life easier.
-TextureCO::TextureCO(const SGPath &f, int lat, int lon): 
+// TextureCO::TextureCO(const SGPath &f, int lat, int lon): 
+MapTexture::MapTexture(const SGPath &f, int lat, int lon): 
     _f(f), _lat(lat), _lon(lon), _dlist(0), _maxElevation(NO_ELEVATION)
 {
 }
 
-TextureCO::~TextureCO()
+MapTexture::~MapTexture()
 {
     unload();
 }
@@ -354,7 +361,7 @@ void geodVertex3f(float lat, float lon)
     glVertex3f(cart[0], cart[1], cart[2]);
 }
 
-void TextureCO::draw()
+void MapTexture::draw()
 {
     // Don't draw ourselves if the texture hasn't been loaded yet.
     if (!_t.loaded()) {
@@ -408,14 +415,14 @@ void TextureCO::draw()
     glCallList(_dlist);
 }
 
-void TextureCO::load()
+void MapTexture::load()
 {
     // Load the file.  Map files can have the map's maximum elevation
     // embedded in them as a text comment, so extract it if it exists.
     _t.load(_f, &_maxElevation);
 }
 
-void TextureCO::unload()
+void MapTexture::unload()
 {
     _t.unload();
     if (_dlist > 0) {
@@ -424,27 +431,13 @@ void TextureCO::unload()
     }
 }
 
-bool TextureCO::loaded() const
+bool MapTexture::loaded() const
 {
     return _t.loaded();
 }
 
-BucketCO::BucketCO(const SGPath& f, long int index)
-{
-    _b = new Bucket(f, index);
-    // Set our centre.
-    setCentre(_b->bounds().getCenter());
-}
-
-BucketCO::~BucketCO()
-{
-    if (_b) {
-	delete _b;
-    }
-}
-
-SceneryTile::SceneryTile(TileInfo *ti): 
-    _ti(ti), _levels(ti->mapLevels()), _maxElevation(NO_ELEVATION),
+SceneryTile::SceneryTile(TileInfo *ti, Scenery *s): 
+    _ti(ti), _scenery(s), _levels(ti->mapLevels()), _maxElevation(NO_ELEVATION),
     _buckets(NULL)
 {
     // Create a texture object for each level at which we have maps.
@@ -458,7 +451,7 @@ SceneryTile::SceneryTile(TileInfo *ti):
 	    SGPath f = _ti->mapsDir();
 	    f.append(str);
 	    f.append(_ti->name());
-	    _textures[i] = new TextureCO(f, _ti->lat(), _ti->lon());
+	    _textures[i] = new MapTexture(f, _ti->lat(), _ti->lon());
 	}
     }
 
@@ -471,9 +464,10 @@ SceneryTile::SceneryTile(TileInfo *ti):
 
 SceneryTile::~SceneryTile()
 {
-    map<int, TextureCO *>::const_iterator c;
-    for (c = _textures.begin(); c != _textures.end(); c++) {
-	delete c->second;
+    for (unsigned int i = 0; i < TileManager::MAX_MAP_LEVEL; i++) {
+	if (_textures[i]) {
+	    delete _textures[i];
+	}
     }
 
     if (_buckets != NULL) {
@@ -484,40 +478,128 @@ SceneryTile::~SceneryTile()
     }
 }
 
-// Adds the texture at the given level, if it exists, to the given
-// cache.  This tells the cache that the texture is visible and needs
-// to be loaded.
-void SceneryTile::addTexture(unsigned int level, Cache *cache)
+// Called by the cache, asking us to Set _dist, the distance from us
+// to centre.
+void SceneryTile::calcDist(sgdVec3 centre)
 {
-    // EYE - should we look for the best match?  In that case, we'd
-    // need access to other caches.
-    if (_textures.find(level) != _textures.end()) {
-	cache->add(_textures[level]);
-    }
+    _dist = sgdDistanceSquaredVec3(centre, _bounds.center);
 }
 
-// Adds any visible buckets to the given cache.  This tells the cache
-// that each bucket is visible and needs to be loaded.  We use the
-// culler to tell us if a bucket is visible or not.
-void SceneryTile::addBuckets(Cache *cache, Culler::FrustumSearch& frustum)
+// Called by the cache when we are added to it.  We return true if we
+// need to load something.  We also prepare ourselves to load buckets
+// if required.
+bool SceneryTile::shouldLoad()
 {
-    // Make sure we know what our buckets are.
-    _findBuckets();
+    bool result = false;
 
-    for (unsigned int i = 0; i < _buckets->size(); i++) {
-	Bucket *b = (*_buckets)[i]->bucket();
-	if ((b != NULL) && 
-	    frustum.intersects(b->bounds())) {
-	    cache->add((*_buckets)[i]);
+    // Calculate what map to load.  If there's nothing to load, set it
+    // to MAX_MAP_LEVEL.
+    _mapToBeLoaded = _calcBest(_scenery->level());
+    if (_mapToBeLoaded != TileManager::MAX_MAP_LEVEL) {
+	// We need to load a map if it exists and it hasn't been
+	// loaded already.
+	if (_textures[_mapToBeLoaded] && !_textures[_mapToBeLoaded]->loaded()) {
+	    result = true;
+	} else {
+	    _mapToBeLoaded = TileManager::MAX_MAP_LEVEL;
 	}
     }
+
+    if (_scenery->live()) {
+	// Make sure we know what our buckets are.
+	_findBuckets();
+
+	// Schedule some buckets for loading.  We load a bucket if:
+	// (a) there is one, (b) it hasn't been loaded, and (c) it is
+	// within the viewing frustum.
+	_bucketsToBeLoaded.clear();
+
+	for (unsigned int i = 0; i < _buckets->size(); i++) {
+	    Bucket *b = (*_buckets)[i];
+	    if ((b != NULL) && !b->loaded() && 
+		_scenery->frustum()->intersects(b->bounds())) {
+		_bucketsToBeLoaded.push_back(b);
+		result = true;
+	    }
+	}
+    }
+
+    return result;
 }
 
-// Returns true if there's a texture object at that level, *and* it
-// has loaded its texture.
-bool SceneryTile::textureLoaded(unsigned int i)
+// Load a map and/or some buckets.  This is called from a cache, after
+// the call to shouldLoad(), where _mapToBeLoaded and
+// _bucketsToBeLoaded were set.  In the interests of responsiveness,
+// we only do a bit of work (ie, loading the map or one bucket) per
+// call.  We return true when everything has been loaded.
+bool SceneryTile::load()
 {
-    return ((_textures.find(i) != _textures.end()) && _textures[i]->loaded());
+    if (_mapToBeLoaded != TileManager::MAX_MAP_LEVEL) {
+	_textures[_mapToBeLoaded]->load();
+	_calcSize();
+
+	// Set our maximum elevation figure if it hasn't been set
+	// already.
+	if (_maxElevation == NO_ELEVATION) {
+	    _maxElevation = _textures[_mapToBeLoaded]->maximumElevation();
+	}
+
+	_mapToBeLoaded = TileManager::MAX_MAP_LEVEL;
+
+	// If we still have buckets to load, tell the cache we're not
+	// done.
+	return _bucketsToBeLoaded.empty();
+    }
+
+    if (!_bucketsToBeLoaded.empty()) {
+	Bucket *b = _bucketsToBeLoaded.back();
+	_bucketsToBeLoaded.pop_back();
+	b->load();
+	_calcSize();
+
+	return _bucketsToBeLoaded.empty();
+    }
+
+    // If we get here, we're done.
+    return true;
+}
+
+// Unload our textures and buckets.  This is called from a cache.  We
+// always unload everything in a single call.
+bool SceneryTile::unload()
+{
+    for (unsigned int i = 0; i < TileManager::MAX_MAP_LEVEL; i++) {
+	if (_textures[i]) {
+	    _textures[i]->unload();
+	}
+    }
+    
+    if (_buckets != NULL) {
+	for (unsigned int i = 0; i < _buckets->size(); i++) {
+	    (*_buckets)[i]->unload();
+	}
+    }
+
+    // We could just set _size to 0, but this seems cleaner.
+    _calcSize();
+
+    return true;
+}
+
+void SceneryTile::_calcSize()
+{
+    _size = 0;
+    for (unsigned int i = 0; i < TileManager::MAX_MAP_LEVEL; i++) {
+	if (_textures[i]) {
+	    _size += _textures[i]->size();
+	}
+    }
+    
+    if (_buckets != NULL) {
+	for (unsigned int i = 0; i < _buckets->size(); i++) {
+	    _size += (*_buckets)[i]->size();
+	}
+    }
 }
 
 // Draws the texture that best matches the given level, where "best"
@@ -525,24 +607,9 @@ bool SceneryTile::textureLoaded(unsigned int i)
 // that, we choose the first one we find above this level.
 void SceneryTile::drawTexture(unsigned int level)
 {
-    // Note the seemingly backwards termination test.  Why?  The loop
-    // variable 'l' is an unsigned int.  We want to test it for all
-    // values down to 0.  However, if it's 0 and we subtract 1, it
-    // will become very large.  Thus the test.  Tricky (and scary).
-    for (unsigned int l = level; l < _levels.size(); l--) {
-	if (textureLoaded(l)) {
-	    _textures[l]->draw();
-	    return;
-	}
-    }
-
-    // No textures at this level or below?  Okay then, how about
-    // above this level?
-    for (unsigned int l = level + 1; l < _levels.size(); l++) {
-	if (textureLoaded(l)) {
-	    _textures[l]->draw();
-	    return;
-	}
+    unsigned int best = _calcBest(level, true);
+    if (best != TileManager::MAX_MAP_LEVEL) {
+	_textures[best]->draw();
     }
 }
 
@@ -550,10 +617,14 @@ void SceneryTile::drawTexture(unsigned int level)
 void SceneryTile::drawBuckets(Culler::FrustumSearch& frustum)
 {
     assert(glutGetWindow() == main_window);
-    assert(_buckets != NULL);
+
+    if (_buckets == NULL) {
+	// If we haven't loaded our buckets yet, just return.
+	return;
+    }
 
     for (unsigned int i = 0; i < _buckets->size(); i++) {
-	Bucket *b = (*_buckets)[i]->bucket();
+	Bucket *b = (*_buckets)[i];
 	if ((b != NULL) && 
 	    (b->loaded()) && 
 	    frustum.intersects(b->bounds())) {
@@ -645,8 +716,13 @@ void SceneryTile::label(Culler::FrustumSearch& frustum, double metresPerPixel,
 
     if (live) {
 	// If we're live, we label each bucket individually.
+	if (_buckets == NULL) {
+	    // EYE - scary.  Should we label the tile if we have no
+	    // buckets, even if we're live?
+	    return;
+	}
 	for (unsigned int i = 0; i < _buckets->size(); i++) {
-	    Bucket *b = (*_buckets)[i]->bucket();
+	    Bucket *b = (*_buckets)[i];
 	    // Label this bucket if it's loaded and visible.
 	    if ((b != NULL) && 
 		(b->loaded()) && 
@@ -656,45 +732,13 @@ void SceneryTile::label(Culler::FrustumSearch& frustum, double metresPerPixel,
 	    }
 	}
     } else {
-	// We're not live, so label the tile as a whole.  The maximum
-	// elevation of this tile is unknown initially, and we don't
-	// find out what it is until we load a map which has the
-	// maximum elevation tag.  Unfortunately, we aren't told when
-	// maps are loaded (we merely request them), so we need to
-	// explicitly check.
-	if (_maxElevation == NO_ELEVATION) {
-	    // Hasn't been set, so check.  We look through our maps
-	    // until we find one with a valid maximum elevation
-	    // figure, then quit.
-	    for (unsigned int i = 0; i < _levels.size(); i++) {
-		if (textureLoaded(i)) {
-		    double m = _textures[i]->maximumElevation();
-		    if (m != NO_ELEVATION) {
-			_maxElevation = m;
-			break;
-		    }
-		}
-	    }
-	}
-
+	// We're not live, so label the tile as a whole.
 	if (_maxElevation != NO_ELEVATION) {
 	    int mef = MEF(_maxElevation);
 	    double lat = _ti->lat() + 0.5;
 	    double lon = _ti->lon() + _ti->width() / 2.0;
 	    _label(mef,  lat, lon, metresPerPixel);
 	}
-    }
-}
-
-// Tells the tile what the centre of our view is.  The tile tells all
-// its textures, which calculate their distance from this point.  This
-// distance is used by the corresponding cache to decide which ones to
-// load first.
-void SceneryTile::setCentre(const sgdVec3 centre)
-{
-    map<int, TextureCO *>::const_iterator c;
-    for (c = _textures.begin(); c != _textures.end(); c++) {
-	c->second->setCentre(centre);
     }
 }
 
@@ -709,8 +753,7 @@ bool SceneryTile::intersection(SGVec3<double> a, SGVec3<double> b,
     }
 
     for (unsigned int i = 0; i < _buckets->size(); i++) {
-	Bucket *bucket = (*_buckets)[i]->bucket();
-	if (bucket->intersection(a, b, c)) {
+	if ((*_buckets)[i]->intersection(a, b, c)) {
 	    return true;
 	}
     }
@@ -730,13 +773,43 @@ void SceneryTile::_findBuckets()
 	return;
     }
 
-    _buckets = new vector<BucketCO *>;
+    _buckets = new vector<Bucket *>;
 
     const vector<long int>* buckets = _ti->bucketIndices();
     for (unsigned int i = 0; i < buckets->size(); i++) {
 	long int index = buckets->at(i);
-	_buckets->push_back(new BucketCO(_ti->sceneryDir(), index));
+	_buckets->push_back(new Bucket(_ti->sceneryDir(), index));
     }
+}
+
+// Returns the map level which best matches the given level, where
+// "best matches" is defined as "at this level or higher if we've got
+// it, else the closest lower level."  If 'loaded' is false (the
+// default), then it doesn't check if the map has been loaded.  If
+// 'loaded' is true, it only considers already-loaded maps.
+unsigned int SceneryTile::_calcBest(unsigned int level, bool loaded) 
+{
+    // First look at this level or above (higher resolutions).
+    for (unsigned int l = level; l < _levels.size(); l++) {
+	if (_textures[l] && (!loaded || _textures[l]->loaded())) {
+	    return l;
+	}
+    }
+
+    // If we found none above this level, then look below (lower
+    // resolution).  Note the seemingly backwards termination test.
+    // Why?  The loop variable 'l' is an unsigned int.  We want to
+    // test it for all values down to 0.  However, if it's 0 and we
+    // subtract 1, it will become very large.  Thus the test.  Tricky
+    // (and scary).
+    for (unsigned int l = level; l < _levels.size(); l--) {
+	if (_textures[l] && (!loaded || _textures[l]->loaded())) {
+	    return l;
+	}
+    }
+    
+    // None found at all.  Return TileManager::MAX_MAP_LEVEL.
+    return TileManager::MAX_MAP_LEVEL;
 }
 
 Scenery::Scenery(TileManager *tm): 
@@ -754,7 +827,7 @@ Scenery::Scenery(TileManager *tm):
 	TileInfo *ti = i->second;
 
 	// Create a tile.
-	SceneryTile *tile = new SceneryTile(ti);
+	SceneryTile *tile = new SceneryTile(ti, this);
 
 	// Add bounds information about this tile to our Culler
 	// object.
@@ -772,21 +845,11 @@ Scenery::Scenery(TileManager *tm):
 	bounds.extendBy(lat + 1, lon + width);
 	bounds.extendBy(lat, lon + width / 2.0); // middle
 	bounds.extendBy(lat + 1, lon + width / 2.0);
-	tile->setCentre(bounds.getCenter());
 
 	tile->setBounds(bounds);
 
 	_tiles.push_back(tile);
 	_culler->addObject(tile);
-    }
-
-    // Create caches for the texture directories.
-    for (unsigned int i = 0; i < _levels.size(); i++) {
-	if (_levels[i]) {
-	    // Make cache size inversely proportional to the size of
-	    // the textures.
-	    _textureCaches[i] = new Cache(exp2(15 - i));
-	}
     }
 
     // Subscribe to notifications of moves and zooms.
@@ -796,11 +859,6 @@ Scenery::Scenery(TileManager *tm):
 
 Scenery::~Scenery()
 {
-    map<int, Cache *>::const_iterator c;
-    for (c = _textureCaches.begin(); c != _textureCaches.end(); c++) {
-	delete c->second;
-    }
-
     for (unsigned int i = 0; i < _tiles.size(); i++) {
 	delete _tiles[i];
     }
@@ -912,6 +970,11 @@ void Scenery::zoom(const sgdFrustum& frustum, double metresPerPixel)
 	_live = true;
     }
 
+    // EYE - use TileManager::MAX_MAP_LEVEL?
+    if (idealLevel >= _levels.size()) {
+	idealLevel = _levels.size() - 1;
+    }
+
     // Note the strange termination test.  We can't test an unsigned
     // int for being negative - when it's zero and then decremented,
     // it instead becomes very large.  So, we just test if it's still
@@ -932,43 +995,23 @@ void Scenery::draw(bool elevationLabels)
     // Has our view of the world changed?
     if (_dirty) {
 	// Yes.  Update our idea of what to display, ask the culler
-	// for visible tiles, and tell the cache(s).
+	// for visible tiles, and tell the cache.
+	_cache.reset(eye);
 
-	// Tell all caches to reset themselves (not strictly
-	// necessary, as most will be idle anyway, but it's easier
-	// than checking).
-	map<int, Cache *>::const_iterator c;
-	for (c = _textureCaches.begin(); c != _textureCaches.end(); c++) {
-	    c->second->reset(eye);
-	}
-	_bucketCache.reset(eye);
-
-	// Now ask the culler for all visible tiles, and tell them to
-	// add themselves to the appropriate cache for loading.
+	// Now ask the culler for all visible tiles, and add them to
+	// the cache for loading.
 	const vector<Cullable *>& intersections = _frustum->intersections();
 	for (unsigned int i = 0; i < intersections.size(); i++) {
 	    SceneryTile *t = dynamic_cast<SceneryTile *>(intersections[i]);
 	    if (!t) {
 		continue;
 	    }
-	    // Tell the tile to schedule a texture for loading.  Note
-	    // that if we have no maps, then there will be no texture
-	    // to be loaded.
-	    if (_level < _levels.size()) {
-		t->addTexture(_level, _textureCaches[_level]);
-	    }
-	    // If we're live, schedule the appropriate buckets for
-	    // loading too.
-	    if (_live) {
-		t->addBuckets(&_bucketCache, *_frustum);
-	    }
+
+	    _cache.add(t);
 	}
 
-	// Now start the cache(s).
-	for (c = _textureCaches.begin(); c != _textureCaches.end(); c++) {
-	    c->second->go();
-	}
-	_bucketCache.go();
+	// Now start the cache.
+	_cache.go();
 
 	_dirty = false;
     }
@@ -1081,10 +1124,8 @@ void Scenery::_label(bool live)
     glDisable(GL_DEPTH_TEST);
 
     // Draw elevation figures.
-//     vector<void *> intersections = _frustum->intersections(_tileType);
     const vector<Cullable *>& intersections = _frustum->intersections();
     for (unsigned int i = 0; i < intersections.size(); i++) {
-// 	SceneryTile *t = (SceneryTile *)intersections[i];
 	SceneryTile *t = dynamic_cast<SceneryTile *>(intersections[i]);
 	if (!t) {
 	    continue;
@@ -1161,10 +1202,8 @@ bool Scenery::intersection(double x, double y,
 	// We first ask each visible tile in turn if the ray
 	// intersects their live scenery, and, if it does, the
 	// elevation at that point.
-// 	vector<void *> intersections = _frustum->intersections(_tileType);
 	const vector<Cullable *>& intersections = _frustum->intersections();
 	for (unsigned int i = 0; i < intersections.size(); i++) {
-// 	    SceneryTile *t = (SceneryTile *)(intersections[i]);
 	    SceneryTile *t = dynamic_cast<SceneryTile *>(intersections[i]);
 	    if (!t) {
 		continue;
@@ -1232,38 +1271,9 @@ bool Scenery::intersection(double x, double y,
 bool Scenery::notification(Notification::type n)
 {
     if (n == Notification::Moved) {
-	sgdMat4 modelViewMatrix;
-	glGetDoublev(GL_MODELVIEW_MATRIX, (GLdouble *)modelViewMatrix);
-	move(modelViewMatrix);
+	move(globals.modelViewMatrix);
     } else if (n == Notification::Zoomed) {
-	// We need to express the current OpenGL projection matrix in
-	// the form of the clipping planes.  To do that, we need to
-	// dissect it.
-	sgdMat4 projectionMatrix;
-	glGetDoublev(GL_PROJECTION_MATRIX, (GLdouble *)projectionMatrix);
-	
-	// Note that we assume the matrix is orthogonal.
-	double planes[6];	// left, right, top, bottom, -far, -near
-	for (int i = 0; i < 3; i++) {
-	    double a = projectionMatrix[i][i];
-	    double t = projectionMatrix[3][i];
-	    planes[i * 2] = -(t + 1) / a;
-	    planes[i * 2 + 1] = -(t - 1) / a;
-	}
-
-	sgdFrustum f;
-	f.setFrustum(planes[0], planes[1],
-		     planes[2], planes[3],
-		     -planes[4], -planes[5]);
-
-	// The zoom depends on the size of the viewing window.  We
-	// assume the scale is the same vertically as horizontally, so
-	// we just look at width (viewport[2]).
-	GLdouble viewport[4];
-	glGetDoublev(GL_VIEWPORT, viewport);
-	double metresPerPixel = (planes[1] - planes[0]) / viewport[2];
-
-	zoom(f, metresPerPixel);
+	zoom(globals.frustum, globals.metresPerPixel);
     } else {
 	assert(false);
     }

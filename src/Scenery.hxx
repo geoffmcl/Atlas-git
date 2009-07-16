@@ -60,12 +60,14 @@ class Texture {
     void load(SGPath f, float *maximumElevation = NULL);
     void unload();
     bool loaded() const { return _name != 0; }
+    unsigned int size() { return _size; }
 
     // Texture name.
     GLuint name() const;
 
   protected:
     GLuint _name;		// Texture name, initialized to 0.
+    unsigned int _size;		// Size, in bytes.
 };
 
 class SceneryTile;
@@ -80,6 +82,10 @@ class Scenery: public Subscriber {
     void zoom(const sgdFrustum& frustum, double metresPerPixel);
 
     void draw(bool elevationLabels);
+
+    bool live() const { return _live; }
+    unsigned int level() const { return _level; }
+    Culler::FrustumSearch* frustum() const { return _frustum; }
 
     // Calculates the intersection of the viewing ray that goes
     // through the window at <x, y> with the earth, returning the
@@ -122,10 +128,9 @@ class Scenery: public Subscriber {
     // degree by 1 degree (usually) chunk of the earth.
     vector<SceneryTile *>_tiles;
 
-    // Caches are used to manage the loading of textures and buckets
+    // The cache is used to manage the loading of textures and buckets
     // (live scenery).
-    std::map<int, Cache *> _textureCaches;
-    Cache _bucketCache;
+    Cache _cache;
 };
 
 #endif
