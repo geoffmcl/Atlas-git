@@ -57,6 +57,9 @@ using namespace std;
 // User preferences (including command-line arguments).
 Preferences prefs;
 
+// Our windows.
+int main_window, graphs_window;
+
 class MainUI {
   public:
     MainUI(int x, int y);
@@ -252,8 +255,6 @@ Search *search_interface;
 sgdVec3 searchFrom;
 
 // Altitude/Speed interface.
-int graphs_window;
-int main_window;
 Graphs *graphs;
 
 // File dialog.
@@ -3258,8 +3259,9 @@ void setLighting()
 
 void init()
 {
-    // Initalize scenery object.
-    scenery = new Scenery(tileManager);
+    // Initalize scenery object.  Note that we specify all scenery to
+    // be created in the main window.
+    scenery = new Scenery(tileManager, main_window);
 
     // Background map image.
     SGPath world = prefs.path;

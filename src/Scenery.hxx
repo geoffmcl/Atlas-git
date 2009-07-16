@@ -73,7 +73,12 @@ class Texture {
 class SceneryTile;
 class Scenery: public Subscriber {
   public:
-    Scenery(TileManager *tm);
+    // A Scenery object needs a TileManager to get tile information,
+    // and needs to know what window to display everything into (this
+    // is mostly because textures are loaded asynchronously, and we
+    // need to make sure that the textures are being created in the
+    // right OpenGL context).
+    Scenery(TileManager *tm, int window);
     ~Scenery();
 
     void setBackgroundImage(const SGPath& f);

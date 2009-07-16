@@ -100,13 +100,15 @@ class CacheObject {
 // CacheObject.
 class Cache {
   public:
-    // The maximum size of the cache (in bytes) is cacheSize,
-    // although it will exceed that limit if all objects are visible.
-    // If cacheSize is 0, there is no limit.  On each call to _load(),
-    // it works workTime milliseconds.  If workTime is 0, it will load
+    // The window for which we want objects loaded is given in window.
+    // The maximum size of the cache (in bytes) is cacheSize, although
+    // it will exceed that limit if all objects are visible.  If
+    // cacheSize is 0, there is no limit.  On each call to _load(), it
+    // works workTime milliseconds.  If workTime is 0, it will load
     // everything in one go.  The number of milliseconds between calls
     // to _load() is given by interval.
-    Cache(unsigned int cacheSize = 50 * 1024 * 1024, // 50 MB
+    Cache(int window,
+	  unsigned int cacheSize = 50 * 1024 * 1024, // 50 MB
 	  unsigned int workTime = 10,		     // 10 ms
 	  unsigned int interval = 0);		     // 0 ms
     ~Cache();
@@ -132,6 +134,17 @@ class Cache {
     void go();
 
   protected:
+    // The GLUT window we're loading objects for.  The cache was
+    // written for loading textures and buckets asynchronously
+    // (although I suppose it could be used for other things).  As I
+    // understand it, we need to make sure we've got the right OpenGL
+    // context current before we load a texture.  Because texture
+    // loading is asynchronous, any window could be current when
+    // _load() is called.  We need to ensure it's the right one.
+    // (Note that I'm hypothesizing a bit here; there may be other
+    // explanations or better solutions to this problem).
+    int _window;				
+
     // Called periodically to load 1 or more tiles
     void _load();
     static void _cacheTimer(int id);

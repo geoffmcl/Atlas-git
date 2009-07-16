@@ -38,9 +38,6 @@ using namespace std;
 // maximum elevation value for a scenery tile or bucket.
 static const float NO_ELEVATION = -1e6;
 
-// EYE - for debugging only
-extern int main_window;
-
 // Drawing scenery is a little bit complex, mostly because of a desire
 // to maintain reasonable response and performance.  We try to do only
 // the minimum amount of work, and we try not to do too much at one
@@ -168,12 +165,10 @@ GLuint Texture::__defaultTexture = 0;
 
 Texture::Texture(): _name(0), _size(0)
 {
-    assert(glutGetWindow() == main_window);
 }
 
 Texture::~Texture()
 {
-    assert(glutGetWindow() == main_window);
     unload();
 }
 
@@ -183,20 +178,6 @@ void Texture::load(SGPath f, float *maximumElevation)
 {
     GLubyte *data;
     int width, height;
-
-    // EYE - a bit of a hack - as I understand it, we need to make
-    // sure we've got the right OpenGL conext current before we load a
-    // texture.  We know at the moment that all our textures are
-    // displayed in the main window, so we make sure the main window
-    // is current (this assumes that main_window is up to date) before
-    // we load the texture.  I'm sure there must be a better way.
-    // Note that because texture loading is usually asynchronous, we
-    // can't be sure when load() will be called.
-    int oldWindow = glutGetWindow();
-    if (oldWindow != main_window) {
-	glutSetWindow(main_window);
-    }
-    assert(glutGetWindow() == main_window);
 
     // Clear any existing data.
     unload();
@@ -255,26 +236,14 @@ void Texture::load(SGPath f, float *maximumElevation)
 		      GL_RGB, GL_UNSIGNED_BYTE, data);
 
     delete []data;
-
-    if (oldWindow != main_window) {
-	glutSetWindow(oldWindow);
-    }
 }
 
 void Texture::unload()
 {
-    int oldWindow = glutGetWindow();
-    if (oldWindow != main_window) {
-	glutSetWindow(main_window);
-    }
-    assert(glutGetWindow() == main_window);
     if (loaded()) {
 	glDeleteTextures(1, &_name);
 	_name = 0;
 	_size = 0;
-    }
-    if (oldWindow != main_window) {
-	glutSetWindow(oldWindow);
     }
 }
 
@@ -616,8 +585,6 @@ void SceneryTile::drawTexture(unsigned int level)
 // Draw the buckets in the tile that are within the culler's frustum.
 void SceneryTile::drawBuckets(Culler::FrustumSearch& frustum)
 {
-    assert(glutGetWindow() == main_window);
-
     if (_buckets == NULL) {
 	// If we haven't loaded our buckets yet, just return.
 	return;
@@ -712,8 +679,6 @@ static void _label(int mef, double lat, double lon, double metresPerPixel)
 void SceneryTile::label(Culler::FrustumSearch& frustum, double metresPerPixel,
 			bool live)
 {
-    assert(glutGetWindow() == main_window);
-
     if (live) {
 	// If we're live, we label each bucket individually.
 	if (_buckets == NULL) {
@@ -812,9 +777,12 @@ unsigned int SceneryTile::_calcBest(unsigned int level, bool loaded)
     return TileManager::MAX_MAP_LEVEL;
 }
 
-Scenery::Scenery(TileManager *tm): 
+// Creates a Scenery object.  The given TileManager will supply tile
+// information, and we assume that all scenery will be displayed in
+// the given window.
+Scenery::Scenery(TileManager *tm, int window): 
     _dirty(true), _level(TileManager::MAX_MAP_LEVEL), _live(false), 
-    _levels(tm->mapLevels()), _tm(tm), _backgroundWorld(0)
+    _levels(tm->mapLevels()), _tm(tm), _backgroundWorld(0), _cache(window)
 {
     // Create a culler and a frustum searcher for it.
     _culler = new Culler();

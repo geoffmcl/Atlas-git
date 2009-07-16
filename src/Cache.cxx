@@ -39,9 +39,6 @@
 
 using namespace std;
 
-// EYE - for debugging only
-extern int main_window;
-
 // Static map between Cache instance ID's and their addresses.  This
 // is used to figure out which one to call when the GLUT timer fires.
 map<int, Cache *> Cache::__map;
@@ -62,11 +59,13 @@ struct CacheObjectLessThan {
     }
 };
 
-Cache::Cache(unsigned int cacheSize, 
+Cache::Cache(int window,
+	     unsigned int cacheSize, 
 	     unsigned int workTime, 
 	     unsigned int interval):
-    _cacheSize(cacheSize), _objectsSize(0), _workTime(workTime),
-    _interval(interval), _callbackPending(false), _running(false)
+    _window(window), _cacheSize(cacheSize), _objectsSize(0), 
+    _workTime(workTime), _interval(interval), _callbackPending(false), 
+    _running(false)
 {
     // Get a valid id for ourselves and add ourselves to the map.
     // This is a bit inefficient, but caches won't be created very
@@ -177,6 +176,10 @@ void Cache::_load()
 	return;
     }
 
+    // Make sure that we're 'in' the right window.
+    int oldWindow = glutGetWindow();
+    glutSetWindow(_window);
+
     // Unload what we can and should unload.  That means: unload stuff
     // if we have a cache limit AND we are over the limit AND there is
     // stuff to unload.
@@ -196,6 +199,7 @@ void Cache::_load()
 
     // If there's nothing left to load, we're done.
     if (_toBeLoaded.empty()) {
+	glutSetWindow(oldWindow);
 	return;
     }
 
@@ -220,13 +224,12 @@ void Cache::_load()
 	}
 	_objectsSize += c->size();
 
-	// EYE - this assumes that we're drawing in main_window
-	// (should be parameterized somehow, or perhaps made into a
-	// notification).
-	glutPostWindowRedisplay(main_window);
-
 	t2.stamp();
     } while ((_toBeLoaded.size() > 0) && ((t2 - t1) < microSeconds));
+
+    // Return to the old window.
+    glutPostWindowRedisplay(_window);
+    glutSetWindow(oldWindow);
 
     // Set up the timer for another callback.  Note that we do this
     // even if there's nothing to be loaded, as there may still be
