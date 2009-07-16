@@ -144,6 +144,7 @@ TileManager::TileManager(const SGPath& scenery, const SGPath& maps,
 	    }
 	}
     }
+    ulCloseDir(mapDir);
 
     // If we didn't find any directories, try creating a default set
     // if requested.
@@ -362,9 +363,13 @@ const vector<long int>* TileInfo::bucketIndices()
     // We hold off on scanning our scenery for buckets, doing so only
     // on demand.  This is done under the assumption that callers will
     // rarely ask for buckets, and do so infrequently.
-    if (!_buckets) {
-	_buckets = new vector<long int>;
+    if (_buckets != NULL) {
+	return _buckets;
+    }
 
+    _buckets = new vector<long int>;
+
+    if (!_scenery.str().empty()) {
 	// Scan the scenery directory for the given tile for its buckets.
 	// We deem that each .stg file represents one bucket.
 	ulDir *dir = ulOpenDir(_scenery.str().c_str());
