@@ -181,7 +181,7 @@ class Culler::FrustumSearch: public Culler::Search {
 	      double near, double far);
     void move(const sgdMat4 modelViewMatrix);
 
-    bool intersects(atlasSphere bounds);
+    bool intersects(atlasSphere bounds) const;
     // EYE - would a set or list be better?
     const std::vector<Cullable *>& intersections();
 

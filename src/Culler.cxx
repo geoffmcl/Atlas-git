@@ -21,8 +21,6 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
 ---------------------------------------------------------------------------*/
 
-using namespace std;
-
 #include "Culler.hxx"
 #include "Globals.hxx"
 
@@ -30,6 +28,8 @@ using namespace std;
 #include <vector>
 
 #include <simgear/math/sg_geodesy.hxx>
+
+using namespace std;
 
 // EYE - we should come up with better debugging output
 // #define DEBUG_OUTPUT
@@ -480,7 +480,7 @@ void Culler::FrustumSearch::move(const sgdMat4 modelViewMatrix)
     _setDirty(true);
 }
 
-bool Culler::FrustumSearch::intersects(atlasSphere bounds)
+bool Culler::FrustumSearch::intersects(atlasSphere bounds) const
 {
     bounds.orthoXform(_modelViewMatrix);
     return (_frustum.contains(&bounds) != SG_OUTSIDE);
