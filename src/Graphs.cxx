@@ -145,14 +145,12 @@ void Graphs::draw()
 
     // Draw current mark and, if it's live, current aircraft position
     // (which is always at the end of the track, but it's drawn just
-    // to reinforce the fact that it's live).
-    assert((_track->mark() >= 0) || _track->live());
-    // Draw the mark using time coordinates in the x-axis,
-    // pixel coordinates in the y-axis.  Note to self - the
-    // transformations happen in reverse of the way they're
-    // given.  In other words, the raw time is first
-    // translated by -times.first, then scaled, then
-    // translated by x.  EYE - is that really right?
+    // to reinforce the fact that it's live).  We draw the mark using
+    // time coordinates in the x-axis, pixel coordinates in the
+    // y-axis.  Note to self - the transformations happen in reverse
+    // of the way they're given.  In other words, the raw time is
+    // first translated by -times.first, then scaled, then translated
+    // by x.  EYE - is that really right?
     glPushMatrix(); {
 	glTranslatef(_margin, 0.0, 0.0);
 	glScalef(_times.pixels / (_times.last - _times.first), 1.0, 0.0);
