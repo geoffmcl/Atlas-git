@@ -421,6 +421,8 @@ SceneryTile::SceneryTile(TileInfo *ti, Scenery *s):
 	    f.append(str);
 	    f.append(_ti->name());
 	    _textures[i] = new MapTexture(f, _ti->lat(), _ti->lon());
+	} else {
+	    _textures[i] = (MapTexture *)NULL;
 	}
     }
 
