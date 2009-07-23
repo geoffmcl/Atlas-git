@@ -630,9 +630,6 @@ static void _label(int mef, double lat, double lon, double metresPerPixel)
     thousands = mef / 1000;
     hundreds = mef % 1000 / 100;
 
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
     // EYE - magic "number"
     glColor4f(0.0, 0.0, 0.5, 0.5);
 
@@ -667,8 +664,6 @@ static void _label(int mef, double lat, double lon, double metresPerPixel)
 	lm.drawText();
     }
     glPopMatrix();
-
-    glDisable(GL_BLEND);
 }
 
 // Labels the tiles or buckets with their maximum elevation figure.
