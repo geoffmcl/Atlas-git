@@ -214,13 +214,14 @@ bool AirportsOverlay::load(const string& fgDir)
 
 // Creates a single predefined beacon and saves it in _beaconDL.
 //
-// A beacon is a five-pointed star with a white (well, nearly white)
-// centre.
+// A beacon is a five-pointed star of radius 1.0 with a white (well,
+// nearly white) centre.
 void AirportsOverlay::_createBeacon()
 {
-    glDeleteLists(_beaconDL, 1);
-    _beaconDL = glGenLists(1);
-    assert(_beaconDL != 0);
+    if (_beaconDL == 0) {
+	_beaconDL = glGenLists(1);
+	assert(_beaconDL != 0);
+    }
     glNewList(_beaconDL, GL_COMPILE); {
 	glBegin(GL_TRIANGLES); {
 	    for (int i = 0; i < 5; i ++) {
@@ -244,21 +245,22 @@ void AirportsOverlay::_createBeacon()
 	}
 	glEnd();
 
-	glPushAttrib(GL_CURRENT_BIT);
-	// Use the runway colour to colour the interior?  Why?  Pure
-	// white just seems too white.
-	glColor4fv(arp_runway_colour);
-	glBegin(GL_POLYGON); {
-	    for (int i = 0; i < 5; i ++) {
-		float theta, x, y;
+	glPushAttrib(GL_CURRENT_BIT); { // Because we change the colour
+	    // Use the runway colour to colour the interior?  Why?  Pure
+	    // white just seems too white.
+	    glColor4fv(arp_runway_colour);
+	    glBegin(GL_POLYGON); {
+		for (int i = 0; i < 5; i ++) {
+		    float theta, x, y;
 
-		theta = (i * 72.0 + 36.0) * SG_DEGREES_TO_RADIANS;
-		x = sin(theta) * 0.2;
-		y = cos(theta) * 0.2;
-		glVertex2f(x, y);
+		    theta = (i * 72.0 + 36.0) * SG_DEGREES_TO_RADIANS;
+		    x = sin(theta) * 0.2;
+		    y = cos(theta) * 0.2;
+		    glVertex2f(x, y);
+		}
 	    }
+	    glEnd();
 	}
-	glEnd();
 	glPopAttrib();
     }
     glEndList();
@@ -276,9 +278,10 @@ void AirportsOverlay::_createBeacon()
 // edge of the view.
 void AirportsOverlay::_createAirportIcon()
 {
-    glDeleteLists(_airportIconDL, 1);
-    _airportIconDL = glGenLists(1);
-    assert(_airportIconDL != 0);
+    if (_airportIconDL == 0) {
+	_airportIconDL = glGenLists(1);
+	assert(_airportIconDL != 0);
+    }
     glNewList(_airportIconDL, GL_COMPILE); {
 	glBegin(GL_POLYGON); {
 	    const int subdivision = 15; // 15-degree steps
@@ -448,7 +451,7 @@ bool AirportsOverlay::_load810(const gzFile& arp)
 		double lat, lon;
 		int beaconType;
 
-		sscanf(line, "%lf %lf, %d", &lat, &lon, &beaconType);
+		sscanf(line, "%lf %lf %d", &lat, &lon, &beaconType);
 		if (beaconType != 0) {
 		    ap->beacon = true;
 		    ap->beaconLat = lat;
@@ -653,9 +656,10 @@ void AirportsOverlay::drawBackgrounds()
 
 	const vector<Cullable *>& intersections = _frustum->intersections();
 
-	glDeleteLists(_backgroundsDisplayList, 1);
-	_backgroundsDisplayList = glGenLists(1);
-	assert(_backgroundsDisplayList != 0);
+	if (_backgroundsDisplayList == 0) {
+	    _backgroundsDisplayList = glGenLists(1);
+	    assert(_backgroundsDisplayList != 0);
+	}
 	glNewList(_backgroundsDisplayList, GL_COMPILE);
 
 	// Background.  We draw the background as an outline if the
@@ -718,12 +722,11 @@ void AirportsOverlay::drawForegrounds()
 
 	const vector<Cullable *>& intersections = _frustum->intersections();
 
-	glDeleteLists(_runwaysDisplayList, 1);
-	_runwaysDisplayList = glGenLists(1);
-	assert(_runwaysDisplayList != 0);
+	if (_runwaysDisplayList == 0) {
+	    _runwaysDisplayList = glGenLists(1);
+	    assert(_runwaysDisplayList != 0);
+	}
 	glNewList(_runwaysDisplayList, GL_COMPILE);
-
-	glEnable(GL_POINT_SMOOTH);
 
 	// Foreground (runways).  We draw the runways only if the
 	// airport is bigger than the airport minimum.
@@ -757,7 +760,6 @@ void AirportsOverlay::drawForegrounds()
 		}
 	    }
 	}
-	glDisable(GL_POINT_SMOOTH);
 
 	// Airport beacons.
 	for (unsigned int i = 0; i < intersections.size(); i++) {
@@ -817,18 +819,15 @@ void AirportsOverlay::drawLabels()
 
 	const vector<Cullable *>& intersections = _frustum->intersections();
 
-	glDeleteLists(_labelsDisplayList, 1);
-	_labelsDisplayList = glGenLists(1);
-	assert(_labelsDisplayList != 0);
+	if (_labelsDisplayList == 0) {
+	    _labelsDisplayList = glGenLists(1);
+	    assert(_labelsDisplayList != 0);
+	}
 	glNewList(_labelsDisplayList, GL_COMPILE);
 
 	////////////
 	// Labels //
 	////////////
-
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-// 	glBlendFunc(GL_SRC_COLOR, GL_ONE_MINUS_SRC_ALPHA);
 
 	// Label the runways.
 	glColor4f(0.0, 0.0, 0.0, 1.0);
@@ -864,9 +863,6 @@ void AirportsOverlay::drawLabels()
 		_labelAirport(ap, rA);
 	    }
 	}	
-
-	glDisable(GL_BLEND);
-
 	glEndList();
 
 	_labelsDirty = false;
