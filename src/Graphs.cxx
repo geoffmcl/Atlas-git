@@ -151,30 +151,35 @@ void Graphs::draw()
     // of the way they're given.  In other words, the raw time is
     // first translated by -times.first, then scaled, then translated
     // by x.  EYE - is that really right?
-    glPushMatrix(); {
-	glTranslatef(_margin, 0.0, 0.0);
-	glScalef(_times.pixels / (_times.last - _times.first), 1.0, 0.0);
-	glTranslatef(-_times.first, 0.0, 0.0);
+    glPushAttrib(GL_LINE_BIT); {
+	// We draw the mark unsmoothed.
+	glDisable(GL_LINE_SMOOTH);
 
-	if (_track->mark() >= 0) {
-	    glBegin(GL_LINES); {
-		glColor4fv(_markColour);
-		glVertex2f(_times.data[_track->mark()], 0.0);
-		glVertex2f(_times.data[_track->mark()], (float)_h);
+	glPushMatrix(); {
+	    glTranslatef(_margin, 0.0, 0.0);
+	    glScalef(_times.pixels / (_times.last - _times.first), 1.0, 0.0);
+	    glTranslatef(-_times.first, 0.0, 0.0);
+
+	    if (_track->mark() >= 0) {
+		glBegin(GL_LINES); {
+		    glColor4fv(_markColour);
+		    glVertex2f(_times.data[_track->mark()], 0.0);
+		    glVertex2f(_times.data[_track->mark()], (float)_h);
+		}
+		glEnd();
 	    }
-	    glEnd();
-	}
-	if (_track->live()) {
-	    glBegin(GL_LINES); {
-		glColor4fv(_aircraftColour);
-		glVertex2f(_times.max, 0.0);
-		glVertex2f(_times.max, (float)_h);
+	    if (_track->live()) {
+		glBegin(GL_LINES); {
+		    glColor4fv(_aircraftColour);
+		    glVertex2f(_times.max, 0.0);
+		    glVertex2f(_times.max, (float)_h);
+		}
+		glEnd();
 	    }
-	    glEnd();
 	}
+	glPopMatrix();
     }
-
-    glPopMatrix();
+    glPopAttrib();
 
     _shouldRerender = _shouldReload = false;
 }
@@ -340,153 +345,161 @@ bool Graphs::notification(Notification::type n)
 // bottom, and _margin pixels on the left and right.
 void Graphs::_drawGraph(Values &values, int x, int y, const char *label)
 {
-    // Print the graph axes.
-    glColor4fv(axisColour);
-    glBegin(GL_LINE_STRIP); {
-	glVertex2i(x, y + values.pixels);
-	glVertex2i(x, y);
-	glVertex2i(x + _times.pixels, y);
-    }
-    glEnd();
+    glPushAttrib(GL_LINE_BIT); {
+	// We draw the graph axes and ticks unsmoothed - it looks nicer.
+	glDisable(GL_LINE_SMOOTH);
 
-    // EYE - use vertex arrays?  See
-    // http://www.glprogramming.com/red/chapter02.html
+	// Print the graph axes.
+	glColor4fv(axisColour);
+	glBegin(GL_LINE_STRIP); {
+	    glVertex2i(x, y + values.pixels);
+	    glVertex2i(x, y);
+	    glVertex2i(x + _times.pixels, y);
+	}
+	glEnd();
 
-    // Don't do anything unless there are at least 2 points.
-    if (values.data.size() >= 2) {
-	// Draw the labels and "ticks" for the y (data) axis.  Change
-	// the y transformation.
-	glPushMatrix();
-	glTranslatef(0.0, y, 0.0);
-	glScalef(1.0, values.pixels / (values.last - values.first), 0.0);
-	glTranslatef(0.0, -values.first, 0.0);
+	// EYE - use vertex arrays?  See
+	// http://www.glprogramming.com/red/chapter02.html
 
-	// To avoid problems with increasing round-off errors, we use
-	// an integer to control the loop.
-	int intervals = rint((values.last - values.first) / values.d);
-	int majorTicks = 0;
-	glBegin(GL_LINES); {
-	    for (int i = 1; i <= intervals; i++) {
-		float tick = values.first + (i * values.d);
-		glColor4fv(axisColour);
-		glVertex2f(x, tick);
-		if (fabs(remainderf(tick, values.D)) < 0.00001) {
-		    // Major tick.
-		    glVertex2f(x + 10, tick);
+	// Don't do anything unless there are at least 2 points.
+	if (values.data.size() >= 2) {
+	    // Draw the labels and "ticks" for the y (data) axis.  Change
+	    // the y transformation.
+	    glPushMatrix();
+	    glTranslatef(0.0, y, 0.0);
+	    glScalef(1.0, values.pixels / (values.last - values.first), 0.0);
+	    glTranslatef(0.0, -values.first, 0.0);
 
-		    glColor4fv(majorTickColour);
-		    glVertex2f(x + 10, tick);
-		    glVertex2f(x + _times.pixels, tick);
+	    // To avoid problems with increasing round-off errors, we use
+	    // an integer to control the loop.
+	    int intervals = rint((values.last - values.first) / values.d);
+	    int majorTicks = 0;
+	    glBegin(GL_LINES); {
+		for (int i = 1; i <= intervals; i++) {
+		    float tick = values.first + (i * values.d);
+		    glColor4fv(axisColour);
+		    glVertex2f(x, tick);
+		    if (fabs(remainderf(tick, values.D)) < 0.00001) {
+			// Major tick.
+			glVertex2f(x + 10, tick);
+
+			glColor4fv(majorTickColour);
+			glVertex2f(x + 10, tick);
+			glVertex2f(x + _times.pixels, tick);
 		
-		    majorTicks++;
-		} else {
-		    // Minor tick.
-		    glVertex2f(x + 5, tick);
+			majorTicks++;
+		    } else {
+			// Minor tick.
+			glVertex2f(x + 5, tick);
 
-		    glColor4fv(minorTickColour);
-		    glVertex2f(x + 5, tick);
-		    glVertex2f(x + _times.pixels, tick);
-		}
-	    }
-	}
-	glEnd();
-    
-	// Now label the y axis.
-	char format[10];
-	sprintf(format, "%%.%df", values.decimals);
-	AtlasString buf;
-	for (int i = 0; i <= intervals; i++) {
-	    float tick = values.first + (i * values.d);
-	    // In general, we just label major ticks.  However, there
-	    // are cases where there is only one major tick.  Just
-	    // labelling that one tick means it's impossible for the
-	    // user to know the scale.
-	    //
-	    // So, we label this tick if: (a) it's major, or (b) it's
-	    // the first or last one and there are fewer than 2 major
-	    // ticks.
-	    if ((fabs(remainderf(tick, values.D)) < 0.00001) ||
-		((majorTicks < 2) && (i == 0)) ||
-		((majorTicks < 2) && (i == intervals))) {
-		glColor4fv(axisColour);
-		buf.printf(format, tick);
-		_drawString(buf.str(), x - _margin, tick);
-	    }
-	}
-
-	glPopMatrix();
-
-	// Now the time (x) axis.  If you'll notice, this code is very
-	// similar to the preceding code.  Basically, all we do is
-	// flip the x and y axes.  If I was really clever, I'd just
-	// use a wacky transform and use the code above, but I'm not.
-
-	// Change the transformation.  The y axis uses pixels values,
-	// while the x axis uses times.
-	glPushMatrix();
-	glTranslatef(x, 0.0, 0.0);
-	glScalef(_times.pixels / (_times.last - _times.first), 1.0, 0.0);
-	glTranslatef(-_times.first, 0.0, 0.0);
-
-	glBegin(GL_LINES); {
-	    intervals = rint((_times.last - _times.first) / _times.d);
-	    for (int i = 1; i <= intervals; i++) {
-		float tick = _times.first + (i * _times.d);
-		glColor4fv(axisColour);
-		glVertex2f(tick, y);
-		if (fabs(remainderf(tick, _times.D)) < 0.00001) {
-		    // Major tick.
-		    glVertex2f(tick, y + 10);
-
-		    glColor4fv(majorTickColour);
-		    glVertex2f(tick, y + 10);
-		    glVertex2f(tick, y + values.pixels);
-		} else {
-		    // Minor tick.
-		    glVertex2f(tick, y + 5);
-
-		    glColor4fv(minorTickColour);
-		    glVertex2f(tick, y + 5);
-		    glVertex2f(tick, y + values.pixels);
-		}
-	    }
-	}
-	glEnd();
-    
-	// Now label the major time ticks.
-	sprintf(format, "%%.%df", _times.decimals);
-	for (int i = 0, tickCount = 0; i <= intervals; i++) {
-	    float tick = _times.first + (i * _times.d);
-	    if ((fabs(remainderf(tick, _times.D)) < 0.00001) ||
-		((tickCount < 2) && (i == intervals))) {
-		tickCount++;
-		glColor4fv(axisColour);
-		buf.printf(format, tick);
-		_drawString(buf.str(), tick, y - _header);
-	    }
-	}
-
-	glPopMatrix();
-
-	// Plot the graph.  This time we transform both x and y values.
-	glPushMatrix(); {
-	    glTranslatef(x, y, 0.0);
-	    glScalef(_times.pixels / (_times.last - _times.first), 
-		     values.pixels / (values.last - values.first), 0.0);
-	    glTranslatef(-_times.first, -values.first, 0.0);
-
-	    int point = 0;
-	    glColor4fv(graphColour);
-	    glBegin(GL_LINE_STRIP); {
-		for (unsigned int i = 0; i < values.data.size(); i++) {
-		    glVertex2f(_times.data[i], values.data[i]);
-		    point++;
+			glColor4fv(minorTickColour);
+			glVertex2f(x + 5, tick);
+			glVertex2f(x + _times.pixels, tick);
+		    }
 		}
 	    }
 	    glEnd();
+    
+	    // Now label the y axis.
+	    char format[10];
+	    sprintf(format, "%%.%df", values.decimals);
+	    AtlasString buf;
+	    for (int i = 0; i <= intervals; i++) {
+		float tick = values.first + (i * values.d);
+		// In general, we just label major ticks.  However, there
+		// are cases where there is only one major tick.  Just
+		// labelling that one tick means it's impossible for the
+		// user to know the scale.
+		//
+		// So, we label this tick if: (a) it's major, or (b) it's
+		// the first or last one and there are fewer than 2 major
+		// ticks.
+		if ((fabs(remainderf(tick, values.D)) < 0.00001) ||
+		    ((majorTicks < 2) && (i == 0)) ||
+		    ((majorTicks < 2) && (i == intervals))) {
+		    glColor4fv(axisColour);
+		    buf.printf(format, tick);
+		    _drawString(buf.str(), x - _margin, tick);
+		}
+	    }
+
+	    glPopMatrix();
+
+	    // Now the time (x) axis.  If you'll notice, this code is very
+	    // similar to the preceding code.  Basically, all we do is
+	    // flip the x and y axes.  If I was really clever, I'd just
+	    // use a wacky transform and use the code above, but I'm not.
+
+	    // Change the transformation.  The y axis uses pixels values,
+	    // while the x axis uses times.
+	    glPushMatrix();
+	    glTranslatef(x, 0.0, 0.0);
+	    glScalef(_times.pixels / (_times.last - _times.first), 1.0, 0.0);
+	    glTranslatef(-_times.first, 0.0, 0.0);
+
+	    glBegin(GL_LINES); {
+		intervals = rint((_times.last - _times.first) / _times.d);
+		for (int i = 1; i <= intervals; i++) {
+		    float tick = _times.first + (i * _times.d);
+		    glColor4fv(axisColour);
+		    glVertex2f(tick, y);
+		    if (fabs(remainderf(tick, _times.D)) < 0.00001) {
+			// Major tick.
+			glVertex2f(tick, y + 10);
+
+			glColor4fv(majorTickColour);
+			glVertex2f(tick, y + 10);
+			glVertex2f(tick, y + values.pixels);
+		    } else {
+			// Minor tick.
+			glVertex2f(tick, y + 5);
+
+			glColor4fv(minorTickColour);
+			glVertex2f(tick, y + 5);
+			glVertex2f(tick, y + values.pixels);
+		    }
+		}
+	    }
+	    glEnd();
+    
+	    // Now label the major time ticks.
+	    sprintf(format, "%%.%df", _times.decimals);
+	    for (int i = 0, tickCount = 0; i <= intervals; i++) {
+		float tick = _times.first + (i * _times.d);
+		if ((fabs(remainderf(tick, _times.D)) < 0.00001) ||
+		    ((tickCount < 2) && (i == intervals))) {
+		    tickCount++;
+		    glColor4fv(axisColour);
+		    buf.printf(format, tick);
+		    _drawString(buf.str(), tick, y - _header);
+		}
+	    }
+
+	    glPopMatrix();
+
+	    // Plot the graph (smoothed).  This time we transform both
+	    // x and y values.
+	    glEnable(GL_LINE_SMOOTH);
+	    glPushMatrix(); {
+		glTranslatef(x, y, 0.0);
+		glScalef(_times.pixels / (_times.last - _times.first), 
+			 values.pixels / (values.last - values.first), 0.0);
+		glTranslatef(-_times.first, -values.first, 0.0);
+
+		int point = 0;
+		glColor4fv(graphColour);
+		glBegin(GL_LINE_STRIP); {
+		    for (unsigned int i = 0; i < values.data.size(); i++) {
+			glVertex2f(_times.data[i], values.data[i]);
+			point++;
+		    }
+		}
+		glEnd();
+	    }
+	    glPopMatrix();
 	}
-	glPopMatrix();
     }
+    glPopAttrib();
 
     // Print a header (actually a "center", since we print it in the
     // middle).
@@ -517,8 +530,6 @@ void Graphs::_drawGS(int x, int y)
 		 0.0);
 	glTranslatef(-_times.first, -_altitude.first, 0.0);
 
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	for (unsigned int i = 0; i < _GSs.size(); i++) {
 	    GSSection *s = _GSs[i];
 
@@ -541,7 +552,6 @@ void Graphs::_drawGS(int x, int y)
 	    }
 	    glEnd();
 	}
-	glDisable(GL_BLEND);
 
 	// Now draw lines representing the top, centre, and bottom
 	// of the glideslope.
