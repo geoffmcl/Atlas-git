@@ -64,13 +64,19 @@ void CrosshairsOverlay::draw()
 
 	    gluOrtho2D(0.0, viewport[2], 0.0, viewport[3]);
 
-	    glLineWidth(1.0);
-	    glBegin(GL_LINES);
-	    glVertex2f(x - 20.0, y);
-	    glVertex2f(x + 20.0, y);
-	    glVertex2f(x, y - 20.0);
-	    glVertex2f(x, y + 20.0);
-	    glEnd(); 
+	    glPushAttrib(GL_LINE_BIT); {
+		// Draw the crosshairs unsmoothed - it's more precise.
+		glDisable(GL_LINE_SMOOTH);
+
+		glBegin(GL_LINES); {
+		    glVertex2f(x - 20.0, y);
+		    glVertex2f(x + 20.0, y);
+		    glVertex2f(x, y - 20.0);
+		    glVertex2f(x, y + 20.0);
+		}
+		glEnd(); 
+	    }
+	    glPopAttrib();
 	}
 	glPopMatrix();
 
