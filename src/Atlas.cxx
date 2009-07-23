@@ -1031,9 +1031,11 @@ void init_gui(bool textureFonts)
 	globals.uiFont.initialize(globals.regularFont, 12.0f);
     }
     puSetDefaultFonts(globals.uiFont, globals.uiFont);
-    //   puSetDefaultColourScheme(0.4f, 0.4f, 0.8f, 0.6f);
-    puSetDefaultColourScheme(0.4, 0.5, 0.9, 0.6);
-    //   puSetDefaultStyle(PUSTYLE_SMALL_SHADED);
+    // Note that the default colour scheme as an alpha of 0.8 - this,
+    // and the fact that GL_BLEND is on, means that the widgets will
+    // be slightly translucent.  Set to 1.0 if you want them to be
+    // completely opaque.
+    puSetDefaultColourScheme(0.4, 0.5, 0.9, 0.8);
     puSetDefaultStyle(PUSTYLE_SMALL_BEVELLED);
 
     //////////////////////////////////////////////////////////////////////
@@ -2726,12 +2728,8 @@ void redrawMap()
     // Overlays.
     globals.overlays->draw();
 
-    // Enable this if you want translucent widgets.
-//     glEnable(GL_BLEND);
-//     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-//     glAlphaFunc(GL_GREATER, 0.1f);
+    // Render the widgets.
     puDisplay();
-//     glDisable(GL_BLEND);
 
     glutSwapBuffers();
 
@@ -3257,10 +3255,23 @@ void setLighting()
 			       globals.lightPosition);
 }
 
+void initStandardOpenGLAttribs()
+{
+    // Standard settings for lines and points.  If you change any of
+    // these, you *must* return them to their original value after!
+    glEnable(GL_LINE_SMOOTH);
+    glEnable(GL_POINT_SMOOTH);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glLineWidth(1.0);
+    glPointSize(1.0);
+}
+
+// Does graphics-related initialization of the main window.
 void init()
 {
-    // Initalize scenery object.  Note that we specify all scenery to
-    // be created in the main window.
+    // Initalize scenery object.  Note that we specify that all
+    // scenery should be displayed in the main window.
     scenery = new Scenery(tileManager, main_window);
 
     // Background map image.
@@ -3275,6 +3286,8 @@ void init()
 
     setLighting();
     glEnable(GL_DEPTH_TEST);
+
+    initStandardOpenGLAttribs();
 
     // EYE - If I do this, I get a wire frame - mostly.  Some polygons
     // still are drawn, which seems to indicate that they are drawn
@@ -4043,6 +4056,9 @@ int main(int argc, char **argv)
     // is some overlap.
     glutPositionWindow(x, y + h);
     glutHideWindow();
+
+    // Initialize some standard OpenGL attributes.
+    initStandardOpenGLAttribs();
 
     graphs = new Graphs(graphs_window);
 //     graphs->setAircraftColor(map_object->getOverlays()->aircraftColor());
