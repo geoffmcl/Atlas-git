@@ -31,6 +31,7 @@
 #include "Culler.hxx"
 #include "Searcher.hxx"
 #include "Notifications.hxx"
+#include "LayoutManager.hxx"
 
 struct FIX: public Searchable, Cullable {
   public:
@@ -55,10 +56,6 @@ struct FIX: public Searchable, Cullable {
     std::string _str;
 };
 
-// Determines how fixes are drawn.
-struct FixPolicy {
-};
-
 class Overlays;
 class FixesOverlay: public Subscriber {
   public:
@@ -71,10 +68,6 @@ class FixesOverlay: public Subscriber {
 
     void draw();
 
-    // EYE - Fixes::Policy instead?
-    void setPolicy(const FixPolicy& p);
-    FixPolicy policy();
-
     // Subscriber interface.
     bool notification(Notification::type n);
 
@@ -83,22 +76,17 @@ class FixesOverlay: public Subscriber {
     Culler::FrustumSearch *_frustum;
     double _metresPerPixel;
 
-    void _createFix();
-
     bool _load600(const gzFile& arp);
 
     void _render(const FIX *f);
-    void _label(const FIX *f);
+    void _label(const FIX *f, LayoutManager& lm);
 
     Overlays& _overlays;
 
     vector<FIX *> _fixes;
 
     GLuint _DL;			// Display list of all rendered fixes.
-    GLuint _fixDL;		// A single fix.
     bool _isDirty;
-
-    FixPolicy _policy;
 };
 
 #endif

@@ -82,12 +82,16 @@ const std::string& FIX::asString()
     return _str;
 }
 
+// Note: there are many types of fixes and waypoints, but our database
+// doesn't differentiate.  So we just draw them as points (rather than
+// triangles, or circles, or any of the other common renderings).
+// This actually looks cleaner, is easier to implement, and also
+// doesn't mislead the user into believing that they are something
+// which they aren't.  Because we just draw them as points, we don't
+// create a special display list for them (unlike VORs, for example).
 FixesOverlay::FixesOverlay(Overlays& overlays):
-    _overlays(overlays), _DL(0), _fixDL(0), _isDirty(false)
+    _overlays(overlays), _DL(0), _isDirty(false)
 {
-    // EYE - Initialize policy here
-    _createFix();
-
     // Create a culler and a frustum searcher for it.
     _culler = new Culler();
     _frustum = new Culler::FrustumSearch(*_culler);
@@ -95,35 +99,6 @@ FixesOverlay::FixesOverlay(Overlays& overlays):
     // Subscribe to moved and zoomed notifications.
     subscribe(Notification::Moved);
     subscribe(Notification::Zoomed);
-}
-
-// Creates a single predefined fix and saves it in _fixDL.  The fix is
-// drawn in the x-y plane.
-void FixesOverlay::_createFix()
-{
-    glDeleteLists(_fixDL, 1);
-    _fixDL = glGenLists(1);
-    assert(_fixDL != 0);
-    glNewList(_fixDL, GL_COMPILE); {
-// 	glBegin(GL_LINE_LOOP); {
-// 	    for (int i = 0; i < 3; i ++) {
-// 		float theta, x, y;
-
-// 		theta = i * 120.0 * SG_DEGREES_TO_RADIANS;
-// 		x = sin(theta);
-// 		y = cos(theta);
-// 		glVertex2f(x, y);
-// 	    }
-// 	}
-// 	glEnd();
-	glEnable(GL_POINT_SMOOTH);
-	glBegin(GL_POINTS); {
-	    glVertex2f(0.0, 0.0);
-	}
-	glEnd();
-	glDisable(GL_POINT_SMOOTH);
-    }
-    glEndList();
 }
 
 FixesOverlay::~FixesOverlay()
@@ -137,22 +112,9 @@ FixesOverlay::~FixesOverlay()
     _fixes.clear();
 
     glDeleteLists(_DL, 1);
-    glDeleteLists(_fixDL, 1);
 
     delete _culler;
     delete _frustum;
-}
-
-void FixesOverlay::setPolicy(const FixPolicy& p)
-{
-    _policy = p;
-
-    setDirty();
-}
-
-FixPolicy FixesOverlay::policy()
-{
-    return _policy;
 }
 
 bool FixesOverlay::load(const string& fgDir)
@@ -259,6 +221,9 @@ void FixesOverlay::setDirty()
 
 void FixesOverlay::draw()
 {
+    // Size of point used to represent the fix.
+    const float fixSize = 4.0;
+
     if (_metresPerPixel > noLevel) {
 	return;
     }
@@ -266,80 +231,63 @@ void FixesOverlay::draw()
     if (_isDirty) {
 	// Something's changed, so we need to regenerate the display
 	// list.
-
-	// EYE - do we need to delete it and generate a new one, or
-	// can we just redefine it?
-	glDeleteLists(_DL, 1);
-	_DL = glGenLists(1);
-	assert(_DL != 0);
-	glNewList(_DL, GL_COMPILE);
-
-// 	glEnable(GL_LINE_SMOOTH);
-	glLineWidth(1.0);
-// 	glColor4fv(fix_colour);
-
-// 	bool high = false, low = false, terminal = false;
-// 	if (_overlays.scale() > highLevel) {
-// 	    high = true;
-// 	    glColor4fv(high_fix_colour);
-// 	} else if (_overlays.scale() > lowLevel) {
-// 	    low = true;
-// 	    glColor4fv(low_fix_colour);
-// 	} else {
-// 	    terminal = true;
-// 	    glColor4fv(terminal_fix_colour);
-// 	}
-
-	vector<Cullable *> intersections = _frustum->intersections();
-	for (unsigned int i = 0; i < intersections.size(); i++) {
-	    FIX *f = dynamic_cast<FIX *>(intersections[i]);
-	    assert(f);
-
-// // 	    _render(f);
-// 	    if ((high && f->high) || 
-// 		(low && f->low) || 
-// 		(terminal && !f->high && !f->low)) {
-// 		_render(f);
-// 	    }
-	    if (f->high && _metresPerPixel < noLevel) {
-		glColor4fv(high_fix_colour);
-		_render(f);
-	    } else if (f->low && (_metresPerPixel < highLevel)) {
-		glColor4fv(low_fix_colour);
-		_render(f);
-	    } else if (!f->high && !f->low && (_metresPerPixel < lowLevel)) {
-		glColor4fv(terminal_fix_colour);
-		_render(f);
-	    }
+	if (_DL == 0) {
+	    // Get a display list.  We could put this in the
+	    // constructor, but it's a bit safer here, because we can
+	    // be pretty sure a display context has been created when
+	    // draw() is called.
+	    _DL = glGenLists(1);
+	    assert(_DL != 0);
 	}
 
-// 	glDisable(GL_LINE_SMOOTH);
+	glNewList(_DL, GL_COMPILE); {
+	    vector<Cullable *> intersections = _frustum->intersections();
+	    // Fixes (points)
+	    glPushAttrib(GL_POINT_BIT); {
+		// We use a non-standard point size, so we need to
+		// wrap this in a glPushAttrib().
+		glPointSize(fixSize);
+		for (unsigned int i = 0; i < intersections.size(); i++) {
+		    FIX *f = dynamic_cast<FIX *>(intersections[i]);
+		    assert(f);
 
-	if (_overlays.isVisible(Overlays::LABELS)) {
-	    glEnable(GL_BLEND);
-	    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-	    for (unsigned int i = 0; i < intersections.size(); i++) {
-		FIX *f = dynamic_cast<FIX *>(intersections[i]);
-		assert(f);
-
-// // 	    _label(f);
-// 	    if ((high && f->high) || 
-// 		(low && f->low) || 
-// 		(terminal && !f->high && !f->low)) {
-// 		_label(f);
-// 	    }
-		if (f->high && _metresPerPixel < noLevel) {
-		    _label(f);
-		} else if (f->low && (_metresPerPixel < highLevel)) {
-		    _label(f);
-		} else if (!f->high && !f->low && 
-			   (_metresPerPixel < lowLevel)) {
-		    _label(f);
+		    if (f->high && _metresPerPixel < noLevel) {
+			glColor4fv(high_fix_colour);
+			_render(f);
+		    } else if (f->low && (_metresPerPixel < highLevel)) {
+			glColor4fv(low_fix_colour);
+			_render(f);
+		    } else if (!f->high && !f->low && 
+			       (_metresPerPixel < lowLevel)) {
+			glColor4fv(terminal_fix_colour);
+			_render(f);
+		    }
 		}
 	    }
+	    glPopAttrib();
 
-	    glDisable(GL_BLEND);
+	    // Fix labels
+	    LayoutManager lm;
+	    fntRenderer& renderer = globals.fontRenderer;
+	    float pointSize = _metresPerPixel * 10.0;
+	    renderer.setPointSize(pointSize);
+	    lm.setFont(renderer, pointSize);
+
+	    if (_overlays.isVisible(Overlays::LABELS)) {
+		for (unsigned int i = 0; i < intersections.size(); i++) {
+		    FIX *f = dynamic_cast<FIX *>(intersections[i]);
+		    assert(f);
+
+		    if (f->high && _metresPerPixel < noLevel) {
+			_label(f, lm);
+		    } else if (f->low && (_metresPerPixel < highLevel)) {
+			_label(f, lm);
+		    } else if (!f->high && !f->low && 
+			       (_metresPerPixel < lowLevel)) {
+			_label(f, lm);
+		    }
+		}
+	    }
 	}
 	glEndList();
 	
@@ -352,10 +300,6 @@ void FixesOverlay::draw()
 // Renders the given fix.
 void FixesOverlay::_render(const FIX *f)
 {
-    double metresPerPixel = _metresPerPixel;
-    SGVec3<double> point;
-    float scale = 5.0 * metresPerPixel;
-
     glPushMatrix(); {
 	glTranslated(f->bounds.center[0],
 		     f->bounds.center[1],
@@ -363,27 +307,18 @@ void FixesOverlay::_render(const FIX *f)
 	glRotatef(f->lon + 90.0, 0.0, 0.0, 1.0);
 	glRotatef(90.0 - f->lat, 1.0, 0.0, 0.0);
 
-	// Draw it with a radius of 5 pixels.
-	glScalef(scale, scale, scale);
-
-	glCallList(_fixDL);
-
+	glBegin(GL_POINTS); {
+	    glVertex2f(0.0, 0.0);
+	}
+	glEnd();
     }
     glPopMatrix();
 }
 
 // Labels the given fix.
-void FixesOverlay::_label(const FIX *f)
+void FixesOverlay::_label(const FIX *f, LayoutManager& lm)
 {
-    double metresPerPixel = _metresPerPixel;
-
-    // Put this outside of _render() (since we only do it once)?
-    LayoutManager lm;
-    fntRenderer& renderer = globals.fontRenderer;
-    float pointSize = metresPerPixel * 10.0;
-    const float labelOffset = metresPerPixel * 10.0;
-    renderer.setPointSize(pointSize);
-    lm.setFont(renderer, pointSize);
+    const float labelOffset = _metresPerPixel * 5.0;
 
     glPushMatrix(); {
 	glTranslated(f->bounds.center[0],
