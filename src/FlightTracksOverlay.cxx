@@ -129,9 +129,10 @@ void FlightTracksOverlay::draw()
 	    FlightTrack *t = i->first;
 	    TRACK_INFO info = i->second;
 
-	    glDeleteLists(info.DL, 1);
-	    info.DL = glGenLists(1);
-	    assert(info.DL != 0);
+	    if (info.DL == 0) {
+		info.DL = glGenLists(1);
+		assert(info.DL != 0);
+	    }
 
 	    glNewList(info.DL, GL_COMPILE); {
 		// Draw the track.
@@ -154,23 +155,14 @@ void FlightTracksOverlay::draw()
 	_isDirty = false;
     }
 
-    // EYE - am I using these right?
-    glPushAttrib(GL_COLOR_BUFFER_BIT | GL_HINT_BIT | GL_LINE_BIT); {
-	glEnable(GL_LINE_SMOOTH);
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	glLineWidth(1.0);
+    for (map<FlightTrack*, TRACK_INFO>::const_iterator i = _tracks.begin(); 
+	 i != _tracks.end(); i++) {
+	// Draw the track.
+	glCallList(i->second.DL);
 
-	for (map<FlightTrack*, TRACK_INFO>::const_iterator i = _tracks.begin(); 
-	     i != _tracks.end(); i++) {
-	    // Draw the track.
-	    glCallList(i->second.DL);
-
-	    // Draw the airplane.
-	    __drawAirplane(i->first, i->second.planeColour);
-	}
+	// Draw the airplane.
+	__drawAirplane(i->first, i->second.planeColour);
     }
-    glPopAttrib();
 }
 
 // Called when somebody posts a notification that we've subscribed to.
