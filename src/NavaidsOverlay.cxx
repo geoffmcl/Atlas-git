@@ -216,19 +216,32 @@ const std::string& NAV::asString()
 
 NavaidsOverlay::NavaidsOverlay(Overlays& overlays):
     _overlays(overlays),
-    _VORRoseDL(0), _VORSymbolDL(0), _VORTACSymbolDL(0), _VORDMESymbolDL(0),
-    _NDBSymbolDL(0), _NDBDMESymbolDL(0),
-    _ILSSymbolDL(0), _LOCSymbolDL(0),
-    _TACANSymbolDL(0), _DMESymbolDL(0),
-    _VORDisplayList(0), _NDBDisplayList(0), _ILSDisplayList(0),
-    _DMEDisplayList(0),
     _VORDirty(false), _NDBDirty(false), _ILSDirty(false), _DMEDirty(false),
     _p(NULL)
 {
-    // EYE - can we do this in the initialization list?
-    _ILSMarkerDLs[0] = 0;
-    _ILSMarkerDLs[1] = 0;
-    _ILSMarkerDLs[2] = 0;
+    // Create all the display list indices.  Note that we must have a
+    // valid OpenGL context for this to work.
+    _VORRoseDL = glGenLists(1);
+    _VORSymbolDL = glGenLists(1);
+    _VORTACSymbolDL = glGenLists(1);
+    _VORDMESymbolDL = glGenLists(1);
+
+    _NDBSymbolDL = glGenLists(1);
+    _NDBDMESymbolDL = glGenLists(1);
+
+    _ILSSymbolDL = glGenLists(1);
+    _LOCSymbolDL = glGenLists(1);
+    _ILSMarkerDLs[0] = glGenLists(1);
+    _ILSMarkerDLs[1] = glGenLists(1);
+    _ILSMarkerDLs[2] = glGenLists(1);
+
+    _TACANSymbolDL = glGenLists(1);
+    _DMESymbolDL = glGenLists(1);
+
+    _VORDisplayList = glGenLists(1);
+    _NDBDisplayList = glGenLists(1);
+    _ILSDisplayList = glGenLists(1);
+    _DMEDisplayList = glGenLists(1);
 
     // EYE - Initialize policy here
     _createVORRose();
@@ -364,8 +377,6 @@ void NavaidsOverlay::_createVORRose()
     // Draw a standard VOR rose or radius 1.  It is drawn in the XY
     // plane, with north in the positive Y direction, and east in the
     // positive X direction.
-    glDeleteLists(_VORRoseDL, 1);
-    _VORRoseDL = glGenLists(1);
     assert(_VORRoseDL != 0);
     glNewList(_VORRoseDL, GL_COMPILE); {
 	glBegin(GL_LINE_LOOP); {
@@ -436,11 +447,8 @@ void NavaidsOverlay::_createVORRose()
 	glEnd();
 
 	// Label the rose.
-	// EYE - save state?
 	const float pointSize = 10.0;
 	f.setPointSize(pointSize);
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	for (int i = 0; i < 360; i += 30) {
 	    glPushMatrix(); {
 		glRotatef(-i, 0.0, 0.0, 1.0);
@@ -458,7 +466,6 @@ void NavaidsOverlay::_createVORRose()
 	    }
 	    glPopMatrix();
 	}
-	glDisable(GL_BLEND);
     }
     glEndList();
 }
@@ -480,8 +487,6 @@ void NavaidsOverlay::_createVORSymbols()
     ////////////////////
     // VOR
     ////////////////////
-    glDeleteLists(_VORSymbolDL, 1);
-    _VORSymbolDL = glGenLists(1);
     assert(_VORSymbolDL != 0);
     glNewList(_VORSymbolDL, GL_COMPILE); {
 	glColor4fv(vor_colour);
@@ -510,8 +515,6 @@ void NavaidsOverlay::_createVORSymbols()
     ////////////////////
     const float lobeThickness = size * 0.5;
 
-    glDeleteLists(_VORTACSymbolDL, 1);
-    _VORTACSymbolDL = glGenLists(1);
     assert(_VORTACSymbolDL != 0);
     glNewList(_VORTACSymbolDL, GL_COMPILE); {
 	glCallList(_VORSymbolDL);
@@ -542,16 +545,12 @@ void NavaidsOverlay::_createVORSymbols()
     // Half the length of the short (left and right) side.
     const float shortSide = sqrt(3.0) / 2.0 * size;
 
-    glDeleteLists(_VORDMESymbolDL, 1);
-    _VORDMESymbolDL = glGenLists(1);
     assert(_VORDMESymbolDL != 0);
     glNewList(_VORDMESymbolDL, GL_COMPILE); {
 	// EYE - if I make the DME a different colour, I render the VOR
 	// symbol on top.
 	//     glCallList(_VORSymbolDL);
 
-	//     glLineWidth(2.0);
-	glLineWidth(1.0);
 	glColor4fv(dme_colour);
 	glBegin(GL_LINE_LOOP); {
 	    glVertex2f(-longSide, -shortSide);
@@ -610,8 +609,6 @@ void NavaidsOverlay::_createNDBSymbols()
     ////////////////////
     // NDB
     ////////////////////
-    glDeleteLists(_NDBSymbolDL, 1);
-    _NDBSymbolDL = glGenLists(1);
     assert(_NDBSymbolDL != 0);
     glNewList(_NDBSymbolDL, GL_COMPILE); {
 	glColor4fv(ndb_colour);
@@ -639,41 +636,36 @@ void NavaidsOverlay::_createNDBSymbols()
 	glEnd();
 
 	// Inner circle.
+	glPushAttrib(GL_LINE_BIT); {
+	    glLineWidth(2.0);
+	    glBegin(GL_LINE_LOOP); {
+		const int subdivision = 20;	// 20-degree steps
 
-	// EYE - this line width (and the one below for the DME) work when
-	// the NDB is of certain sizes.  However, when scaled up, these
-	// look too skinny.
-	glLineWidth(2.0);
-	glBegin(GL_LINE_LOOP); {
-	    const int subdivision = 20;	// 20-degree steps
+		// Now continue around the circle.
+		for (int i = 0; i < 360; i += subdivision) {
+		    float theta, x, y;
 
-	    // Now continue around the circle.
-	    for (int i = 0; i < 360; i += subdivision) {
-		float theta, x, y;
-
-		// Draw circle segment.
-		theta = i * SG_DEGREES_TO_RADIANS;
-		x = sin(theta) * 0.255;
-		y = cos(theta) * 0.255;
-		glVertex2f(x, y);
+		    // Draw circle segment.
+		    theta = i * SG_DEGREES_TO_RADIANS;
+		    x = sin(theta) * 0.255;
+		    y = cos(theta) * 0.255;
+		    glVertex2f(x, y);
+		}
 	    }
+	    glEnd();
 	}
-	glEnd();
+	glPopAttrib();
     }
     glEndList();
 
     ////////////////////
     // NDB-DME
     ////////////////////
-    glDeleteLists(_NDBDMESymbolDL, 1);
-    _NDBDMESymbolDL = glGenLists(1);
     assert(_NDBDMESymbolDL != 0);
     glNewList(_NDBDMESymbolDL, GL_COMPILE); {
 	glCallList(_NDBSymbolDL);
 
 	// DME square
-	glLineWidth(1.0);
-	//     glLineWidth(2.0);
 	glColor4fv(dme_colour);
 	glBegin(GL_LINE_LOOP); {
 	    glVertex2f(-0.5, -0.5);
@@ -698,8 +690,6 @@ void NavaidsOverlay::_createDMESymbols()
     ////////////////////
     // TACAN
     ////////////////////
-    glDeleteLists(_TACANSymbolDL, 1);
-    _TACANSymbolDL = glGenLists(1);
     assert(_TACANSymbolDL != 0);
     glNewList(_TACANSymbolDL, GL_COMPILE); {
 	glColor4fv(dme_colour);
@@ -744,15 +734,11 @@ void NavaidsOverlay::_createDMESymbols()
     ////////////////////
     // DME, DME-ILS
     ////////////////////
-    glDeleteLists(_DMESymbolDL, 1);
-    _DMESymbolDL = glGenLists(1);
     assert(_DMESymbolDL != 0);
     glNewList(_DMESymbolDL, GL_COMPILE); {
 	glCallList(_DMESymbolDL);
 
 	// DME square
-// 	glLineWidth(1.0);
-	glLineWidth(2.0);
 	glColor4fv(dme_colour);
 	glBegin(GL_LINE_LOOP); {
 	    glVertex2f(-0.5, -0.5);
@@ -772,18 +758,16 @@ void NavaidsOverlay::_createDMESymbols()
 // EYE - add ILS symbol (a dot with a circle) at the tip?
 void NavaidsOverlay::_createILSSymbols()
 {
-    _createILSSymbol(&_ILSSymbolDL, ils_colour);
-    _createILSSymbol(&_LOCSymbolDL, loc_colour);
+    _createILSSymbol(_ILSSymbolDL, ils_colour);
+    _createILSSymbol(_LOCSymbolDL, loc_colour);
 }
 
 // Creates a single ILS-type symbol, for the given display list
 // variable, in the given colour.
-void NavaidsOverlay::_createILSSymbol(GLuint *dl, const float *colour)
+void NavaidsOverlay::_createILSSymbol(GLuint dl, const float *colour)
 {
-    glDeleteLists(*dl, 1);
-    *dl = glGenLists(1);
-    assert(*dl != 0);
-    glNewList(*dl, GL_COMPILE); {
+    assert(dl != 0);
+    glNewList(dl, GL_COMPILE); {
 	glBegin(GL_TRIANGLES); {
 	    // The right side is pink.
 	    glColor4fv(colour);
@@ -806,8 +790,6 @@ void NavaidsOverlay::_createILSSymbol(GLuint *dl, const float *colour)
 	glEnd();
 
 	// Draw an outline around it, and a line down the middle.
-	// EYE - save this state!
-	glEnable(GL_LINE_SMOOTH);
 	glBegin(GL_LINE_STRIP); {
 	    glColor4f(0.0, 0.0, 0.0, 0.2);
 	    glVertex2f(0.0, 0.0);
@@ -818,7 +800,6 @@ void NavaidsOverlay::_createILSSymbol(GLuint *dl, const float *colour)
 	    glVertex2f(0.0, -1.0);
 	}
 	glEnd();
-	glDisable(GL_LINE_SMOOTH);
     }
     glEndList();
 }
@@ -832,8 +813,6 @@ void NavaidsOverlay::_createMarkerSymbols()
     const int segments = 10;
 
     for (int i = 0; i < 3; i++) {
-	glDeleteLists(_ILSMarkerDLs[i], 1);
-	_ILSMarkerDLs[i] = glGenLists(1);
 	assert(_ILSMarkerDLs[i] != 0);
 	glNewList(_ILSMarkerDLs[i], GL_COMPILE); {
 	    const float offset = cos(30.0 * SG_DEGREES_TO_RADIANS) * markerRadii[i];
@@ -862,8 +841,6 @@ void NavaidsOverlay::_createMarkerSymbols()
 	    // Draw an outline around the marker.
 	    sgVec4 black = {0.0, 0.0, 0.0, 0.5};
 	    glColor4fv(black);
-	    glLineWidth(1.0);
-	    glEnable(GL_LINE_SMOOTH);
 	    glBegin(GL_LINE_LOOP); {
 		for (int j = 0; j < segments; j++) {
 		    float pHdg = (j - segments / 2) * (60.0 / segments) 
@@ -881,7 +858,6 @@ void NavaidsOverlay::_createMarkerSymbols()
 		}
 	    }
 	    glEnd();
-	    glDisable(GL_LINE_SMOOTH);
 	}
 	glEndList();
     }
@@ -911,11 +887,6 @@ static void _createTriangle(float width,
     fadedLeftColour[3] = 0.0;
     sgCopyVec4(fadedRightColour, rightColour);
     fadedRightColour[3] = 0.0;
-
-    // EYE - as usual, these should be pushed and popped
-    // EYE - we assume the shading model is GL_SMOOTH
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     glBegin(GL_TRIANGLES); {
 	// Right side
@@ -959,8 +930,6 @@ static void _createTriangle(float width,
 
     // Draw lines down the left, centre and right.  We don't fade the
     // lines like the triangles above - it looks better.
-    glEnable(GL_LINE_SMOOTH);	// EYE - push attributes
-    glLineWidth(1.0);
     glBegin(GL_LINES); {
 	glColor4f(0.0, 0.0, 0.0, 0.2);
 
@@ -985,7 +954,6 @@ static void _createTriangle(float width,
 	}
     }
     glEnd();
-    glDisable(GL_LINE_SMOOTH);
 }
 
 bool NavaidsOverlay::_load810(float cycle, const gzFile& arp)
@@ -1313,8 +1281,6 @@ void NavaidsOverlay::drawVORs()
     if (_VORDirty) {
 	// Something's changed, so we need to regenerate the VOR
 	// display list.
-	glDeleteLists(_VORDisplayList, 1);
-	_VORDisplayList = glGenLists(1);
 	assert(_VORDisplayList != 0);
 	glNewList(_VORDisplayList, GL_COMPILE); {
 	    const vector<Cullable *>& intersections = _frustum->intersections();
@@ -1341,8 +1307,6 @@ void NavaidsOverlay::drawNDBs()
     if (_NDBDirty) {
 	// Something's changed, so we need to regenerate the NDB
 	// display list.
-	glDeleteLists(_NDBDisplayList, 1);
-	_NDBDisplayList = glGenLists(1);
 	assert(_NDBDisplayList != 0);
 	glNewList(_NDBDisplayList, GL_COMPILE); {
 	    const vector<Cullable *>& intersections = _frustum->intersections();
@@ -1371,8 +1335,6 @@ void NavaidsOverlay::drawILSs()
 	// display list.
 	const vector<Cullable *>& intersections = _frustum->intersections();
 
-	glDeleteLists(_ILSDisplayList, 1);
-	_ILSDisplayList = glGenLists(1);
 	assert(_ILSDisplayList != 0);
 	glNewList(_ILSDisplayList, GL_COMPILE); {
 	    // We do all markers first, then all the ILS systems.
@@ -1415,8 +1377,6 @@ void NavaidsOverlay::drawDMEs()
     if (_DMEDirty) {
 	// Something's changed, so we need to regenerate the DME
 	// display list.
-	glDeleteLists(_DMEDisplayList, 1);
-	_DMEDisplayList = glGenLists(1);
 	assert(_DMEDisplayList != 0);
 	glNewList(_DMEDisplayList, GL_COMPILE); {
 	    const vector<Cullable *>& intersections = _frustum->intersections();
@@ -1596,30 +1556,29 @@ void NavaidsOverlay::_renderVOR(const NAV *n)
 	    }
 	    glScalef(scale, scale, scale);
 
-	    // EYE - save old state?
-	    glEnable(GL_POINT_SMOOTH);
-	    // EYE - magic number
-	    glPointSize(3.0);
+	    glPushAttrib(GL_POINT_BIT); {
+		// EYE - magic number
+		glPointSize(3.0);
 
-	    // EYE - save old state?
-	    if (n->navtype == NAV_VOR) {
-		glLineWidth(1.0);
-		if (n->navsubtype == VOR) {
-		    glCallList(_VORSymbolDL);
-		} else if (n->navsubtype == VORTAC) {
-		    glCallList(_VORTACSymbolDL);
-		} else if (n->navsubtype == VOR_DME) {
-		    glCallList(_VORDMESymbolDL);
+		if (n->navtype == NAV_VOR) {
+		    if (n->navsubtype == VOR) {
+			glCallList(_VORSymbolDL);
+		    } else if (n->navsubtype == VORTAC) {
+			glCallList(_VORTACSymbolDL);
+		    } else if (n->navsubtype == VOR_DME) {
+			glCallList(_VORDMESymbolDL);
+		    }
+		} else {
+		    glPushAttrib(GL_LINE_BIT); {
+			// A line width of 1 makes it too hard to pick
+			// out, at least when drawn in grey.
+			glLineWidth(2.0);
+			glCallList(_TACANSymbolDL);
+		    }
+		    glPopAttrib();
 		}
-	    } else {
-		// EYE - a line width of 1 makes it too hard to pick
-		// out, at least when drawn in grey
-// 		glLineWidth(2.0);
-		glLineWidth(1.0);
-		glCallList(_TACANSymbolDL);
 	    }
-
-	    glDisable(GL_POINT_SMOOTH);
+	    glPopAttrib();
 	}
 	glPopMatrix();
 
@@ -1719,21 +1678,19 @@ void NavaidsOverlay::_renderVOR(const NAV *n)
 		lineWidth = lineScale * radius;
 	    }
 
-	    // Making lines smooth makes them much too chunky.
-	    // 	    glEnable(GL_LINE_SMOOTH);
-
 	    glScalef(radius * _metresPerPixel,
 		     radius * _metresPerPixel,
 		     radius * _metresPerPixel);
 	    glRotatef(-n->magvar, 0.0, 0.0, 1.0);
 
-	    glLineWidth(lineWidth);
+	    glPushAttrib(GL_LINE_BIT); {
+		glLineWidth(lineWidth);
 	    
-	    // Draw the VOR rose using the VOR colour.
-	    glColor4fv(vor_colour);
-	    glCallList(_VORRoseDL);
-
-    // 	    glDisable(GL_LINE_SMOOTH);
+		// Draw the VOR rose using the VOR colour.
+		glColor4fv(vor_colour);
+		glCallList(_VORRoseDL);
+	    }
+	    glPopAttrib();
 	}
     }
     glPopMatrix();
@@ -1759,7 +1716,10 @@ void NavaidsOverlay::_renderNDB(const NAV *n)
     if (radius > maxNDBSize) {
 	radius = maxNDBSize;
     }
-    dotSize = radius * 0.075;
+    // The size of the dots in the NDB varies as the NDB's radius
+    // varies.
+    // EYE - yes, another magic number
+    dotSize = radius * 0.1;
 
     // Check if we're tuned into this NDB.
     bool live = false;
@@ -1778,34 +1738,28 @@ void NavaidsOverlay::_renderNDB(const NAV *n)
 	    ////////////////////
 	    // NDB icon
 	    ////////////////////
-	    glEnable(GL_POINT_SMOOTH);
-	    glPointSize(dotSize);
-	    // EYE - figure out how line widths work in display lists.
-	    //     glLineWidth(2.0);
+	    glPushAttrib(GL_POINT_BIT); {
+		glPointSize(dotSize);
 
-	    // EYE - just draw a dot if the NDB is shrunk too far
-	    // (around 1/2 or 1/3).  Or maybe just draw the dot and
-	    // circle, then the dot (don't shrink the circle until the
-	    // radius forces it to).
-	    float scale = radius * _metresPerPixel;
-	    glScalef(scale, scale, scale);
+		float scale = radius * _metresPerPixel;
+		glScalef(scale, scale, scale);
 
-	    if (n->navsubtype == NDB) {
-		glCallList(_NDBSymbolDL);
-	    } else if (n->navsubtype == NDB_DME) {
-		glCallList(_NDBDMESymbolDL);
-	    } else if (n->navsubtype == LOM) {
-		// EYE - an LOM is just an NDB on top of an outer marker.
-		// However, of the 24 LOMs listed in the 850 file, 16
-		// don't have corresponding outer markers.  What to do?
-		//
-		// A: check some LOMs on real VFR charts and see how
-		// they're rendered.  Curiously, most of them are in
-		// Denmark.
-		glCallList(_NDBSymbolDL);
+		if (n->navsubtype == NDB) {
+		    glCallList(_NDBSymbolDL);
+		} else if (n->navsubtype == NDB_DME) {
+		    glCallList(_NDBDMESymbolDL);
+		} else if (n->navsubtype == LOM) {
+		    // EYE - an LOM is just an NDB on top of an outer marker.
+		    // However, of the 24 LOMs listed in the 850 file, 16
+		    // don't have corresponding outer markers.  What to do?
+		    //
+		    // A: check some LOMs on real VFR charts and see how
+		    // they're rendered.  Curiously, most of them are in
+		    // Denmark.
+		    glCallList(_NDBSymbolDL);
+		}
 	    }
-
-	    glDisable(GL_POINT_SMOOTH);
+	    glPopAttrib();
 	}
 	glPopMatrix();
 
@@ -1931,9 +1885,6 @@ void NavaidsOverlay::_renderILS(const NAV *n)
 	labelPointSize = labelPointSize * 50.0 / _metresPerPixel;
     }
 
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
     glPushMatrix(); {
 	glTranslated(n->bounds.center[0],
 		     n->bounds.center[1],
@@ -2031,24 +1982,22 @@ void NavaidsOverlay::_renderILS(const NAV *n)
 		}
 		int heading = normalizeHeading(rint(n->magvar - magvar), false);
 
+		// EYE - we should add the glideslope too, if it has
+		// one (eg, "284@3.00")
+
 		// Degree symbol (EYE - magic number)
 		const unsigned char degreeSymbol = 176; 
 		globalString.printf("%d%C%s", heading, degreeSymbol, magTrue);
 		lm.addText(globalString.str());
 		lm.end();
 
-		glEnable(GL_BLEND);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		glColor4fv(ils_label_colour);
 		lm.drawText();
-		glDisable(GL_BLEND);
 	    }
 	    glPopMatrix();
 	}
     }
     glPopMatrix();
-
-    glDisable(GL_BLEND);
 }
 
 void NavaidsOverlay::_renderMarker(const NAV *n)
@@ -2070,9 +2019,6 @@ void NavaidsOverlay::_renderMarker(const NAV *n)
 	}
     }
 
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
     glPushMatrix(); {
 	glTranslated(n->bounds.center[0],
 		     n->bounds.center[1],
@@ -2090,8 +2036,6 @@ void NavaidsOverlay::_renderMarker(const NAV *n)
 	}
     }
     glPopMatrix();
-
-    glDisable(GL_BLEND);
 }
 
 // Renders a stand-alone DME.
@@ -2275,9 +2219,9 @@ float NavaidsOverlay::_renderMorse(const string& id, float height,
     const float dotSpace = height * 0.4;
 
     if (render) {
-	// Make dots square.
+	// We only do the OpenGL stuff if we're actually rendering.
+	glPushAttrib(GL_LINE_BIT);
 	glLineWidth(dotWidth / _metresPerPixel);
-	glEnable(GL_LINE_SMOOTH);
 	glBegin(GL_LINES);
     }
 
@@ -2319,7 +2263,7 @@ float NavaidsOverlay::_renderMorse(const string& id, float height,
 
     if (render) {
 	glEnd();
-	glDisable(GL_LINE_SMOOTH);
+	glPopAttrib();
     }
 
     return maxWidth;
@@ -2501,10 +2445,6 @@ void NavaidsOverlay::_drawLabel(Label *l)
 {
     float x = l->x, y = l->y, width = l->width, height = l->height;
 
-    // EYE - save and restore state: blend, colour, line width
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
     ////////////////////
     // Draw background.
     ////////////////////
@@ -2533,15 +2473,10 @@ void NavaidsOverlay::_drawLabel(Label *l)
 	_renderMorse(l->id, ascent, chunkX, chunkY);
     }
 
-    glDisable(GL_BLEND);
-
     ////////////////////
     // Bounding box.
     ////////////////////
     if (l->box) {
-	// EYE - fix all this setting and resetting of
-	// line widths.
-	glLineWidth(1.0);
 	glBegin(GL_LINE_LOOP); {
 	    glVertex2f(x - width / 2.0, y - height / 2.0);
 	    glVertex2f(x - width / 2.0, y + height / 2.0);

@@ -131,7 +131,7 @@ class NavaidsOverlay: public Subscriber {
     void _createMarkerSymbols();
     void _createDMESymbols();
     void _createILSSymbols();
-    void _createILSSymbol(GLuint *dl, const float *colour);
+    void _createILSSymbol(GLuint dl, const float *colour);
     bool _load810(float cycle, const gzFile& arp);
 
     void _renderVOR(const NAV *n);
