@@ -243,7 +243,6 @@ NavaidsOverlay::NavaidsOverlay(Overlays& overlays):
     _ILSDisplayList = glGenLists(1);
     _DMEDisplayList = glGenLists(1);
 
-    // EYE - Initialize policy here
     _createVORRose();
     _createVORSymbols();
     _createNDBSymbols();
@@ -296,18 +295,6 @@ NavaidsOverlay::~NavaidsOverlay()
     glDeleteLists(_ILSMarkerDLs[0], 1);
     glDeleteLists(_ILSMarkerDLs[1], 1);
     glDeleteLists(_ILSMarkerDLs[2], 1);
-}
-
-void NavaidsOverlay::setPolicy(const NavaidPolicy& p)
-{
-    _policy = p;
-
-    setDirty();
-}
-
-NavaidPolicy NavaidsOverlay::policy()
-{
-    return _policy;
 }
 
 bool NavaidsOverlay::load(const string& fgDir)

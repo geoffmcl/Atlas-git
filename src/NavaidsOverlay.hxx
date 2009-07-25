@@ -84,10 +84,6 @@ struct NAV: public Searchable, Cullable {
     std::string _str;
 };
 
-// Determines how navaids are drawn.
-struct NavaidPolicy {
-};
-
 // Used for drawing labels on navaids.
 struct Label {
     float x, y, width, height;
@@ -113,10 +109,6 @@ class NavaidsOverlay: public Subscriber {
     void drawNDBs();
     void drawILSs();
     void drawDMEs();
-
-    // EYE - Navaids::Policy instead?
-    void setPolicy(const NavaidPolicy& p);
-    NavaidPolicy policy();
 
     const vector<Cullable *>& getNavaids(sgdVec3 p);
     const vector<Cullable *>& getNavaids(FlightData *p);
@@ -167,8 +159,6 @@ class NavaidsOverlay: public Subscriber {
     GLuint _TACANSymbolDL, _DMESymbolDL;
     GLuint _VORDisplayList, _NDBDisplayList, _ILSDisplayList, _DMEDisplayList;
     bool _VORDirty, _NDBDirty, _ILSDirty, _DMEDirty;
-
-    NavaidPolicy _policy;
 
     // Radio frequencies for NAV1, NAV2, and the ADF, and radials for
     // NAV1 and NAV2.  These are checked each time we get an
