@@ -56,11 +56,6 @@ struct AWY: public Cullable {
     int base, top;		// Base and top of airway in 100's of feet
     atlasSphere bounds;
     double length;		// Length of segment in metres
-//     GLuint DL;
-};
-
-// Determines how airways are drawn.
-struct AirwayPolicy {
 };
 
 class Overlays;
@@ -75,10 +70,6 @@ class AirwaysOverlay: public Subscriber {
 
     void toggle(bool forward = true);
 
-    // EYE - Airways::Policy instead?
-    void setPolicy(const AirwayPolicy& p);
-    AirwayPolicy policy();
-
     // Subscriber interface.
     bool notification(Notification::type n);
 
@@ -90,17 +81,14 @@ class AirwaysOverlay: public Subscriber {
     bool _load640(const gzFile& arp);
     void _checkEnd(AwyLabel &end, bool isLow);
 
-//     void _render(const AWY *n);
-    void _render(AWY *a);
-    bool _label(AWY *a);
+    void _render(const AWY *n) const;
+    bool _label(const AWY *a) const;
 
     Overlays& _overlays;
 
-    std::vector<AWY *> _segments;	// Airway segments.
+    std::vector<AWY *> _segments; // Individual airway segments.
 
     GLuint _highDL, _lowDL;	// Display lists
-
-    AirwayPolicy _policy;
 };
 
 #endif

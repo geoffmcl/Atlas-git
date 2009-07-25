@@ -44,6 +44,12 @@ const float minHighAirway = 50.0;
 const float maxLowAirway = 1250.0;
 const float minLowAirway = 50.0;
 
+// Colouring airways is a bit difficult.  At first I wanted to try to
+// colour each one a different colour.  However, that's nearly
+// impossible, as airways often overlap.  As well, it seems to be more
+// important to use colour to denote function, rather than identity,
+// so I scrapped the idea of individual colouring.
+
 // faa-h-8083-15-2.pdf, page 8-5, has a sample airways chart
 
 // From VFR_Chart_Symbols.pdf
@@ -85,63 +91,6 @@ const float awy_high_colour[4] = {0.176, 0.435, 0.667, 0.7};
 // {l}{d}+ (Eur) - air route (low altitude), 10nm wide, up to FL195
 // U{l}{d}+ (Eur) - upper air route (high altitude), above FL195
 
-const GLubyte airway_colours[36][4] = {
-    {255, 204, 102, 191},	// cantaloupe
-    {204, 255, 102, 191},	// honeydew
-    {102, 255, 204, 191},	// spindrift
-    {102, 204, 255, 191},	// sky
-    {204, 102, 255, 191},	// lavender
-    {255, 111, 207, 191},	// carnation
-
-    {255, 102, 102, 191},	// salmon
-    {255, 255, 102, 191},	// banana
-    {102, 255, 102, 191},	// flora
-    {102, 255, 255, 191},	// ice
-    {102, 102, 255, 191},	// orchid
-    {255, 102, 255, 191},	// bubblegum
-    {255, 102, 0, 191},		// tangerine
-
-    {128, 255, 0, 191},		// lime
-    {0, 255, 128, 191},		// sea foam
-    {0, 128, 255, 191},		// aqua
-    {102, 0, 255, 191},		// grape
-    {255, 0, 128, 191},		// strawberry
-
-    {128, 64, 0, 191},		// mocha
-    {64, 128, 0, 191},		// fern
-    {0, 128, 64, 191},		// moss
-    {0, 64, 128, 191},		// ocean
-    {64, 0, 128, 191},		// eggplant
-    {128, 0, 64, 191},		// maroon
-
-    {128, 0, 0, 191},		// cayenne
-    {128, 128, 0, 191},		// asparagus
-    {0, 128, 0, 191},		// clover
-    {0, 128, 128, 191},		// teal
-    {0, 0, 128, 191},		// midnight
-    {128, 0, 128, 191},		// plum
-
-    {255, 0, 0, 191},		// maraschino
-    {255, 255, 0, 191},		// lemon
-    {0, 255, 0, 191},		// spring
-    {0, 255, 255, 191},		// turquoise
-    {0, 255, 255, 191},		// blueberry
-    {255, 0, 255, 191}		// magenta
-};
-
-// Cheezy string hash function.
-unsigned int hash(const string& foo)
-{
-    unsigned int result = 0;
-    for (unsigned int i = 0; i < foo.size(); i++) {
-	if (foo[i] == '-') {
-	    break;
-	}
-	result += foo[i];
-    }
-    return result;
-}
-
 //////////////////////////////////////////////////////////////////////
 // AirwaysOverlay
 //////////////////////////////////////////////////////////////////////
@@ -149,8 +98,6 @@ unsigned int hash(const string& foo)
 AirwaysOverlay::AirwaysOverlay(Overlays& overlays):
     _overlays(overlays), _highDL(0), _lowDL(0)
 {
-    // EYE - Initialize policy here
-
     // Create a culler and a frustum searcher for it.
     _culler = new Culler();
     _frustum = new Culler::FrustumSearch(*_culler);
@@ -167,21 +114,13 @@ AirwaysOverlay::~AirwaysOverlay()
 
 	delete n;
     }
-
     _segments.clear();
+
+    glDeleteLists(_highDL, 1);
+    glDeleteLists(_lowDL, 1);
 
     delete _frustum;
     delete _culler;
-}
-
-void AirwaysOverlay::setPolicy(const AirwayPolicy& p)
-{
-    _policy = p;
-}
-
-AirwayPolicy AirwaysOverlay::policy()
-{
-    return _policy;
 }
 
 bool AirwaysOverlay::load(const string& fgDir)
@@ -291,6 +230,11 @@ bool AirwaysOverlay::_load640(const gzFile& arp)
     return true;
 }
 
+// Each airway segment has two endpoints, which should be fixes and/or
+// navaids.  If an endpoint is a fix, we use the airway type as a
+// heuristic to decide whether that fix is a high or low fix.  Note
+// that the navaid, fix, and airways databases are not perfect; so we
+// need to handle cases where no or partial matches are made.
 void AirwaysOverlay::_checkEnd(AwyLabel &end, bool isLow)
 {
     // EYE - clear as mud!
@@ -381,119 +325,61 @@ void AirwaysOverlay::_checkEnd(AwyLabel &end, bool isLow)
 // Therefore, we need to do all the low-altitude airways first
 // (they'll all have the same line width), and all the high-alitude
 // airways last.
-// void AirwaysOverlay::draw()
 void AirwaysOverlay::draw(bool drawHigh, bool drawLow, bool label)
 {
-// //     static double scale = 0.0;
-
-//     if (_type < 0) {
-// 	// EYE - error?
-// 	// Airways weren't loaded.
-// 	return;
-//     }
-
-// //     if (_overlays.scale() != scale) {
-// // 	scale = _overlays.scale();
-//     if (_overlays.isDirty()) {
-// 	// Something's changed, so we need to regenerate the display
-// 	// list.
-// 	glDeleteLists(_DL, 1);
-// 	_DL = glGenLists(1);
-// 	assert(_DL != 0);
-// 	glNewList(_DL, GL_COMPILE);
-
-// 	glEnable(GL_LINE_SMOOTH);
-// 	glEnable(GL_POINT_SMOOTH);
-// 	glEnable(GL_BLEND);
-// 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-// 	vector<void *> intersections = _culler.intersections(_type);
-// 	for (int i = 0; i < intersections.size(); i++) {
-// 	    AWY *a = (AWY *)intersections[i];
-
-// 	    _render(a);
-// 	}
-
-// 	glDisable(GL_BLEND);
-// 	glDisable(GL_POINT_SMOOTH);
-// 	glDisable(GL_LINE_SMOOTH);
-
-// 	glEndList();
-//     }
-
-//     glCallList(_DL);
-//     static double scale = 0.0;
-
-    static bool firstTime = true;
-    if (firstTime) {
-	_lowDL = glGenLists(1);
-	assert(_lowDL != 0);
-	glNewList(_lowDL, GL_COMPILE);
-// 	glColor4fv(awy_low_colour);
-	glLineWidth(2.0);
-	for (unsigned int i = 0; i < _segments.size(); i++) {
-	    AWY *a = _segments[i];
-	    if (a->isLow) {
-// 	    if (a->isLow && (a->top != 180)) {
-		_render(a);
+    // I used to add individual airway segments to the culler and draw
+    // them based on whether they were visible.  This turned out to be
+    // too much work.  It's much easier just to create one display
+    // list for low airways and one display list for high airways, and
+    // turn them on and off as required.  If, for some reasons, we
+    // wanted to render airways differently depending on our zoom, for
+    // example, then we couldn't do this.
+    if (drawLow) {
+	if (_lowDL == 0) {
+	    _lowDL = glGenLists(1);
+	    assert(_lowDL != 0);
+	    glNewList(_lowDL, GL_COMPILE); {
+		glColor4fv(awy_low_colour);
+		glPushAttrib(GL_LINE_BIT); {
+		    glLineWidth(2.0);
+		    for (unsigned int i = 0; i < _segments.size(); i++) {
+			AWY *a = _segments[i];
+			if (a->isLow) {
+			    _render(a);
+			}
+		    }
+		}
+		glPopAttrib();
 	    }
+	    glEndList();
 	}
-	glEndList();
 
-	_highDL = glGenLists(1);
-	assert(_highDL != 0);
-	glNewList(_highDL, GL_COMPILE);
-// 	glColor4fv(awy_high_colour);
-	glLineWidth(1.0);
-	for (unsigned int i = 0; i < _segments.size(); i++) {
-	    AWY *a = _segments[i];
-	    if (!a->isLow) {
-		_render(a);
-	    }
-	}
-	glEndList();
-
-	firstTime = false;
+	glCallList(_lowDL);
     }
 
-    glEnable(GL_LINE_SMOOTH);
-    glEnable(GL_POINT_SMOOTH);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-//     for (int i = 0; i < _segments.size(); i++) {
-// 	AWY *a = _segments[i];
-// 	if (a->DL > 0) {
-// 	    glCallList(a->DL);
-// 	}
-//     }
-//     if (_overlays.scale() > minHighAirway) {
-// 	glCallList(_highDL);
-//     }
-//     if (_overlays.scale() < maxLowAirway) {
-// 	glCallList(_lowDL);
-//     }
-//     if (_airwayDisplay == low) {
-// 	glCallList(_lowDL);
-//     } else if (_airwayDisplay == high) {
-// 	glCallList(_highDL);
-//     }
-    if (drawLow) {
-	glCallList(_lowDL);
-    } 
     if (drawHigh) {
+	if (_highDL == 0) {
+	    _highDL = glGenLists(1);
+	    assert(_highDL != 0);
+	    glNewList(_highDL, GL_COMPILE); {
+		glColor4fv(awy_high_colour);
+		for (unsigned int i = 0; i < _segments.size(); i++) {
+		    AWY *a = _segments[i];
+		    if (!a->isLow) {
+			_render(a);
+		    }
+		}
+	    }
+	    glEndList();
+	}
+
 	glCallList(_highDL);
     }
-    glDisable(GL_BLEND);
-    glDisable(GL_POINT_SMOOTH);
-    glDisable(GL_LINE_SMOOTH);
 
     // Now label them.
     // EYE - we should create a display list, combine this with the
     // previous bit, blah blah blah
     if (label) {
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	glLineWidth(1.0);
 	vector<Cullable *> intersections = _frustum->intersections();
 	for (unsigned int i = 0; i < intersections.size(); i++) {
 	    AWY *a = dynamic_cast<AWY *>(intersections[i]);
@@ -505,7 +391,6 @@ void AirwaysOverlay::draw(bool drawHigh, bool drawLow, bool label)
 		_label(a);
 	    }
 	}
-	glDisable(GL_BLEND);
     }
 }
 
@@ -518,63 +403,10 @@ void AirwaysOverlay::draw(bool drawHigh, bool drawLow, bool label)
 // (3) draw airways/labels in different styles depending on type (eg,
 //     LF, high vs low, ...)
 // (4) add directions at edge of VOR roses
-// void AirwaysOverlay::_render(const AWY *a)
-void AirwaysOverlay::_render(AWY *a)
+void AirwaysOverlay::_render(const AWY *a) const
 {
     sgdVec3 point;
 
-//     // EYE - magic numbers
-//     // Low - < 1000.0 m/pixel, High - > 100.0
-
-//     // Render an airway between a range.  At the edges, the width is
-//     // 1, in the middle it's 5.
-// //     sgVec2 low = {50.0, 1000.0}, high = {250.0, 10000.0};
-
-//     float width = 0.0;
-//     if (a->isLow) {
-// 	glColor4fv(awy_low_colour);
-// 	if (metresPerPixel < 1000.0) {
-// 	    width = 5.0 - metresPerPixel / 200.0;
-// 	}
-// 	if (metresPerPixel < 100.0) {
-// // 	    width = 5.0;
-// 	    width = metresPerPixel / 20.0;
-// 	}
-// // 	if ((metresPerPixel >= low[0]) && (metresPerPixel <= low[1])) {
-// // 	    float middle = (low[0] + low[1]) / 2.0;
-// // 	    width = (middle - fabs(middle - metresPerPixel)) / middle * 4.0 + 1.0;
-// // 	}
-//     } else {
-// 	glColor4fv(awy_high_colour);
-// 	if (metresPerPixel > 200.0) {
-// // 	    width = (metresPerPixel - 100.0) / 500.0;
-// 	    width = 1.0;
-// 	}
-// 	if (width > 5.0) {
-// 	    width = 5.0;
-// 	}
-// // 	if ((metresPerPixel >= high[0]) && (metresPerPixel <= high[1])) {
-// // 	    float middle = (high[0] + high[1]) / 2.0;
-// // 	    width = (middle - fabs(middle - metresPerPixel)) / middle * 4.0 + 1.0;
-// // 	}
-//     }
-
-//     if (fabs(width) < 0.01) {
-// 	return;
-//     }
-//     a->DL = glGenLists(1);
-//     assert(a->DL != 0);
-//     glNewList(a->DL, GL_COMPILE);
-
-//     glLineWidth(width);
-//     glPointSize(width / 2.0);
-// //     if (a->name.find("J121") != string::npos) {
-// //     if (a->name == "A632") {
-    if (a->isLow) {
-	glColor4ubv(airway_colours[hash(a->name) % 24]);
-    } else {
-	glColor4ubv(airway_colours[(hash(a->name) % 12) + 24]);
-    }
     glBegin(GL_LINES); {
 	atlasGeodToCart(a->start.lat, a->start.lon, 0.0, point);
 	glVertex3dv(point);
@@ -582,53 +414,6 @@ void AirwaysOverlay::_render(AWY *a)
 	glVertex3dv(point);
     }
     glEnd();
-//     glEndList();
-//     if (metresPerPixel < 7500.0) {
-// 	glBegin(GL_POINTS); {
-// 	    glColor4f(0.0, 0.0, 0.0, (7500.0 - metresPerPixel) / 7500.0);
-// 	    SGGeodesy::SGGeodToCart(SGGeod::fromDegFt(a->start.lon, a->start.lat, 0.0), point);
-// 	    glVertex3dv(point.sg());
-// 	    SGGeodesy::SGGeodToCart(SGGeod::fromDegFt(a->end.lon, a->end.lat, 0.0), point);
-// 	    glVertex3dv(point.sg());
-// 	}
-// 	glEnd();
-//     }
-//     // Label
-//     if ((a->isLow && (width > 2.5)) ||
-// 	(!a->isLow && (metresPerPixel > 500.0) && (metresPerPixel < 3000.0))) {
-// 	// EYE - we really should do the intersections separately from
-// 	// the segments.
-// 	fntRenderer& f = _overlays.fontRenderer();
-// 	if (a->isLow) {
-// 	    f.setPointSize(width * 2.0 * metresPerPixel);
-// 	} else {
-// 	    f.setPointSize(7.0 * metresPerPixel);
-// 	}
-// 	// EYE - black (from above) looks nicer
-// // 	glColor4fv(awy_low_colour);
-// 	glPushMatrix(); {
-// 	    SGGeodesy::SGGeodToCart(SGGeod::fromDegFt(a->start.lon, a->start.lat, 0.0), point);
-// 	    glTranslated(point[0], point[1], point[2]);
-// 	    glRotatef(a->start.lon + 90.0, 0.0, 0.0, 1.0);
-// 	    glRotatef(90.0 - a->start.lat, 1.0, 0.0, 0.0);
-
-// 	    f.start3f(0.0, 0.0, 0.0);
-// 	    f.puts(a->start.id.c_str());
-// 	}
-// 	glPopMatrix();
-
-// 	glPushMatrix(); {
-// 	    SGGeodesy::SGGeodToCart(SGGeod::fromDegFt(a->end.lon, a->end.lat, 0.0), point);
-// 	    glTranslated(point[0], point[1], point[2]);
-// 	    glRotatef(a->end.lon + 90.0, 0.0, 0.0, 1.0);
-// 	    glRotatef(90.0 - a->end.lat, 1.0, 0.0, 0.0);
-
-// 	    f.start3f(0.0, 0.0, 0.0);
-// 	    f.puts(a->end.id.c_str());
-// 	}
-// 	glPopMatrix();
-//     }
-// //     }
 }
 
 // Draws a single text box.  The background is white, the text and a
@@ -664,7 +449,7 @@ static void _drawLabel(LayoutManager &lm, float *colour,
 
 // Labels the given airway.  Does nothing if there isn't enough room
 // to label the segment.
-bool AirwaysOverlay::_label(AWY *a)
+bool AirwaysOverlay::_label(const AWY *a) const
 {
     // The labels are placed in the middle of the segment, oriented
     // along the segment.
