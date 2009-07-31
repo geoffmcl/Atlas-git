@@ -103,14 +103,6 @@ FixesOverlay::FixesOverlay(Overlays& overlays):
 
 FixesOverlay::~FixesOverlay()
 {
-    for (unsigned int i = 0; i < _fixes.size(); i++) {
-	FIX *n = _fixes[i];
-
-	delete n;
-    }
-
-    _fixes.clear();
-
     glDeleteLists(_DL, 1);
 
     delete _culler;
@@ -196,9 +188,6 @@ bool FixesOverlay::_load600(const gzFile& arp)
 
 	// Add to our culler.
 	_frustum->culler().addObject(f);
-
-	// Add to the fixes vector.
-	_fixes.push_back(f);
 
 	// Create search tokens for it.
 	globals.searcher.add(f);

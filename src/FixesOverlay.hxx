@@ -83,8 +83,6 @@ class FixesOverlay: public Subscriber {
 
     Overlays& _overlays;
 
-    vector<FIX *> _fixes;
-
     GLuint _DL;			// Display list of all rendered fixes.
     bool _isDirty;
 };
