@@ -64,8 +64,10 @@ class FlightData {
 
     // Derived values (ie, not passed explicitly from FlightGear)
     float est_t_offset;		// Estimated time offset from first
-				// point in flight track.
+				// point in flight track (in seconds)
     sgdVec3 cart;		// Cartesian coordinates of position.
+    float dist;			// Cumulative distance from start of
+				// flight (in metres)
 
     const vector<NAV *>& navaids();
 
@@ -180,6 +182,7 @@ class FlightTrack {
     AtlasString _name;
 
     void _adjustOffsetsAround(int i);
+    void _calcDistancesFrom(int i);
 
     bool _readFlightFile(const char *path);
     bool _parse_message(char *buf, FlightData *d);

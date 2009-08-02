@@ -199,6 +199,7 @@ void FlightTrack::setMaxBufferSize(unsigned int size)
 
     _version++;
     _adjustOffsetsAround(0);
+    _calcDistancesFrom(0);
 }
 
 void FlightTrack::clear() 
@@ -585,6 +586,34 @@ void FlightTrack::_adjustOffsetsAround(int i)
     }
 }
 
+// Similar to the previous method, this is used to set the 'dist'
+// field of the indicated FlightData point and all points after.  All
+// points before 'i' are assumed to have the correct cumulative
+// distance.
+void FlightTrack::_calcDistancesFrom(int i)
+{
+    if (i >= _track.size()) {
+	return;
+    }
+
+    // If we're being asked to start at the beginning, we need to set
+    // the first point's distance to 0.0 explicitly.
+    if (i == 0) {
+	dataAtPoint(0)->dist = 0.0;
+	i++;
+    }
+
+    // Now update starting at point i (which depends on the cumulative
+    // distance in point i - 1), going to the end.
+    FlightData *d0 = dataAtPoint(i - 1), *d1;
+    for (; i < _track.size(); i++) {
+	d1 = dataAtPoint(i);
+	float delta = sgdDistanceVec3(d1->cart, d0->cart);
+	d1->dist = d0->dist + delta;
+	d0 = d1;
+    }
+}
+
 // EYE - change to use _file
 // Initialize ourselves to the data contained in the given file.
 bool FlightTrack::_readFlightFile(const char *path)
@@ -677,6 +706,7 @@ bool FlightTrack::_parse_message(char *buf, FlightData *d)
     d->lat = d->lon = d->alt = d->hdg = d->spd = 0.0;
     d->nav1_rad = d->nav2_rad = 0.0;
     d->nav1_freq = d->nav2_freq = d->adf_freq = 0;
+    d->est_t_offset = d->dist = 0.0;
 
     // The buffer should consist of 3 lines, so first divide it by
     // newlines.
@@ -849,11 +879,13 @@ bool FlightTrack::_addPoint(FlightData *data, float tolerance)
 
 	// Recalculate time offsets from the start onwards.
 	_adjustOffsetsAround(0);
+	_calcDistancesFrom(0);
     }
 
     // Add point.
     _track.push_back(data);
     _adjustOffsetsAround(_track.size() - 1);
+    _calcDistancesFrom(_track.size() - 1);
 
     // Mark us as changed.
     _version++;
