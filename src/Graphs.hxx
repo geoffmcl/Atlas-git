@@ -31,41 +31,6 @@
 #include "FlightTrack.hxx"
 #include "Notifications.hxx"
 
-// This contains a set of data points, which could be along the x-axis
-// (time), or the y-axis (altitude, speed, or climb rate).  It also
-// contains some bookkeeping information we use to draw the graph.
-struct Values {
-    // This information concerns the data.
-    std::vector<float> data;
-    float min, max;		// Minimum and maximum data value.
-    
-    // This information concerns the way it is graphed.
-    int pixels;			// Space for axis (excluding labels).
-    float first, last;		// Extreme values of graph.
-    float d, D;			// Small and large tick intervals.
-    int decimals;		// Significant digits after the decimal.
-};
-
-// Contains information about one slice of a glideslope: the data
-// point (as an index into the flight track data), the opacity (a
-// number from 0.0 - clear - to 1.0 - opaque), and the bottom, middle,
-// and top of the glideslope (in feet).
-struct GSValue {
-    int x;
-    float opacity;
-    float bottom, middle, top;
-};
-
-// Contains information on one unbroken section of glideslope data for
-// a single radio.  Sections for different radios can overlap in time.
-// We ignore the possibility that a single radio could receive signals
-// from more than one transmitter.
-enum Radio {NAV1 = 0, NAV2, _RADIO_COUNT};
-struct GSSection {
-    vector <GSValue> vals;
-    Radio radio;
-};
-
 class Graphs: public Subscriber {
 public:
     static const int ALTITUDE = 1 << 0;
@@ -89,14 +54,55 @@ public:
     unsigned int smoothing();
     void setSmoothing(unsigned int s);
 
+    enum XAxisType { TIME, DISTANCE };
+    void setXAxisType(XAxisType t);
+    XAxisType xAxisType() { return _xAxisType; }
+
     bool notification(Notification::type n);
 protected:
+    // This contains a set of data points, which could be along the
+    // x-axis (time), or the y-axis (altitude, speed, or climb rate).
+    // It also contains some bookkeeping information we use to draw
+    // the graph.
+    struct Values {
+	// This information concerns the data.
+	std::vector<float> data;
+	float min, max;		// Minimum and maximum data value.
+    
+	// This information concerns the way it is graphed.
+	int pixels;	      // Space for axis (excluding labels).
+	float first, last;    // Extreme values of graph.
+	float d, D;	      // Small and large tick intervals.
+	int decimals;	      // Significant digits after the decimal.
+    };
+
+    // Contains information about one slice of a glideslope: the data
+    // point (as an index into the flight track data), the opacity (a
+    // number from 0.0 - clear - to 1.0 - opaque), and the bottom,
+    // middle, and top of the glideslope (in feet).
+    struct GSValue {
+	int x;
+	float opacity;
+	float bottom, middle, top;
+    };
+
+    // Contains information on one unbroken section of glideslope data
+    // for a single radio.  Sections for different radios can overlap
+    // in time.  We ignore the possibility that a single radio could
+    // receive signals from more than one transmitter.
+    enum Radio {NAV1 = 0, NAV2, _RADIO_COUNT};
+    struct GSSection {
+	vector <GSValue> vals;
+	Radio radio;
+    };
+
     int _window;
     int _w, _h;
 
     FlightTrack *_track;
     int _graphTypes;
     unsigned int _smoothing;
+    XAxisType _xAxisType;
     GLfloat _aircraftColour[4];
     GLfloat _markColour[4];
 
@@ -106,7 +112,7 @@ protected:
     // These contain the data (raw and derived) of the track.  Since
     // most tracks never change, we save them here to save ourselves
     // time.
-    Values _times, _speed, _altitude, _rateOfClimb;
+    Values _time, _dist, _speed, _altitude, _rateOfClimb;
     std::vector<GSSection *> _GSs;
 
     // These determine whether the graphs should be redrawn anew or
@@ -122,8 +128,10 @@ protected:
     bool _shouldRerender, _shouldReload;
     GLuint _graphDL;
 
-    void _drawGraph(Values &values, int x, int y, const char *label);
-    void _drawGS(int x, int y);
+    void _drawGraph(Values &xVals, Values& yVals, int x, int y, 
+		    const char *label);
+    void _drawGS(Values& xVals, int x, int y);
+    Values& _xValues();
 
     void _calcNiceIntervals(Values &values);
 

@@ -44,7 +44,7 @@ float glideslopeOutlineColour[4] = {0.75, 0.75, 0.75, 1.0};
 
 Graphs::Graphs(int window): 
     _window(window), _track(NULL), _graphTypes(0), _smoothing(10),
-    _shouldRerender(false), _shouldReload(false), _graphDL(0)
+    _xAxisType(TIME), _shouldRerender(false), _shouldReload(false), _graphDL(0)
 {
     // Default mark and live aircraft colours are black.
     GLfloat black[4] = {0.0, 0.0, 0.0, 1.0};
@@ -74,6 +74,7 @@ void Graphs::draw()
 {
     assert(glutGetWindow() == _window);
 
+    Values& xVals = _xValues();
     if (_shouldRerender) {
 	if (_shouldReload) {
 	    _loadData();
@@ -113,25 +114,25 @@ void Graphs::draw()
 		// labels.
 		int x = _margin, y = _header;
 
-		_times.pixels = _w - (_margin * 2);
-		_calcNiceIntervals(_times);
+		xVals.pixels = _w - (_margin * 2);
+		_calcNiceIntervals(xVals);
 		if (graphTypes() & Graphs::CLIMB_RATE) {
 		    _rateOfClimb.pixels = (_h / graphCount) - (_header * 2);
 		    _calcNiceIntervals(_rateOfClimb);
-		    _drawGraph(_rateOfClimb, x, y, "Climb Rate (ft/min)");
+		    _drawGraph(xVals, _rateOfClimb, x, y, "Climb Rate (ft/min)");
 		    y += _rateOfClimb.pixels + (2 * _header);
 		}
 		if (graphTypes() & Graphs::SPEED) {
 		    _speed.pixels = (_h / graphCount) - (_header * 2);
 		    _calcNiceIntervals(_speed);
-		    _drawGraph(_speed, x, y, "Speed (kt)");
+		    _drawGraph(xVals, _speed, x, y, "Speed (kt)");
 		    y += _speed.pixels + (2 * _header);
 		}
 		if (graphTypes() & Graphs::ALTITUDE) {
 		    _altitude.pixels = (_h / graphCount) - (_header * 2);
 		    _calcNiceIntervals(_altitude);
-		    _drawGS(x, y);
-		    _drawGraph(_altitude, x, y, "Altitude (ft)");
+		    _drawGS(xVals, x, y);
+		    _drawGraph(xVals, _altitude, x, y, "Altitude (ft)");
 		}
 	    }
 	    glPopAttrib();
@@ -157,22 +158,22 @@ void Graphs::draw()
 
 	glPushMatrix(); {
 	    glTranslatef(_margin, 0.0, 0.0);
-	    glScalef(_times.pixels / (_times.last - _times.first), 1.0, 0.0);
-	    glTranslatef(-_times.first, 0.0, 0.0);
+	    glScalef(xVals.pixels / (xVals.last - xVals.first), 1.0, 0.0);
+	    glTranslatef(-xVals.first, 0.0, 0.0);
 
 	    if (_track->mark() >= 0) {
 		glBegin(GL_LINES); {
 		    glColor4fv(_markColour);
-		    glVertex2f(_times.data[_track->mark()], 0.0);
-		    glVertex2f(_times.data[_track->mark()], (float)_h);
+		    glVertex2f(xVals.data[_track->mark()], 0.0);
+		    glVertex2f(xVals.data[_track->mark()], (float)_h);
 		}
 		glEnd();
 	    }
 	    if (_track->live()) {
 		glBegin(GL_LINES); {
 		    glColor4fv(_aircraftColour);
-		    glVertex2f(_times.max, 0.0);
-		    glVertex2f(_times.max, (float)_h);
+		    glVertex2f(xVals.max, 0.0);
+		    glVertex2f(xVals.max, (float)_h);
 		}
 		glEnd();
 	    }
@@ -213,9 +214,10 @@ int Graphs::pixelToPoint(int x)
     // graph has a regular scale - each pixel corresponds to a fixed
     // amount of time.  The x coordinate therefore corresponds to a
     // certain time.
-    float scale = (_times.last - _times.first) / _times.pixels;
-    int left = (_times.min - _times.first) / scale + _margin;
-    int right = (_times.max - _times.first) / scale + _margin;
+    Values& xVals = _xValues();
+    float scale = (xVals.last - xVals.first) / xVals.pixels;
+    int left = (xVals.min - xVals.first) / scale + _margin;
+    int right = (xVals.max - xVals.first) / scale + _margin;
     // Convert out-of-range values to in-range values.
     if (x < left) {
 	x = left;
@@ -226,9 +228,9 @@ int Graphs::pixelToPoint(int x)
     // Find a point close to our x value, this time expressed as time.
     // Note that we may not have an exact match, so we try to find the
     // closest.
-    float time = (x - left) * scale + _times.min;
-    for (unsigned int i = 0; i < _times.data.size(); i++) {
-	if (_times.data[i] > time) {
+    float time = (x - left) * scale + xVals.min;
+    for (unsigned int i = 0; i < xVals.data.size(); i++) {
+	if (xVals.data[i] > time) {
 	    // We've passed the cutoff.  Check if the point we're at
 	    // is better than the point we just passed.
 	    if (i == 0) {
@@ -238,8 +240,8 @@ int Graphs::pixelToPoint(int x)
 	    // which isn't always true.  On the other hand, we don't
 	    // have any god way to handle non-increasing time values,
 	    // so we'll just close our eyes and hope nothing happens.
-	    float time0 = _times.data[i] - time;
-	    float time1 = time - _times.data[i - 1];
+	    float time0 = xVals.data[i] - time;
+	    float time1 = time - xVals.data[i - 1];
 	    if (time0 < time1) {
 		return i;
 	    } else {
@@ -307,6 +309,16 @@ void Graphs::setSmoothing(unsigned int s)
     _shouldRerender = _shouldReload = true;
 }
 
+void Graphs::setXAxisType(XAxisType t)
+{
+    if (t == _xAxisType) {
+	return;
+    }
+
+    _xAxisType = t;
+    _shouldRerender = true;
+}
+
 // This routine receives notifications of events that we've subscribed
 // to.  Basically it translates from some outside event, like the
 // flight track being modified, to some internal action or future
@@ -343,7 +355,8 @@ bool Graphs::notification(Notification::type n)
 // actual graph.  _drawGraph assumes that there is space around the
 // graph for labels, specifically _header pixels on the top and
 // bottom, and _margin pixels on the left and right.
-void Graphs::_drawGraph(Values &values, int x, int y, const char *label)
+void Graphs::_drawGraph(Values &xVals, Values& yVals, int x, int y, 
+			const char *label)
 {
     glPushAttrib(GL_LINE_BIT); {
 	// We draw the graph axes and ticks unsmoothed - it looks nicer.
@@ -352,9 +365,9 @@ void Graphs::_drawGraph(Values &values, int x, int y, const char *label)
 	// Print the graph axes.
 	glColor4fv(axisColour);
 	glBegin(GL_LINE_STRIP); {
-	    glVertex2i(x, y + values.pixels);
+	    glVertex2i(x, y + yVals.pixels);
 	    glVertex2i(x, y);
-	    glVertex2i(x + _times.pixels, y);
+	    glVertex2i(x + xVals.pixels, y);
 	}
 	glEnd();
 
@@ -362,30 +375,30 @@ void Graphs::_drawGraph(Values &values, int x, int y, const char *label)
 	// http://www.glprogramming.com/red/chapter02.html
 
 	// Don't do anything unless there are at least 2 points.
-	if (values.data.size() >= 2) {
+	if (yVals.data.size() >= 2) {
 	    // Draw the labels and "ticks" for the y (data) axis.  Change
 	    // the y transformation.
 	    glPushMatrix();
 	    glTranslatef(0.0, y, 0.0);
-	    glScalef(1.0, values.pixels / (values.last - values.first), 0.0);
-	    glTranslatef(0.0, -values.first, 0.0);
+	    glScalef(1.0, yVals.pixels / (yVals.last - yVals.first), 0.0);
+	    glTranslatef(0.0, -yVals.first, 0.0);
 
 	    // To avoid problems with increasing round-off errors, we use
 	    // an integer to control the loop.
-	    int intervals = rint((values.last - values.first) / values.d);
+	    int intervals = rint((yVals.last - yVals.first) / yVals.d);
 	    int majorTicks = 0;
 	    glBegin(GL_LINES); {
 		for (int i = 1; i <= intervals; i++) {
-		    float tick = values.first + (i * values.d);
+		    float tick = yVals.first + (i * yVals.d);
 		    glColor4fv(axisColour);
 		    glVertex2f(x, tick);
-		    if (fabs(remainderf(tick, values.D)) < 0.00001) {
+		    if (fabs(remainderf(tick, yVals.D)) < 0.00001) {
 			// Major tick.
 			glVertex2f(x + 10, tick);
 
 			glColor4fv(majorTickColour);
 			glVertex2f(x + 10, tick);
-			glVertex2f(x + _times.pixels, tick);
+			glVertex2f(x + xVals.pixels, tick);
 		
 			majorTicks++;
 		    } else {
@@ -394,7 +407,7 @@ void Graphs::_drawGraph(Values &values, int x, int y, const char *label)
 
 			glColor4fv(minorTickColour);
 			glVertex2f(x + 5, tick);
-			glVertex2f(x + _times.pixels, tick);
+			glVertex2f(x + xVals.pixels, tick);
 		    }
 		}
 	    }
@@ -402,10 +415,10 @@ void Graphs::_drawGraph(Values &values, int x, int y, const char *label)
     
 	    // Now label the y axis.
 	    char format[10];
-	    sprintf(format, "%%.%df", values.decimals);
+	    sprintf(format, "%%.%df", yVals.decimals);
 	    AtlasString buf;
 	    for (int i = 0; i <= intervals; i++) {
-		float tick = values.first + (i * values.d);
+		float tick = yVals.first + (i * yVals.d);
 		// In general, we just label major ticks.  However, there
 		// are cases where there is only one major tick.  Just
 		// labelling that one tick means it's impossible for the
@@ -414,7 +427,7 @@ void Graphs::_drawGraph(Values &values, int x, int y, const char *label)
 		// So, we label this tick if: (a) it's major, or (b) it's
 		// the first or last one and there are fewer than 2 major
 		// ticks.
-		if ((fabs(remainderf(tick, values.D)) < 0.00001) ||
+		if ((fabs(remainderf(tick, yVals.D)) < 0.00001) ||
 		    ((majorTicks < 2) && (i == 0)) ||
 		    ((majorTicks < 2) && (i == intervals))) {
 		    glColor4fv(axisColour);
@@ -434,39 +447,39 @@ void Graphs::_drawGraph(Values &values, int x, int y, const char *label)
 	    // while the x axis uses times.
 	    glPushMatrix();
 	    glTranslatef(x, 0.0, 0.0);
-	    glScalef(_times.pixels / (_times.last - _times.first), 1.0, 0.0);
-	    glTranslatef(-_times.first, 0.0, 0.0);
+	    glScalef(xVals.pixels / (xVals.last - xVals.first), 1.0, 0.0);
+	    glTranslatef(-xVals.first, 0.0, 0.0);
 
 	    glBegin(GL_LINES); {
-		intervals = rint((_times.last - _times.first) / _times.d);
+		intervals = rint((xVals.last - xVals.first) / xVals.d);
 		for (int i = 1; i <= intervals; i++) {
-		    float tick = _times.first + (i * _times.d);
+		    float tick = xVals.first + (i * xVals.d);
 		    glColor4fv(axisColour);
 		    glVertex2f(tick, y);
-		    if (fabs(remainderf(tick, _times.D)) < 0.00001) {
+		    if (fabs(remainderf(tick, xVals.D)) < 0.00001) {
 			// Major tick.
 			glVertex2f(tick, y + 10);
 
 			glColor4fv(majorTickColour);
 			glVertex2f(tick, y + 10);
-			glVertex2f(tick, y + values.pixels);
+			glVertex2f(tick, y + yVals.pixels);
 		    } else {
 			// Minor tick.
 			glVertex2f(tick, y + 5);
 
 			glColor4fv(minorTickColour);
 			glVertex2f(tick, y + 5);
-			glVertex2f(tick, y + values.pixels);
+			glVertex2f(tick, y + yVals.pixels);
 		    }
 		}
 	    }
 	    glEnd();
     
 	    // Now label the major time ticks.
-	    sprintf(format, "%%.%df", _times.decimals);
+	    sprintf(format, "%%.%df", xVals.decimals);
 	    for (int i = 0, tickCount = 0; i <= intervals; i++) {
-		float tick = _times.first + (i * _times.d);
-		if ((fabs(remainderf(tick, _times.D)) < 0.00001) ||
+		float tick = xVals.first + (i * xVals.d);
+		if ((fabs(remainderf(tick, xVals.D)) < 0.00001) ||
 		    ((tickCount < 2) && (i == intervals))) {
 		    tickCount++;
 		    glColor4fv(axisColour);
@@ -482,15 +495,15 @@ void Graphs::_drawGraph(Values &values, int x, int y, const char *label)
 	    glEnable(GL_LINE_SMOOTH);
 	    glPushMatrix(); {
 		glTranslatef(x, y, 0.0);
-		glScalef(_times.pixels / (_times.last - _times.first), 
-			 values.pixels / (values.last - values.first), 0.0);
-		glTranslatef(-_times.first, -values.first, 0.0);
+		glScalef(xVals.pixels / (xVals.last - xVals.first), 
+			 yVals.pixels / (yVals.last - yVals.first), 0.0);
+		glTranslatef(-xVals.first, -yVals.first, 0.0);
 
 		int point = 0;
 		glColor4fv(graphColour);
 		glBegin(GL_LINE_STRIP); {
-		    for (unsigned int i = 0; i < values.data.size(); i++) {
-			glVertex2f(_times.data[i], values.data[i]);
+		    for (unsigned int i = 0; i < yVals.data.size(); i++) {
+			glVertex2f(xVals.data[i], yVals.data[i]);
 			point++;
 		    }
 		}
@@ -504,12 +517,12 @@ void Graphs::_drawGraph(Values &values, int x, int y, const char *label)
     // Print a header (actually a "center", since we print it in the
     // middle).
     glColor4fv(labelColour);
-    _drawString(label, x + _times.pixels / 2, y + values.pixels / 2);
+    _drawString(label, x + xVals.pixels / 2, y + yVals.pixels / 2);
 }
 
 // Draws any glideslope indications on the altitude graph.  We assume
 // that _altitude.pixels is correct.
-void Graphs::_drawGS(int x, int y)
+void Graphs::_drawGS(Values& xVals, int x, int y)
 {
     if (_GSs.size() == 0) {
 	// No glideslope chunks to draw.
@@ -520,15 +533,15 @@ void Graphs::_drawGS(int x, int y)
     // outside of the graphing area.  Rather than testing whether
     // points of the glideslope are outside the graph, we just set a
     // scissor rectangle and let OpenGL do the work for us.
-    glScissor(x, y, _times.pixels, _altitude.pixels);
+    glScissor(x, y, xVals.pixels, _altitude.pixels);
     glEnable(GL_SCISSOR_TEST);
 
     glPushMatrix(); {
 	glTranslatef(x, y, 0.0);
-	glScalef(_times.pixels / (_times.last - _times.first), 
+	glScalef(xVals.pixels / (xVals.last - xVals.first), 
 		 _altitude.pixels / (_altitude.last - _altitude.first), 
 		 0.0);
-	glTranslatef(-_times.first, -_altitude.first, 0.0);
+	glTranslatef(-xVals.first, -_altitude.first, 0.0);
 
 	for (unsigned int i = 0; i < _GSs.size(); i++) {
 	    GSSection *s = _GSs[i];
@@ -546,8 +559,8 @@ void Graphs::_drawGS(int x, int y)
 		    GSValue& v = s->vals[j];
 
 		    glColor4f(c[0], c[1], c[2], v.opacity);
-		    glVertex2d(_times.data[v.x], v.bottom);
-		    glVertex2d(_times.data[v.x], v.top);
+		    glVertex2d(xVals.data[v.x], v.bottom);
+		    glVertex2d(xVals.data[v.x], v.top);
 		}
 	    }
 	    glEnd();
@@ -562,21 +575,21 @@ void Graphs::_drawGS(int x, int y)
 	    glBegin(GL_LINE_STRIP); {
 		for (unsigned int j = 0; j < s->vals.size(); j++) {
 		    GSValue& v = s->vals[j];
-		    glVertex2d(_times.data[v.x], v.top);
+		    glVertex2d(xVals.data[v.x], v.top);
 		}
 	    }
 	    glEnd();
 	    glBegin(GL_LINE_STRIP); {
 		for (unsigned int j = 0; j < s->vals.size(); j++) {
 		    GSValue& v = s->vals[j];
-		    glVertex2d(_times.data[v.x], v.middle);
+		    glVertex2d(xVals.data[v.x], v.middle);
 		}
 	    }
 	    glEnd();
 	    glBegin(GL_LINE_STRIP); {
 		for (unsigned int j = 0; j < s->vals.size(); j++) {
 		    GSValue& v = s->vals[j];
-		    glVertex2d(_times.data[v.x], v.bottom);
+		    glVertex2d(xVals.data[v.x], v.bottom);
 		}
 	    }
 	    glEnd();
@@ -584,6 +597,15 @@ void Graphs::_drawGS(int x, int y)
     }
     glPopMatrix();
     glDisable(GL_SCISSOR_TEST);
+}
+
+Graphs::Values& Graphs::_xValues()
+{
+    if (_xAxisType == TIME) {
+	return _time;
+    } else {
+	return _dist;
+    }
 }
 
 // Calculates "nice" intervals for a given set of data values.  The
@@ -679,19 +701,22 @@ void Graphs::_drawString(const char *str, float x, float y)
     }
 }
 
-// Sets the _times, _speed, _altitude, and _rateOfClimb variables,
-// based on the values in _track.  In general, this should be called
-// whenever we detect that _track has changed.
+// Sets the _time, _dist, _speed, _altitude, and _rateOfClimb
+// variables, based on the values in _track.  In general, this should
+// be called whenever we detect that _track has changed.
 void Graphs::_loadData()
 {
-    // Time, altitude, and speed are easy.  We'll do those first.
-    _times.data.clear();
+    // Time, distance, altitude, and speed are easy.  We'll do those
+    // first.
+    _time.data.clear();
+    _dist.data.clear();
     _speed.data.clear();
     _altitude.data.clear();
 
     _track->firstPoint();
     while (FlightData *p = _track->getNextPoint()) {
-	_addPoint(p->est_t_offset, _times);
+	_addPoint(p->est_t_offset, _time);
+	_addPoint(p->dist * SG_METER_TO_NM, _dist);
 	_addPoint(p->spd, _speed);
 	_addPoint(p->alt, _altitude);
     }
@@ -736,7 +761,7 @@ void Graphs::_loadClimbRate()
 
 	p = _track->dataAtPoint(i);
 	thisAlt = p->alt;
-	thisTime = _times.data[i];
+	thisTime = _time.data[i];
 	// EYE - I really should check to make sure this is correct.
 	if (i == 0) {
 	    // The first climb rate is 0.0 by default.
@@ -750,26 +775,26 @@ void Graphs::_loadClimbRate()
 	    lastAlt = thisAlt;
 	    lastTime = thisTime;
 	} else {
-	    if ((_times.data[i] - _times.data[j]) > _smoothing) {
+	    if ((_time.data[i] - _time.data[j]) > _smoothing) {
 		// 'j' has fallen behind.  We need to move it forward
 		// until it's back within range.
 		j++;
-		while ((_times.data[i] - _times.data[j]) > _smoothing) {
+		while ((_time.data[i] - _time.data[j]) > _smoothing) {
 		    j++;
 		}
 	    }
 
 	    if (j == 0) {
 		lastAlt = _track->dataAtPoint(j)->alt;
-		lastTime = _times.data[j];
+		lastTime = _time.data[j];
 	    } else {
 		float time0, time1, alt0, alt1;
-		time0 = _times.data[j - 1];
-		time1 = _times.data[j];
+		time0 = _time.data[j - 1];
+		time1 = _time.data[j];
 		alt0 = _track->dataAtPoint(j - 1)->alt;
 		alt1 = _track->dataAtPoint(j)->alt;
 		
-		lastTime = _times.data[i] - _smoothing;
+		lastTime = _time.data[i] - _smoothing;
 		lastAlt = (lastTime - time0) / (time1 - time0) * (alt1 - alt0) 
 		    + alt0;
 	    }
