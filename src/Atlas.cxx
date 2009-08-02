@@ -131,19 +131,20 @@ class InfoUI {
     void hide() { gui->hide(); }
     bool isVisible() { return gui->isVisible(); }
 
-//     void setText(FlightTrack *track);
     void setText();
 
     puPopup *gui;
     puFrame *infoFrame;
     puButton *follow;
-    puText *latText, *lonText, *altText, *hdgText, *spdText;
+    puText *latText, *lonText, *altText, *hdgText, *spdText, *hmsText, *dstText;
     puFrame *VOR1Colour, *VOR2Colour, *ADFColour;
     puText *VOR1Text, *VOR2Text, *ADFText;
-    puButtonBox *button_box_info;
+    puButtonBox *graphsBox;
     // EYE - constant alert!  We should get '3' from Graphs.hxx somehow.
-    const char *button_box_labels[4];
+    const char *graphsBoxLabels[4];
     puSlider *smoother;
+    puButtonBox *xAxisBox;
+    const char *xAxisBoxLabels[3];
 };
 
 //////////////////////////////////////////////////////////////////////
@@ -436,6 +437,7 @@ const double zoomFactor = pow(10.0, 0.1);
 // Forward declarations of all callbacks.
 //////////////////////////////////////////////////////////////////////
 void smoother_cb(puObject *smoother);
+void graph_axis_cb(puObject *xAxisBox);
 void lighting_cb(puObject *lightingUIObject);
 void close_ok_cb(puObject *widget);
 void zoom_cb(puObject *cb);
@@ -444,7 +446,7 @@ void position_cb (puObject *cb);
 void clear_ftrack_cb(puObject *);
 void degMinSec_cb(puObject *cb);
 void magTrue_cb(puObject *cb);
-void graph_type_cb (puObject *button_box_info);
+void graph_type_cb (puObject *graphsBox);
 void save_as_file_cb(puObject *cb);;
 void save_as_cb(puObject *cb);
 void save_as_file_cb(puObject *cb);
@@ -855,6 +857,7 @@ void searchFinished(Search *s, int i)
 	movePosition(s->location());
     } else {
 	// User hit escape, so return to our original point.
+	// EYE - restore original orientation too
 	movePosition(searchFrom);
     }
 
@@ -1569,35 +1572,6 @@ void MainUI::setMagnetic(bool magnetic)
     }
 }
 
-// Maintains the array of strings used by tracksComboBox.
-// EYE - make part of MainUI?
-// void set_trackList()
-// {
-//     static char **trackList = NULL;
-
-//     unsigned int n = mainUI->tracksComboBox->getCurrentItem();
-//     if (trackList != NULL) {
-// 	for (int i = 0; i < mainUI->tracksComboBox->getNumItems(); i++) {
-// 	    free(trackList[i]);
-// 	}
-// 	free(trackList);
-//     }
-
-//     trackList = (char **)malloc(sizeof(char *) * globals.tracks().size() + 1);
-//     for (unsigned int i = 0; i < globals.tracks().size(); i++) {
-// 	// The display styles are the same as in the graphs window.
-// 	trackList[i] = strdup(Graphs::generateName(globals.tracks[i]));
-//     }
-//     trackList[globals.tracks().size()] = (char *)NULL;
-
-//     mainUI->tracksComboBox->newList(trackList);
-
-//     if (n >= globals.tracks().size()) {
-// 	n = globals.tracks().size() - 1;
-//     }
-//     mainUI->setCurrentItem(n);    
-// }
-
 //////////////////////////////////////////////////////////////////////
 // InfoUI
 //////////////////////////////////////////////////////////////////////
@@ -1607,11 +1581,12 @@ InfoUI::InfoUI(int x, int y)
     const int bigSpace = 5;
     // EYE - magic numbers
     const int textWidth = 175;
-    const int boxHeight = 75, boxWidth = 135;
-    const int smootherHeight = bigSpace * 4, smootherWidth = 100;
+    const int graphsBoxHeight = 75, graphsBoxWidth = 115;
+    const int xAxisBoxHeight = 50, xAxisBoxWidth = 100;
+    const int smootherHeight = bigSpace * 4, smootherWidth = graphsBoxWidth;
 
-    const int height = textHeight * 8 + 3 * bigSpace;
-    const int width = textWidth + boxWidth + smootherWidth + 2 * bigSpace;
+    const int height = textHeight * 10 + 3 * bigSpace;
+    const int width = textWidth + graphsBoxWidth + xAxisBoxWidth;
 
     int curx, cury;
 
@@ -1646,6 +1621,8 @@ InfoUI::InfoUI(int x, int y)
 			  vor1Colour[0], vor1Colour[1], vor1Colour[2], 0.6);
     VOR1Text = new puText(curx + textHeight, cury); cury += textHeight + bigSpace;
 
+    dstText = new puText(curx, cury); cury += textHeight;
+    hmsText = new puText(curx, cury); cury += textHeight;
     spdText = new puText(curx, cury); cury += textHeight;
     hdgText = new puText(curx, cury); cury += textHeight;
     altText = new puText(curx, cury); cury += textHeight;
@@ -1653,20 +1630,21 @@ InfoUI::InfoUI(int x, int y)
     latText = new puText(curx, cury); cury += textHeight;
 
     curx = textWidth;
-    cury = height - boxHeight;
+    cury = height - graphsBoxHeight;
 
     // EYE - Perhaps we should get these from Graphs.hxx (if not the
     // actual text, at least the number).
-    button_box_labels[0] = "Altitude";
-    button_box_labels[1] = "Speed";
-    button_box_labels[2] = "Rate of Climb";
-    button_box_labels[3] = NULL;
-    button_box_info = 
-	new puButtonBox(curx, cury, curx + boxWidth, cury + boxHeight, 
-			(char **)button_box_labels, FALSE);
-    button_box_info->setCallback(graph_type_cb);
+    graphsBoxLabels[0] = "Altitude";
+    graphsBoxLabels[1] = "Speed";
+    graphsBoxLabels[2] = "Climb rate";
+    graphsBoxLabels[3] = NULL;
+    graphsBox = 
+	new puButtonBox(curx, cury, 
+			curx + graphsBoxWidth, cury + graphsBoxHeight, 
+			(char **)graphsBoxLabels, FALSE);
+    graphsBox->setCallback(graph_type_cb);
 
-    curx += boxWidth + bigSpace;
+    cury -= smootherHeight + textHeight;
     smoother = new puSlider(curx, cury, smootherWidth, FALSE, smootherHeight);
     smoother->setLabelPlace(PUPLACE_TOP_CENTERED);
     // EYE - necessary?
@@ -1677,6 +1655,18 @@ InfoUI::InfoUI(int x, int y)
     smoother->setMaxValue(60.0); // 60.0 = smooth over a 60s interval
     smoother->setStepSize(1.0);
     smoother->setCallback(smoother_cb);
+
+    curx += graphsBoxWidth;
+    cury = height - xAxisBoxHeight;
+
+    xAxisBoxLabels[0] = "Time";
+    xAxisBoxLabels[1] = "Distance";
+    xAxisBoxLabels[2] = NULL;
+    xAxisBox = 
+	new puButtonBox(curx, cury, 
+			curx + xAxisBoxWidth, cury + xAxisBoxHeight, 
+			(char **)xAxisBoxLabels, TRUE);
+    xAxisBox->setCallback(graph_axis_cb);
 
     gui->close();
 
@@ -1992,11 +1982,11 @@ void InfoUI::setText()
 	return;
     }
 
-    static AtlasString latStr, lonStr, altStr, hdgStr, spdStr, elevStr, 
-	vor1Str, vor2Str, adfStr;
+    static AtlasString latStr, lonStr, altStr, hdgStr, spdStr, hmsStr,
+	dstStr, vor1Str, vor2Str, adfStr;
 
-    latStr.printf("LAT: %c%s", (p->lat < 0) ? 'S':'N', formatAngle(p->lat));
-    lonStr.printf("LON: %c%s", (p->lon < 0) ? 'W':'E', formatAngle(p->lon));
+    latStr.printf("Lat: %c%s", (p->lat < 0) ? 'S':'N', formatAngle(p->lat));
+    lonStr.printf("Lon: %c%s", (p->lon < 0) ? 'W':'E', formatAngle(p->lon));
     if (globals.track()->isAtlasProtocol()) {
 	char *magTrue = "T";
 	double hdg = p->hdg;
@@ -2006,8 +1996,8 @@ void InfoUI::setText()
 	    hdg -= magneticVariation(p->lat, p->lon, p->alt * SG_FEET_TO_METER);
 	}
 	hdg = normalizeHeading(rint(hdg), false);
-	hdgStr.printf("HDG: %03.0f%C%s", hdg, degreeSymbol, magTrue);
-	spdStr.printf("SPD: %.0f kt EAS", p->spd);
+	hdgStr.printf("Hdg: %03.0f%C%s", hdg, degreeSymbol, magTrue);
+	spdStr.printf("Speed: %.0f kt EAS", p->spd);
     } else {
 	char *magTrue = "T";
 	double hdg = p->hdg;
@@ -2017,10 +2007,18 @@ void InfoUI::setText()
 	    hdg -= magneticVariation(p->lat, p->lon, p->alt * SG_FEET_TO_METER);
 	}
 	hdg = normalizeHeading(rint(hdg), false);
-	hdgStr.printf("TRK: %.0f%C%s", hdg, degreeSymbol, magTrue);
-	spdStr.printf("SPD: %.0f kt GS", p->spd);
+	hdgStr.printf("Track: %.0f%C%s", hdg, degreeSymbol, magTrue);
+	spdStr.printf("Speed: %.0f kt GS", p->spd);
     }
-    altStr.printf("ALT: %.0f ft MSL", p->alt);
+    altStr.printf("Alt: %.0f ft MSL", p->alt);
+    int hours, minutes, seconds;
+    seconds = lrintf(p->est_t_offset);
+    hours = seconds / 3600;
+    seconds -= hours * 3600;
+    minutes = seconds / 60;
+    seconds -= minutes * 60;
+    hmsStr.printf("Time: %d:%02d:%02d", hours, minutes, seconds);
+    dstStr.printf("Dist: %.1f nm", p->dist * SG_METER_TO_NM);
 
     // Only the atlas protocol has navaid information.
     if (globals.track()->isAtlasProtocol()) {
@@ -2066,6 +2064,8 @@ void InfoUI::setText()
     altText->setLabel(altStr.str());
     hdgText->setLabel(hdgStr.str());
     spdText->setLabel(spdStr.str());
+    hmsText->setLabel(hmsStr.str());
+    dstText->setLabel(dstStr.str());
     VOR1Text->setLabel(vor1Str.str());
     VOR2Text->setLabel(vor2Str.str());
     ADFText->setLabel(adfStr.str());
@@ -3216,6 +3216,12 @@ void keyPressed(unsigned char key, int x, int y)
 	    show_cb(mainUI->labelsToggle);
 	    break;
 
+	  case 'x':
+	    // Toggle x-axis type (time, distance)
+	    infoUI->xAxisBox->setValue(!infoUI->xAxisBox->getValue());
+	    graph_axis_cb(infoUI->xAxisBox);
+	    break;
+
 	  case ' ':
 	    // Toggle main interface.
 	    if (!mainUI->gui->isVisible()) {
@@ -3344,6 +3350,24 @@ void smoother_cb(puObject *smoother)
 
     // Update the graphs.
     graphs->setSmoothing(smoother->getIntegerValue());
+    glutSetWindow(graphs_window);
+    glutPostRedisplay();
+
+    // Update the interface.
+    glutSetWindow(main_window);
+    glutPostRedisplay();
+}
+
+void graph_axis_cb(puObject *xAxisBox)
+{
+    // Update the graphs based on the value in the xAxisBox.
+
+    // EYE - magic number
+    if (xAxisBox->getValue() == 0) {
+	graphs->setXAxisType(Graphs::TIME);
+    } else {
+	graphs->setXAxisType(Graphs::DISTANCE);
+    }
     glutSetWindow(graphs_window);
     glutPostRedisplay();
 
@@ -3533,14 +3557,14 @@ void magTrue_cb(puObject *cb)
 
 // EYE - this counts on the Graphs type values being same as the
 // corresponding entries in the button box.
-void graph_type_cb (puObject *button_box_info) 
+void graph_type_cb (puObject *graphsBox) 
 {
     // EYE - need to check if there's a track to display too
     glutSetWindow(graphs_window);
-    if (button_box_info->getValue() == 0) {
+    if (graphsBox->getValue() == 0) {
 	glutHideWindow();
     } else {
-	graphs->setGraphTypes(button_box_info->getValue());
+	graphs->setGraphTypes(graphsBox->getValue());
 	glutShowWindow();
 	glutPostRedisplay();
     }
@@ -3671,6 +3695,7 @@ void unload_cb(puObject *cb)
     if (t) {
 	mainUI->setTrackListDirty();
 	newFlightTrack();
+	delete t;
     }
 }
 
@@ -4068,15 +4093,17 @@ int main(int argc, char **argv)
     // corresponding entries in the button box.  As well, is there a
     // cleaner way to do this?  Is there a way to force the call to the
     // callback without calling it explicitly?
-    infoUI->button_box_info->setValue(Graphs::ALTITUDE | 
-				      Graphs::SPEED | 
-				      Graphs::CLIMB_RATE);
-    graphs->setGraphTypes(infoUI->button_box_info->getValue());
+    infoUI->graphsBox->setValue(Graphs::ALTITUDE | 
+				Graphs::SPEED | 
+				Graphs::CLIMB_RATE);
+    graphs->setGraphTypes(infoUI->graphsBox->getValue());
     // Our initial smoothing value is 10s (rates of climb and descent
     // will be smoothed over a 10s interval).
     // EYE - magic number?
     infoUI->smoother->setValue(10);
     graphs->setSmoothing(10);
+    // EYE - we assume that xAxisBox has the correct value already
+    graph_axis_cb(infoUI->xAxisBox);
     infoUI->hide();
       
     glutSetWindow(main_window);
