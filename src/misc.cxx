@@ -212,25 +212,36 @@ bool gzGetLine(const gzFile& f, char **linePtr)
 	assert(buf != NULL);
     }
 
+    // This will be true when we've read an entire line.
     bool eoln = false;
-    // This points to the place where the most recent read took place.
-    // At first this is the same as buf, but if we extend the buffer
-    // to do extra reads, readPoint will move along the buffer.
+    // We ask gzgets() to read to the buffer at this point.  At first
+    // this is the same as buf, but if we extend the buffer to do
+    // extra reads, readPoint will move along the buffer.
     char *readPoint = buf;
+    // This is the maximum gzgets() can read.  At first this is the
+    // entire buffer, but if we need to extend the buffer, this will
+    // be the size of the extension.
+    unsigned int toRead = length;
 
-    // First read as much as we can.
-    gzgets(f, buf, length);
+    // First read as much of the line as we can.
+    // EYE - check return code, use gzerror() to report error.
+    assert(gzgets(f, readPoint, toRead) != Z_NULL);
     do {
 	// Now see if we've hit the end of the line.
 	unsigned int crlf = strcspn(readPoint, "\n\r");
-	if (crlf == strlen(readPoint)) {
-	    // No CR/LF.  Increase the buffer size, and read some more.
+	if (crlf == toRead - 1) {
+	    // No CR/LF - increase the buffer size.
 	    length += chunkSize;
 	    buf = (char *)realloc(buf, length * sizeof(char));
 	    assert(buf != NULL);
 
-	    readPoint = buf - chunkSize;
-	    gzgets(f, readPoint, chunkSize);
+	    // Read some more onto the end of our current string.
+	    // Note that we have to recalculate readPoint because
+	    // realloc may have moved buf (in other words, we can't
+	    // just add chunkSize to readPoint).
+	    readPoint = buf + length - chunkSize;
+	    toRead = chunkSize;
+	    assert(gzgets(f, readPoint, toRead) != Z_NULL);
 	} else {
 	    readPoint[crlf] = '\0';
 	    eoln = true;
