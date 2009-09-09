@@ -245,12 +245,14 @@ void AirportsOverlay::_createBeacon()
 	}
 	glEnd();
 
-	glPushAttrib(GL_CURRENT_BIT); { // Because we change the colour
-	    // Use the runway colour to colour the interior?  Why?  Pure
-	    // white just seems too white.
+	// Push GL_CURRENT, because we change the colour.
+	glPushAttrib(GL_CURRENT_BIT); {
+	    // Use the runway colour to colour the interior.  Why?
+	    // Pure white just seems too white.
 	    glColor4fv(arp_runway_colour);
 	    glBegin(GL_POLYGON); {
-		for (int i = 0; i < 5; i ++) {
+		// Draw the beacon interior counterclockwise.
+		for (int i = 4; i >= 0; i--) {
 		    float theta, x, y;
 
 		    theta = (i * 72.0 + 36.0) * SG_DEGREES_TO_RADIANS;
@@ -285,7 +287,8 @@ void AirportsOverlay::_createAirportIcon()
     glNewList(_airportIconDL, GL_COMPILE); {
 	glBegin(GL_POLYGON); {
 	    const int subdivision = 15; // 15-degree steps
-	    for (int i = 0; i < 360; i += subdivision) {
+	    // Draw the circle (in a counterclockwise direction).
+	    for (int i = 360; i > 0; i -= subdivision) {
 		float theta, x, y;
 
 		// Draw circle segment.
