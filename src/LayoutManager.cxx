@@ -218,7 +218,15 @@ void LayoutManager::drawText()
 		_f->setFont(c->f);
 		_f->setSlant(c->italics);
 		_f->start3f(c->x, l.y, 0.0);
+		// EYE - PLIB (1.8.5) renders the string using a
+		// triangle strip.  Unfortunately, it is specified
+		// with a clockwise winding, which means that
+		// applications that use backface culling (eg, us)
+		// will see nothing unless we reverse our definition
+		// of front and back.
+		glFrontFace(GL_CW);
 		_f->puts(c->s.c_str());
+		glFrontFace(GL_CCW);
 	    }
 	}
     }    

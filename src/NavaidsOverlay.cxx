@@ -807,9 +807,9 @@ void NavaidsOverlay::_createMarkerSymbols()
 	    glColor4fv(marker_colours[i]);
 	    // EYE - do here, or in the calling routine?
 	    glBegin(GL_POLYGON); {
-		// Draw first arc.
+		// Draw first arc (counterclockwise).
 		for (int j = 0; j < segments; j++) {
-		    float pHdg = (j - segments / 2) * (60.0 / segments) 
+		    float pHdg = (segments / 2 - j) * (60.0 / segments) 
 			* SG_DEGREES_TO_RADIANS;
 		    glVertex2f(offset - cos(pHdg) * markerRadii[i], 
 			       sin(pHdg) * markerRadii[i]);
@@ -817,7 +817,7 @@ void NavaidsOverlay::_createMarkerSymbols()
 
 		// Now the other arc.
 		for (int j = 0; j < segments; j++) {
-		    float pHdg = (j - segments / 2) * (60.0 / segments) 
+		    float pHdg = (segments / 2 - j) * (60.0 / segments) 
 			* SG_DEGREES_TO_RADIANS;
 		    glVertex2f(cos(pHdg) * markerRadii[i] - offset, 
 			       -sin(pHdg) * markerRadii[i]);
@@ -830,7 +830,7 @@ void NavaidsOverlay::_createMarkerSymbols()
 	    glColor4fv(black);
 	    glBegin(GL_LINE_LOOP); {
 		for (int j = 0; j < segments; j++) {
-		    float pHdg = (j - segments / 2) * (60.0 / segments) 
+		    float pHdg = (segments / 2 - j) * (60.0 / segments) 
 			* SG_DEGREES_TO_RADIANS;
 		    glVertex2f(offset - cos(pHdg) * markerRadii[i], 
 			       sin(pHdg) * markerRadii[i]);
@@ -838,7 +838,7 @@ void NavaidsOverlay::_createMarkerSymbols()
 
 		// Now the other arc.
 		for (int j = 0; j < segments; j++) {
-		    float pHdg = (j - segments / 2) * (60.0 / segments) 
+		    float pHdg = (segments / 2 - j) * (60.0 / segments) 
 			* SG_DEGREES_TO_RADIANS;
 		    glVertex2f(cos(pHdg) * markerRadii[i] - offset,
 			       -sin(pHdg) * markerRadii[i]);
@@ -881,16 +881,14 @@ static void _createTriangle(float width,
 	glVertex2f(0.0, 0.0);
 	glColor4fv(fadedRightColour);
 	glVertex2f(0.0, -1.0);
-	glColor4fv(fadedRightColour);
 	glVertex2f(deflection, -1.0);
 
 	if (both) {
 	    glColor4fv(rightColour);
 	    glVertex2f(0.0, 0.0);
 	    glColor4fv(fadedRightColour);
-	    glVertex2f(0.0, 1.0);
-	    glColor4fv(fadedRightColour);
 	    glVertex2f(deflection, 1.0);
+	    glVertex2f(0.0, 1.0);
 	}
     }
     glEnd();
@@ -900,16 +898,14 @@ static void _createTriangle(float width,
 	glColor4fv(leftColour);
 	glVertex2f(0.0, 0.0);
 	glColor4fv(fadedLeftColour);
-	glVertex2f(0.0, -1.0);
-	glColor4fv(fadedLeftColour);
 	glVertex2f(-deflection, -1.0);
+	glVertex2f(0.0, -1.0);
 
 	if (both) {
 	    glColor4fv(leftColour);
 	    glVertex2f(0.0, 0.0);
 	    glColor4fv(fadedLeftColour);
 	    glVertex2f(0.0, 1.0);
-	    glColor4fv(fadedLeftColour);
 	    glVertex2f(-deflection, 1.0);
 	}
     }
@@ -2439,9 +2435,9 @@ void NavaidsOverlay::_drawLabel(Label *l)
 	glBegin(GL_QUADS); {
 	    glColor4f(1.0, 1.0, 1.0, 0.5);
 	    glVertex2f(x - width / 2.0, y - height / 2.0);
-	    glVertex2f(x - width / 2.0, y + height / 2.0);
-	    glVertex2f(x + width / 2.0, y + height / 2.0);
 	    glVertex2f(x + width / 2.0, y - height / 2.0);
+	    glVertex2f(x + width / 2.0, y + height / 2.0);
+	    glVertex2f(x - width / 2.0, y + height / 2.0);
 	}
 	glEnd();
     }
