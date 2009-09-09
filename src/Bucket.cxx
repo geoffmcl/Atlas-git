@@ -40,10 +40,7 @@
 #include <simgear/bucket/newbucket.hxx>
 #include <simgear/math/sg_geodesy.hxx>
 
-// #include "loadMap.hxx"
 #include "Subbucket.hxx"
-#include "LayoutManager.hxx"
-#include "Globals.hxx"
 
 using namespace std;
 
@@ -80,9 +77,6 @@ Bucket::Bucket(const SGPath &p, long int index):
     _bounds.extendBy(_lat + height, _lon + width);
     _bounds.extendBy(_lat - height, _lon); // middle
     _bounds.extendBy(_lat + height, _lon);
-
-//     // Get notifications of palette changes.
-//     subscribe(Notification::NewPalette);
 }
 
 Bucket::~Bucket()
@@ -255,15 +249,3 @@ bool Bucket::intersection(SGVec3<double> near, SGVec3<double> far,
 
     return true;
 }
-
-// // Called when the palette changes.
-// bool Bucket::notification(Notification::type n)
-// {
-//     if (n == Notification::NewPalette) {
-// 	_dirty = true;
-//     } else {
-// 	assert(false);
-//     }
-
-//     return true;
-// }

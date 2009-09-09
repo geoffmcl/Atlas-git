@@ -36,7 +36,7 @@
 #include <simgear/misc/sg_path.hxx>
 #include <simgear/io/sg_binobj.hxx>
 
-#include "Scenery.hxx"
+#include "misc.hxx"
 #include "Palette.hxx"
 
 class Subbucket;
