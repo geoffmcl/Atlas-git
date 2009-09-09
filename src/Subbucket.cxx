@@ -942,24 +942,39 @@ void Subbucket::_drawElevationTri(int vert0, int vert1, int vert2,
     // Triangle spans more than one level.  Drats.  Do a quick sort on
     // the vertices, so that vert0 points to the top vertex, vert1,
     // the middle, and vert2 the bottom.
+    //
+    // Note that when we swap vertices, we change the triangle's
+    // winding.  We have backface culling turned on, so we need to
+    // ensure that we know how the front face is wound.  We assume
+    // that the triangle comes in specified in a counterclockwise
+    // direction, and that GL_FRONT_FACE is counterclockwise by
+    // default.
+    bool clockwise = false;
     if (index[0] < index[1]) {
 	swap(vert0, vert1);
 	swap(norm0, norm1);
 	swap(index[0], index[1]);
+	clockwise = !clockwise;
     }
     if (index[0] < index[2]) {
 	swap(vert0, vert2);
 	swap(norm0, norm2);
 	swap(index[0], index[2]);
+	clockwise = !clockwise;
     }
     if (index[1] < index[2]) {
 	swap(vert1, vert2);
 	swap(norm1, norm2);
 	swap(index[1], index[2]);
+	clockwise = !clockwise;
     }
-
     assert(index[0] >= index[1]);
     assert(index[1] >= index[2]);
+
+    // If the font face of the triangle is now clockwise, tell OpenGL.
+    if (clockwise) {
+	glFrontFace(GL_CW);
+    }
 
     // Now begin slicing the lines leading away from vert0 to vert1
     // and vert2.  Slicing a triangle creates new triangles, new
@@ -1088,4 +1103,9 @@ void Subbucket::_drawElevationTri(int vert0, int vert1, int vert2,
     assert(vertices <= 5);
 
     __drawElevationSlice(vertices, _discreteContours, k, nrms, ps, es);
+
+    // Restore counterclockwise winding.
+    if (clockwise) {
+	glFrontFace(GL_CCW);
+    }
 }
