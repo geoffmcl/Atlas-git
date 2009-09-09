@@ -64,15 +64,15 @@ const char *TileManager::tileName(float latitude, float longitude)
     int lon = floor(longitude);
     char ew = 'e', ns = 'n';
     if (lat < 0) {
-	lat = -lat - 1;
+	lat = -lat;
 	ns = 's';
     }
     if (lon < 0) {
-	lon = -lon - 1;
+	lon = -lon;
 	ew = 'w';
     }
 
-    snprintf(name, 7, "%c%3d%c%2d", ew, lon, ns, lat);
+    snprintf(name, 8, "%c%03d%c%02d", ew, lon, ns, lat);
 
     return name;
 }

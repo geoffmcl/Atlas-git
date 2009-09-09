@@ -558,15 +558,15 @@ const char *tileName(float latitude, float longitude)
     int lon = floor(longitude);
     char ew = 'e', ns = 'n';
     if (lat < 0) {
-	lat = -lat - 1;
+	lat = -lat;
 	ns = 's';
     }
     if (lon < 0) {
-	lon = -lon - 1;
+	lon = -lon;
 	ew = 'w';
     }
 
-    name.printf("%c%3d%c%2d", ew, lon, ns, lat);
+    name.printf("%c%03d%c%02d", ew, lon, ns, lat);
 
     return name.str();
 }
