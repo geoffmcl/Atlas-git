@@ -86,36 +86,44 @@ public:
     // it will do as it says: save them to the preferences file.
     void savePreferences();
 
+    //////////////////////////////////////////////////////////////////////
     // Our preferences.
+    //////////////////////////////////////////////////////////////////////
+
+    // Startup location
     float latitude;
     float longitude;
     float zoom;
     char *icao;
-    SGPath path;
-    SGPath fg_root;
-    SGPath palette;
+
+    // Paths
+    SGPath path;		// Path to maps
+    SGPath fg_root;		// Root of FlightGear stuff
+    SGPath palette;		// Path to palettes
+    SGPath scenery_root;	// Path to FlightGear scenery
+
+    // Visual stuff - fonts, window size, ...
     bool textureFonts;
-    int width;
-    int height;
+    int width, height;
     bool softcursor;
-    // EYE - use sets?
-    vector<int> networkConnections;
-    vector<SerialConnection> serialConnections;
-    float update;
-    SGPath scenery_root;
-    int max_track;
-    bool autocenter_mode;
-    bool discreteContours;
-    bool lightingOn;
-    bool smoothShading;
-    sgVec4 lightPosition;
-    float azimuth, elevation;
 
+    // Flight paths
     vector<SGPath> flightFiles;
+    bool autocenter_mode;
 
+    // FlightGear connection(s)
+    float update;
+    int max_track;
+    vector<int> networkConnections;
     static const unsigned int defaultPort;
+    vector<SerialConnection> serialConnections;
     static const char *defaultSerialDevice;
     static const int defaultBaudRate;
+
+    // Lighting
+    bool discreteContours, lightingOn, smoothShading;
+    float azimuth, elevation;
+    sgVec4 lightPosition;
 
 protected:
     bool _loadPreferences(int argc, char *argv[]);
