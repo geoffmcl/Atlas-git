@@ -26,8 +26,6 @@
 
 #include "Globals.hxx"
 
-// #include <simgear/timing/timestamp.hxx> // SGTimeStamp
-
 #include "Overlays.hxx"
 
 using namespace std;
@@ -85,70 +83,44 @@ void Overlays::draw()
 
     // Overlays must be written on top of whatever scenery is there,
     // so we ignore depth values.
-    glPushAttrib(GL_DEPTH_BUFFER_BIT);
-    glDisable(GL_DEPTH_TEST);
+    glPushAttrib(GL_DEPTH_BUFFER_BIT); {
+	glDisable(GL_DEPTH_TEST);
 
-//     SGTimeStamp t1, t2;
-//     t1.stamp();
-    if (_overlays[AIRPORTS]) {
-	_airports->drawBackgrounds();
-    }
-    // We sandwich ILSs between runway backgrounds and the runways.
-    if (_overlays[NAVAIDS] && _overlays[ILS]) {
-	_navaids->drawILSs();
-    }
-    if (_overlays[AIRPORTS]) {
-	_airports->drawForegrounds();
-	if (_overlays[LABELS]) {
-	    _airports->drawLabels();
+	if (_overlays[AIRPORTS]) {
+	    _airports->drawBackgrounds();
+	}
+	// We sandwich ILSs between runway backgrounds and the runways.
+	if (_overlays[NAVAIDS] && _overlays[ILS]) {
+	    _navaids->drawILSs();
+	}
+	if (_overlays[AIRPORTS]) {
+	    _airports->drawForegrounds();
+	    if (_overlays[LABELS]) {
+		_airports->drawLabels();
+	    }
+	}
+	if (_overlays[AIRWAYS]) {
+	    _airways->draw(_overlays[HIGH], _overlays[LOW], _overlays[LABELS]);
+	}
+	if (_overlays[NAVAIDS] && _overlays[FIXES]) {
+	    _fixes->draw();
+	}
+	if (_overlays[NAVAIDS] && _overlays[NDB]) {
+	    _navaids->drawNDBs();
+	}
+	if (_overlays[NAVAIDS] && _overlays[VOR]) {
+	    _navaids->drawVORs();
+	}
+	if (_overlays[NAVAIDS] && _overlays[DME]) {
+	    _navaids->drawDMEs();
+	}
+	if (_overlays[CROSSHAIRS]) {
+	    _crosshairs->draw();
+	}
+	if (_overlays[TRACKS]) {
+	    _tracks->draw();
 	}
     }
-//     t2.stamp();
-//     printf("air: %lf, ", (t2 - t1) / 1e6);
-
-//     t1.stamp();
-    if (_overlays[AIRWAYS]) {
-	_airways->draw(_overlays[HIGH], _overlays[LOW], _overlays[LABELS]);
-    }
-//     t2.stamp();
-//     printf("awy: %lf, ", (t2 - t1) / 1e6);
-
-//     t1.stamp();
-    if (_overlays[NAVAIDS] && _overlays[FIXES]) {
-	_fixes->draw();
-    }
-//     t2.stamp();
-//     printf("fix: %lf, ", (t2 - t1) / 1e6);
-
-//     t1.stamp();
-    if (_overlays[NAVAIDS] && _overlays[NDB]) {
-	_navaids->drawNDBs();
-    }
-//     t2.stamp();
-//     printf("NDBs: %lf, ", (t2 - t1) / 1e6);
-
-//     t1.stamp();
-    if (_overlays[NAVAIDS] && _overlays[VOR]) {
-	_navaids->drawVORs();
-    }
-//     t2.stamp();
-//     printf("VORs: %lf, ", (t2 - t1) / 1e6);
-
-//     t1.stamp();
-    if (_overlays[NAVAIDS] && _overlays[DME]) {
-	_navaids->drawDMEs();
-    }
-//     t2.stamp();
-//     printf("DMEs: %lf\n", (t2 - t1) / 1e6);
-
-    if (_overlays[CROSSHAIRS]) {
-	_crosshairs->draw();
-    }
-
-    if (_overlays[TRACKS]) {
-	_tracks->draw();
-    }
-
     glPopAttrib();
 }
 
