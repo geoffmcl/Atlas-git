@@ -43,6 +43,8 @@
 
 class Globals {
  public:
+    static const size_t npos;
+
     Globals();
     ~Globals();
 
@@ -52,19 +54,19 @@ class Globals {
     // Flight tracks.  There will always be a valid current track and
     // a valid current track number, except when the tracks vector is
     // empty, in which case the track will be NULL and the track
-    // number will be undefined.
+    // number will be Globals::npos.
     FlightData *currentPoint();
     const vector<FlightTrack *>& tracks() { return _tracks; }
-    unsigned int currentTrackNo() { return _currentTrackNo; }
+    size_t currentTrackNo() { return _currentTrackNo; }
     FlightTrack *track() { return _track; }
-    FlightTrack *track(unsigned int i);
-    unsigned int addTrack(FlightTrack *t, bool select = true);
+    FlightTrack *track(size_t i);
+    size_t addTrack(FlightTrack *t, bool select = true);
     FlightTrack *removeTrack() { return removeTrack(_currentTrackNo); }
-    FlightTrack *removeTrack(unsigned int i);
-    FlightTrack *setCurrent(unsigned int i);
-    unsigned int exists(int port);
-    unsigned int exists(const char *device, int baud);
-    unsigned int exists(const char *path);
+    FlightTrack *removeTrack(size_t i);
+    FlightTrack *setCurrent(size_t i);
+    FlightTrack *exists(int port, bool select = true);
+    FlightTrack *exists(const char *device, int baud, bool select = true);
+    FlightTrack *exists(const char *path, bool select = true);
 
     // Our view on the world.
     sgdMat4 modelViewMatrix;
@@ -84,7 +86,7 @@ class Globals {
     Palette *palette;
 
     // The fonts we use for the user interface, scenery and overlays.
-    fntRenderer fontRenderer;
+    atlasFntRenderer fontRenderer;
     atlasFntTexFont *regularFont, *boldFont;
     puFont uiFont;
     // Sets the current font (which is accessed through fontRenderer)
@@ -98,7 +100,7 @@ class Globals {
   protected:
     vector<FlightTrack *> _tracks;
     FlightTrack *_track;
-    unsigned int _currentTrackNo;
+    size_t _currentTrackNo;
 };
 
 extern Globals globals;

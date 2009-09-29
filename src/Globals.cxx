@@ -22,14 +22,17 @@
   ---------------------------------------------------------------------------*/
 
 #include <algorithm>
+#include <limits>
 
 #include "Globals.hxx"
 
 Globals globals;
 
+const size_t Globals::npos = std::numeric_limits<size_t>::max();
+
 Globals::Globals(): 
     palette(NULL), regularFont(NULL), boldFont(NULL), magnetic(true), 
-    _track(NULL), _currentTrackNo(0)
+    _track(NULL), _currentTrackNo(npos)
 {
 }
 
@@ -42,13 +45,13 @@ Globals::~Globals()
 FlightData *Globals::currentPoint()
 {
     if (_track && !_track->empty()) {
-	return _track->getCurrentPoint();
+	return _track->current();
     }
 
     return (FlightData *)NULL;
 }
 
-FlightTrack *Globals::track(unsigned int i)
+FlightTrack *Globals::track(size_t i)
 {
     if (i >= _tracks.size()) {
 	return NULL;
@@ -68,7 +71,7 @@ struct TrackLessThan {
 // Adds the track to the _tracks vector, and returns its index.  If
 // select is true, or if this is the only track, also sets '_track'
 // and '_currentTrackNo' to the new track.
-unsigned int Globals::addTrack(FlightTrack *t, bool select)
+size_t Globals::addTrack(FlightTrack *t, bool select)
 {
     // EYE - check if t is already in the list?
     _tracks.push_back(t);
@@ -81,19 +84,19 @@ unsigned int Globals::addTrack(FlightTrack *t, bool select)
 
     // Since things may have moved around, _currentTrackNo could be
     // invalid.
-    for (unsigned int i = 0; i < _tracks.size(); i++) {
+    for (size_t i = 0; i < _tracks.size(); i++) {
 	if (_tracks[i] == _track) {
 	    _currentTrackNo = i;
 	    break;
 	}
     }
 
-    return (_tracks.size() - 1);
+    return _currentTrackNo;
 }
 
 // Removes the track at the given index .  If out of range, does
 // nothing.  Returns the track removed, NULL if nothing is removed.
-FlightTrack *Globals::removeTrack(unsigned int i)
+FlightTrack *Globals::removeTrack(size_t i)
 {
     FlightTrack *result = NULL;
     if (i >= _tracks.size()) {
@@ -109,7 +112,7 @@ FlightTrack *Globals::removeTrack(unsigned int i)
     if (result == _track) {
 	// We removed the current track, so make a new one current.
 	if (_tracks.empty()) {
-	    _currentTrackNo = -1;
+	    _currentTrackNo = npos;
 	    _track = NULL;
 	} else if (_currentTrackNo >= _tracks.size()) {
 	    _currentTrackNo = _tracks.size() - 1;
@@ -125,10 +128,9 @@ FlightTrack *Globals::removeTrack(unsigned int i)
 // Sets the current track to the one at the given index.  If nothing
 // changes, it returns NULL, otherwise it returns the track at that
 // index.
-FlightTrack *Globals::setCurrent(unsigned int i)
+FlightTrack *Globals::setCurrent(size_t i)
 {
     if ((i >= _tracks.size()) || (i == _currentTrackNo)) {
-	// EYE - what if tracks is empty?
 	return NULL;
     }
 
@@ -138,47 +140,60 @@ FlightTrack *Globals::setCurrent(unsigned int i)
     return _track;
 }
 
-// Returns true if we already have a network track listening to the
-// given port.
-unsigned int Globals::exists(int port)
+// If we already have a network track listening to the given port,
+// return the track in question, otherwise return NULL.  If 'select'
+// is true, it also makes the given track current.
+FlightTrack *Globals::exists(int port, bool select)
 {
-    for (unsigned int i = 0; i < _tracks.size(); i++) {
+    for (size_t i = 0; i < _tracks.size(); i++) {
 	FlightTrack *t = _tracks[i];
 	if (t->isNetwork() && (port == t->port())) {
-	    return i;
+	    if (select) {
+		return setCurrent(i);
+	    } else {
+		return track(i);
+	    }
 	}
     }
 
-    return _tracks.size();
+    return NULL;
 }
 
 // Checks if the serial connection described by the device and baud
 // rate already exists in _tracks.  Note that the baud rate is ignored
 // in determining equivalence.  Why include it?  So that this method
 // has a different call signature than the following one.
-unsigned int Globals::exists(const char *device, int baud)
+FlightTrack *Globals::exists(const char *device, int baud, bool select)
 {
-    for (unsigned int i = 0; i < _tracks.size(); i++) {
+    for (size_t i = 0; i < _tracks.size(); i++) {
 	FlightTrack *t = _tracks[i];
 	if (t->isSerial() && (strcmp(device, t->device()) == 0)) {
-	    return i;
+	    if (select) {
+		return setCurrent(i);
+	    } else {
+		return track(i);
+	    }
 	}
     }
 
-    return _tracks.size();
+    return NULL;
 }
 
 // Checking if two files are the same is actually quite tricky, so we
 // solve this problem by just ignoring it.  Let the user beware!
-unsigned int Globals::exists(const char *path)
+FlightTrack *Globals::exists(const char *path, bool select)
 {
-    for (unsigned int i = 0; i < _tracks.size(); i++) {
+    for (size_t i = 0; i < _tracks.size(); i++) {
 	FlightTrack *t = _tracks[i];
 	if (t->hasFile() && (strcmp(path, t->filePath()) == 0)) {
-	    return i;
+	    if (select) {
+		return setCurrent(i);
+	    } else {
+		return track(i);
+	    }
 	}
     }
 
-    return _tracks.size();
+    return NULL;
 }
 
