@@ -359,7 +359,7 @@ bool NavaidsOverlay::load(const string& fgDir)
 // width.
 void NavaidsOverlay::_createVORRose()
 {
-    fntRenderer& f = globals.fontRenderer;
+    atlasFntRenderer& f = globals.fontRenderer;
 
     // Draw a standard VOR rose or radius 1.  It is drawn in the XY
     // plane, with north in the positive Y direction, and east in the

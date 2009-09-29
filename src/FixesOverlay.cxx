@@ -257,7 +257,7 @@ void FixesOverlay::draw()
 
 	    // Fix labels
 	    LayoutManager lm;
-	    fntRenderer& renderer = globals.fontRenderer;
+	    atlasFntRenderer& renderer = globals.fontRenderer;
 	    float pointSize = _metresPerPixel * 10.0;
 	    renderer.setPointSize(pointSize);
 	    lm.setFont(renderer, pointSize);

@@ -59,7 +59,7 @@ class LayoutManager {
     // Begin a layout session, with the lower-left corner at <x, y>.
     void begin(float x = 0.0, float y = 0.0);
     // Set the font to the given PLIB font renderer.
-    void setFont(fntRenderer &f, float pointSize, float italics = 0.0);
+    void setFont(atlasFntRenderer &f, float pointSize, float italics = 0.0);
     // Add some text.  Don't put newlines in the text - break the text
     // into single lines and use the newline() method to tell the
     // layout manager about new lines.  For better results, the text
@@ -87,7 +87,7 @@ class LayoutManager {
   protected:
     bool _layingOut;
     float _x, _y, _width, _height;
-    fntRenderer *_f;
+    atlasFntRenderer *_f;
     float _pointSize, _italics;
 
     class Chunk {

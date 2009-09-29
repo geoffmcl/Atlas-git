@@ -1053,7 +1053,7 @@ void AirportsOverlay::_labelAirport(ARP *ap, int rA)
 {
     const int rO = _policy.rO;
     const int rI = _policy.rI;
-    fntRenderer& f = globals.fontRenderer;
+    atlasFntRenderer& f = globals.fontRenderer;
 
     const int labelHeading = _policy.labelHeading;
     const float maxLabelDist = _policy.maxLabelDist;
@@ -1280,7 +1280,7 @@ void AirportsOverlay::_labelRunway(RWY *rwy)
 // (the "main" end), and 180.0 (the "other" end).
 void AirportsOverlay::_labelRunwayEnd(const char *str, float hdg, RWY *rwy)
 {
-    fntRenderer& f = globals.fontRenderer;
+    atlasFntRenderer& f = globals.fontRenderer;
     float pointSize = f.getPointSize();
     float left, right, bottom, top;
     f.getFont()->getBBox(str, pointSize, 0.0, &left, &right, &bottom, &top);
