@@ -36,6 +36,7 @@
 #include <iostream>
 #include <sstream>
 #include <fstream>
+#include <limits>
 
 #include <simgear/bucket/newbucket.hxx>
 #include <simgear/math/sg_geodesy.hxx>
@@ -242,7 +243,7 @@ bool Bucket::intersection(SGVec3<double> near, SGVec3<double> far,
     // value, which is given in the hit record at offset 1.  Note that
     // OpenGL applies a scaling factor of 2^32-1 to z values, where z
     // = 0 at the near plane, and 2^32-1 at the far plane.
-    const double scale = (double)SGLimits<GLuint>::max();
+    const double scale = (double)numeric_limits<GLuint>::max();
     double minZ = selectBuf[1] / scale;
 
     *c = (far - near) * minZ + near;
