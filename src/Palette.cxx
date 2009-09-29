@@ -265,7 +265,7 @@ void Palette::smoothColour(float elevation, sgVec4 colour)
 	cl = _elevations[i - 1].colour;
     } else if (i == 0) {
 	// And the first level is a special case too - there's no
-	// lower colour to blend with.  Everyting below the midway
+	// lower colour to blend with.  Everything below the midway
 	// point will be "pure" coloured.
 	range = (_elevations[i + 1].elevation - _elevations[i].elevation);
 	delta = elevation - _elevations[i].elevation;
