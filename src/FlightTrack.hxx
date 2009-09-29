@@ -78,6 +78,8 @@ class FlightData {
 
 class FlightTrack {
   public:
+    static const size_t npos;	// Represents an undefined mark.
+
     // Flight tracks can be loaded from files, by listening on a
     // socket, or by reading a serial device (I think - I've never
     // tested the latter).
@@ -104,7 +106,7 @@ class FlightTrack {
 
     // Returns true if this is a socket- or serial-driven flight
     // track which is currently accepting input.
-    bool live();
+    bool live() { return _live; }
     // Closes the I/O channel to further input.
     void detach();
 
@@ -117,27 +119,21 @@ class FlightTrack {
     // serial device).
     bool checkForInput();
 
-    // Sequential access to the flight track.
-    void firstPoint();
-    FlightData *getNextPoint();
-
     // Random access to the flight track.
-    FlightData *dataAtPoint(int i);
+    FlightData *at(size_t i);
     
     // Convenience access.  The first gets the last point, obviously.
     // The second retrieves the last point if we're live, otherwise it
     // returns the marked point.
-    FlightData *getLastPoint();
-    FlightData *getCurrentPoint();
+    FlightData *last();
+    FlightData *current() { return at(mark()); }
 
-    int size();
+    size_t size() { return _track.size(); }
 
-    // The mark specifies, for "dead" tracks (ie, file-based tracks),
-    // the position of the aircraft along the track.  For live tracks,
-    // mark is always -1, and the aircraft is always drawn at the end
-    // of the track.
-    void setMark(int i);
-    int mark();
+    // The mark specifies the position of the aircraft along the
+    // track, as selected by the user.
+    size_t mark() { return _mark; }
+    void setMark(size_t i);
 
     bool hasFile();		// True if file path is not empty
     const char *fileName();	// File name
@@ -148,12 +144,10 @@ class FlightTrack {
     bool modified();
 
   protected:
-    unsigned int _max_buffer;
+    size_t _max_buffer;	// Maximum size of a buffer.
+    std::deque<FlightData*> _track; // Our data.
+    size_t _mark;
 
-    std::deque<FlightData*> _track;
-    std::deque<FlightData*>::iterator _track_pos;
-
-    int _mark;
     // True if we are currently accepting input (from a socket or
     // serial port) for this track.
     bool _live;
@@ -181,8 +175,8 @@ class FlightTrack {
 
     AtlasString _name;
 
-    void _adjustOffsetsAround(int i);
-    void _calcDistancesFrom(int i);
+    void _adjustOffsetsAround(size_t i);
+    void _calcDistancesFrom(size_t i);
 
     bool _readFlightFile(const char *path);
     bool _parse_message(char *buf, FlightData *d);

@@ -28,6 +28,7 @@
 #include <string>
 #include <fstream>
 #include <stdexcept>
+#include <limits>
 
 #include <simgear/timing/sg_time.hxx>
 #include <simgear/math/sg_geodesy.hxx>
@@ -69,9 +70,11 @@ const vector<NAV *>& FlightData::navaids()
     return _navaids;
 }
 
+const size_t FlightTrack::npos = numeric_limits<size_t>::max();
+
 // EYE - create a common initializer?
 FlightTrack::FlightTrack(const char *filePath) : 
-    _max_buffer(0), _mark(-1), _live(false), _input_channel(NULL)
+    _max_buffer(0), _mark(npos), _live(false), _input_channel(NULL)
 {
     if (!_readFlightFile(filePath)) {
 	throw runtime_error("flight file open failure");
@@ -89,7 +92,7 @@ FlightTrack::FlightTrack(const char *filePath) :
 }
 
 FlightTrack::FlightTrack(int port, unsigned int max_buffer) : 
-    _max_buffer(max_buffer), _mark(-1), _live(true)
+    _max_buffer(max_buffer), _mark(npos), _live(true)
 {
     AtlasString portStr;
 
@@ -110,7 +113,7 @@ FlightTrack::FlightTrack(int port, unsigned int max_buffer) :
 }
 
 FlightTrack::FlightTrack(const char *device, int baud, unsigned int max_buffer) : 
-    _max_buffer(max_buffer), _mark(-1), _live(true)
+    _max_buffer(max_buffer), _mark(npos), _live(true)
 {
     AtlasString baudStr;
 
@@ -209,19 +212,12 @@ void FlightTrack::clear()
 	_track.pop_front();
     }
     _version++;
-    _mark = -1;
+    _mark = npos;
 }
 
 bool FlightTrack::empty() 
 {
     return _track.empty();
-}
-
-// Returns true if this is a socket- or serial-driven flight track
-// which is currently accepting input.
-bool FlightTrack::live() 
-{
-    return _live;
 }
 
 // Closes the I/O channel to further input.
@@ -282,30 +278,16 @@ bool FlightTrack::checkForInput()
     return result;
 }
 
-void FlightTrack::firstPoint() 
+FlightData *FlightTrack::at(size_t i)
 {
-    _track_pos = _track.begin();
-}
-
-FlightData *FlightTrack::getNextPoint() 
-{
-    if (_track_pos != _track.end()) {
-	return *(_track_pos++);
-    } else {
-	return NULL;
-    }
-}
-
-FlightData *FlightTrack::dataAtPoint(int i)
-{
-    if ((i < 0) || (i >= _track.size())) {
+    if (i >= _track.size()) {
 	return NULL;
     } else {
 	return _track[i];
     }
 }
 
-FlightData *FlightTrack::getLastPoint() 
+FlightData *FlightTrack::last() 
 {
     if (_track.size() > 0) {
 	return _track.back();
@@ -314,34 +296,14 @@ FlightData *FlightTrack::getLastPoint()
     }
 }
 
-FlightData *FlightTrack::getCurrentPoint() 
+// Sets mark to given position if we can.
+void FlightTrack::setMark(size_t i)
 {
-    if (_track.size() == 0) {
-	return NULL;
-    }
-
-    if (live()) {
-	return getLastPoint();
-    } else {
-	return dataAtPoint(mark());
-    }
-}
-
-int FlightTrack::size()
-{
-    return _track.size();
-}
-
-void FlightTrack::setMark(int i)
-{
-    if ((i >= -1) && (i < _track.size())) {
+    if (_track.size() > i) {
 	_mark = i;
+    } else {
+	_mark = npos;
     }
-}
-
-int FlightTrack::mark()
-{
-    return _mark;
 }
 
 // Returns true if the file path is not the empty string.
@@ -541,23 +503,23 @@ bool FlightTrack::modified()
 // distributed 2 points in an interval (at x and x + 0.5), then get a
 // third point, we have to redistribute them (x, x + 0.33, x + 0.67).
 // Ditto for removing points.
-void FlightTrack::_adjustOffsetsAround(int i)
+void FlightTrack::_adjustOffsetsAround(size_t i)
 {
-    FlightData *data = dataAtPoint(i);
+    FlightData *data = at(i);
 
     if (data == NULL) {
 	return;
     }
 
     // Find the first point with the same absolute time value.
-    FlightData *d = dataAtPoint(--i);
+    FlightData *d = at(--i);
     while (d && (fabs(difftime(data->time, d->time)) < 0.5)) {
-	d = dataAtPoint(--i);
+	d = at(--i);
     }
     i++;
 
     // Now adjust everything starting at i.
-    time_t start = dataAtPoint(0)->time; // Time of very first point.
+    time_t start = at(0)->time; // Time of very first point.
     time_t t = data->time;		 // Time of first point in
 					 // current interval.
     int subPoints = 0;			 // Number of points in
@@ -565,7 +527,7 @@ void FlightTrack::_adjustOffsetsAround(int i)
     for (; i < size(); i++) {
 	subPoints++;
 
-	FlightData *d = dataAtPoint(i);
+	FlightData *d = at(i);
 	// An interval ends when we get a different time value, or
 	// when we reach the end of the data.
 	if ((difftime(d->time, t) > 0.5) || (i == (size() - 1))) {
@@ -576,7 +538,7 @@ void FlightTrack::_adjustOffsetsAround(int i)
 	    float subInterval = 1.0 / subPoints;
 	    int intervalStart = i - subPoints + 1;
 	    for (int j = 0; j < subPoints; j++) {
-		dataAtPoint(intervalStart + j)->est_t_offset = 
+		at(intervalStart + j)->est_t_offset = 
 		    difftime(t, start) + (j * subInterval);
 	    }
 
@@ -590,7 +552,7 @@ void FlightTrack::_adjustOffsetsAround(int i)
 // field of the indicated FlightData point and all points after.  All
 // points before 'i' are assumed to have the correct cumulative
 // distance.
-void FlightTrack::_calcDistancesFrom(int i)
+void FlightTrack::_calcDistancesFrom(size_t i)
 {
     if (i >= _track.size()) {
 	return;
@@ -599,15 +561,15 @@ void FlightTrack::_calcDistancesFrom(int i)
     // If we're being asked to start at the beginning, we need to set
     // the first point's distance to 0.0 explicitly.
     if (i == 0) {
-	dataAtPoint(0)->dist = 0.0;
+	at(0)->dist = 0.0;
 	i++;
     }
 
     // Now update starting at point i (which depends on the cumulative
     // distance in point i - 1), going to the end.
-    FlightData *d0 = dataAtPoint(i - 1), *d1;
+    FlightData *d0 = at(i - 1), *d1;
     for (; i < _track.size(); i++) {
-	d1 = dataAtPoint(i);
+	d1 = at(i);
 	float delta = sgdDistanceVec3(d1->cart, d0->cart);
 	d1->dist = d0->dist + delta;
 	d0 = d1;
