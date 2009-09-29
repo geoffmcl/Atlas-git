@@ -55,7 +55,7 @@ const float minLowAirway = 50.0;
 // From VFR_Chart_Symbols.pdf
 //
 // Low altitude:
-//   Alternate / Enroute Airway {0.576, 0.788, 0.839}
+//   VOR Airway {0.576, 0.788, 0.839}
 //   LF / MF Airway {0.831, 0.627, 0.753}
 
 const float awy_low_colour[4] = {0.576, 0.788, 0.839, 0.7};
@@ -73,6 +73,11 @@ const float awy_low_colour[4] = {0.576, 0.788, 0.839, 0.7};
 const float awy_high_colour[4] = {0.176, 0.435, 0.667, 0.7};
 // const float awy_high_colour[4] = {0.878, 0.812, 0.753, 0.7};
 // const float awy_high_colour[4] = {0.624, 0.439, 0.122, 0.7};
+
+// From Canadian high and low altitude charts:
+//
+// VOR route {0.5, 0.5, 0.5}
+// NDB route {0.2, 0.8, 0.2}
 
 // Different airways have different names, depending on their role and
 // country.  There's some information in
@@ -200,6 +205,10 @@ bool AirwaysOverlay::_load640(const gzFile& arp)
 	    assert(false);
 	}
 
+	// Check that the first id is alphabetically less than the
+	// second.  We use this assumption in other parts of the code.
+	assert(a->start.id < a->end.id);
+
 	// Add to the culler.  The airway bounds are given by its two
 	// endpoints.
 	// EYE - save these two points
@@ -217,7 +226,7 @@ bool AirwaysOverlay::_load640(const gzFile& arp)
 	// Add to our culler.
 	_frustum->culler().addObject(a);
 
-	// Add to the airways vector.
+	// Add to the segments vector.
 	_segments.push_back(a);
 	
 	// Look for the two endpoints in the navPoints map.  For those
@@ -233,7 +242,7 @@ bool AirwaysOverlay::_load640(const gzFile& arp)
 // Each airway segment has two endpoints, which should be fixes and/or
 // navaids.  If an endpoint is a fix, we use the airway type as a
 // heuristic to decide whether that fix is a high or low fix.  Note
-// that the navaid, fix, and airways databases are not perfect; so we
+// that the navaid, fix, and airways databases are not perfect, so we
 // need to handle cases where no or partial matches are made.
 void AirwaysOverlay::_checkEnd(AwyLabel &end, bool isLow)
 {
@@ -405,9 +414,40 @@ void AirwaysOverlay::draw(bool drawHigh, bool drawLow, bool label)
 // (4) add directions at edge of VOR roses
 void AirwaysOverlay::_render(const AWY *a) const
 {
-    sgdVec3 point;
-
+//     bool isVOR = false, isNDB = false;
+//     if (a->start.isNavaid) {
+// 	NAV *n = (NAV *)a->start.n;
+// 	if (n->navtype == NAV_VOR) {
+// 	    isVOR = true;
+// 	} else if (n->navtype == NAV_NDB) {
+// 	    isNDB = true;
+// 	}
+//     }
+//     if (a->end.isNavaid) {
+// 	NAV *n = (NAV *)a->end.n;
+// 	if (n->navtype == NAV_VOR) {
+// 	    isVOR = true;
+// 	} else if (n->navtype == NAV_NDB) {
+// 	    isNDB = true;
+// 	}
+//     }
+//     if (isVOR) {
+// // 	glColor4f(0.176, 0.435, 0.667, 0.7); // American high RNAV
+// // 	glColor4f(0.5, 0.5, 0.5, 0.7); // Canadian
+// 	glColor4f(0.000, 0.420, 0.624, 0.7); // VOR
+//     } else if (isNDB) {
+// // 	glColor4f(0.624, 0.439, 0.122, 0.7); // American low LF / MF
+// // 	glColor4f(0.2, 0.8, 0.2, 0.7); // Canadian
+// 	glColor4f(0.525, 0.294, 0.498, 0.7); // NDB
+//     } else if (a->isLow) {
+// // 	glColor4fv(awy_low_colour);
+// 	glColor4f(0.5, 0.5, 0.5, 0.7);
+//     } else {
+// // 	glColor4fv(awy_high_colour);
+// 	glColor4f(0.5, 0.5, 0.5, 0.7);
+//     }
     glBegin(GL_LINES); {
+	sgdVec3 point;
 	atlasGeodToCart(a->start.lat, a->start.lon, 0.0, point);
 	glVertex3dv(point);
 	atlasGeodToCart(a->end.lat, a->end.lon, 0.0, point);
@@ -426,9 +466,9 @@ static void _drawLabel(LayoutManager &lm, float *colour,
     glBegin(GL_QUADS); {
 	glColor4f(1.0, 1.0, 1.0, 1.0);
 	glVertex2f(x - width / 2.0, -height / 2.0);
-	glVertex2f(x - width / 2.0, height / 2.0);
-	glVertex2f(x + width / 2.0, height / 2.0);
 	glVertex2f(x + width / 2.0, -height / 2.0);
+	glVertex2f(x + width / 2.0, height / 2.0);
+	glVertex2f(x - width / 2.0, height / 2.0);
     }
     glEnd();
 
@@ -467,7 +507,7 @@ bool AirwaysOverlay::_label(const AWY *a) const
     sgdAddVec3(middle, start, end);
     sgdScaleVec3(middle, 0.5);
 
-    fntRenderer& f = globals.fontRenderer;
+    atlasFntRenderer& f = globals.fontRenderer;
     LayoutManager lmName, lmElev, lmDist;
 //     LayoutManager lmStart, lmEnd;
     // EYE - magic numbers
