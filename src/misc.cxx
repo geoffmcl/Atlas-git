@@ -22,6 +22,7 @@
   ---------------------------------------------------------------------------*/
 
 #include <cassert>
+#include <limits>
 
 #include "misc.hxx"
 
@@ -187,6 +188,28 @@ void atlasFntTexFont::_calcAscentDescent()
     normalize = 1.0 / (_ascent - _descent);
     _ascent *= normalize;
     _descent *= normalize;
+}
+
+//////////////////////////////////////////////////////////////////////
+// atlasFntRenderer
+//////////////////////////////////////////////////////////////////////
+
+void atlasFntRenderer::putch(char c)
+{
+    glPushAttrib(GL_POLYGON_BIT); {
+	glFrontFace(GL_CW);
+	fntRenderer::putch(c);
+    }
+    glPopAttrib();
+}
+
+void atlasFntRenderer::puts(const char *s)
+{
+    glPushAttrib(GL_POLYGON_BIT); {
+	glFrontFace(GL_CW);
+	fntRenderer::puts(s);
+    }
+    glPopAttrib();
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -376,8 +399,7 @@ bool RaySphere(SGVec3<double> p1, SGVec3<double> p2,
     c = dot(sc, sc) + dot(p1, p1) - 2 * dot(sc, p1) - (r * r);
 
     bb4ac = b * b - 4 * a * c;
-    if ((fabs(a) < 100 * SGLimits<double>::epsilon()) ||
-	(bb4ac < 0)) {
+    if ((fabs(a) < std::numeric_limits<double>::epsilon()) || (bb4ac < 0)) {
 	*mu1 = 0;
 	*mu2 = 0;
 

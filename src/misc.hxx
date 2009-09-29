@@ -90,6 +90,18 @@ class atlasFntTexFont: public fntTexFont {
     void _calcAscentDescent();
 };
 
+// atlasFntRenderer - a small extension to PLIB's fntRenderer
+//
+// PLIB (1.8.5) renders the string using a triangle strip.
+// Unfortunately, it is specified with a clockwise winding, which
+// means that applications that use backface culling (eg, us) will see
+// nothing unless we reverse our definition of front and back.
+class atlasFntRenderer: public fntRenderer {
+  public:
+    void putch(char c);
+    void puts(const char *s);
+};
+
 // A slightly modified version of zlib's gzgets().  This one *always*
 // gets the entire line, and *never* includes the trailing CR/LF.
 //
