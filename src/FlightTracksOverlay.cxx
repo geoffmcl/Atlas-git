@@ -75,46 +75,48 @@ void FlightTracksOverlay::setDirty()
     _isDirty = true;
 }
 
-// Draw the airplane at the current point in the given track in the
+// Draw the airplane at the given point in the given track in the
 // given colour.  We draw it in the XY plane, with the nose pointing
 // in the positive Y direction.  The XY plane, however, has been
 // translated, rotated, scaled, and otherwise shamelessly manipulated
 // so that it maps onto the correct place in the correct orientation
 // in XYZ space.
-static void __drawAirplane(FlightTrack *t, const sgVec4 colour)
+static void __drawAirplane(FlightData *d, const sgVec4 colour)
 {
-    FlightData *d = t->getCurrentPoint();
-    if (d) {
-	glColor4fv(colour);
-	glPushMatrix(); {
-	    sgdVec3 cart;
-	    atlasGeodToCart(d->lat, d->lon, d->alt * SG_FEET_TO_METER, 
-			    cart);
-
-	    glTranslated(cart[0], cart[1], cart[2]);
-	    glRotatef(d->lon + 90.0, 0.0, 0.0, 1.0);
-	    glRotatef(90.0 - d->lat, 1.0, 0.0, 0.0);
-	    glRotatef(-d->hdg, 0.0, 0.0, 1.0);
-	    double metresPerPixel = globals.metresPerPixel;
-	    glScalef(metresPerPixel, metresPerPixel, metresPerPixel);
-
-	    glBegin(GL_LINES); {
-		// "fuselage"
-		glVertex3f(0.0, 4.0, 0.0);
-		glVertex3f(0.0, -9.0, 0.0);
-
-		// "wing"
-		glVertex3f(-7.0, 0.0, 0.0);
-		glVertex3f(7.0, 0.0, 0.0);
-
-		// "tail"
-		glVertex3f(-3.0, -7.0, 0.0);
-		glVertex3f(3.0, -7.0, 0.0);
-	    }
-	    glEnd();
-	}
-	glPopMatrix();
+    if (d == NULL) {
+	return;
     }
+
+    // EYE - draw a trail (eg, 10s) as well?
+    glColor4fv(colour);
+    glPushMatrix(); {
+	sgdVec3 cart;
+	atlasGeodToCart(d->lat, d->lon, d->alt * SG_FEET_TO_METER, 
+			cart);
+
+	glTranslated(cart[0], cart[1], cart[2]);
+	glRotatef(d->lon + 90.0, 0.0, 0.0, 1.0);
+	glRotatef(90.0 - d->lat, 1.0, 0.0, 0.0);
+	glRotatef(-d->hdg, 0.0, 0.0, 1.0);
+	double metresPerPixel = globals.metresPerPixel;
+	glScalef(metresPerPixel, metresPerPixel, metresPerPixel);
+
+	glBegin(GL_LINES); {
+	    // "fuselage"
+	    glVertex3f(0.0, 4.0, 0.0);
+	    glVertex3f(0.0, -9.0, 0.0);
+
+	    // "wing"
+	    glVertex3f(-7.0, 0.0, 0.0);
+	    glVertex3f(7.0, 0.0, 0.0);
+
+	    // "tail"
+	    glVertex3f(-3.0, -7.0, 0.0);
+	    glVertex3f(3.0, -7.0, 0.0);
+	}
+	glEnd();
+    }
+    glPopMatrix();
 }
 
 void FlightTracksOverlay::draw()
@@ -139,14 +141,13 @@ void FlightTracksOverlay::draw()
 		glColor4fv(info.trackColour);
 
 		glBegin(GL_LINE_STRIP); {
-		    for (int i = 0; i < t->size(); i++) {
-			FlightData *d = t->dataAtPoint(i);
+		    for (size_t i = 0; i < t->size(); i++) {
+			FlightData *d = t->at(i);
 			glVertex3dv(d->cart);
 		    }
 		}
 		glEnd();
 	    }
-
 	    glEndList();
 
 	    _tracks[t] = info;
@@ -160,8 +161,14 @@ void FlightTracksOverlay::draw()
 	// Draw the track.
 	glCallList(i->second.DL);
 
-	// Draw the airplane.
-	__drawAirplane(i->first, i->second.planeColour);
+	// Draw the airplane.  If the track is live, we draw an
+	// airplane at the end, in the track colour.  We also draw an
+	// airplane at the mark, in the plane colour.
+	FlightTrack *t = i->first;
+	if (t->live()) {
+	    __drawAirplane(t->last(), i->second.trackColour);
+	}
+	__drawAirplane(t->current(), i->second.planeColour);
     }
 }
 
