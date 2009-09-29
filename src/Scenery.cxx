@@ -1085,19 +1085,19 @@ void Scenery::_label(bool live)
 
     // Labels must be written on top of whatever scenery is there, so
     // we ignore depth values.
-    glPushAttrib(GL_DEPTH_BUFFER_BIT);
-    glDisable(GL_DEPTH_TEST);
+    glPushAttrib(GL_DEPTH_BUFFER_BIT); {
+	glDisable(GL_DEPTH_TEST);
 
-    // Draw elevation figures.
-    const vector<Cullable *>& intersections = _frustum->intersections();
-    for (unsigned int i = 0; i < intersections.size(); i++) {
-	SceneryTile *t = dynamic_cast<SceneryTile *>(intersections[i]);
-	if (!t) {
-	    continue;
+	// Draw elevation figures.
+	const vector<Cullable *>& intersections = _frustum->intersections();
+	for (unsigned int i = 0; i < intersections.size(); i++) {
+	    SceneryTile *t = dynamic_cast<SceneryTile *>(intersections[i]);
+	    if (!t) {
+		continue;
+	    }
+	    t->label(*_frustum, _metresPerPixel, live);
 	}
-	t->label(*_frustum, _metresPerPixel, live);
     }
-
     glPopAttrib();
 }
 
