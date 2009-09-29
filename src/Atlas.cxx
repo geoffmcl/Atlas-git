@@ -139,12 +139,6 @@ class InfoUI {
     puText *latText, *lonText, *altText, *hdgText, *spdText, *hmsText, *dstText;
     puFrame *VOR1Colour, *VOR2Colour, *ADFColour;
     puText *VOR1Text, *VOR2Text, *ADFText;
-    puButtonBox *graphsBox;
-    // EYE - constant alert!  We should get '3' from Graphs.hxx somehow.
-    const char *graphsBoxLabels[4];
-    puSlider *smoother;
-    puButtonBox *xAxisBox;
-    const char *xAxisBoxLabels[3];
 };
 
 //////////////////////////////////////////////////////////////////////
@@ -171,7 +165,7 @@ class LightingUI {
     void setLightPosition();
     void previous();
     void next();
-    void setPalette(unsigned int i);
+    void setPalette(size_t i);
     int currentItem() { return paletteComboBox->getCurrentItem(); }
     void updatePalettes();
 
@@ -267,8 +261,8 @@ puaFileSelector *fileDialog = NULL;
 bool showGraphWindow = true;
 
 // Some default colours.
-float flightTrackColour[4] = {0.0, 0.0, 1.0, 1.0};
-float planeColour[4] = {1.0, 1.0, 0.0, 1.0};
+float trackColour[4] = {0.0, 0.0, 1.0, 1.0};
+float markColour[4] = {1.0, 1.0, 0.0, 1.0};
 // EYE - eventually these should be placed in preferences.  Also,
 // we'll eventually need to deal with more than 3 radios.
 float vor1Colour[4] = {0.000, 0.420, 0.624, 0.7};
@@ -299,9 +293,9 @@ class Palettes {
     ~Palettes();
 
     Palette *currentPalette();
-    unsigned int currentPaletteNo() { return _i; }
-    unsigned int size() { return _palettes.size(); }
-    const Palette *setPalette(unsigned int i);
+    size_t currentPaletteNo() { return _i; }
+    size_t size() { return _palettes.size(); }
+    const Palette *setPalette(size_t i);
     const vector<Palette *>& palettes() { return _palettes; }
 
     // Adds the given path to the list (unless it's there already),
@@ -313,7 +307,7 @@ class Palettes {
     const Palette *unload();
 
   protected:
-    unsigned int _i;
+    size_t _i;
     vector<Palette *> _palettes;
 };
 Palettes *palettes;
@@ -352,13 +346,10 @@ Palette *Palettes::currentPalette()
     }
 }
 
-const Palette *Palettes::setPalette(unsigned int i)
+const Palette *Palettes::setPalette(size_t i)
 {
     if (i < _palettes.size()) {
 	_i = i;
-    }
-
-    if (_i < _palettes.size()) {
 	return _palettes[_i];
     } else {
 	return NULL;
@@ -436,33 +427,30 @@ const double zoomFactor = pow(10.0, 0.1);
 //////////////////////////////////////////////////////////////////////
 // Forward declarations of all callbacks.
 //////////////////////////////////////////////////////////////////////
-void smoother_cb(puObject *smoother);
-void graph_axis_cb(puObject *xAxisBox);
-void lighting_cb(puObject *lightingUIObject);
-void close_ok_cb(puObject *widget);
-void zoom_cb(puObject *cb);
-void show_cb(puObject *cb);
-void position_cb (puObject *cb);
-void clear_ftrack_cb(puObject *);
-void degMinSec_cb(puObject *cb);
-void magTrue_cb(puObject *cb);
-void graph_type_cb (puObject *graphsBox);
-void save_as_file_cb(puObject *cb);;
-void save_as_cb(puObject *cb);
-void save_as_file_cb(puObject *cb);
-void save_cb(puObject *cb);
-void load_file_cb(puObject *cb);
-void load_cb(puObject *cb);
-void unload_cb(puObject *cb);
-void detach_cb(puObject *cb);
-void track_select_cb(puObject *cb);
-void track_aircraft_cb(puObject *cb);
-void jump_to_cb(puObject *cb);
-void track_limit_cb(puObject *cb);
-void attach_cb(puObject *);
-void network_serial_toggle_cb(puObject *o);
-void network_serial_cb(puObject *obj);
-void help_cb(puObject *obj);
+static void lighting_cb(puObject *lightingUIObject);
+static void close_ok_cb(puObject *widget);
+static void zoom_cb(puObject *cb);
+static void show_cb(puObject *cb);
+static void position_cb (puObject *cb);
+static void clear_ftrack_cb(puObject *);
+static void degMinSec_cb(puObject *cb);
+static void magTrue_cb(puObject *cb);
+static void save_as_file_cb(puObject *cb);;
+static void save_as_cb(puObject *cb);
+static void save_as_file_cb(puObject *cb);
+static void save_cb(puObject *cb);
+static void load_file_cb(puObject *cb);
+static void load_cb(puObject *cb);
+static void unload_cb(puObject *cb);
+static void detach_cb(puObject *cb);
+static void track_select_cb(puObject *cb);
+static void track_aircraft_cb(puObject *cb);
+static void jump_to_cb(puObject *cb);
+static void track_limit_cb(puObject *cb);
+static void attach_cb(puObject *);
+static void network_serial_toggle_cb(puObject *o);
+static void network_serial_cb(puObject *obj);
+static void help_cb(puObject *obj);
 
 // Call this when the cursor or the scene moves.  It updates the
 // variables that depend on the cursor location.  It assumes that
@@ -532,10 +520,10 @@ void _rotate(double hdg)
 }
 
 // Called after a change to the eye position or up vector.  Sets the
-// OpenGL eye point (via gluLookAt), updates the location string, and
-// asks GLUT to redisplay.  Assumes that eye and/or eyeUp has been
-// correctly set.  In general, this routine shouldn't be called
-// directly - use movePosition() or rotatePosition() instead.
+// OpenGL eye point (via gluLookAt), notifies everyone that we've
+// moved, and asks GLUT to redisplay.  Assumes that eye and/or eyeUp
+// has been correctly set.  In general, this routine shouldn't be
+// called directly - use movePosition() or rotatePosition() instead.
 void _move()
 {
     // Note that we always look at the origin.  This means that our
@@ -623,27 +611,28 @@ void zoomTo(double scale)
     GLfloat width = viewport[2];
     GLfloat height = viewport[3];
 
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
+    glPushAttrib(GL_TRANSFORM_BIT); { // Save current matrix mode.
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
 
-    double left, right, bottom, top, near, far;
-    right = width * globals.metresPerPixel / 2.0;
-    left = -right;
-    top = height * globals.metresPerPixel / 2.0;
-    bottom = -top;
+	double left, right, bottom, top, near, far;
+	right = width * globals.metresPerPixel / 2.0;
+	left = -right;
+	top = height * globals.metresPerPixel / 2.0;
+	bottom = -top;
 
-    double l = sgdLengthVec3(eye);
-//     near = l - SGGeodesy::EQURAD - 10000;
-    near = -10000.0;		// EYE - magic number
-    far = l;			// EYE - need better magic number (use
-				// bounds?)
-    glOrtho(left, right, bottom, top, near, far);
+	double l = sgdLengthVec3(eye);
+	//     near = l - SGGeodesy::EQURAD - 10000;
+	near = -100000.0;		// EYE - magic number
+	far = l;			// EYE - need better magic
+					// number (use bounds?)
+	glOrtho(left, right, bottom, top, near, far);
 
-    glMatrixMode(GL_MODELVIEW);
-
-    // Set our global frustum.  This is used by various subsystems to
-    // find out what's going on.
-    globals.frustum.setFrustum(left, right, bottom, top, near, far);
+	// Set our global frustum.  This is used by various subsystems
+	// to find out what's going on.
+	globals.frustum.setFrustum(left, right, bottom, top, near, far);
+    }
+    glPopAttrib();
     
     // Note: If you want to get this and the scale from OpenGL, here's
     // the code:
@@ -760,7 +749,7 @@ void newFlightTrack()
     // it with the current one.
     FlightTracksOverlay *fto = globals.overlays->flightTracksOverlay();
     fto->removeTrack();
-    fto->addTrack(globals.track(), flightTrackColour, planeColour);
+    fto->addTrack(globals.track(), trackColour, markColour);
 
     // Tell everyone what has happened.  Note that we need to do this
     // before some operations below, because they depend on other
@@ -793,7 +782,6 @@ void newFlightTrack()
 	}
 	centerMapOnAircraft();
 	infoUI->setText();
-	smoother_cb(infoUI->smoother);
     }
 
     // Set status of the flight track buttons.
@@ -1028,13 +1016,11 @@ void init_gui(bool textureFonts)
     puInit();
 
     if (textureFonts) {
-	//     SGPath font_name(prefs.fg_root.str());
-	//     font_name.append("Fonts/helvetica_medium.txf");
 	assert(globals.regularFont);
-	globals.uiFont.initialize(globals.regularFont, 12.0f);
+	globals.uiFont.initialize(globals.regularFont, 12.0);
     }
     puSetDefaultFonts(globals.uiFont, globals.uiFont);
-    // Note that the default colour scheme as an alpha of 0.8 - this,
+    // Note that the default colour scheme has an alpha of 0.8 - this,
     // and the fact that GL_BLEND is on, means that the widgets will
     // be slightly translucent.  Set to 1.0 if you want them to be
     // completely opaque.
@@ -1455,7 +1441,7 @@ void MainUI::setTrackList()
 void MainUI::update()
 {
     FlightTrack *track = globals.track();
-    int trackNo = globals.currentTrackNo();
+    size_t trackNo = globals.currentTrackNo();
     if (!track) {
 	// If there's no track, we can only load and attach.
 	unloadButton->greyOut();
@@ -1514,7 +1500,7 @@ void MainUI::update()
 	setTrackSize(track->size());
 	trackLimitInput->greyOut();
     }
-    if (trackNo <= 0) {
+    if (trackNo == 0) {
 	prevTrackButton->greyOut();
     } else {
 	prevTrackButton->activate();
@@ -1539,9 +1525,11 @@ void MainUI::setTrackSize(int i)
 // Sets the ith item in the tracks combo box to be current.
 void MainUI::setCurrentItem(int i)
 {
-    if (i < 0) {
-	i = 0;
-    } else if (i >= tracksComboBox->getNumItems()) {
+    if (tracksComboBox->getNumItems() == 0) {
+	return;
+    }
+
+    if (i >= tracksComboBox->getNumItems()) {
 	i = tracksComboBox->getNumItems() - 1;
     }
 
@@ -1581,12 +1569,9 @@ InfoUI::InfoUI(int x, int y)
     const int bigSpace = 5;
     // EYE - magic numbers
     const int textWidth = 175;
-    const int graphsBoxHeight = 75, graphsBoxWidth = 115;
-    const int xAxisBoxHeight = 50, xAxisBoxWidth = 100;
-    const int smootherHeight = bigSpace * 4, smootherWidth = graphsBoxWidth;
 
-    const int height = textHeight * 10 + 3 * bigSpace;
-    const int width = textWidth + graphsBoxWidth + xAxisBoxWidth;
+    const int height = textHeight * 8 + 3 * bigSpace;
+    const int width = textWidth * 2;
 
     int curx, cury;
 
@@ -1621,52 +1606,16 @@ InfoUI::InfoUI(int x, int y)
 			  vor1Colour[0], vor1Colour[1], vor1Colour[2], 0.6);
     VOR1Text = new puText(curx + textHeight, cury); cury += textHeight + bigSpace;
 
-    dstText = new puText(curx, cury); cury += textHeight;
-    hmsText = new puText(curx, cury); cury += textHeight;
     spdText = new puText(curx, cury); cury += textHeight;
     hdgText = new puText(curx, cury); cury += textHeight;
     altText = new puText(curx, cury); cury += textHeight;
     lonText = new puText(curx, cury); cury += textHeight;
     latText = new puText(curx, cury); cury += textHeight;
 
-    curx = textWidth;
-    cury = height - graphsBoxHeight;
-
-    // EYE - Perhaps we should get these from Graphs.hxx (if not the
-    // actual text, at least the number).
-    graphsBoxLabels[0] = "Altitude";
-    graphsBoxLabels[1] = "Speed";
-    graphsBoxLabels[2] = "Climb rate";
-    graphsBoxLabels[3] = NULL;
-    graphsBox = 
-	new puButtonBox(curx, cury, 
-			curx + graphsBoxWidth, cury + graphsBoxHeight, 
-			(char **)graphsBoxLabels, FALSE);
-    graphsBox->setCallback(graph_type_cb);
-
-    cury -= smootherHeight + textHeight;
-    smoother = new puSlider(curx, cury, smootherWidth, FALSE, smootherHeight);
-    smoother->setLabelPlace(PUPLACE_TOP_CENTERED);
-    // EYE - necessary?
-    smoother->setLegendFont(globals.uiFont);
-    smoother->setLabelFont(globals.uiFont);
-    smoother->setLabel("Smoothing (s)");
-    smoother->setMinValue(0.0);	 // 0.0 = no smoothing
-    smoother->setMaxValue(60.0); // 60.0 = smooth over a 60s interval
-    smoother->setStepSize(1.0);
-    smoother->setCallback(smoother_cb);
-
-    curx += graphsBoxWidth;
-    cury = height - xAxisBoxHeight;
-
-    xAxisBoxLabels[0] = "Time";
-    xAxisBoxLabels[1] = "Distance";
-    xAxisBoxLabels[2] = NULL;
-    xAxisBox = 
-	new puButtonBox(curx, cury, 
-			curx + xAxisBoxWidth, cury + xAxisBoxHeight, 
-			(char **)xAxisBoxLabels, TRUE);
-    xAxisBox->setCallback(graph_axis_cb);
+    curx += textWidth;
+    cury = height - 2 * bigSpace - 2 * textHeight;
+    dstText = new puText(curx, cury); cury += textHeight;
+    hmsText = new puText(curx, cury); cury += textHeight;
 
     gui->close();
 
@@ -2082,7 +2031,7 @@ LightingUI::LightingUI(int x, int y)
     const int boxHeight = 55, boxWidth = 100;
 
     const int directionHeight = boxHeight + labelHeight + bigSpace * 3;
-    const int smootherHeight = boxHeight, smootherWidth = bigSpace * 4;
+    const int sliderHeight = boxHeight, sliderWidth = bigSpace * 4;
 
     const int paletteHeight = labelHeight * 2 + bigSpace * 3;
 
@@ -2147,9 +2096,9 @@ LightingUI::LightingUI(int x, int y)
 	azimuthDial->setLabel("Azimuth");
 	azimuthDial->setCallback(lighting_cb);
 
-	curx = width - bigSpace - smootherWidth;
+	curx = width - bigSpace - sliderWidth;
 	elevationSlider = 
-	    new puSlider(curx, cury, smootherHeight, TRUE, smootherWidth);
+	    new puSlider(curx, cury, sliderHeight, TRUE, sliderWidth);
 	elevationSlider->setLabelPlace(PUPLACE_LOWER_LEFT);
 	elevationSlider->setLabel("Elevation");
 	elevationSlider->setMinValue(0.0);
@@ -2290,7 +2239,7 @@ void LightingUI::setLightPosition()
 // Select the previous palette (if there is one).
 void LightingUI::previous()
 {
-    unsigned int i = paletteComboBox->getCurrentItem();
+    int i = paletteComboBox->getCurrentItem();
     if (i > 0) {
 	setPalette(i - 1);
     }
@@ -2299,15 +2248,16 @@ void LightingUI::previous()
 // Select the next palette (if there is one).
 void LightingUI::next()
 {
-    unsigned int i = paletteComboBox->getCurrentItem();
+    int i = paletteComboBox->getCurrentItem();
     setPalette(i + 1);
 }
 
 // Updates the lighting interface so that the ith palette is selected.
 // This does *not* actually select a palette - it just updates the
 // interface.
-void LightingUI::setPalette(unsigned int i)
+void LightingUI::setPalette(size_t i)
 {
+    // EYE - what if size() == 0?
     if (i >= palettes->size()) {
 	i = palettes->size() - 1;
     }
@@ -2535,6 +2485,12 @@ HelpUI::HelpUI(int x, int y, Preferences& prefs, TileManager& tm)
     globalString.appendf("Airways\n");
     globalString.appendf("    %s/Navaids/awy.dat.gz\n", prefs.fg_root.c_str());
 
+    globalString.appendf("\nOpenGL\n");
+    globalString.appendf("    vendor: %s\n", glGetString(GL_VENDOR));
+    globalString.appendf("    renderer: %s\n", glGetString(GL_RENDERER));
+    globalString.appendf("    version: %s\n", glGetString(GL_VERSION));
+    globalString.appendf("\n");	// puaLargeInput seems to require an extra LF
+
     _generalText = strdup(globalString.str());
 
     // Keyboard shortcuts.
@@ -2568,7 +2524,9 @@ HelpUI::HelpUI(int x, int y, Preferences& prefs, TileManager& tm)
     globalString.appendf(fmt.str(), "w", "close current flight track");
     globalString.appendf(fmt.str(), "u", "detach (unattach) current connection");
     globalString.appendf(fmt.str(), "v", "toggle labels");
+    globalString.appendf(fmt.str(), "x", "toggle x-axis type (time/dist)");
     globalString.appendf(fmt.str(), "space", "toggle main interface");
+    globalString.appendf("\n");	// puaLargeInput seems to require an extra LF
 
     _keyboardText = strdup(globalString.str());
 
@@ -2617,36 +2575,6 @@ void reshapeMap(int _width, int _height)
     // (with a 20-pixel space at the bottom and right).
     lightingUI->getSize(&w, &h);
     lightingUI->setPosition(_width - w - 20, 20);
-}
-
-void bjsBitmapString(int x, int y, void *font, const char *str)
-{
-    GLfloat viewport[4];
-
-    glGetFloatv(GL_VIEWPORT, viewport);
-
-    glMatrixMode(GL_MODELVIEW);
-    glPushMatrix(); {
-	glLoadIdentity();
-
-	glMatrixMode(GL_PROJECTION);
-	glPushMatrix(); {
-	    glLoadIdentity();
-	    gluOrtho2D(0.0, viewport[2], 0.0, viewport[3]);
-
-	    glColor3f(1.0, 1.0, 1.0);
-	    glRasterPos2i(x, y);
-	    for (unsigned int i = 0; i < strlen(str); i++) {
-		// 	glRasterPos2i(x, y);
-		glutBitmapCharacter(font, str[i]);
-		// 	x += glutBitmapWidth(font, str[i]);
-	    }
-	}
-	glPopMatrix();
-
-	glMatrixMode(GL_MODELVIEW);
-    }
-    glPopMatrix();
 }
 
 void redrawMap() 
@@ -2752,12 +2680,9 @@ void redrawGraphs()
 // Called when the graphs window is resized.
 void reshapeGraphs(int w, int h)
 {
-    glViewport(0, 0, (GLsizei) w, (GLsizei) h);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    gluOrtho2D(0.0, (GLdouble) w, 0.0, (GLdouble) h);
-
     graphs->reshape(w, h);
+    // EYE - move this into reshape()?  Do same for other graphs
+    // window callbacks?
     glutPostRedisplay();
 }
 
@@ -2765,9 +2690,9 @@ void reshapeGraphs(int w, int h)
 // in the graphs window.
 void motionGraphs(int x, int y) 
 {
-    // Marks are only honoured for non-live tracks.
-    if (!globals.track()->live()) {
-	globals.track()->setMark(graphs->pixelToPoint(x));
+    size_t mark = graphs->mouseMotion(x, y);
+    if (mark != globals.track()->mark()) {
+	globals.track()->setMark(mark);
 
 	glutSetWindow(main_window);
 	aircraftMoved();
@@ -2780,9 +2705,16 @@ void motionGraphs(int x, int y)
 // Called for mouse button events in the graphs window.
 void mouseGraphs(int button, int state, int x, int y)
 {
-    // EYE - should we look at the button and state eventually?
-    if (state == GLUT_DOWN) {
-	motionGraphs(x, y);
+    size_t mark = graphs->mouseClick(button, state, x, y);
+    // EYE - combine with mouseMotion?
+    if (mark != globals.track()->mark()) {
+	globals.track()->setMark(mark);
+
+	glutSetWindow(main_window);
+	aircraftMoved();
+	glutPostRedisplay();
+
+	glutPostWindowRedisplay(graphs_window);
     }
 }
 
@@ -2792,24 +2724,22 @@ void keyPressed(unsigned char key, int x, int y);
 // pass the key on to the handler for the main window.
 void keyboardGraphs(unsigned char key, int x, int y)
 {
-    // EYE - keyPressed does a call to puKeyboard.  Is this okay
-    // (especially if we do the same in the future)?
-    glutSetWindow(main_window);
-    keyPressed(key, x, y);
-    glutSetWindow(graphs_window);
+    if (puKeyboard(key, PU_DOWN)) {
+	glutPostRedisplay();
+    } else {
+	glutSetWindow(main_window);
+	// EYE - keyPressed does a call to puKeyboard.  Is this okay
+	// (especially if we do the same in the future)?
+	keyPressed(key, x, y);
+	glutSetWindow(graphs_window);
+    }
 }
 
 // Called when the user presses a "special" key in the graphs window,
 // where "special" includes directional keys.
 void specialGraphs(int key, int x, int y) 
 {
-    // The special keys all adjust the mark.  However, live tracks
-    // have no mark.
-    if (globals.track()->live()) {
-	return;
-    }
-
-    int offset = 1;
+    size_t offset = 1;
     if (glutGetModifiers() & GLUT_ACTIVE_SHIFT) {
 	// If the user presses the shift key, right and left arrow
 	// clicks move 10 times as far.
@@ -2857,9 +2787,19 @@ void timer(int value)
 
     // Check for input on all live tracks.
     for (unsigned int i = 0; i < globals.tracks().size(); i++) {
-	if (globals.track(i)->live() && globals.track(i)->checkForInput()) {
-	    // Is this track is the currently displayed track?
-	    if (globals.track(i) == globals.track()) {
+	FlightTrack *t = globals.track(i);
+	// We consider a track "synced" (the mark should stay at the
+	// end) if the mark is currently at the end.
+	bool synced = (t->current() == t->last());
+	if (t->live() && t->checkForInput()) {
+	    // We got some new data.  Is this track is the currently
+	    // displayed track?
+	    if (t == globals.track()) {
+		// If we're synced, place the mark at the end.
+		if (synced) {
+		    t->setMark(t->size() - 1);
+		}
+
 		// Register that the aircraft has moved (this will
 		// update the display as necessary).
 		aircraftMoved();
@@ -2868,6 +2808,7 @@ void timer(int value)
 		// main UI.
 		mainUI->setTrackSize(globals.track()->size());
 
+		// Register that the flight track has changed.
 		flightTrackModified();
 
 		// And update our graphs.
@@ -2880,7 +2821,7 @@ void timer(int value)
     }
 
     // Check again later.
-    glutTimerFunc((int)(prefs.update * 1000.0f), timer, value);
+    glutTimerFunc((int)(prefs.update * 1000.0), timer, value);
 }
 
 bool dragging = false;
@@ -3107,13 +3048,6 @@ void keyPressed(unsigned char key, int x, int y)
 	    glutPostRedisplay();
 	    break;
 
-	  case 'm':
-	    // Toggle between mouse and centre modes.
-	    mainUI->showMouse = !mainUI->showMouse;
-	    show_cb(mainUI->mouseText);
-	    glutPostRedisplay(); // EYE - overkill
-	    break;
-
 	  case 'l':
 	    // Turn lighting UI on/off.
 	    if (lightingUI->isVisible()) {
@@ -3124,11 +3058,23 @@ void keyPressed(unsigned char key, int x, int y)
 	    glutPostRedisplay();
 	    break;
 
+	  case 'm':
+	    // Toggle between mouse and centre modes.
+	    mainUI->showMouse = !mainUI->showMouse;
+	    show_cb(mainUI->mouseText);
+	    glutPostRedisplay(); // EYE - overkill
+	    break;
+
 	  case 'M':
 	    // Toggle MEF display on/off.
 	    elevationLabels = !elevationLabels;
 	    mainUI->MEFToggle->setValue(elevationLabels);
 	    glutPostRedisplay();
+	    break;
+
+	  case 'n':
+	    // Rotate camera so that north is up.
+	    rotateEye();
 	    break;
 
 	  case 'N':
@@ -3137,15 +3083,14 @@ void keyPressed(unsigned char key, int x, int y)
 	    show_cb(mainUI->navaidsToggle);
 	    break;    
 
-	  case 'n':
-	    // Rotate camera so that north is up.
-	    rotateEye();
-	    break;
-
 	  case 'o':
 	    // Open a flight file (unless the file dialog is already
 	    // active doing something else).
 	    load_cb(NULL);
+	    break;
+
+	  case 'p':
+	    centerMapOnAircraft();
 	    break;
 
 	  case 'P':
@@ -3156,10 +3101,6 @@ void keyPressed(unsigned char key, int x, int y)
 		  track_aircraft_cb(toggle);
 		  glutPostRedisplay();
 	      }
-	    break;
-
-	  case 'p':
-	    centerMapOnAircraft();
 	    break;
 
 	  case 'q':
@@ -3218,8 +3159,7 @@ void keyPressed(unsigned char key, int x, int y)
 
 	  case 'x':
 	    // Toggle x-axis type (time, distance)
-	    infoUI->xAxisBox->setValue(!infoUI->xAxisBox->getValue());
-	    graph_axis_cb(infoUI->xAxisBox);
+	    graphs->toggleXAxisType();
 	    break;
 
 	  case ' ':
@@ -3295,12 +3235,10 @@ void init()
 
     initStandardOpenGLAttribs();
 
-    // EYE - If I do this, I get a wire frame - mostly.  Some polygons
-    // still are drawn, which seems to indicate that they are drawn
-    // clockwise instead of counter-clockwise.  Text is rendered
-    // correctly, though, which seems to suggest that they are
-    // actually backwards too.
-//     glPolygonMode(GL_FRONT, GL_LINE);
+    // Turn on backface culling.  We use the OpenGL standard of
+    // counterclockwise winding for front faces.
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
 
     // EYE - probably we should make this a class with a constructor.
     cursor.x = cursor.y = -1;
@@ -3341,42 +3279,7 @@ void graphVisibilityFunc(int state)
 // PUI code (callbacks)
 ///////////////////////////////////////////////////////////////////////////////
 
-void smoother_cb(puObject *smoother) 
-{
-    // This must be static, as PUI will access it later.
-    static AtlasString buf;
-    buf.printf("%d", smoother->getIntegerValue());
-    smoother->setLegend(buf.str());
-
-    // Update the graphs.
-    graphs->setSmoothing(smoother->getIntegerValue());
-    glutSetWindow(graphs_window);
-    glutPostRedisplay();
-
-    // Update the interface.
-    glutSetWindow(main_window);
-    glutPostRedisplay();
-}
-
-void graph_axis_cb(puObject *xAxisBox)
-{
-    // Update the graphs based on the value in the xAxisBox.
-
-    // EYE - magic number
-    if (xAxisBox->getValue() == 0) {
-	graphs->setXAxisType(Graphs::TIME);
-    } else {
-	graphs->setXAxisType(Graphs::DISTANCE);
-    }
-    glutSetWindow(graphs_window);
-    glutPostRedisplay();
-
-    // Update the interface.
-    glutSetWindow(main_window);
-    glutPostRedisplay();
-}
-
-void lighting_cb(puObject *lightingUIObject)
+static void lighting_cb(puObject *lightingUIObject)
 {
     if (lightingUIObject == lightingUI->contours) {
 	globals.discreteContours = (lightingUI->contours->getValue() == 0);
@@ -3409,7 +3312,7 @@ void lighting_cb(puObject *lightingUIObject)
     glutPostRedisplay();
 }
 
-void zoom_cb(puObject *cb)
+static void zoom_cb(puObject *cb)
 { 
     if (cb == mainUI->zoomInButton) {
 	zoomBy(1.0 / zoomFactor);
@@ -3429,7 +3332,7 @@ void zoom_cb(puObject *cb)
     glutPostRedisplay();
 }
 
-void show_cb(puObject *cb)
+static void show_cb(puObject *cb)
 {
     bool on = (cb->getValue() != 0);
     if (cb == mainUI->navaidsToggle) {
@@ -3490,7 +3393,7 @@ void show_cb(puObject *cb)
     glutPostRedisplay();
 }
 
-void position_cb(puObject *cb) 
+static void position_cb(puObject *cb) 
 {
     char *buffer;
     cb->getValue(&buffer);
@@ -3522,7 +3425,7 @@ void position_cb(puObject *cb)
     glutPostRedisplay();
 }
 
-void clear_ftrack_cb(puObject *) 
+static void clear_ftrack_cb(puObject *) 
 {
     // EYE - disallow clears of file-based flight tracks?
     if (globals.track() != NULL) {
@@ -3535,7 +3438,7 @@ void clear_ftrack_cb(puObject *)
     glutPostRedisplay();
 }
 
-void degMinSec_cb(puObject *cb)
+static void degMinSec_cb(puObject *cb)
 {
     // EYE - glutPostRedisplay() doesn't seem to be necessary - is
     // PLIB smart enough to update its widgets?
@@ -3546,7 +3449,7 @@ void degMinSec_cb(puObject *cb)
     infoUI->setText();
 }
 
-void magTrue_cb(puObject *cb)
+static void magTrue_cb(puObject *cb)
 {
     // EYE - see notes in degMinSec_cb
     globals.magnetic = !globals.magnetic;
@@ -3555,25 +3458,8 @@ void magTrue_cb(puObject *cb)
     Notification::notify(Notification::MagTrue);
 }
 
-// EYE - this counts on the Graphs type values being same as the
-// corresponding entries in the button box.
-void graph_type_cb (puObject *graphsBox) 
-{
-    // EYE - need to check if there's a track to display too
-    glutSetWindow(graphs_window);
-    if (graphsBox->getValue() == 0) {
-	glutHideWindow();
-    } else {
-	graphs->setGraphTypes(graphsBox->getValue());
-	glutShowWindow();
-	glutPostRedisplay();
-    }
-
-    glutSetWindow(main_window);
-}
-
 // Called when the user wants to 'save as' a file.
-void save_as_cb(puObject *cb)
+static void save_as_cb(puObject *cb)
 {
     if (fileDialog == NULL) {
 	mainUI->saveAsButton->greyOut();
@@ -3585,7 +3471,7 @@ void save_as_cb(puObject *cb)
 }
 
 // Called when the user presses OK or Cancel on the save file dialog.
-void save_as_file_cb(puObject *cb)
+static void save_as_file_cb(puObject *cb)
 {
     // If the user hit "Ok", then the string value of the save dialog
     // will be non-empty.
@@ -3623,7 +3509,7 @@ void save_as_file_cb(puObject *cb)
 }
 
 // Called to save the current track.
-void save_cb(puObject *cb)
+static void save_cb(puObject *cb)
 {
     if (globals.track() && globals.track()->hasFile()) {
 	globals.track()->save();
@@ -3632,17 +3518,14 @@ void save_cb(puObject *cb)
 }
 
 // Called when the user presses OK or Cancel on the load file dialog.
-void load_file_cb(puObject *cb)
+static void load_file_cb(puObject *cb)
 {
     // If the user hit "Ok", then the string value of the save dialog
     // will be non-empty.
     char *file = fileDialog->getStringValue();
     if (strcmp(file, "") != 0) {
 	// Look to see if we've already loaded that flight track.
-	unsigned int i = globals.exists(file);
-	if (i < globals.tracks().size()) {
-	    globals.setCurrent(i);
-	} else {
+	if (globals.exists(file) == NULL) {
 	    // We didn't find the track, so load it.
 	    try {
 		FlightTrack *t = new FlightTrack(file);
@@ -3661,9 +3544,11 @@ void load_file_cb(puObject *cb)
 
     puDeleteObject(fileDialog);
     fileDialog = NULL;
+
+    mainUI->loadButton->activate();
 }
 
-void load_cb(puObject *cb)
+static void load_cb(puObject *cb)
 {
     // Open a flight file (unless the file dialog is already active
     // doing something else).
@@ -3680,7 +3565,7 @@ void load_cb(puObject *cb)
 // convention: if cb is NULL, we unload the current flight track
 // silently, even if it hasn't been saved.  If you want the user to be
 // warned, cb should be non-NULL.
-void unload_cb(puObject *cb)
+static void unload_cb(puObject *cb)
 {
     if (cb != NULL) {
 	if (globals.track() && globals.track()->modified()) {
@@ -3699,8 +3584,13 @@ void unload_cb(puObject *cb)
     }
 }
 
-void detach_cb(puObject *cb)
+static void detach_cb(puObject *cb)
 {
+    // EYE - check out this problem: attach, clear, detach, attach -
+    // it gives a warning about not being saved, then when the second
+    // attach occurs, the time scale duplicates the old one (probably
+    // best to try this when the traffic manager is on and screwing up
+    // times).
     if (!globals.track() || !globals.track()->live()) {
 	return;
     }
@@ -3725,7 +3615,7 @@ void detach_cb(puObject *cb)
 
 // This is called either by the tracksComboBox or one of the arrows
 // beside it.
-void track_select_cb(puObject *cb)
+static void track_select_cb(puObject *cb)
 {
     int i = mainUI->tracksComboBox->getCurrentItem();
 
@@ -3744,20 +3634,20 @@ void track_select_cb(puObject *cb)
     }
 }
 
-void track_aircraft_cb(puObject *cb)
+static void track_aircraft_cb(puObject *cb)
 {
     // Toggle auto-centering.
     prefs.autocenter_mode = (cb->getIntegerValue() == 1);
     aircraftMoved();
 }
 
-void jump_to_cb(puObject *cb)
+static void jump_to_cb(puObject *cb)
 {
     centerMapOnAircraft();
 }
 
 // Called when return is pressed in the track buffer size input field.
-void track_limit_cb(puObject *cb)
+static void track_limit_cb(puObject *cb)
 {
     assert(globals.track());
     assert(globals.track()->live());
@@ -3770,7 +3660,7 @@ void track_limit_cb(puObject *cb)
     glutPostRedisplay();	// EYE - when do I need these things?
 }
 
-void attach_cb(puObject *)
+static void attach_cb(puObject *)
 {
     networkPopup = new NetworkPopup(100, 100);
 
@@ -3783,7 +3673,7 @@ void attach_cb(puObject *)
     network_serial_toggle_cb(networkPopup->networkButton);
 }
 
-void network_serial_toggle_cb(puObject *o)
+static void network_serial_toggle_cb(puObject *o)
 {
     if (!networkPopup) {
 	return;
@@ -3807,7 +3697,7 @@ void network_serial_toggle_cb(puObject *o)
 }
 
 // Called if the user hits ok or cancel on the network/serial dialog.
-void network_serial_cb(puObject *obj)
+static void network_serial_cb(puObject *obj)
 {
     assert(networkPopup);
 
@@ -3817,10 +3707,7 @@ void network_serial_cb(puObject *obj)
 	    // It's a network connection.  Check to make sure we don't
 	    // have one already.
 	    int port = networkPopup->portInput->getIntegerValue();
-	    unsigned int i = globals.exists(port);
-	    if (i < globals.tracks().size()) {
-		globals.setCurrent(i);
-	    } else {
+	    if (globals.exists(port) == NULL) {
 		// We didn't find a match, so open a connection.
 		int bufferSize = mainUI->trackLimitInput->getIntegerValue();
 		track = new FlightTrack(port, bufferSize);
@@ -3835,10 +3722,7 @@ void network_serial_cb(puObject *obj)
 	    // EYE - untested!
 	    const char *device = networkPopup->deviceInput->getStringValue();
 	    int baud = networkPopup->baudInput->getIntegerValue();
-	    unsigned int i = globals.exists(device, baud);
-	    if (i < globals.tracks().size()) {
-		globals.setCurrent(i);
-	    } else {
+	    if (globals.exists(device, baud) == NULL) {
 		// We didn't find a match, so open a connection.
 		int bufferSize = mainUI->trackLimitInput->getIntegerValue();
 		track = new FlightTrack(device, baud, bufferSize);
@@ -3859,10 +3743,14 @@ void network_serial_cb(puObject *obj)
 }
 
 // Called when one of the help buttons is pressed.
-void help_cb(puObject *obj)
+static void help_cb(puObject *obj)
 {
     helpUI->setText(obj);
 }
+
+///////////////////////////////////////////////////////////////////////////////
+// End of callbacks
+///////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, char **argv) 
 {
@@ -3908,6 +3796,9 @@ int main(int argc, char **argv)
     // GLUT initialization.
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_RGB | GLUT_DEPTH | GLUT_DOUBLE);
+    // EYE - turn off depth test altogether?  We don't really need it,
+    // as the back clip plane will do everything we want for us.
+    // glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
     // EYE - see glutInitWindowPosition man page - call glutInit() after
     // this and pass argc, and argv to glutInit?
     glutInitWindowSize(prefs.width, prefs.height);
@@ -3957,7 +3848,7 @@ int main(int argc, char **argv)
     for (unsigned int i = 0; i < prefs.flightFiles.size(); i++) {
 	// First check if we've loaded that file already.
 	const char *file = prefs.flightFiles[i].c_str();
-	if (globals.exists(file) == globals.tracks().size()) {
+	if (globals.exists(file, false) == NULL) {
 	    // Nope - open it.
 	    try {
 		FlightTrack *t =new FlightTrack(file);
@@ -3973,7 +3864,7 @@ int main(int argc, char **argv)
     for (unsigned int i = 0; i < prefs.networkConnections.size(); i++) {
 	// Already loaded?.
 	int port = prefs.networkConnections[i];
-	if (globals.exists(port) == globals.tracks().size()) {
+	if (globals.exists(port, false) == NULL) {
 	    FlightTrack *f = 
 		new FlightTrack(port, prefs.max_track);
 	    globals.addTrack(f, false);
@@ -3984,7 +3875,7 @@ int main(int argc, char **argv)
 	// Already loaded?.
 	const char *device = prefs.serialConnections[i].device;
 	int baud = prefs.serialConnections[i].baud;
-	if (globals.exists(device, baud) == globals.tracks().size()) {
+	if (globals.exists(device, baud, false) == NULL) {
 	    FlightTrack *f = 
 		new FlightTrack(device, baud, prefs.max_track);
 	    globals.addTrack(f, false);
@@ -4076,34 +3967,21 @@ int main(int argc, char **argv)
     // EYE - add keyboard function: space (play in real time, pause)
 
     glutReshapeWindow(800, 200);
-    // EYE - this kind of works, but neglects the border OS X adds
-    // around the window (and perhaps other effects too), so there
-    // is some overlap.
     glutPositionWindow(x, y + h);
     glutHideWindow();
 
     // Initialize some standard OpenGL attributes.
     initStandardOpenGLAttribs();
 
+    // Initialize the graphs window.
     graphs = new Graphs(graphs_window);
-//     graphs->setAircraftColor(map_object->getOverlays()->aircraftColor());
-//     graphs->setMarkColor(map_object->getOverlays()->aircraftMarkColor());
+    graphs->setAircraftColour(trackColour);
+    graphs->setMarkColour(markColour);
 
-    // EYE - this counts on the Graphs type values being same as the
-    // corresponding entries in the button box.  As well, is there a
-    // cleaner way to do this?  Is there a way to force the call to the
-    // callback without calling it explicitly?
-    infoUI->graphsBox->setValue(Graphs::ALTITUDE | 
-				Graphs::SPEED | 
-				Graphs::CLIMB_RATE);
-    graphs->setGraphTypes(infoUI->graphsBox->getValue());
-    // Our initial smoothing value is 10s (rates of climb and descent
-    // will be smoothed over a 10s interval).
-    // EYE - magic number?
-    infoUI->smoother->setValue(10);
-    graphs->setSmoothing(10);
-    // EYE - we assume that xAxisBox has the correct value already
-    graph_axis_cb(infoUI->xAxisBox);
+    graphs->setXAxisType(Graphs::TIME);
+    graphs->setYAxisType(Graphs::ALTITUDE, true);
+    graphs->setYAxisType(Graphs::SPEED, true);
+    graphs->setYAxisType(Graphs::CLIMB_RATE, true);
     infoUI->hide();
       
     glutSetWindow(main_window);
