@@ -1958,7 +1958,7 @@ void NavaidsOverlay::_renderILS(const NAV *n)
 		lm.begin(offset, 0.0);
 		// EYE - just record this once, when the navaid is loaded?
 		double magvar = 0.0;
-		char *magTrue = "T";
+		const char *magTrue = "T";
 		if (globals.magnetic) {
 		    magvar = magneticVariation(n->lat, n->lon, n->elev);
 		    magTrue = "";

@@ -133,7 +133,8 @@ static void print_short_help(char *name)
 //     the varargs list.
 //
 // (d) The end of the list (ie, the last argument) must be NULL.
-static void printOne(char *indent, char *option, char *str, ...)
+static void printOne(const char *indent, const char *option, 
+		     const char *str, ...)
 {
     const int width = 20;
     globalString.printf("%%s%%-%ds%%s\n", width);
@@ -149,7 +150,7 @@ static void printOne(char *indent, char *option, char *str, ...)
 }
 
 // Prints a long entry for the given option.
-static void print_help_for(int option, char *indent)
+static void print_help_for(int option, const char *indent)
 {
     switch(option) {
       case FG_ROOT_OPTION:

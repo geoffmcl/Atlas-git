@@ -79,7 +79,7 @@ class MainUI {
 
     // Preferences frame widgets.
     puButtonBox *degMinSecBox, *magTrueBox;
-    char *degMinSecBoxLabels[3], *magTrueBoxLabels[3];
+    const char *degMinSecBoxLabels[3], *magTrueBoxLabels[3];
     bool degMinSec;
 
     // Location frame widgets.
@@ -175,7 +175,7 @@ class LightingUI {
     // Lighting toggles
     puButtonBox *contours, *lighting, *polygons;
     puText *contoursLabel, *lightingLabel, *polygonsLabel;
-    char *contoursLabels[3], *lightingLabels[3], *polygonsLabels[3];
+    const char *contoursLabels[3], *lightingLabels[3], *polygonsLabels[3];
 
     // Lighting direction
     puFrame *directionFrame;
@@ -866,7 +866,7 @@ void searchItemSelected(Search *s, int i)
 // Called when the user changes the search string.  We just call
 // searchTimer() if it's not running already, which will incrementally
 // search for str.
-void searchStringChanged(Search *s, char *str)
+void searchStringChanged(Search *s, const char *str)
 {
     if (!searchTimerScheduled) {
 	searchTimerScheduled = true;
@@ -1726,7 +1726,7 @@ static void VORsAsString(vector<NAV *>& navs, int x,
 	    // radial, and a TO radial 180 degrees different).  We
 	    // choose the one that's closest to our dialled-in radial.
 	    double diff = normalizeHeading(ar - radial, false);
-	    char *fromStr;
+	    const char *fromStr;
 	    if ((diff <= 90.0) || (diff >= 270.0)) {
 		fromStr = "FROM";
 	    } else {
@@ -1802,7 +1802,7 @@ static void ILSsAsString(vector<NAV *>& navs, int x,
     if (chosen != NULL) {
 	NAV *loc = NULL, *dme = NULL;
 	double ar, d;
-	char *magTrue = "T";
+	const char *magTrue = "T";
 
 	for (unsigned int j = 0; j < chosen->size(); j++) {
 	    NAV *n = chosen->at(j);
@@ -1937,7 +1937,7 @@ void InfoUI::setText()
     latStr.printf("Lat: %c%s", (p->lat < 0) ? 'S':'N', formatAngle(p->lat));
     lonStr.printf("Lon: %c%s", (p->lon < 0) ? 'W':'E', formatAngle(p->lon));
     if (globals.track()->isAtlasProtocol()) {
-	char *magTrue = "T";
+	const char *magTrue = "T";
 	double hdg = p->hdg;
 	if (globals.magnetic) {
 	    magTrue = "";
@@ -1948,7 +1948,7 @@ void InfoUI::setText()
 	hdgStr.printf("Hdg: %03.0f%C%s", hdg, degreeSymbol, magTrue);
 	spdStr.printf("Speed: %.0f kt EAS", p->spd);
     } else {
-	char *magTrue = "T";
+	const char *magTrue = "T";
 	double hdg = p->hdg;
 	if (globals.magnetic) {
 	    magTrue = "";

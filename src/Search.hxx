@@ -46,7 +46,7 @@ public:
     void setSelectCallback(void(*cb)(Search *, int));
     // Called whenever the search string changes.  The user should
     // make a copy of the string if they want to use it.
-    void setInputCallback(void(*cb)(Search *, char *));
+    void setInputCallback(void(*cb)(Search *, const char *));
     // Called whenever we need to know the size of the user's data
     // array.
     void setSizeCallback(int(*cb)(Search *));
@@ -75,7 +75,7 @@ protected:
 
     void(*_cb)(Search *, int);
     void(*_select_cb)(Search *, int);
-    void(*_input_cb)(Search *, char *);
+    void(*_input_cb)(Search *, const char *);
     int(*_size_cb)(Search *);
     char *(*_data_cb)(Search *, int);
 

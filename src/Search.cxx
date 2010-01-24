@@ -102,7 +102,7 @@ void Search::setSelectCallback(void(*cb)(Search *, int))
 }
 
 // Called whenever the search string changes.
-void Search::setInputCallback(void(*cb)(Search *, char *))
+void Search::setInputCallback(void(*cb)(Search *, const char *))
 {
     _input_cb = cb;
 }
