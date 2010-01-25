@@ -256,15 +256,13 @@ void AirwaysOverlay::_checkEnd(AwyLabel &end, bool isLow)
     ret = navPoints.equal_range(end.id);
     for (it = ret.first; it != ret.second; it++) {
 	NAVPOINT p = (*it).second;
-	FIX *f;
-	NAV *n;
 	double lat, lon;
 	if (p.isNavaid) {
-	    n = (NAV *)p.n;
+	    NAV *n = (NAV *)p.n;
 	    lat = n->lat;
 	    lon = n->lon;
 	} else {
-	    f = (FIX *)p.n;
+	    FIX *f = (FIX *)p.n;
 	    lat = f->lat;
 	    lon = f->lon;
 	}
@@ -273,6 +271,7 @@ void AirwaysOverlay::_checkEnd(AwyLabel &end, bool isLow)
 	    // Bingo!
 	    if (!p.isNavaid) {
 		// If the end is a fix, make sure we tag it as high/low.
+		FIX *f = (FIX *)p.n;
 		if (isLow) {
 		    f->low = true;
 		} else {
