@@ -30,7 +30,7 @@ void geodDrawText(LayoutManager& lm, double lat, double lon, double hdg,
     if (alwaysUp) {
 	hdg = normalizeHeading(hdg);
 	if ((hdg > 90.0) && (hdg < 270.0)) {
-	    hdg = -hdg;
+	    hdg -= 180.0;
 	}
     }
     geodPushMatrix(lat, lon, hdg); {
