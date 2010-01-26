@@ -31,7 +31,8 @@ Atlas_SOURCES = \
 	Subbucket.cxx Subbucket.hxx \
 	Palette.cxx Palette.hxx \
 	misc.cxx misc.hxx \
-	Globals.cxx Globals.hxx
+	Globals.cxx Globals.hxx \
+	Geographics.cxx Geographics.hxx 
 
 Atlas_LDADD = \
 	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgserial -lsgdebug \
