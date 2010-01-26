@@ -11,9 +11,9 @@
   can contain anything - the layout manager just reserves space for
   them), and the layout manager will try to align everything nicely.
   It can handle changes in fonts.  Text is laid out with positive x
-  pointing to the right and positive y pointing up.  The upper-left
-  corner text can be placed at an arbitrary location (the default is
-  <0.0, 0.0>).
+  pointing to the right and positive y pointing up.  The centre of the
+  text can be placed at an arbitrary location (the default is <0.0,
+  0.0>).  Lines are centre justified.
 
   When creating a piece of laid-out text, you must call begin() first.
   Add the text and boxes that you want (including newlines, which must
@@ -54,30 +54,68 @@
 class LayoutManager {
   public:
     LayoutManager();
+    // These constructors makes it easy to lay out a single string.
+    LayoutManager(const std::string &s, atlasFntTexFont *f, float pointSize);
+    LayoutManager(const char *s, atlasFntTexFont *f, float pointSize);
     ~LayoutManager();
 
     // Begin a layout session, with the lower-left corner at <x, y>.
     void begin(float x = 0.0, float y = 0.0);
     // Set the font to the given PLIB font renderer.
-    void setFont(atlasFntRenderer &f, float pointSize, float italics = 0.0);
-    // Add some text.  Don't put newlines in the text - break the text
-    // into single lines and use the newline() method to tell the
-    // layout manager about new lines.  For better results, the text
-    // chunks should be as big as possible (the character metrics are
-    // more accurately calculated that way).
-    void addText(const std::string &s);
-    void addText(const char *s);
-    // Add a box of the given size.  If <x, y> is <0, 0>, then the
+    void setFont(atlasFntTexFont *f, float pointSize, float italics = 0.0);
+    void setFont(atlasFntTexFont *f) { _font = f; }
+    void setPointSize(float pointSize) { _pointSize = pointSize; }
+    void setItalics(float italics) { _italics = italics; }
+    // Add some text.  The text will be rendered with the current
+    // font, point size, and italics style.  If x and y are non-zero,
+    // the text will be shifted by the amounts given.  Don't put
+    // newlines in the text - break the text into single lines and use
+    // the newline() method to tell the layout manager about new
+    // lines.  For better results, the text chunks should be as big as
+    // possible (the character metrics are more accurately calculated
+    // that way).
+    void addText(const std::string &s, float x = 0.0, float y = 0.0);
+    void addText(const char *s, float x = 0.0, float y = 0.0);
+    // Adds a box of the given width and height, with its lower
+    // left-hand corner at <x, y> (where x is relative to the end of
+    // the previous chunk on the line, and y is relative to the
+    // baseline of the current line).  If <x, y> is <0, 0>, then the
     // lower-left corner of the box will be placed on the baseline of
     // the current line at the current x position.
     int addBox(float width, float height, float x = 0.0, float y = 0.0);
     void newline();
     void end();
 
-    // Get the width and height of the laid-out text.
+    // These are convenience routines - they do a begin(), addText(s),
+    // and end().
+    void setText(const std::string &s);
+    void setText(const char *s);
+
+    // Do not call the following routines until end() has been called.
+
+    // Get the width and height of the laid-out text.  Not valid
+    // unless end() has been called.
     void size(float *width, float *height);
-    // Move the lower-left corner to the given point.
-    void moveTo(float x, float y);
+    float width() { return _width; }
+    float height() { return _height; }
+
+    // Points on the bounding box.  U = upper, C = centre, L =
+    // lower/left, R = right, with the Y position given before the X
+    // position.  Therefore, for example, LC means "lower-centre" (the
+    // mid-point of the bottom of the box), while CL means
+    // "centre-left" (the mid-point of the left side).
+    enum Point { UL, UC, UR, 
+		 CL, CC, CR, 
+		 LL, LC, LR };
+
+    // Returns the coordinate of the given point on the bounding box.
+    float x(Point p = CC);
+    float y(Point p = CC);
+
+    // Position the text on the given point.  By default we move the
+    // centre to the point, but you can specify other points on the
+    // bounding box as well.
+    void moveTo(float x, float y, Point p = CC);
 
     // Get the lower-left corner of the nth chunk.
     void nthChunk(int n, float *x, float *y);
@@ -85,9 +123,16 @@ class LayoutManager {
     void drawText();
 
   protected:
+    // True if begin() has been called but end() has not.
     bool _layingOut;
+    // Our metrics (<_x, _y> gives the *centre* of the layout).  These
+    // are not valid until end() is called.
     float _x, _y, _width, _height;
-    atlasFntRenderer *_f;
+    atlasFntRenderer _renderer;
+
+    // Current font properties.  Whenever addText() is called, these
+    // are used to set the properties for that chunk of text.
+    atlasFntTexFont *_font;
     float _pointSize, _italics;
 
     class Chunk {
