@@ -30,13 +30,13 @@
 #include "LayoutManager.hxx"
 #include "Globals.hxx"
 #include "misc.hxx"
+#include "Geographics.hxx"
 
 using namespace std;
 
 void airportLatLon(ARP *ap);
 void runwayExtents(RWY *rwy, float elev);
 void drawRunway(RWY *rwy, float border = 0.0);
-// void drawIcon(const atlasSphere &bounds, float radius);
 
 // EYE - move to policy?
 // Border (magenta)
@@ -782,14 +782,7 @@ void AirportsOverlay::drawForegrounds()
 		}
 
 		// EYE - precompute this?
-		sgdVec3 location;
-		sgGeodToCart(ap->beaconLat * SGD_DEGREES_TO_RADIANS, 
-			     ap->beaconLon * SGD_DEGREES_TO_RADIANS, 
-			     0.0, location);
-		glPushMatrix(); {
-		    glTranslated(location[0], location[1], location[2]);
-		    glRotatef(ap->beaconLon + 90.0, 0.0, 0.0, 1.0);
-		    glRotatef(90.0 - ap->beaconLat, 1.0, 0.0, 0.0);
+		geodPushMatrix(ap->beaconLat, ap->beaconLon); {
 		    // EYE - magic number.  Probably we should scale
 		    // this somewhat (start by drawing it small, then
 		    // draw it larger as we zoom in, up to a maximum).
@@ -799,7 +792,7 @@ void AirportsOverlay::drawForegrounds()
 
 		    glCallList(_beaconDL);
 		};
-		glPopMatrix();
+		geodPopMatrix();
 	    }
 	}
 
@@ -1030,17 +1023,11 @@ void AirportsOverlay::_drawIcon(ARP *ap, float radius)
 {
     // Radius is passed in in pixels; we convert it to metres
     radius = radius * _metresPerPixel;
-    glPushMatrix(); {
-	glTranslated(ap->bounds.center[0],
-		     ap->bounds.center[1],
-		     ap->bounds.center[2]);
-	glRotatef(ap->lon + 90.0, 0.0, 0.0, 1.0);
-	glRotatef(90.0 - ap->lat, 1.0, 0.0, 0.0);
+    geodPushMatrix(ap->bounds.center, ap->lat, ap->lon); {
 	glScalef(radius, radius, radius);
-
 	glCallList(_airportIconDL);
     }
-    glPopMatrix();
+    geodPopMatrix();
 }
 
 // Labels a single airport.  Because we don't label many airports at a
@@ -1053,9 +1040,7 @@ void AirportsOverlay::_labelAirport(ARP *ap, int rA)
 {
     const int rO = _policy.rO;
     const int rI = _policy.rI;
-    atlasFntRenderer& f = globals.fontRenderer;
 
-    const int labelHeading = _policy.labelHeading;
     const float maxLabelDist = _policy.maxLabelDist;
 
     // 		float scale = 2.0 * rA / rO;
@@ -1084,126 +1069,117 @@ void AirportsOverlay::_labelAirport(ARP *ap, int rA)
     }
     glColor4fv(colour);
 
-    // Place airport 2 pixels outside of the outer circle,
-    // but no more than maxLabelDist pixels from the
-    // center.
+    // Generate label.
+    LayoutManager lm;
+    lm.begin();
+    lm.setFont(globals.regularFont, pointSize);
+
+    globalString.printf("%s (%s)", ap->name.c_str(), ap->id.c_str());
+    lm.addText(globalString.str());
+
+    // Frequencies
+    lm.newline();
+
+    // Only do frequencies if we're very close.
+    // EYE - magic number
+    if (_metresPerPixel < 20.0) {
+	map<ATCCodeType, FrequencyMap>::iterator fMap;
+	for (fMap = ap->freqs.begin(); fMap != ap->freqs.end(); fMap++) {
+	    FrequencyMap& bar = fMap->second;
+
+	    // The frequency map is a map from strings (like, "ATLANTA
+	    // APP") to a set of frequencies (118350, 126900, 127250,
+	    // 127900).  All of the name/frequency set pairs are
+	    // members of the same ATCCodeType (eg, APP).
+	    FrequencyMap::iterator freq;
+	    for (freq = bar.begin(); freq != bar.end(); freq++) {
+		set<int>& freqs = freq->second;
+
+		// Separate named groups of frequencies with two spaces.
+		if (freq != bar.begin()) {
+		    lm.addText("  ");
+		}
+
+		// First, the frequency name.
+		lm.setFont(globals.regularFont, tiny);
+		lm.addText(freq->first);
+
+		// Now, the frequencies themselves.
+		globalString.clear();
+		lm.setFont(globals.boldFont, small);
+		set<int>::iterator j;
+		for (j = freqs.begin(); j != freqs.end(); j++) {
+		    int mhz, khz;
+		    splitFrequency(*j, &mhz, &khz);
+		    globalString.appendf(" %d.%d", mhz, khz);
+		}
+		lm.addText(globalString.str());
+	    }
+
+	    lm.newline();
+	}
+
+	// The last line contains the airport elevation, lighting
+	// indicator, and maximum runway length.
+	lm.newline();
+
+	// Airport elevation - set in regular italics.
+	lm.setFont(globals.regularFont, medium, 0.25);
+	// We need to ensure that the number is at least 2 digits
+	// long (ie, '6' must be written '06').
+	globalString.printf("%02.0f  ", ap->elev * SG_METER_TO_FEET);
+	lm.addText(globalString.str());
+	lm.setItalics(0.0);
+
+	// Runway lighting.
+	if (ap->lighting) {
+	    lm.addText("L  ");
+	} else {
+	    lm.addText("-  ");
+	}
+
+	// Runway length
+	float maxRwy = 0;
+	for (unsigned int i = 0; i < ap->rwys.size(); i++) {
+	    if (ap->rwys[i]->length > maxRwy) {
+		maxRwy = ap->rwys[i]->length;
+	    }
+	}
+	// According to the FAA's "IFR Aeronautical Chart Symbols"
+	// document, on IFR low altitude charts, the runway length is
+	// given to the nearest 100 feet, with 70 feet as the dividing
+	// point.  It's probably different in different countries, and
+	// it may be different on VFR charts.  For now, though, we'll
+	// use the '70 rule'.
+	globalString.printf("%.0f",
+			    round((maxRwy * SG_METER_TO_FEET - 20) / 100));
+	lm.addText(globalString.str());
+    }
+
+    lm.end();
+
+    // Place airport label 2 pixels outside of the outer circle, but
+    // no more than maxLabelDist pixels from the center.
     double distance = (rA * rO / rI) + 2;
     if ((maxLabelDist != 0) && (distance > maxLabelDist)) {
 	distance = maxLabelDist;
     }
     distance *= _metresPerPixel;
 
-    // Place label at a heading of labelHeading, at the
-    // calculated distance, from the airport center.
-    double lat, lon, az;
-    sgdVec3 location;
-    geo_direct_wgs_84(ap->lat, ap->lon, 
-		      labelHeading, distance, &lat, &lon, &az);
-    sgGeodToCart(lat * SGD_DEGREES_TO_RADIANS, 
-		 lon * SGD_DEGREES_TO_RADIANS, 0.0, location);
+    // Add space to compensate for the size of the label.
+    float width, height;
+    lm.size(&width, &height);
+    distance += sqrt((width * width) + (height * height)) / 2.0;
 
-    f.setPointSize(pointSize);
+    // Place label at a heading of labelHeading, at the calculated
+    // distance, from the airport center.
+    float heading = SG_DEGREES_TO_RADIANS * (90.0 - _policy.labelHeading);
+    float x = cos(heading) * distance;
+    float y = sin(heading) * distance;
+    lm.moveTo(x, y);
 
-    // EYE - needs float, not double
-    glPushMatrix(); {
-	glTranslated(location[0], location[1], location[2]);
-	glRotatef(lon + 90.0, 0.0, 0.0, 1.0);
-	glRotatef(90.0 - lat, 1.0, 0.0, 0.0);
-
-	// Generate label.
-	LayoutManager lm;
-	lm.begin();
-	lm.setFont(f, pointSize);
-
-	globalString.printf("%s (%s)", ap->name.c_str(), ap->id.c_str());
-	lm.addText(globalString.str());
-
-	// Frequencies
-	lm.newline();
-
-	// Only do frequencies if we're very close.
-	// EYE - magic number
-	if (_metresPerPixel < 20.0) {
-	    map<ATCCodeType, FrequencyMap>::iterator fMap;
-	    for (fMap = ap->freqs.begin(); fMap != ap->freqs.end(); fMap++) {
-		FrequencyMap& bar = fMap->second;
-
-		// The frequency map is a map from strings (like, "ATLANTA
-		// APP") to a set of frequencies (118350, 126900, 127250,
-		// 127900).  All of the name/frequency set pairs are
-		// members of the same ATCCodeType (eg, APP).
-		FrequencyMap::iterator freq;
-		for (freq = bar.begin(); freq != bar.end(); freq++) {
-		    set<int>& freqs = freq->second;
-
-		    // Separate named groups of frequencies with two spaces.
-		    if (freq != bar.begin()) {
-			lm.addText("  ");
-		    }
-
-		    // First, the frequency name.
-		    lm.setFont(f, tiny);
-		    lm.addText(freq->first);
-
-		    // Now, the frequencies themselves.
-		    globalString.clear();
-		    globals.bold();
-		    lm.setFont(f, small);
-		    set<int>::iterator j;
-		    for (j = freqs.begin(); j != freqs.end(); j++) {
-			int mhz, khz;
-			splitFrequency(*j, &mhz, &khz);
-			globalString.appendf(" %d.%d", mhz, khz);
-		    }
-		    lm.addText(globalString.str());
-		}
-
-		lm.newline();
-	    }
-
-	    // Airport elevation
-	    lm.newline();
-	    // Set in italics.
-	    lm.setFont(f, medium, 0.25);
-	    // We need to ensure that the number is at least 2 digits
-	    // long (ie, '6' must be written '06').
-	    globalString.printf("%02.0f  ", ap->elev * SG_METER_TO_FEET);
-	    lm.addText(globalString.str());
-
-	    // Runway lighting.
-	    lm.setFont(f, medium);
-	    if (ap->lighting) {
-		lm.addText("L  ");
-	    } else {
-		lm.addText("-  ");
-	    }
-
-	    // Runway length
-	    float maxRwy = 0;
-	    for (unsigned int i = 0; i < ap->rwys.size(); i++) {
-		if (ap->rwys[i]->length > maxRwy) {
-		    maxRwy = ap->rwys[i]->length;
-		}
-	    }
-	    // According to the FAA's "IFR Aeronautical Chart Symbols"
-	    // document, on IFR low altitude charts, the runway length is
-	    // given to the nearest 100 feet, with 70 feet as the dividing
-	    // point.  It's probably different in different countries, and
-	    // it may be different on VFR charts.  For now, though, we'll
-	    // use the '70 rule'.
-	    globalString.printf("%.0f",
-				round((maxRwy * SG_METER_TO_FEET - 20) / 100));
-	    lm.addText(globalString.str());
-	}
-
-	lm.end();
-
-	float width, height;
-	lm.size(&width, &height);
-	lm.moveTo(width / 2.0, 0.0);
-	lm.drawText();
-    }
-    glPopMatrix();
+    // Finally - draw the text.
+    geodDrawText(lm, ap->lat, ap->lon);
 }
 
 // Given the label for one end of a runway, generates the label for
@@ -1248,6 +1224,8 @@ void AirportsOverlay::_labelRunway(RWY *rwy)
 //     static const float multiple = 10.0;
     static const float multiple = 4.0;
 
+    atlasFntRenderer& f = globals.fontRenderer;
+
     // Calculate size (in metres) of text.
     float pointSize;
     if ((rwy->width * multiple) < (maxHeight * _metresPerPixel)) {
@@ -1262,47 +1240,62 @@ void AirportsOverlay::_labelRunway(RWY *rwy)
     if (pointSize / _metresPerPixel < 10.0) {
 	return;
     }
-    globals.fontRenderer.setPointSize(pointSize);
+    f.setPointSize(pointSize);
 
     // Label "main" end.
-    _labelRunwayEnd(rwy->id.c_str(), 0.0, rwy);
+    _labelRunwayEnd(rwy->id.c_str(), pointSize, 0.0, rwy);
 
     // Label "other" end.
     // EYE - precompute this, and precompute it more elegantly!
     // EYE - use a string?
     char label[4];
     otherEnd(rwy->id.c_str(), label);
-    _labelRunwayEnd(label, 180.0, rwy);
+    _labelRunwayEnd(label, pointSize, 180.0, rwy);
+
+    // Add runway length and width.  According to Canadian rules,
+    // width is indicated only if different than 200', the standard
+    // width.  Length is drawn alongside the runway (to the foot).
+    // Diagrams also indicated slope, actual magnetic heading,
+    // lighting symbols (eg, dots down the runway to indicate centre
+    // lighting), runway threshold elevation in feet, magnetic
+    // variation.
+    //
+    // British charts indicate lengths in metres (and always write
+    // both, in the form length x width).  They also show the highest
+    // spot in the touchdown zone.
+
+    // Calculate point size (in metres) of text.  We make the text fit
+    // the runway width until it gets to maxHeight * 0.5.
+    pointSize = rwy->width;
+    if (pointSize > (maxHeight * 0.5 * _metresPerPixel)) {
+	pointSize = maxHeight * 0.5 * _metresPerPixel;
+    }
+
+    // Create the label.
+    globalString.printf("%.0f' x %.0f'", 
+			rwy->length * SG_METER_TO_FEET,
+			rwy->width * SG_METER_TO_FEET);
+    LayoutManager lm(globalString.str(), globals.regularFont, pointSize);
+
+    // Now draw it.
+    geodDrawText(lm, rwy->lat, rwy->lon, rwy->hdg - 90.0);
 }
 
 // Writes the given label at the end of the given rwy, where 'end' is
 // defined by the given heading.  The only reasonable values are 0.0
 // (the "main" end), and 180.0 (the "other" end).
-void AirportsOverlay::_labelRunwayEnd(const char *str, float hdg, RWY *rwy)
+void AirportsOverlay::_labelRunwayEnd(const char *str, float pointSize,
+				      float hdg, RWY *rwy)
 {
-    atlasFntRenderer& f = globals.fontRenderer;
-    float pointSize = f.getPointSize();
-    float left, right, bottom, top;
-    f.getFont()->getBBox(str, pointSize, 0.0, &left, &right, &bottom, &top);
-    glPushMatrix(); {
-	// EYE - fix this!
-	sgdVec3 location;
-	sgGeodToCart(rwy->lat * SGD_DEGREES_TO_RADIANS, 
-		     rwy->lon * SGD_DEGREES_TO_RADIANS, 
-		     0.0, location);
-	glTranslated(location[0], location[1], location[2]);
-	glRotatef(rwy->lon + 90.0, 0.0, 0.0, 1.0);
-	glRotatef(90.0 - rwy->lat, 1.0, 0.0, 0.0);
-	glRotatef(-(rwy->hdg + hdg), 0.0, 0.0, 1.0);
-	// EYE - magic number
-	glScalef(0.5, 1.0, 1.0); // Squish characters together
+    LayoutManager lm(str, globals.regularFont, pointSize);
+    lm.moveTo(0.0, -rwy->length / 2.0, LayoutManager::UC);
 
-	f.start3f(0.0 - (left + right) / 2.0,
-		  -((top - bottom) + rwy->length / 2.0 + rwy->width), 
-		   0.0);
-	f.puts(str);
+    geodPushMatrix(rwy->lat, rwy->lon, rwy->hdg + hdg); {
+    	// EYE - magic number
+    	glScalef(0.5, 1.0, 1.0); // Squish characters together
+	lm.drawText();
     }
-    glPopMatrix();
+    geodPopMatrix();
 }
 
 // Called when somebody posts a notification that we've subscribed to.

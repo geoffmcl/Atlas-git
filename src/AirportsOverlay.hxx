@@ -43,9 +43,9 @@
 
 struct RWY {
     std::string id;
-    double lat, lon;
-    float hdg;
-    float length, width;
+    double lat, lon;		// centre of runway
+    float hdg;			// true heading, in degrees
+    float length, width;	// metres
 
     atlasSphere bounds;
     sgdVec3 ahead, aside, above;
@@ -163,7 +163,7 @@ class AirportsOverlay: public Subscriber {
 
     void _labelAirport(ARP *ap, int rA);
     void _labelRunway(RWY *rwy);
-    void _labelRunwayEnd(const char *str, float hdg, RWY *rwy);
+    void _labelRunwayEnd(const char *str, float pointSize, float hdg, RWY *rwy);
 
     Overlays& _overlays;
 
