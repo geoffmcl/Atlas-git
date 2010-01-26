@@ -177,28 +177,36 @@ Texture::~Texture()
 void Texture::load(SGPath f, float *maximumElevation)
 {
     GLubyte *data;
-    int width, height;
+    int width, height, depth;
 
     // Clear any existing data.
     unload();
     assert(_name == 0);
 
     // Load the data.
-
-    // EYE - we should not have to guess this - the full pathname
-    // should be passed in (as a const char *, I might add).
-    f.concat(".jpg");
-    data = (GLubyte *)loadJPEG(f.c_str(), &width, &height, maximumElevation);
-    if (!data) {
-	f.set(f.base());
-	f.concat(".png");
-	data = (GLubyte *)loadPNG(f.c_str(), &width, &height, maximumElevation);
+    if (f.extension() == "jpg") {
+	data = (GLubyte *)loadJPEG(f.c_str(), &width, &height, &depth, 
+				   maximumElevation);
+    } else if (f.extension() == "png") {
+	data = (GLubyte *)loadPNG(f.c_str(), &width, &height, &depth,
+				  maximumElevation);
+    } else {
+	// EYE - we should not have to guess this - the full pathname
+	// should be passed in (as a const char *, I might add).
+	f.concat(".jpg");
+	data = (GLubyte *)loadJPEG(f.c_str(), &width, &height, &depth, 
+				   maximumElevation);
+	if (!data) {
+	    f.set(f.base());
+	    f.concat(".png");
+	    data = (GLubyte *)loadPNG(f.c_str(), &width, &height, &depth,
+				      maximumElevation);
+	}
     }
     if (data == NULL) {
 	return;
     }
-    // EYE - we calculate this, but maybe loadJPEG/loadPNG should return it?
-    _size = width * height * 4;
+    _size = width * height * depth;
 
     // Create the texture.
     glGenTextures(1, &_name);
@@ -229,11 +237,19 @@ void Texture::load(SGPath f, float *maximumElevation)
 //     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height,
-		 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-    // This looks nicer, although it slows things down a bit.
-    gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGB, width, height,
-		      GL_RGB, GL_UNSIGNED_BYTE, data);
+    if (depth == 3) {
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height,
+		     0, GL_RGB, GL_UNSIGNED_BYTE, data);
+	// This looks nicer, although it slows things down a bit.
+	gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGB, width, height,
+			  GL_RGB, GL_UNSIGNED_BYTE, data);
+    } else {
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height,
+		     0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+	// This looks nicer, although it slows things down a bit.
+	gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGBA, width, height,
+			  GL_RGBA, GL_UNSIGNED_BYTE, data);
+    }
 
     delete []data;
 }
@@ -349,6 +365,7 @@ void MapTexture::draw()
 	// 'push'.
 	glColor3f(1.0, 1.0, 1.0);
 	glEnable(GL_TEXTURE_2D);
+	// EYE - toss this?
 // #ifndef LIGHTING
 // 	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL);
 // #else

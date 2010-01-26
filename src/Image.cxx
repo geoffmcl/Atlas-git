@@ -31,7 +31,8 @@
 #include "Image.hxx"
 #include "misc.hxx"
 
-char *loadJPEG(const char *filename, int *width, int *height, float *maxElev)
+char *loadJPEG(const char *filename, int *width, int *height, int *depth,
+	       float *maxElev)
 {
     FILE *fp = fopen(filename, "rb");
     if (!fp) {
@@ -58,6 +59,7 @@ char *loadJPEG(const char *filename, int *width, int *height, float *maxElev)
     // Extract useful information from the header.
     *width = cinfo.image_width;
     *height = cinfo.image_height;
+    *depth = 0;
 
     if (maxElev) {
 	*maxElev = -1e6;
@@ -79,10 +81,12 @@ char *loadJPEG(const char *filename, int *width, int *height, float *maxElev)
 
     char *image = NULL;
     if (cinfo.out_color_space == JCS_RGB) {
-	image = new char[cinfo.output_width * cinfo.output_height * 3];
+	*depth = 3;
+	image = new char[cinfo.output_width * cinfo.output_height * *depth];
 
 	while (cinfo.output_scanline < cinfo.output_height) {
-	    char *buf = &image[cinfo.output_width * cinfo.output_scanline * 3];
+	    char *buf = 
+		&image[cinfo.output_width * cinfo.output_scanline * *depth];
 	    jpeg_read_scanlines(&cinfo, (JSAMPARRAY)&buf, 1);
 	}
     }
@@ -95,7 +99,8 @@ char *loadJPEG(const char *filename, int *width, int *height, float *maxElev)
     return image;
 }
 
-char *loadPNG(const char *filename, int *width, int *height, float *maxElev)
+char *loadPNG(const char *filename, int *width, int *height, int *depth,
+	      float *maxElev)
 {
     char *header[8];
 
@@ -143,19 +148,24 @@ char *loadPNG(const char *filename, int *width, int *height, float *maxElev)
 
     *width = png_get_image_width(png_ptr, info_ptr);
     *height = png_get_image_height(png_ptr, info_ptr);
+    *depth = 0;
 
-    // We only accept RGB files.
+    // We only accept RGB and RGBA files.
     int color_type = png_get_color_type(png_ptr, info_ptr);
-    if (color_type != PNG_COLOR_TYPE_RGB) {
+    if (color_type == PNG_COLOR_TYPE_RGB) {
+	*depth = 3;
+    } else if (color_type == PNG_COLOR_TYPE_RGBA) {
+	*depth = 4;
+    } else {
 	png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
 	return NULL;
     }
 
     // Allocate image chunk.
     png_bytep *rows = new png_bytep[*height];
-    char *image = new char[*width * *height * 3];
+    char *image = new char[*width * *height * *depth];
     for (int i = 0; i < *height; i++) {
-	rows[i] = (png_bytep)(image + i * *width * 3);
+	rows[i] = (png_bytep)(image + i * *width * *depth);
     }
 
     // Read the image.

@@ -29,8 +29,10 @@
 
 enum ImageType {PNG, JPEG};
 
-char *loadJPEG(const char *filename, int *width, int *height, float *maxElev);
-char *loadPNG(const char *filename, int *width, int *height, float *maxElev);
+char *loadJPEG(const char *filename, int *width, int *height, int *depth,
+	       float *maxElev = NULL);
+char *loadPNG(const char *filename, int *width, int *height, int *depth,
+	      float *maxElev = NULL);
 
 void saveJPEG(const char *file, int quality, 
 	      GLubyte *image, int width, int height, float maxElev);

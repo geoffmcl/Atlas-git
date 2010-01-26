@@ -66,6 +66,8 @@ enum {FIRST_OPTION,
       MAX_TRACK_OPTION,
       UPDATE_OPTION,
       AUTO_CENTER_MODE_OPTION,
+      LINE_WIDTH_OPTION,
+      AIRPLANE_IMAGE_OPTION,
       DISCRETE_CONTOURS_OPTION,
       SMOOTH_CONTOURS_OPTION,
       LIGHTING_ON_OPTION,
@@ -97,6 +99,8 @@ static struct option long_options[] = {
     {"update", required_argument, 0, UPDATE_OPTION},
     {"max-track", required_argument, 0, MAX_TRACK_OPTION},
     {"autocenter-mode", no_argument, 0, AUTO_CENTER_MODE_OPTION},
+    {"line-width", required_argument, 0, LINE_WIDTH_OPTION},
+    {"airplane", required_argument, 0, AIRPLANE_IMAGE_OPTION},
     {"discrete-contours", no_argument, 0, DISCRETE_CONTOURS_OPTION},
     {"smooth-contours", no_argument, 0, SMOOTH_CONTOURS_OPTION},
     {"lighting", no_argument, 0, LIGHTING_ON_OPTION},
@@ -118,7 +122,7 @@ static void print_short_help(char *name)
     printf("\t[--softcursor] [--udp[=<port>]] [--serial=[<dev>]] [--baud=<rate>]\n");
     printf("\t[--autocenter-mode] [--discrete-contour] [--smooth-contour]\n");
     printf("\t[--lighting] [--no-lighting] [--light=azim,elev] [--smooth-shading]\n");
-    printf("\t[--flat-shading] [--version]\n");
+    printf("\t[--flat-shading] [--line-width=<w>] [--airplane=<path>[@<size]] [--version]\n");
     printf("\t[--help] [<flight file>] ...\n");
 }
 
@@ -227,6 +231,18 @@ static void print_help_for(int option, const char *indent)
 		 "Automatically center map on aircraft (default is",
 		 "to not auto-center)", NULL);
 	break;
+      case LINE_WIDTH_OPTION:
+ 	printOne(indent, "--line-width=<w>",
+		 "Set line width of flight track overlays ",
+		 "(in pixels, defaults to 1.0)", NULL);
+ 	break;
+      case AIRPLANE_IMAGE_OPTION:
+ 	printOne(indent, "--airplane=<path>[@<size>] ",
+		 "Set path for image to be drawn as airplane symbol",
+		 "If not present, only a small line drawing is used",
+		 "The optional size argument is the size of the image",
+		 "in pixels (defaults to 50)", NULL);
+	break;
       case DISCRETE_CONTOURS_OPTION:
 	printOne(indent, "--discrete-contours",
 		 "Don't blend contour colours on live maps (default)", NULL);
@@ -327,6 +343,9 @@ Preferences::Preferences()
     update = 1.0;
     max_track = 2000;
     autocenter_mode = false;
+    lineWidth = 1.0;
+    airplaneImage.set("");
+    airplaneImageSize = 50.0;
 
     // Lighting and rendering stuff.
     discreteContours = true;
@@ -427,6 +446,8 @@ void Preferences::savePreferences()
     printf("%s\n", scenery_root.c_str());
     printf("%d\n", max_track);
     printf("%d\n", autocenter_mode);
+    printf("%f\n", lineWidth);
+    printf("%s\n", airplaneImage.c_str());
 
     printf("%d\n", discreteContours);
     printf("%d\n", lightingOn);
@@ -569,6 +590,29 @@ bool Preferences::_loadPreferences(int argc, char *argv[])
 	  case AUTO_CENTER_MODE_OPTION:
 	    autocenter_mode = true;
 	    break;
+ 	  case LINE_WIDTH_OPTION:
+ 	    OPTION_CHECK(sscanf(optarg, "%f", &lineWidth), 1, 
+			 LINE_WIDTH_OPTION);
+ 	    break;
+ 	  case AIRPLANE_IMAGE_OPTION: {
+	      string optargstr = optarg; // Convert to std::string for find etc.
+	      // Check if a size for the image was appended (like
+	      // --airplane=image.png@100)
+	      string::size_type pos = optargstr.find('@');
+	      if (pos != string::npos) { // Did we find a '@'?
+		  // Image path is the part before the @.
+		  airplaneImage.set(optargstr.substr(0, pos)); 
+		  // Size the part after the @.
+		  optargstr = optargstr.substr(pos + 1, 
+					       optargstr.length() - pos - 1); 
+		  OPTION_CHECK(sscanf(optargstr.c_str(), "%f", 
+				      &airplaneImageSize), 1, 
+			       LINE_WIDTH_OPTION);
+	      } else {
+		  airplaneImage.set(optarg); // No size given
+	      }
+ 	  }
+ 	    break;
 	  case HELP_OPTION:
 	    print_help();
 	    return false;

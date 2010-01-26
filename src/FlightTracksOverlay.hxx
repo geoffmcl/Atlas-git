@@ -31,6 +31,7 @@
 #include "FlightTrack.hxx"
 #include "Overlays.hxx"
 #include "Notifications.hxx"
+#include "Scenery.hxx"
 
 struct TRACK_INFO {
     sgVec4 trackColour;
@@ -63,6 +64,11 @@ class FlightTracksOverlay: public Subscriber {
     std::map<FlightTrack*, TRACK_INFO> _tracks;
 
     bool _isDirty;
+
+    // Aircraft icon.
+    void _drawAirplane(FlightData *d, const sgVec4 colour);
+    bool _haveImage;
+    Texture _airplaneTexture;
 };
 
 #endif

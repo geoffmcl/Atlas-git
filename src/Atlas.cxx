@@ -1654,7 +1654,7 @@ static void VORsAsString(vector<NAV *>& navs, int x,
 			 AtlasString& str)
 {
     NAV *vor = NULL, *dme = NULL;
-    string *id;
+    string *id = NULL;
     double vorStrength = 0.0, dmeStrength = 0.0;
     double dmeDistance = 0.0;
     unsigned int matchingNavaids = 0;
@@ -3025,6 +3025,16 @@ void keyPressed(unsigned char key, int x, int y)
 	    show_cb(mainUI->tracksToggle);
 	    glutPostRedisplay();
 	    break;
+
+ 	  case 'i':
+	    // Zoom airplane image.
+ 	    prefs.airplaneImageSize *= 1.1;
+	    glutPostRedisplay();
+ 	    break;
+ 	  case 'I':
+ 	    prefs.airplaneImageSize /= 1.1;
+	    glutPostRedisplay();
+ 	    break;
 
 	  case 'j':
 	    // Toggle the search interface.

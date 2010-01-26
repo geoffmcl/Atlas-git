@@ -110,6 +110,9 @@ public:
     // Flight paths
     vector<SGPath> flightFiles;
     bool autocenter_mode;
+    float lineWidth;
+    SGPath airplaneImage;
+    float airplaneImageSize;
 
     // FlightGear connection(s)
     float update;
