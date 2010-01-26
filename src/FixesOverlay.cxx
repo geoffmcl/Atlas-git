@@ -29,6 +29,7 @@
 
 #include "FixesOverlay.hxx"
 #include "Globals.hxx"
+#include "Geographics.hxx"
 
 using namespace std;
 
@@ -257,10 +258,8 @@ void FixesOverlay::draw()
 
 	    // Fix labels
 	    LayoutManager lm;
-	    atlasFntRenderer& renderer = globals.fontRenderer;
 	    float pointSize = _metresPerPixel * 10.0;
-	    renderer.setPointSize(pointSize);
-	    lm.setFont(renderer, pointSize);
+	    lm.setFont(globals.regularFont, pointSize);
 
 	    if (_overlays.isVisible(Overlays::LABELS)) {
 		for (unsigned int i = 0; i < intersections.size(); i++) {
@@ -289,45 +288,28 @@ void FixesOverlay::draw()
 // Renders the given fix.
 void FixesOverlay::_render(const FIX *f)
 {
-    glPushMatrix(); {
-	glTranslated(f->bounds.center[0],
-		     f->bounds.center[1],
-		     f->bounds.center[2]);
-	glRotatef(f->lon + 90.0, 0.0, 0.0, 1.0);
-	glRotatef(90.0 - f->lat, 1.0, 0.0, 0.0);
-
+    geodPushMatrix(f->bounds.center, f->lat, f->lon); {
 	glBegin(GL_POINTS); {
 	    glVertex2f(0.0, 0.0);
 	}
 	glEnd();
     }
-    glPopMatrix();
+    geodPopMatrix();
 }
 
-// Labels the given fix.
+// Labels the given fix using the given layout manager (which is
+// assumed to have been set up with the desired font and point size).
 void FixesOverlay::_label(const FIX *f, LayoutManager& lm)
 {
+    // EYE - magic number
     const float labelOffset = _metresPerPixel * 5.0;
 
-    glPushMatrix(); {
-	glTranslated(f->bounds.center[0],
-		     f->bounds.center[1],
-		     f->bounds.center[2]);
-	glRotatef(f->lon + 90.0, 0.0, 0.0, 1.0);
-	glRotatef(90.0 - f->lat, 1.0, 0.0, 0.0);
+    // Draw a label labelOffset pixels to the left of the fix.
+    glColor4fv(fix_label_colour);
+    lm.setText(f->name);
+    lm.moveTo(-labelOffset, 0.0, LayoutManager::CR);
 
-	// Draw a label labelOffset pixels to the left of the fix.
-	glColor4fv(fix_label_colour);
-	lm.begin();
-	lm.addText(f->name);
-	lm.end();
-
-	float width, height;
-	lm.size(&width, &height);
-	lm.moveTo(-(width / 2.0 + labelOffset), 0.0);
-	lm.drawText();
-    }
-    glPopMatrix();
+    geodDrawText(lm, f->bounds.center, f->lat, f->lon);
 }
 
 // Called when somebody posts a notification that we've subscribed to.

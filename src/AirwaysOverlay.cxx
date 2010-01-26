@@ -506,9 +506,6 @@ bool AirwaysOverlay::_label(const AWY *a) const
     sgdAddVec3(middle, start, end);
     sgdScaleVec3(middle, 0.5);
 
-    atlasFntRenderer& f = globals.fontRenderer;
-    LayoutManager lmName, lmElev, lmDist;
-//     LayoutManager lmStart, lmEnd;
     // EYE - magic numbers
     const float maxPointSize = 12.0;
     const float minPointSize = 1.0;
@@ -543,11 +540,7 @@ bool AirwaysOverlay::_label(const AWY *a) const
     pointSize *= _metresPerPixel;
 
     // Name
-    lmName.begin();
-    lmName.setFont(f, pointSize);
-    lmName.addText(a->name);
-    lmName.end();
-
+    LayoutManager lmName(a->name, globals.regularFont, pointSize);
     lmName.size(&nameWidth, &nameHeight);
     nameWidth += border;
     nameHeight += border;
@@ -562,9 +555,10 @@ bool AirwaysOverlay::_label(const AWY *a) const
     // The lows can be added immediately (500 or less).  Or maybe just
     // add them to the sides of the name, and only do so when there's
     // room?
+    LayoutManager lmElev;
     lmElev.begin();
     // EYE - magic number
-    lmElev.setFont(f, pointSize * 0.75);
+    lmElev.setFont(globals.regularFont, pointSize * 0.75);
     globalString.printf("%d", a->isLow ? a->top * 100 : a->top);
     lmElev.addText(globalString.str());
     lmElev.newline();
@@ -582,13 +576,10 @@ bool AirwaysOverlay::_label(const AWY *a) const
     }
 
     // Length
-    lmDist.begin();
-    // EYE - magic number
-    lmDist.setFont(f, pointSize * 0.75);
     globalString.printf("%.0f", a->length * SG_METER_TO_NM);
-    lmDist.addText(globalString.str());
-    lmDist.end();
-
+    // EYE - magic number
+    LayoutManager lmDist(globalString.str(), globals.regularFont, 
+			 pointSize * 0.75);
     lmDist.size(&distWidth, &distHeight);
     distWidth += border;
     distHeight += border;

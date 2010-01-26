@@ -93,12 +93,16 @@ class Scenery: public Subscriber {
     Culler::FrustumSearch* frustum() const { return _frustum; }
 
     // Calculates the intersection of the viewing ray that goes
-    // through the window at <x, y> with the earth, returning the
-    // result in c.  If it intersects with live scenery, then
-    // validElevation is set to true (if it is non-null), and the
+    // through the window at <x, y> with the earth, returning true if
+    // the ray intersects the earth (in which case c contains the
+    // point of intersection).  If it intersects with live scenery,
+    // then validElevation (if it is non-null) is set to true, and the
     // elevation in c is the actual elevation at that point.  If
     // validElevation is false, then the elevation in c is the
-    // elevation with the earth ellipsoid.
+    // elevation with the earth ellipsoid.  x and y use window
+    // coordinates, with <0.0, 0.0> at the top left corner, and <w, h>
+    // at the bottom right corner (where w and h are the window width
+    // and height respectively).
     bool intersection(double x, double y, SGVec3<double> *c, 
 		      bool *validElevation = NULL);
 

@@ -21,16 +21,25 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
 ---------------------------------------------------------------------------*/
 
+#include <cassert>
+
 #include <simgear/math/sg_geodesy.hxx>
 #include <simgear/math/SGMisc.hxx>
-
-#include <cassert>
+#if defined( __APPLE__)
+#  include <GLUT/glut.h>	// Needed for gluPickMatrix().
+#else
+#  ifdef WIN32
+#    include <windows.h>
+#  endif
+#  include <GL/glut.h>
+#endif
 
 #include "Scenery.hxx"
 #include "Bucket.hxx"
 #include "Globals.hxx"
 #include "Image.hxx"
 #include "LayoutManager.hxx"
+#include "Geographics.hxx"
 
 using namespace std;
 
@@ -643,44 +652,37 @@ bool SceneryTile::notification(Notification::type n)
 // scale.
 static void _label(int mef, double lat, double lon, double metresPerPixel)
 {
+    // EYE - magic numbers
+    const float thousandsSize = 36.0 * metresPerPixel;
+    const float hundredsSize = 24.0 * metresPerPixel;
+
     int thousands, hundreds;
     thousands = mef / 1000;
     hundreds = mef % 1000 / 100;
 
+    // Create the label.
+    LayoutManager lm;
+    lm.begin(); {
+	globalString.printf("%d", thousands);
+	lm.setFont(globals.regularFont, thousandsSize);
+	lm.addText(globalString.str());
+
+	globalString.printf(" %d", hundreds);
+	// This is how we fake a superscript - we use a smaller font,
+	// then draw it a bit closer (-1/3) and higher (1/2).
+	lm.setPointSize(hundredsSize);
+	lm.addText(globalString.str(), -hundredsSize / 3.0, hundredsSize / 2.0);
+    }
+    lm.end();
+    
     // EYE - magic "number"
     glColor4f(0.0, 0.0, 0.5, 0.5);
 
-    glPushMatrix(); {
-	// Most of the time we could just use the bucket's bounding
-	// sphere centre, but at high latitudes this doesn't work -
-	// the centre of the bounding sphere may not even lie within
-	// the bucket.  So we use its latitude and longitude instead.
-	sgdVec3 v;
-	sgGeodToCart(lat * SGD_DEGREES_TO_RADIANS, lon * SGD_DEGREES_TO_RADIANS,
-		     0, v);
-	glTranslated(v[0], v[1], v[2]);
-	glRotatef(lon + 90.0, 0.0, 0.0, 1.0);
-	glRotatef(90.0 - lat, 1.0, 0.0, 0.0);
-
-	LayoutManager lm;
-	lm.begin();
-
-	// EYE - magic font sizes
-	lm.setFont(globals.fontRenderer, 36.0 * metresPerPixel);
-	globalString.printf("%d", thousands);
-	lm.addText(globalString.str());
-
-	// EYE - need a way to do superscripts
-	lm.setFont(globals.fontRenderer, 24.0 * metresPerPixel);
-	globalString.printf(" %d", hundreds);
-	lm.addText(globalString.str());
-
-	lm.end();
-
-	// EYE - centre it somehow?
-	lm.drawText();
-    }
-    glPopMatrix();
+    // Most of the time we could just use the bucket's bounding sphere
+    // centre, but at high latitudes this doesn't work - the centre of
+    // the bounding sphere may not even lie within the bucket.  So we
+    // use its latitude and longitude instead.
+    geodDrawText(lm, lat, lon);
 }
 
 // Labels the tiles or buckets with their maximum elevation figure.
@@ -1131,8 +1133,14 @@ void Scenery::_label(bool live)
 // coordinates of that point.  With textures, we intersect with an
 // idealized earth ellipsoid.
 //
-// EYE - I'm not sure what x and y should represent - the centre of a
-// pixel, the lower-left corner, ...?
+// x and y are window coordinates, with (0.0, 0.0) being the *top*
+// left corner.  They represent a point, not a pixel.  For example, if
+// a window is 100 pixels wide and 50 pixels high, then the lower
+// right *pixel* is (99, 49).  However, the *point* (99.0, 49.0) is
+// the top left corner of that pixel.  The lower right corner of the
+// entire window is (100.0, 50.0).  If you are calling this with a
+// mouse coordinate, you probably should add 0.5 to both the x and y
+// coordinates, which is the centre of the pixel.
 bool Scenery::intersection(double x, double y, 
 			   SGVec3<double> *c, bool *validElevation)
 {
@@ -1140,8 +1148,10 @@ bool Scenery::intersection(double x, double y,
     GLdouble mvmatrix[16], projmatrix[16];
     GLdouble wx, wy, wz;	// World x, y, z coords.
 
-    // True if we intersect with the live scenery.
-    bool liveIntersection = false;
+    // EYE - I think I should do this.  However, it's then very
+    // important that this routine not be called from someone's draw()
+    // method (at least if it uses a different context).
+    // atlasWindow->atlasView->make_current();
 
     // Our line is given by two points: the intersection of our
     // viewing "ray" with the near depth plane and far depth planes.
@@ -1151,13 +1161,10 @@ bool Scenery::intersection(double x, double y,
     glGetIntegerv(GL_VIEWPORT, viewport);
     glGetDoublev(GL_MODELVIEW_MATRIX, mvmatrix);
     glGetDoublev(GL_PROJECTION_MATRIX, projmatrix);
-    // EYE - I seem to have to do this correction, but I'm not sure
-    // why.  A bug/feature of OS X?  Pixel centre vs pixel corner?  Or
-    // am I just confused?
-    x -= 1.0;
-    y -= 1.0;
-    // viewport[3] is height of window in pixels.
-    y = viewport[3] - y - 1;
+    // viewport[3] is height of window in pixels.  We need to convert
+    // from window coordinates, where y increases down, to viewport
+    // coordinates, where y increases up.
+    y = viewport[3] - y;
 
     // Near depth plane intersection.
     gluUnProject (x, y, 0.0, mvmatrix, projmatrix, viewport, &wx, &wy, &wz);
@@ -1167,59 +1174,68 @@ bool Scenery::intersection(double x, double y,
     gluUnProject (x, y, 1.0, mvmatrix, projmatrix, viewport, &wx, &wy, &wz);
     SGVec3<double> far(wx, wy, wz);
     
-    // Later, we'll ask candidate buckets will redraw themselves in
-    // select mode to see if there are any intersections.  We define a
-    // new projection matrix containing the pick region, which we
-    // define to be 1 pixel square.  When the buckets draw themselves,
-    // they will only get results for this small region.
-    glMatrixMode(GL_PROJECTION);
-    glPushMatrix(); {
-	glLoadIdentity();
-	gluPickMatrix(x, y, 1.0, 1.0, viewport);
-	glMultMatrixd(projmatrix);
+    // If validElevation is not NULL, that means the caller is
+    // interested in a valid elevation result, which means we must
+    // query our live scenery.
+    if (validElevation != NULL) {
+	// For now, assume that no buckets intersect.
+	*validElevation = false;
 
-	// Now that we have our viewing ray (although, technically
-	// speaking, it should actually be a very narrow viewing
-	// frustum, but a ray is good enough), get the intersection.
-	// We first ask each visible tile in turn if the ray
-	// intersects their live scenery, and, if it does, the
-	// elevation at that point.
-	const vector<Cullable *>& intersections = _frustum->intersections();
-	for (unsigned int i = 0; i < intersections.size(); i++) {
-	    SceneryTile *t = dynamic_cast<SceneryTile *>(intersections[i]);
-	    if (!t) {
-		continue;
-	    }
-	    if (t->intersection(near, far, c)) {
-		// Found one!  Since the tile found the intersection
-		// using one of its buckets (ie, live scenery), we
-		// know that the elevation value is valid.
-		liveIntersection = true;
-		break;
-	    }
-	}
+	// Later, we'll ask candidate buckets will redraw themselves
+	// in select mode to see if there are any intersections.  We
+	// define a new projection matrix containing the pick region,
+	// which we define to be 1 pixel square.  When the buckets
+	// draw themselves, they will only get results for this small
+	// region.
 	glMatrixMode(GL_PROJECTION);
-    }
-    glPopMatrix();
-    glMatrixMode(GL_MODELVIEW);
+	glPushMatrix(); {
+	    glLoadIdentity();
+	    gluPickMatrix(x, y, 1.0, 1.0, viewport);
+	    glMultMatrixd(projmatrix);
 
-    // Set the validElevation variable if it's not NULL.
-    if (validElevation) {
-	*validElevation = liveIntersection;
+	    // Now that we have our viewing ray (although, technically
+	    // speaking, it should actually be a very narrow viewing
+	    // frustum, but a ray is good enough), get the
+	    // intersection.  We first ask each visible tile in turn
+	    // if the ray intersects their live scenery, and, if it
+	    // does, the elevation at that point.
+	    const vector<Cullable *>& intersections = _frustum->intersections();
+	    for (unsigned int i = 0; i < intersections.size(); i++) {
+		SceneryTile *t = dynamic_cast<SceneryTile *>(intersections[i]);
+		if (!t) {
+		    continue;
+		}
+		if (t->intersection(near, far, c)) {
+		    // Found one!  Since the tile found the
+		    // intersection using one of its buckets (ie, live
+		    // scenery), we know that the elevation value is
+		    // valid.  We can also short-circuit our search.
+		    // liveIntersection = true;
+		    *validElevation = true;
+		    break;
+		}
+	    }
+	    glMatrixMode(GL_PROJECTION);
+	}
+	glPopMatrix();
+	glMatrixMode(GL_MODELVIEW);
+
+	if (*validElevation) {
+	    return true;
+	}
     }
 
-    // If we found a valid intersection, we can return right now.
-    if (liveIntersection) {
-	return true;
-    }
-    
     // If we got here, that means no tiles intersected or the user
-    // isn't intersted in an elevation.  So, we'll just use a
-    // simple earth/ray intersection to find out the lat/lon.  We
-    // stretch the universe along the earth's axis so that the
-    // earth is a sphere.  This code assumes that the earth is
-    // centred at the origin, and that the earth's axis is aligned
-    // with the z axis, north positive.
+    // isn't intersted in an elevation.  So, we'll just use a simple
+    // earth/ray intersection with a standard earth ellipsoid.  This
+    // will give us the lat/lon, but the elevation will always be 0
+    // (sea level).
+    //
+    // We stretch the universe along the earth's axis so that the
+    // earth is a sphere.  This code assumes that the earth is centred
+    // at the origin, and that the earth's axis is aligned with the z
+    // axis, north positive.
+    assert((validElevation == NULL) || (*validElevation == false));
     SGVec3<double> centre(0.0, 0.0, 0.0);
     double mu1, mu2;
     near[2] *= SGGeodesy::STRETCH;

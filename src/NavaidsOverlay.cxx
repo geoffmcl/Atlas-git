@@ -33,6 +33,7 @@
 
 #include "Globals.hxx"
 #include "misc.hxx"
+#include "Geographics.hxx"
 
 #include "NavaidsOverlay.hxx"
 
@@ -1518,13 +1519,7 @@ void NavaidsOverlay::_renderVOR(const NAV *n)
 	radius = maxVORSize;
     }
 
-    glPushMatrix(); {
-	glTranslated(n->bounds.center[0],
-		     n->bounds.center[1],
-		     n->bounds.center[2]);
-	glRotatef(n->lon + 90.0, 0.0, 0.0, 1.0);
-	glRotatef(90.0 - n->lat, 1.0, 0.0, 0.0);
-
+    geodPushMatrix(n->bounds.center, n->lat, n->lon); {
 	////////////////////
 	// VOR icon
 	////////////////////
@@ -1676,7 +1671,7 @@ void NavaidsOverlay::_renderVOR(const NAV *n)
 	    glPopAttrib();
 	}
     }
-    glPopMatrix();
+    geodPopMatrix();
 }
 
 void NavaidsOverlay::_renderNDB(const NAV *n)
@@ -1710,13 +1705,7 @@ void NavaidsOverlay::_renderNDB(const NAV *n)
 	live = true;
     }
 
-    glPushMatrix(); {
-	glTranslated(n->bounds.center[0],
-		     n->bounds.center[1],
-		     n->bounds.center[2]);
-	glRotatef(n->lon + 90.0, 0.0, 0.0, 1.0);
-	glRotatef(90.0 - n->lat, 1.0, 0.0, 0.0);
-
+    geodPushMatrix(n->bounds.center, n->lat, n->lon); {
 	glPushMatrix(); {
 	    ////////////////////
 	    // NDB icon
@@ -1802,7 +1791,7 @@ void NavaidsOverlay::_renderNDB(const NAV *n)
 	    delete l;
 	}
     }
-    glPopMatrix();
+    geodPopMatrix();
 }
 
 // ILS
@@ -1868,13 +1857,7 @@ void NavaidsOverlay::_renderILS(const NAV *n)
 	labelPointSize = labelPointSize * 50.0 / _metresPerPixel;
     }
 
-    glPushMatrix(); {
-	glTranslated(n->bounds.center[0],
-		     n->bounds.center[1],
-		     n->bounds.center[2]);
-	glRotatef(n->lon + 90.0, 0.0, 0.0, 1.0);
-	glRotatef(90.0 - n->lat, 1.0, 0.0, 0.0);
-
+    geodPushMatrix(n->bounds.center, n->lat, n->lon); {
 	glPushMatrix(); {
 	    glRotatef(-n->magvar, 0.0, 0.0, 1.0);
 	    glScalef(ilsLength, ilsLength, ilsLength);
@@ -1936,9 +1919,9 @@ void NavaidsOverlay::_renderILS(const NAV *n)
 		if (n->magvar < 180.0) {
 		    // EYE - a bit ugly - because we're using
 		    // _renderMorse(), we have to have GL units as
-		    // metres (fix this somehow?), so we can't
-		    // call glScalef(), so we have to scale
-		    // everything ourselves.
+		    // metres (fix this somehow?), so we can't call
+		    // glScalef(), so we have to scale everything
+		    // ourselves.
 		    offset = -0.5 * ilsLength;
 		} else {
 		    offset = 0.5 * ilsLength;
@@ -1954,7 +1937,7 @@ void NavaidsOverlay::_renderILS(const NAV *n)
 		offset *= 1.75;
 		LayoutManager lm;
 		// EYE - magic number
-		lm.setFont(globals.fontRenderer, pointSize * 1.25);
+		lm.setFont(globals.regularFont, pointSize * 1.25);
 		lm.begin(offset, 0.0);
 		// EYE - just record this once, when the navaid is loaded?
 		double magvar = 0.0;
@@ -1980,7 +1963,7 @@ void NavaidsOverlay::_renderILS(const NAV *n)
 	    glPopMatrix();
 	}
     }
-    glPopMatrix();
+    geodPopMatrix();
 }
 
 void NavaidsOverlay::_renderMarker(const NAV *n)
@@ -2002,13 +1985,7 @@ void NavaidsOverlay::_renderMarker(const NAV *n)
 	}
     }
 
-    glPushMatrix(); {
-	glTranslated(n->bounds.center[0],
-		     n->bounds.center[1],
-		     n->bounds.center[2]);
-	glRotatef(n->lon + 90.0, 0.0, 0.0, 1.0);
-	glRotatef(90.0 - n->lat, 1.0, 0.0, 0.0);
-
+    geodPushMatrix(n->bounds.center, n->lat, n->lon); {
 	glRotatef(-n->magvar + 90.0, 0.0, 0.0, 1.0);
 	if (n->navtype == NAV_OM) {
 	    glCallList(_ILSMarkerDLs[0]);
@@ -2018,7 +1995,7 @@ void NavaidsOverlay::_renderMarker(const NAV *n)
 	    glCallList(_ILSMarkerDLs[2]);
 	}
     }
-    glPopMatrix();
+    geodPopMatrix();
 }
 
 // Renders a stand-alone DME.
@@ -2041,13 +2018,7 @@ void NavaidsOverlay::_renderDME(const NAV *n)
 	radius = maxDMESize;
     }
 
-    glPushMatrix(); {
-	glTranslated(n->bounds.center[0],
-		     n->bounds.center[1],
-		     n->bounds.center[2]);
-	glRotatef(n->lon + 90.0, 0.0, 0.0, 1.0);
-	glRotatef(90.0 - n->lat, 1.0, 0.0, 0.0);
-
+    geodPushMatrix(n->bounds.center, n->lat, n->lon); {
 	////////////////////
 	// DME icon
 	////////////////////
@@ -2092,7 +2063,7 @@ void NavaidsOverlay::_renderDME(const NAV *n)
 	    delete l;
 	}
     }
-    glPopMatrix();
+    geodPopMatrix();
 }
 
 // Renders a DME-ILS.
@@ -2125,13 +2096,7 @@ void NavaidsOverlay::_renderDMEILS(const NAV *n)
 	radius = maxDMESize;
     }
 
-    glPushMatrix(); {
-	glTranslated(n->bounds.center[0],
-		     n->bounds.center[1],
-		     n->bounds.center[2]);
-	glRotatef(n->lon + 90.0, 0.0, 0.0, 1.0);
-	glRotatef(90.0 - n->lat, 1.0, 0.0, 0.0);
-
+    geodPushMatrix(n->bounds.center, n->lat, n->lon); {
 	////////////////////
 	// DME icon
 	////////////////////
@@ -2170,16 +2135,14 @@ void NavaidsOverlay::_renderDMEILS(const NAV *n)
 	    delete l;
 	}
     }
-    glPopMatrix();
+    geodPopMatrix();
 }
 
 // Returns width necessary to render the given string in morse code,
 // at the current point size.
 float NavaidsOverlay::_morseWidth(const string& id, float height)
 {
-    float x, y;
-
-    return _renderMorse(id, height, x, y, false);
+    return _renderMorse(id, height, 0.0, 0.0, false);
 }
 
 // Either draws the given string in morse code at the given location
@@ -2187,7 +2150,8 @@ float NavaidsOverlay::_morseWidth(const string& id, float height)
 // render is false.  In this case, x and y are ignored).  If drawn, we
 // draw the morse stacked on top of each other to fill one line (which
 // we assume to be pointSize high).  We assume that the current OpenGL
-// units are metres.
+// units are metres.  The location (x, y) specifies the lower-left
+// corner of the rendered morse text.
 float NavaidsOverlay::_renderMorse(const string& id, float height,
 				   float x, float y, bool render)
 {
@@ -2252,6 +2216,22 @@ float NavaidsOverlay::_renderMorse(const string& id, float height,
     return maxWidth;
 }
 
+// Create a navaid label.  We use a printf-style format string to
+// specify the style.  The format string can include text (including
+// linefeeds, specified with '\n') and conversion specifications, a la
+// printf.  Valid specifications are:
+//
+// %I - id
+// %M - morse code version of id
+// %N - name
+// %F - primary frequency
+// %f - second frequency (the DME part of an NDB-DME)
+// %% - literal '%'
+//
+// All of the data for the conversion specifications comes from the
+// *single* NAV parameter (unlike printf).
+//
+// Each line of text is centered.
 Label *NavaidsOverlay::_makeLabel(const char *fmt, const NAV *n,
 				  float labelPointSize,
 				  float x, float y)
@@ -2261,17 +2241,15 @@ Label *NavaidsOverlay::_makeLabel(const char *fmt, const NAV *n,
     // morse unit has a width, height, and origin.
     Label *l = new Label;
 
-    // Set our point size.
-    globals.fontRenderer.setPointSize(labelPointSize);
-
     // Find out what our ascent is (_morseWidth and _renderMorse need
     // it).
+    globals.fontRenderer.setPointSize(labelPointSize);
     atlasFntTexFont *f = (atlasFntTexFont *)globals.fontRenderer.getFont();
     float ascent = f->ascent() * labelPointSize;
 
     // Go through the format string once, using the layout manager to
     // calculate sizes.
-    l->lm.setFont(globals.fontRenderer, labelPointSize);
+    l->lm.setFont(globals.regularFont, labelPointSize);
     l->lm.begin(x, y);
     bool spec = false;
     l->morseChunk = -1;
@@ -2397,21 +2375,6 @@ Label *NavaidsOverlay::_makeLabel(const char *fmt, const NAV *n,
 // current font, at the given point size.  VORs, DMEs and NDBs are
 // drawn with a box around the text and a translucent white background
 // behind the text.
-//
-// The format string can include text (including linefeeds) and
-// conversion specifications, a la printf.  Valid specifications are:
-//
-// %I - id
-// %M - morse code version of id
-// %N - name
-// %F - primary frequency
-// %f - second frequency (the DME part of an NDB-DME)
-// %% - literal '%'
-//
-// All of the data for the conversion specifications comes from the
-// *single* NAV parameter (unlike printf).
-//
-// Each line of text is centered.
 void NavaidsOverlay::_drawLabel(const char *fmt, const NAV *n,
 				float labelPointSize,
 				float x, float y)
