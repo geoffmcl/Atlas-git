@@ -454,7 +454,7 @@ SceneryTile::SceneryTile(TileInfo *ti, Scenery *s):
 
     // Subscribe to the discrete/smooth contour change and palette
     // change notifications.  When we get either, we'll tell our
-    // buckets that they're dirty.
+    // buckets.
     subscribe(Notification::DiscreteContours);
     subscribe(Notification::NewPalette);
 }
@@ -623,7 +623,7 @@ void SceneryTile::drawBuckets(Culler::FrustumSearch& frustum)
 	if ((b != NULL) && 
 	    (b->loaded()) && 
 	    frustum.intersects(b->bounds())) {
-	    b->draw(globals.palette, globals.discreteContours);
+	    b->draw();
 	}
     }
 }
@@ -631,14 +631,18 @@ void SceneryTile::drawBuckets(Culler::FrustumSearch& frustum)
 // Called when the lighting changes.
 bool SceneryTile::notification(Notification::type n)
 {
-    if ((n == Notification::DiscreteContours) ||
-	(n == Notification::NewPalette)) {
-	// Switched between smooth and discrete contours, or got a new
-	// palette.  We need to force re-rendering of our live
-	// scenery.  Tell each bucket it's dirty.
+    if (n == Notification::DiscreteContours) {
+	// Switched between smooth and discrete contours.
 	if (_buckets) {
 	    for (unsigned int i = 0; i < _buckets->size(); i++) {
-		_buckets->at(i)->setDirty();
+		_buckets->at(i)->discreteContoursChanged();
+	    }
+	}
+    } else if (n == Notification::NewPalette) {
+	// Got a new palette.
+	if (_buckets) {
+	    for (unsigned int i = 0; i < _buckets->size(); i++) {
+		_buckets->at(i)->paletteChanged();
 	    }
 	}
     } else {
