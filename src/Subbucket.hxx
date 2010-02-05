@@ -35,11 +35,27 @@
 #ifndef _SUBBUCKET_H_
 #define _SUBBUCKET_H_
 
+#include <vector>
+#include <deque>
+#include <tr1/unordered_map>
+
 #include <simgear/misc/sg_path.hxx>
 #include <simgear/io/sg_binobj.hxx>
 
 #include "Bucket.hxx"
 #include "Palette.hxx"
+
+// Create a hash function for pairs of integers.  This will be used in
+// the _edgeMap unordered_map.
+struct PairHash {
+    size_t operator()(const std::pair<int, int>& x) const
+    {
+	// Note: the decision to use XOR to combine the two values was
+	// made on the basis of pure ignorance.  There are, no doubt,
+	// better ways.
+	return std::tr1::hash<int>()(x.first ^ x.second);
+    }
+};
 
 class Subbucket {
   public:
@@ -50,35 +66,86 @@ class Subbucket {
     bool loaded() const { return _loaded; }
     void unload();
     unsigned int size() { return _size; }
-
     double maximumElevation() const { return _maxElevation; }
 
-    void draw(Palette *palette, bool discreteContours = true);
+    void paletteChanged();
+    void discreteContoursChanged();
+
+    void draw();
+
   protected:
-    void _drawTristrip(const int_list &vertex_indices, 
-		       const int_list &normal_indices,
-		       const float *col);
-    void _drawTrifan(const int_list &vertex_indices, 
-		     const int_list &normal_indices, 
-		     const float *col);
-    void _drawTris(const int_list &vertex_indices, 
-		   const int_list &normal_indices, 
-		   const float *col);
-    void _drawTri(int vert0, int vert1, int vert2,
-		  int norm0, int norm1, int norm2,
-		  const float *col);
-    void _drawElevationTri(int vert0, int vert1, int vert2,
-			   int norm0, int norm1, int norm2);
+    void _palettize();
+    void _chopTriangles(const int_list& triangles);
+    void _chopTriangleStrip(const int_list& strip);
+    void _chopTriangleFan(const int_list& fan);
+    void _chopTriangle(int i0, int i1, int i2);
+    int _chopEdge(int i0, int i1);
+    void _createTriangle(int i0, int i1, int i2, bool cw, int e);
+    void _checkTriangle(int i0, int i1, int i2, int e);
+    void _addElevationSlice(std::deque<int>& vs, int e, 
+			    bool cw, bool top = false);
 
     SGPath _path;
-    bool _loaded;
+    bool _loaded, _airport;
     double _maxElevation;
     SGBinObject _chunk;
-    // EYE - change to SGVec3?
-    vector<float *> _vertices, _normals;
-    vector<float> _elevations;
+    // Vertices, normals, and elevations are all calculated directly
+    // from the chunk.  We may add to these vectors if contours cut
+    // through any chunk objects.  If there are n vertices, then the
+    // size of the vertices and normals vectors is n * 3, while the
+    // elevations vector is n.
+    std::vector<float> _vertices, _normals;
+    std::vector<float> _elevations;
+
+    // These depend on the palette that we have loaded.  The elevation
+    // indices vector stores contour indexes (as returned by the
+    // palette), while the colours has smoothed RGBA colours (also as
+    // returned by the palette).  If there are n vertices, then the
+    // size of the elevation indices is n, while the colours vectors
+    // is n * 4.
+    std::vector<int> _elevationIndices;
+    std::vector<float> _colours;
+
+    bool _palettized;
+
+    // The net result of drawing are these 3 display lists:
+    // _materialsDL draws all triangles coloured by their material
+    // (ie, not their elevation), _contoursDL draws all triangles
+    // coloured by their elevation, and _contourLinesDL draws all
+    // contour lines.
+    GLuint _materialsDL, _contoursDL, _contourLinesDL;
 
     unsigned int _size;	// Size of subbucket (approximately) in bytes.
+
+    // These contain references to all objects to be coloured by a
+    // single material (eg, "water", "railroad", ...).  Each vector
+    // contains a list of vertices, in GL_TRIANGLES format (ie, each
+    // set of 3 indices represents one triangle).  The first map,
+    // _materials, is for objects with a common normal; the second,
+    // _materialsN, are for those objects with per-vertex normals.
+    std::map<std::string, std::vector<GLuint> > _materials;
+    std::map<std::string, std::vector<GLuint> > _materialsN;
+
+    // To colour "contour" objects (objects coloured by their
+    // elevation), we have to chop up triangles, strips, and fans into
+    // simple triangles, then slice them if a contour line goes
+    // through them (creating more, smaller, triangles).  We store
+    // these triangles based on their colour index in the palette.
+    // So, for example, _contours[3] has a list of vertex indices for
+    // triangles coloured with the fourth contour colour.
+    std::vector<int_list> _contours;
+    
+    // A list of vertex index pairs, each one representing a contour
+    // line segment (ie, GL_LINES format).
+    int_list _contourLines;
+
+    // This is used while building contour objects.  There is one
+    // entry per unique edge (which is identified by the vertex
+    // indices of the two endpoints).  For each edge we store the
+    // beginning index of its intermediate vertices, with one vertex
+    // per contour passing through the edge.  These vertices are
+    // created sequentially, so we only need to store the first index.
+    std::tr1::unordered_map<std::pair<int, int>, int, PairHash> _edgeMap;
 };
 
 #endif // _SUBBUCKET_H_
