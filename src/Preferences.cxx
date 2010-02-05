@@ -70,6 +70,8 @@ enum {FIRST_OPTION,
       AIRPLANE_IMAGE_OPTION,
       DISCRETE_CONTOURS_OPTION,
       SMOOTH_CONTOURS_OPTION,
+      CONTOUR_LINES_OPTION,
+      NO_CONTOUR_LINES_OPTION,
       LIGHTING_ON_OPTION,
       LIGHTING_OFF_OPTION,
       SMOOTH_SHADING_OPTION,
@@ -103,6 +105,8 @@ static struct option long_options[] = {
     {"airplane", required_argument, 0, AIRPLANE_IMAGE_OPTION},
     {"discrete-contours", no_argument, 0, DISCRETE_CONTOURS_OPTION},
     {"smooth-contours", no_argument, 0, SMOOTH_CONTOURS_OPTION},
+    {"contour-lines", no_argument, 0, CONTOUR_LINES_OPTION},
+    {"no-contour-lines", no_argument, 0, NO_CONTOUR_LINES_OPTION},
     {"lighting", no_argument, 0, LIGHTING_ON_OPTION},
     {"no-lighting", no_argument, 0, LIGHTING_OFF_OPTION},
     {"smooth-shading", no_argument, 0, SMOOTH_SHADING_OPTION},
@@ -121,6 +125,7 @@ static void print_short_help(char *name)
     printf("\t[--airport=<icao>] [--glutfonts] [--geometry=<w>x<h>]\n");
     printf("\t[--softcursor] [--udp[=<port>]] [--serial=[<dev>]] [--baud=<rate>]\n");
     printf("\t[--autocenter-mode] [--discrete-contour] [--smooth-contour]\n");
+    printf("\t[--contour-lines] [--no-contour-lines]\n");
     printf("\t[--lighting] [--no-lighting] [--light=azim,elev] [--smooth-shading]\n");
     printf("\t[--flat-shading] [--line-width=<w>] [--airplane=<path>[@<size]] [--version]\n");
     printf("\t[--help] [<flight file>] ...\n");
@@ -251,6 +256,15 @@ static void print_help_for(int option, const char *indent)
 	printOne(indent, "--smooth-contours",
 		 "Blend contour colours on live maps", NULL);
 	break;
+      case CONTOUR_LINES_OPTION:
+	printOne(indent, "--contour-lines",
+		 "Draw contour lines at contour boundaries", NULL);
+	break;
+      case NO_CONTOUR_LINES_OPTION:
+	printOne(indent, "--no-contour-lines",
+		 "Don't draw contour lines at contour boundaries (default)", 
+		 NULL);
+	break;
       case LIGHTING_ON_OPTION:
 	printOne(indent, "--lighting",
 		 "Light the terrain on live maps (default)", NULL);
@@ -349,6 +363,7 @@ Preferences::Preferences()
 
     // Lighting and rendering stuff.
     discreteContours = true;
+    contourLines = false;
     lightingOn = true;
     smoothShading = true;
     azimuth = 315;
@@ -450,6 +465,7 @@ void Preferences::savePreferences()
     printf("%s\n", airplaneImage.c_str());
 
     printf("%d\n", discreteContours);
+    printf("%d\n", contourLines);
     printf("%d\n", lightingOn);
     printf("%d\n", smoothShading);
     printf("<%.1f, %.1f>", azimuth, elevation);
@@ -561,6 +577,12 @@ bool Preferences::_loadPreferences(int argc, char *argv[])
 	    break;
 	  case SMOOTH_CONTOURS_OPTION:
 	    discreteContours = false;
+	    break;
+	  case CONTOUR_LINES_OPTION:
+	    contourLines = true;
+	    break;
+	  case NO_CONTOUR_LINES_OPTION:
+	    contourLines = false;
 	    break;
 	  case LIGHTING_ON_OPTION:
 	    lightingOn = true;

@@ -124,7 +124,7 @@ public:
     static const int defaultBaudRate;
 
     // Lighting
-    bool discreteContours, lightingOn, smoothShading;
+    bool discreteContours, contourLines, lightingOn, smoothShading;
     float azimuth, elevation;
     sgVec4 lightPosition;
 
