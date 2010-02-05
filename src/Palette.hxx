@@ -31,7 +31,7 @@
 
 #include <plib/sg.h>
 
-#include <vector>
+#include <deque>
 #include <map>
 #include <string>
 
@@ -54,7 +54,7 @@ class Palette {
     const Contour& contour(float elevation);
 
     // Returns the colour (RGBA) for the given material.  If
-    // 'material' is not found, then black is returned.
+    // 'material' is not found, then NULL is returned.
     const float *colour(const char *material) const;
 
     // Calculates the smoothed colour for the given elevation, putting
@@ -67,6 +67,9 @@ class Palette {
     // Returns the ith contour struct.  If i is too large, it returns
     // the last element.
     const Contour& contourAtIndex(unsigned int i) const;
+    // Returns the number of valid contour intervals.  We subtract 2
+    // because of the "fake" first and last Contour pairs.
+    unsigned int size() const { return _elevations.size() - 2; }
 
   protected:
     // Our file.
@@ -82,8 +85,10 @@ class Palette {
     // Maps from a material name to a colour.
     std::map<std::string, _foodle> _materials;
 
-    // Vector of <elevation, colour> pairs.
-    std::vector<Contour> _elevations;
+    // Deque of <elevation, colour> pairs.  The first and last pairs
+    // are generated internally by the Palette class to make
+    // calculating smooth colour values easier.
+    std::deque<Contour> _elevations;
     
     // Index of last colour index returned from contourIndex().  I'm
     // guessing that successive calls to this method will be for

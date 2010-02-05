@@ -139,6 +139,18 @@ Palette::Palette(const char *path): _i(0)
 	    }
 	}
     }
+    // Now add Contour "fences" to the beginning and end of the deque.
+    // The purpose of these fake entries is the make calculating
+    // smoothed colour values in smoothColour() easier - without them,
+    // we need to do tricky testing for boundary conditions.
+    Contour fake = _elevations[0];
+    fake.elevation -= 1.0;
+    _elevations.push_front(fake);
+
+    size_t i = _elevations.size() - 1;
+    fake = _elevations[i];
+    fake.elevation += _elevations[i].elevation - _elevations[i - 1].elevation;
+    _elevations.push_back(fake);
 
     _path = path;
 }
@@ -168,27 +180,43 @@ const float *Palette::colour(const char *material) const
 // Material Elevation_<x> <colour>
 //
 // means "everything at <x> or above is <colour>".
+//
+// Note that we return an index in the range <0, Palette::size()>, and
+// that a returned index i corresponds to _elevations[i + 1].  This is
+// because the palette has an extra <elevation, contour> pair inserted
+// at the beginning (and at the end).
 unsigned int Palette::contourIndex(float elevation)
 {
-    // Search up.
+    // Search up.  We use a class variable _i, which maintains its
+    // value between calls, the logic being that successive calls to
+    // this routine will be at similar elevations - by beginning a new
+    // search at the end of the last one, we're likely to already be
+    // at the right place.
     for (; 
-	 (_i < _elevations.size() - 1) && 
+	 (_i < _elevations.size() - 2) && 
 	     (elevation >= _elevations[_i + 1].elevation); 
 	 _i++)
 	;
     // Search down.
-    for (; (_i > 0) && (elevation < _elevations[_i].elevation); _i--)
+    for (; (_i > 1) && (elevation < _elevations[_i].elevation); _i--)
 	;
 
-    return _i;
+    // Adjust for the "fake" first pair.
+    return _i - 1;
 }
 
+// Returns the <elevation, colour> pair at the given index, which is
+// assumed to have come from a call contourIndex() (ie, it has been
+// adjusted for the extra pairs at the start and end of the
+// _elevations deque).
 const Palette::Contour& Palette::contourAtIndex(unsigned int i) const
 {
-    if (i < 0) {
-	i = 0;
-    } else if (i >= _elevations.size()) {
-	i = _elevations.size() - 1;
+    // Adjust for the "fake" first pair.
+    i++;
+    if (i < 1) {
+	i = 1;
+    } else if (i >= _elevations.size() - 2) {
+	i = _elevations.size() - 2;
     }
 
     return _elevations[i];
@@ -219,11 +247,11 @@ const Palette::Contour& Palette::contourAtIndex(unsigned int i) const
 // (5) an elevation of 200 gives a colour of c1 + c2 / 2.0.
 void Palette::smoothColour(float elevation, sgVec4 colour)
 {
-    unsigned int i = contourIndex(elevation);
+    // We directly access the _elevations deque in this routine, so we
+    // need to add one to the index returned by contourIndex.
+    unsigned int i = contourIndex(elevation) + 1;
 
-    // These are used when smoothing colours.  Their standard meanings
-    // are given below, although they have to be adjusted when at the
-    // top or bottom contours.
+    // These are used when smoothing colours:
     //
     // range - elevation range for the band the elevation is in
     // delta - difference between the elevation and the bottom of the
@@ -232,69 +260,23 @@ void Palette::smoothColour(float elevation, sgVec4 colour)
     float range, delta, scale;
     const float *cu, *cl;		// Upper and lower colours.
 
-    if (i == (_elevations.size() - 1)) {
-	// The top elevation slice is a special case.  First, it's
-	// typically defined to extend way way past any possible
-	// highest elevation.  This means that just linearly
-	// interpolating will never give us a pure top colour.
-	// Second, there is no higher colour to blend with.
-	//
-	// Ideally (in my opinion), a smooth map should look like an
-	// unsmoothed map, just smoother.  Midpoints in a contour
-	// interval should, in the smoothed map, have identical
-	// colours to that in the unsmoothed map.  The colour along
-	// the contour line should be equally composed of the upper
-	// and lower colours.
-	//
-	// To solve this problem, we define the middle of the top
-	// elevation slice (where the bottom colour's contribution is
-	// 0) to be equal to the middle of the next lower slice.  So,
-	// if the previous slice covers 1000m, and this slice starts
-	// at 3000m, then the middle of this slice is 3500m.
-	// Elevations below 3500m are a combination of this slice's
-	// colour and the previous slice's colour. All elevations
-	// above that will be coloured only with this slice's colour.
-	range = (_elevations[i].elevation - _elevations[i - 1].elevation);
-	delta = elevation - _elevations[i].elevation;
-	scale = delta / range;
-	scale += 0.5;
-	if (scale > 1.0) {
-	    scale = 1.0;
-	}
-	cu = _elevations[i].colour;
-	cl = _elevations[i - 1].colour;
-    } else if (i == 0) {
-	// And the first level is a special case too - there's no
-	// lower colour to blend with.  Everything below the midway
-	// point will be "pure" coloured.
-	range = (_elevations[i + 1].elevation - _elevations[i].elevation);
-	delta = elevation - _elevations[i].elevation;
-	scale = delta / range;
-	if (scale < 0.5) {
-	    scale = 0.5;
-	}
+    range = _elevations[i + 1].elevation - _elevations[i].elevation;
+    delta = elevation - _elevations[i].elevation;
+    scale = delta / range;
+    if (scale > 0.5) {
+	// Blend with upper colour.  The lower colour varies from 1.0
+	// (in the middle) to 0.5 (at the border), the upper colour
+	// from 0.0 (in the middle) to 0.5 (at the border).
 	scale -= 0.5;
 	cu = _elevations[i + 1].colour;
 	cl = _elevations[i].colour;
     } else {
-	range = _elevations[i + 1].elevation - _elevations[i].elevation;
-	delta = elevation - _elevations[i].elevation;
-	scale = delta / range;
-	if (scale > 0.5) {
-	    // Blend with upper colour.  The lower colour varies from
-	    // 1.0 (in the middle) to 0.5 (at the border), the upper
-	    // colour from 0.0 (in the middle) to 0.5 (at the border).
-	    scale = 1.5 - scale;
-	    cu = _elevations[i].colour;
-	    cl = _elevations[i + 1].colour;
-	} else {
-	    // Blend with lower colour.  The upper colour varies from
-	    // 1.0 (in the middle) to 0.5 (at the border), the lower
-	    // colour from 0.0 (in the middle) to 0.5 (at the border).
-	    scale += 0.5;
-	    cu = _elevations[i].colour;
-	    cl = _elevations[i - 1].colour;
-	}
+	// Blend with lower colour.  The upper colour varies from 1.0
+	// (in the middle) to 0.5 (at the border), the lower colour
+	// from 0.0 (in the middle) to 0.5 (at the border).
+	scale += 0.5;
+	cu = _elevations[i].colour;
+	cl = _elevations[i - 1].colour;
     }
 
     sgSubVec4(colour, cu, cl);
