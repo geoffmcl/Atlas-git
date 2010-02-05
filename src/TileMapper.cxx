@@ -34,15 +34,20 @@ using namespace std;
 
 const float TileMapper::MIN_ELEVATION;
 
-TileMapper::TileMapper(Palette *p, bool discreteContours, sgVec4 light, 
-		       bool lighting, bool smoothShading):
-    _palette(p), _discreteContours(discreteContours), _lightPosition(light), 
+TileMapper::TileMapper(Palette *p, bool discreteContours, bool contourLines,
+		       sgVec4 light, bool lighting, bool smoothShading):
+    _palette(p), _discreteContours(discreteContours), 
+    _contourLines(contourLines), _lightPosition(light), 
     _lighting(lighting), _smoothShading(smoothShading)
 {
     // We must have a palette.
     if (!_palette) {
 	throw runtime_error("palette");
     }
+
+    Bucket::palette = _palette;
+    Bucket::discreteContours = _discreteContours;
+    Bucket::contourLines = _contourLines;
 }
 
 TileMapper::~TileMapper()
@@ -202,7 +207,7 @@ void TileMapper::draw(unsigned int size)
 	// that if asked to be drawn more than once.  Therefore
 	// calling Tile::draw() more than once is relatively cheap, if
 	// the buckets have not been unloaded.
-	_buckets[i]->draw(_palette, _discreteContours);
+	_buckets[i]->draw();
     }
 
     glFinish();

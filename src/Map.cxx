@@ -74,6 +74,8 @@ static bool lighting = true;
 // True if we want discrete elevation colours, false for smoothly
 // varying elevation colours.
 static bool discreteContours = true;
+// True if we want contour lines.
+static bool contourLines = false;
 // Position of light.  We always set the light at infinity (w = 0.0);
 // EYE - this must be shared with Atlas - make defaults global?
 static float azimuth = 315.0, elevation = 55.0;
@@ -162,6 +164,8 @@ void print_help()
 	   rescaleFactor);
     printf("  --discrete-contour Don't blend contour colours (default)\n");
     printf("  --smooth-contour   Blend contour colours\n");
+    printf("  --no-contour-lines Don't draw contour lines (default)\n");
+    printf("  --contour-lines    Draw contour lines\n");
     printf("  --light=azim,elev  Set light position (default = <%.0f, %.0f>)\n",
 	   azimuth, elevation);
     printf("  --lighting         Light the terrain (default)\n");
@@ -194,6 +198,10 @@ bool parse_arg(char* arg)
 	discreteContours = true;
     } else if (strcmp(arg, "--smooth-contour") == 0) {
 	discreteContours = false;
+    } else if (strcmp(arg, "--contour-lines") == 0) {
+	contourLines = true;
+    } else if (strcmp(arg, "--no-contour-lines") == 0) {
+	contourLines = false;
     } else if (sscanf(arg, "--aafactor=%d", &rescaleFactor) == 1) {
 	;
     } else if (sscanf(arg, "--light=%f, %f", &azimuth, &elevation) == 2) {
@@ -584,8 +592,8 @@ int main(int argc, char **argv)
     // Now we know where to get the scenery data, where to put the
     // maps, the desired map sizes, the size of the buffers we can
     // use, and the palette to use.  Let's draw!
-    mapper = new TileMapper(atlasPalette, discreteContours, lightPosition, 
-			    lighting, smoothShading);
+    mapper = new TileMapper(atlasPalette, discreteContours, contourLines,
+			    lightPosition, lighting, smoothShading);
 
     const map<string, TileInfo *> tiles = tileManager->tiles();
     map<string, TileInfo *>::const_iterator i = tiles.begin();

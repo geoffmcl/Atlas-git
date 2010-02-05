@@ -38,6 +38,7 @@ class TileMapper {
   public:
     TileMapper(Palette *p, 
 	       bool discreteContours = true, 
+	       bool contourLines = false, 
 	       sgVec4 light = NULL,
 	       bool lighting = true,
 	       bool smoothShading = true);
@@ -66,6 +67,8 @@ class TileMapper {
     Palette *_palette;
     // True if we should have discrete contour colours.
     bool _discreteContours;
+    // True if we should draw contour lines.
+    bool _contourLines;
     // Position of light (in eye coordinates).
     float *_lightPosition;
     // True if we have lighting.

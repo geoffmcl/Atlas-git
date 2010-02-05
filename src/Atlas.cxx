@@ -51,6 +51,7 @@
 #include "Globals.hxx"
 #include "Notifications.hxx"
 #include "Palette.hxx"
+#include "Bucket.hxx"
 
 using namespace std;
 
@@ -146,8 +147,8 @@ class InfoUI {
 // Lighting Interface
 //
 // This allows the user to adjust lighting parameters: discrete/smooth
-// contours, lighting on/off, smooth/flat polygon shading, and
-// current palette.
+// contours, contour lines on/off, lighting on/off, smooth/flat
+// polygon shading, and current palette.
 class LightingUI {
   public:
     LightingUI(int x, int y);
@@ -173,9 +174,10 @@ class LightingUI {
     puFrame *frame;
 
     // Lighting toggles
-    puButtonBox *contours, *lighting, *polygons;
-    puText *contoursLabel, *lightingLabel, *polygonsLabel;
-    const char *contoursLabels[3], *lightingLabels[3], *polygonsLabels[3];
+    puButtonBox *contours, *lines, *lighting, *polygons;
+    puText *contoursLabel, *linesLabel, *lightingLabel, *polygonsLabel;
+    const char *contoursLabels[3], *linesLabels[3], *lightingLabels[3], 
+	*polygonsLabels[3];
 
     // Lighting direction
     puFrame *directionFrame;
@@ -2035,7 +2037,8 @@ LightingUI::LightingUI(int x, int y)
 
     const int paletteHeight = labelHeight * 2 + bigSpace * 3;
 
-    const int height = boxHeight * 3 + directionHeight + paletteHeight;
+    // const int height = boxHeight * 3 + directionHeight + paletteHeight;
+    const int height = boxHeight * 4 + directionHeight + paletteHeight;
     const int width = labelWidth + boxWidth;
 
     const int paletteWidth = width - 2 * bigSpace - labelHeight;
@@ -2166,6 +2169,25 @@ LightingUI::LightingUI(int x, int y)
 				   curx + boxWidth, cury + boxHeight,
 				   (char **)lightingLabels, TRUE);
 	lighting->setCallback(lighting_cb);
+
+	curx = 0;
+	cury += boxHeight;
+
+	// Contour lines
+	cury += boxHeight / 2;
+	linesLabel = new puText(curx, cury);
+	linesLabel->setLabel("Contour\nlines");
+
+	curx += labelWidth;
+	cury -= boxHeight / 2;
+	linesLabels[0] = "on";
+	linesLabels[1] = "off";
+	linesLabels[2] = NULL;
+	lines = new puButtonBox(curx, cury, 
+				curx + boxWidth, cury + boxHeight,
+				(char **)linesLabels, TRUE);
+	lines->setCallback(lighting_cb);
+	lines->setLegend("you shouldn't see this");
 
 	curx = 0;
 	cury += boxHeight;
@@ -2496,7 +2518,8 @@ HelpUI::HelpUI(int x, int y, Preferences& prefs, TileManager& tm)
     // Keyboard shortcuts.
     AtlasString fmt;
     fmt.printf("%%-%ds%%s\n", 8);
-    globalString.printf(fmt.str(), "C-x c", "discrete/smooth contours");
+    globalString.printf(fmt.str(), "C-x c", "toggle contour lines");
+    globalString.appendf(fmt.str(), "C-x d", "discrete/smooth contours");
     globalString.appendf(fmt.str(), "C-x l", "toggle lighting");
     globalString.appendf(fmt.str(), "C-x p", "smooth/flat polygon shading");
 //     globalString.appendf("C-space\n");
@@ -2911,7 +2934,11 @@ void passivemotion(int x, int y)
 void prefixKeypressed(unsigned char key, int x, int y)
 {
     switch (key) {
-      case 'c':			// Discrete/smooth contours
+      case 'c':			// Contour lines on/off
+	lightingUI->lines->setValue(!lightingUI->lines->getValue());
+	lighting_cb(lightingUI->lines);
+	break;
+      case 'd':			// Discrete/smooth contours
 	lightingUI->contours->setValue(!lightingUI->contours->getValue());
 	lighting_cb(lightingUI->contours);
 	break;
@@ -3204,8 +3231,10 @@ void specPressed(int key, int x, int y)
 void setLighting()
 {
     globals.discreteContours = prefs.discreteContours;
+    globals.contourLines = prefs.contourLines;
     globals.lightingOn = prefs.lightingOn;
     globals.smoothShading = prefs.smoothShading;
+
     // Convert azimuth, elevation to x, y, z, w.
     LightingUI::azimElevToXYZW(prefs.azimuth, prefs.elevation, 
 			       globals.lightPosition);
@@ -3226,17 +3255,6 @@ void initStandardOpenGLAttribs()
 // Does graphics-related initialization of the main window.
 void init()
 {
-    // Initalize scenery object.  Note that we specify that all
-    // scenery should be displayed in the main window.
-    scenery = new Scenery(tileManager, main_window);
-
-    // Background map image.
-    SGPath world = prefs.path;
-    world.append("background");
-    scenery->setBackgroundImage(world);
-
-    globals.overlays = new Overlays(prefs.fg_root.str());
-
     //  Select clearing (background) color
     glClearColor(0.0, 0.0, 0.0, 0.0);
 
@@ -3250,10 +3268,20 @@ void init()
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
 
+    // Initalize scenery object.  Note that we specify that all
+    // scenery should be displayed in the main window.
+    scenery = new Scenery(tileManager, main_window);
+
+    // Background map image.
+    SGPath world = prefs.path;
+    world.append("background");
+    scenery->setBackgroundImage(world);
+
+    globals.overlays = new Overlays(prefs.fg_root.str());
+
     // EYE - probably we should make this a class with a constructor.
     cursor.x = cursor.y = -1;
     cursor.validLocation = false;
-
 }
 
 // I don't know if this constitues a hack or not, but doing something
@@ -3293,7 +3321,11 @@ static void lighting_cb(puObject *lightingUIObject)
 {
     if (lightingUIObject == lightingUI->contours) {
 	globals.discreteContours = (lightingUI->contours->getValue() == 0);
+	Bucket::discreteContours = globals.discreteContours;
 	Notification::notify(Notification::DiscreteContours);
+    } else if (lightingUIObject == lightingUI->lines) {
+	globals.contourLines = (lightingUI->lines->getValue() == 0);
+	Bucket::contourLines = globals.contourLines;
     } else if (lightingUIObject == lightingUI->lighting) {
 	globals.lightingOn = (lightingUI->lighting->getValue() == 0);
     } else if (lightingUIObject == lightingUI->polygons) {
@@ -3305,17 +3337,17 @@ static void lighting_cb(puObject *lightingUIObject)
     } else if (lightingUIObject == lightingUI->paletteComboBox) {
 	lightingUI->setPalette(lightingUI->currentItem());
 	palettes->setPalette(lightingUI->currentItem());
-	globals.palette = palettes->currentPalette();
+	globals.setPalette(palettes->currentPalette());
 	Notification::notify(Notification::NewPalette);
     } else if (lightingUIObject == lightingUI->prevPalette) {
 	lightingUI->previous();
 	palettes->setPalette(lightingUI->currentItem());
-	globals.palette = palettes->currentPalette();
+	globals.setPalette(palettes->currentPalette());
 	Notification::notify(Notification::NewPalette);
     } else if (lightingUIObject == lightingUI->nextPalette) {
 	lightingUI->next();
 	palettes->setPalette(lightingUI->currentItem());
-	globals.palette = palettes->currentPalette();
+	globals.setPalette(palettes->currentPalette());
 	Notification::notify(Notification::NewPalette);
     }
 
@@ -3789,13 +3821,13 @@ int main(int argc, char **argv)
     }
 
     // Load the preferred palette.
-    globals.palette = palettes->load(prefs.palette.c_str());
-    if (!globals.palette) {
+    globals.setPalette(palettes->load(prefs.palette.c_str()));
+    if (!globals.palette()) {
 	// Try tacking the palette directory on the front and see what
 	// happens.
 	paletteDir.append(prefs.palette.str());
-	globals.palette = palettes->load(paletteDir.c_str());
-	if (!globals.palette) {
+	globals.setPalette(palettes->load(paletteDir.c_str()));
+	if (!globals.palette()) {
 	    printf("%s: Failed to read palette file '%s'\n", 
 		   argv[0], prefs.palette.c_str());
 	    // EYE - exit?
@@ -3954,7 +3986,19 @@ int main(int argc, char **argv)
     mainUI->showMouse = false;
     show_cb(mainUI->mouseText);
 
-    // Update our palettes list.
+    // Set initial values for the lighting UI.  Note that, given the
+    // layout of the radio buttons on the interface, if a value is
+    // true, that means we want the top widget selected.  The top
+    // widget has a value of 0, so basically that means negating the
+    // prefs value.
+    lightingUI->contours->setValue(!prefs.discreteContours);
+    lighting_cb(lightingUI->contours);
+    lightingUI->lines->setValue(!prefs.contourLines);
+    lighting_cb(lightingUI->lines);
+    lightingUI->lighting->setValue(!prefs.lightingOn);
+    lighting_cb(lightingUI->lighting);
+    lightingUI->polygons->setValue(!prefs.smoothShading);
+    lighting_cb(lightingUI->polygons);
     lightingUI->updatePalettes();
 
     // Create the graphs window, placed below the main.  First, get the
