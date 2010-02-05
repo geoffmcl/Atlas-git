@@ -43,6 +43,15 @@ class Subbucket;
 
 class Bucket {
 public:
+    // These variables are shared amongst all buckets and subbuckets.
+    // If you change palette or discreteContours, you should notify
+    // all buckets via paletteChanged() and discreteContoursChanged(),
+    // and then redraw.  It's not necessary to notify buckets about
+    // changes to contourLines (because it doesn't require any
+    // recalculations), but you still need to redraw.
+    static Palette *palette;
+    static bool discreteContours, contourLines;
+
     Bucket(const SGPath &p, long int index);
     ~Bucket();
 
@@ -60,8 +69,10 @@ public:
 
     double maximumElevation() const { return _maxElevation; }
 
-    void setDirty() { _dirty = true; }
-    void draw(Palette *palette, bool discreteContours = true);
+    void paletteChanged();
+    void discreteContoursChanged();
+
+    void draw();
 
     bool intersection(SGVec3<double> near, SGVec3<double> far, 
 		      SGVec3<double> *c);
@@ -76,12 +87,11 @@ public:
     atlasSphere _bounds;
 
     // A bucket is divided into a bunch of pieces, which we call
-    // chunks.
-    vector<Subbucket *> _chunks;
+    // subbuckets.
+    vector<Subbucket *> _subbuckets;
     double _maxElevation;
-    GLuint _dlist;
 
-    bool _loaded, _dirty;
+    bool _loaded;
     unsigned int _size;		// Size of bucket (approximately) in bytes.
 };
 

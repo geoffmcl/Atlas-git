@@ -36,7 +36,6 @@
 #include <iostream>
 #include <sstream>
 #include <fstream>
-#include <limits>
 
 #include <simgear/bucket/newbucket.hxx>
 #include <simgear/math/sg_geodesy.hxx>
@@ -45,13 +44,17 @@
 
 using namespace std;
 
+Palette *Bucket::palette = NULL;
+bool Bucket::discreteContours = true;
+bool Bucket::contourLines = false;
+
 // EYE - chunk? tile? bucket?  In newbucket.hxx, it seems that a 1x1
 // square is a chunk, and the parts are called both tiles and buckets.
 // In the HTML documentation, it seems that a chunk is just a vague
 // term for a part, and a tile is the 1/8 x 1/8 degree (or whatever)
 // bit corresponding to a single scenery file.
 Bucket::Bucket(const SGPath &p, long int index): 
-    _p(p), _index(index), _dlist(0), _loaded(false), _dirty(true), _size(0)
+    _p(p), _index(index), _loaded(false), _size(0)
 {
     // Calculate bounds.
 
@@ -118,7 +121,7 @@ void Bucket::load(Projection projection)
 	    Subbucket *sb = new Subbucket(object);
 	    if (sb->load(projection)) {
 		_size += sb->size();
-		_chunks.push_back(sb);
+		_subbuckets.push_back(sb);
 	    } else {
 		fprintf(stderr, "'%s': object file '%s' not found\n", 
 			stg.c_str(), object.c_str());
@@ -129,9 +132,9 @@ void Bucket::load(Projection projection)
     // Find the highest point in the bucket and set _maxElevation.
     // EYE - magic number!
     _maxElevation = -1e6;
-    for (unsigned int i = 0; i < _chunks.size(); i++) {
-	if (_chunks[i]->maximumElevation() > _maxElevation) {
-	    _maxElevation = _chunks[i]->maximumElevation();
+    for (unsigned int i = 0; i < _subbuckets.size(); i++) {
+	if (_subbuckets[i]->maximumElevation() > _maxElevation) {
+	    _maxElevation = _subbuckets[i]->maximumElevation();
 	}
     }
 
@@ -140,45 +143,39 @@ void Bucket::load(Projection projection)
 
 void Bucket::unload()
 {
-    for (unsigned int i = 0; i < _chunks.size(); i++) {
-	delete _chunks[i];
+    for (unsigned int i = 0; i < _subbuckets.size(); i++) {
+	delete _subbuckets[i];
     }
-    _chunks.clear();
+    _subbuckets.clear();
     _size = 0;
 
     _loaded = false;
-
-    glDeleteLists(_dlist, 1);
-    _dlist = 0;
-    _dirty = true;
 }
 
-// void Bucket::draw(bool discreteContours)
-void Bucket::draw(Palette *palette, bool discreteContours)
+void Bucket::paletteChanged()
+{
+    for (size_t i = 0; i < _subbuckets.size(); i++) {
+	_subbuckets[i]->paletteChanged();
+    }
+}
+
+void Bucket::discreteContoursChanged()
+{
+    for (size_t i = 0; i < _subbuckets.size(); i++) {
+	_subbuckets[i]->discreteContoursChanged();
+    }
+}
+
+void Bucket::draw()
 {
     if (!_loaded) {
 	return;
     }
 
-    if (_dirty) {
-	glDeleteLists(_dlist, 1);
-	_dlist = glGenLists(1);
-	assert(_dlist != 0);
-
-	glNewList(_dlist, GL_COMPILE);
-
-	// EYE - Assumes that GL_COLOR_MATERIAL has been set and
-	// enabled.
-	for (unsigned int i = 0; i < _chunks.size(); i++) {
-// 	    _chunks[i]->draw(globals.palette, discreteContours);
-	    _chunks[i]->draw(palette, discreteContours);
-	}
-
-	glEndList();
-	_dirty = false;
+    // EYE - Assumes that GL_COLOR_MATERIAL has been set and enabled.
+    for (unsigned int i = 0; i < _subbuckets.size(); i++) {
+	_subbuckets[i]->draw();
     }
-
-    glCallList(_dlist);
 }
 
 // Checks if the ray defined by points near and far intersect this
@@ -192,8 +189,8 @@ bool Bucket::intersection(SGVec3<double> near, SGVec3<double> far,
 			  SGVec3<double> *c)
 {
     // We don't try to do a "live" intersection unless we've actually
-    // loaded the scenery and created a display list for it.
-    if (!_loaded || (_dlist == 0)) {
+    // loaded the scenery.
+    if (!_loaded) {
 	return false;
     }
 
@@ -222,7 +219,7 @@ bool Bucket::intersection(SGVec3<double> near, SGVec3<double> far,
 
     // Now "draw" the bucket.
     glMatrixMode(GL_MODELVIEW);
-    glCallList(_dlist);
+    draw();
 
     // Any hits?
     int hits = glRenderMode(GL_RENDER);
