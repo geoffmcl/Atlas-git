@@ -77,13 +77,12 @@ class Globals {
     Searcher searcher;
 
     // Scenery lighting.
-    bool discreteContours;
-    bool lightingOn;
-    bool smoothShading;
+    bool discreteContours, contourLines, lightingOn, smoothShading;
     sgVec4 lightPosition;
 
     // Current palette.
-    Palette *palette;
+    Palette *palette() { return _palette; }
+    void setPalette(Palette *p);
 
     // The fonts we use for the user interface, scenery and overlays.
     atlasFntRenderer fontRenderer;
@@ -101,6 +100,8 @@ class Globals {
     vector<FlightTrack *> _tracks;
     FlightTrack *_track;
     size_t _currentTrackNo;
+
+    Palette *_palette;
 };
 
 extern Globals globals;

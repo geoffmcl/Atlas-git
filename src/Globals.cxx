@@ -25,14 +25,15 @@
 #include <limits>
 
 #include "Globals.hxx"
+#include "Bucket.hxx"
 
 Globals globals;
 
 const size_t Globals::npos = std::numeric_limits<size_t>::max();
 
 Globals::Globals(): 
-    palette(NULL), regularFont(NULL), boldFont(NULL), magnetic(true), 
-    _track(NULL), _currentTrackNo(npos)
+    regularFont(NULL), boldFont(NULL), magnetic(true), 
+    _track(NULL), _currentTrackNo(npos), _palette(NULL)
 {
 }
 
@@ -197,3 +198,9 @@ FlightTrack *Globals::exists(const char *path, bool select)
     return NULL;
 }
 
+void Globals::setPalette(Palette *p)
+{
+    _palette = p;
+    // The Bucket class tracks the current palette as well.
+    Bucket::palette = p;
+}
