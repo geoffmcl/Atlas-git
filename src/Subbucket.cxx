@@ -128,82 +128,86 @@ bool Subbucket::load(Bucket::Projection projection)
     // terrain and airport.  For reasons I don't understand, terrain
     // files never have triangles and strips, but only fans, whereas
     // airports are the opposite.  Moreover, airport files always have
-    // different numbers of actual vertices and normals, and, more
-    // strangely, they only ever use the first normal.
-    if (wgs84_nodes.size() != m_norms.size()) {
-	// Airport file - triangles and triangle strips.
-	_airport = true;
+    // more vertices than normals, and, more strangely, they only ever
+    // use the first normal.  Note that 99% of the time, a "terrain"
+    // file has exactly the same number of vertices and normals.
+    // However, there are rare exceptions where there is one extra
+    // normal (eg, w053n47/2089568.btg).  This seems to indicate a bug
+    // in TerraGear, if you ask me.
+    if (wgs84_nodes.size() > m_norms.size()) {
+    	// Airport file - triangles and triangle strips.
+    	_airport = true;
 
-	assert(_chunk.get_tris_v().size() > 0);
-	assert(_chunk.get_tris_v().size() ==_chunk.get_tris_n().size());
-	for (size_t i = 0; i < _chunk.get_tris_v().size(); i++) {
-	    // There is a separate specification of normals...
-	    assert(_chunk.get_tris_n().at(i).size() > 0);
-	    // ... with one normal per vertex.
-	    assert(_chunk.get_tris_v().at(i).size() == 
-		   _chunk.get_tris_n().at(i).size());
-	    for (size_t j = 0; j < _chunk.get_tris_n().at(i).size(); j++) {
-		// However, it's always the first normal.
-		assert(_chunk.get_tris_n().at(i).at(j) == 0);
-	    }
-	}
+    	assert(_chunk.get_tris_v().size() > 0);
+    	assert(_chunk.get_tris_v().size() ==_chunk.get_tris_n().size());
+    	for (size_t i = 0; i < _chunk.get_tris_v().size(); i++) {
+    	    // There is a separate specification of normals...
+    	    assert(_chunk.get_tris_n().at(i).size() > 0);
+    	    // ... with one normal per vertex.
+    	    assert(_chunk.get_tris_v().at(i).size() == 
+    		   _chunk.get_tris_n().at(i).size());
+    	    for (size_t j = 0; j < _chunk.get_tris_n().at(i).size(); j++) {
+    		// However, it's always the first normal.
+    		assert(_chunk.get_tris_n().at(i).at(j) == 0);
+    	    }
+    	}
 
-	// Make sure the vertex indices are valid.
-	for (size_t i = 0; i < _chunk.get_tris_v().size(); i++) {
-	    const int_list& vs = _chunk.get_tris_v()[i];
-	    for (size_t j = 0; j < vs.size(); j++) {
-		assert(vs[j] < _elevations.size());
-	    }
-	}
+    	// Make sure the vertex indices are valid.
+    	for (size_t i = 0; i < _chunk.get_tris_v().size(); i++) {
+    	    const int_list& vs = _chunk.get_tris_v()[i];
+    	    for (size_t j = 0; j < vs.size(); j++) {
+    		assert(vs[j] < _elevations.size());
+    	    }
+    	}
 
-	// Ditto for triangle strips.
-	assert(_chunk.get_strips_v().size() > 0);
-	assert(_chunk.get_strips_v().size() ==_chunk.get_strips_n().size());
-	for (size_t i = 0; i < _chunk.get_strips_n().size(); i++) {
-	    assert(_chunk.get_strips_n().at(i).size() > 0);
-	    assert(_chunk.get_strips_v().at(i).size() ==
-		   _chunk.get_strips_n().at(i).size());
-	    for (size_t j = 0; j < _chunk.get_strips_n().at(i).size(); j++) {
-		assert(_chunk.get_strips_n().at(i).at(j) == 0);
-	    }
-	}
+    	// Ditto for triangle strips.
+    	assert(_chunk.get_strips_v().size() > 0);
+    	assert(_chunk.get_strips_v().size() ==_chunk.get_strips_n().size());
+    	for (size_t i = 0; i < _chunk.get_strips_n().size(); i++) {
+    	    assert(_chunk.get_strips_n().at(i).size() > 0);
+    	    assert(_chunk.get_strips_v().at(i).size() ==
+    		   _chunk.get_strips_n().at(i).size());
+    	    for (size_t j = 0; j < _chunk.get_strips_n().at(i).size(); j++) {
+    		assert(_chunk.get_strips_n().at(i).at(j) == 0);
+    	    }
+    	}
 
-	// Make sure the vertex indices are valid.
-	for (size_t i = 0; i < _chunk.get_strips_v().size(); i++) {
-	    const int_list& vs = _chunk.get_strips_v()[i];
-	    for (size_t j = 0; j < vs.size(); j++) {
-		assert(vs[j] < _elevations.size());
-	    }
-	}
+    	// Make sure the vertex indices are valid.
+    	for (size_t i = 0; i < _chunk.get_strips_v().size(); i++) {
+    	    const int_list& vs = _chunk.get_strips_v()[i];
+    	    for (size_t j = 0; j < vs.size(); j++) {
+    		assert(vs[j] < _elevations.size());
+    	    }
+    	}
 
-	// But no triangle fans.
-	assert(_chunk.get_fans_v().size() == 0);
-	assert(_chunk.get_fans_n().size() == 0);
+    	// But no triangle fans.
+    	assert(_chunk.get_fans_v().size() == 0);
+    	assert(_chunk.get_fans_n().size() == 0);
     } else {
-	// Terrain file - no triangles or triangle strips.
-	_airport = false;
+    	// Terrain file - no triangles or triangle strips.
+    	_airport = false;
 
-	assert(_chunk.get_tris_v().size() == 0);
-	assert(_chunk.get_tris_n().size() == 0);
-	assert(_chunk.get_strips_v().size() == 0);
-	assert(_chunk.get_strips_n().size() == 0);
+    	assert(_chunk.get_tris_v().size() == 0);
+    	assert(_chunk.get_tris_n().size() == 0);
+    	assert(_chunk.get_strips_v().size() == 0);
+    	assert(_chunk.get_strips_n().size() == 0);
 
-	// But triangle fans.
-	assert(_chunk.get_fans_v().size() > 0);
-	assert(_chunk.get_fans_n().size() > 0);
-	for (size_t i = 0; i < _chunk.get_fans_n().size(); i++) {
-	    // There is no separate set of normal indices; the nth
-	    // vertex uses the nth normal.
-	    assert(_chunk.get_fans_n().at(i).size() == 0);
-	}
+    	// But triangle fans.
+    	assert(_chunk.get_fans_v().size() > 0);
+    	assert(_chunk.get_fans_n().size() > 0);
+    	for (size_t i = 0; i < _chunk.get_fans_n().size(); i++) {
+    	    // There is no separate set of normal indices; the nth
+    	    // vertex uses the nth normal.
+    	    assert(_chunk.get_fans_n().at(i).size() == 0);
+    	}
 
-	// Make sure the vertex indices are valid.
-	for (size_t i = 0; i < _chunk.get_fans_v().size(); i++) {
-	    const int_list& vs = _chunk.get_fans_v()[i];
-	    for (size_t j = 0; j < vs.size(); j++) {
-		assert(vs[j] < _elevations.size());
-	    }
-	}
+    	// Make sure the vertex indices are valid.
+    	for (size_t i = 0; i < _chunk.get_fans_v().size(); i++) {
+    	    const int_list& vs = _chunk.get_fans_v()[i];
+    	    for (size_t j = 0; j < vs.size(); j++) {
+    		assert(vs[j] < _elevations.size());
+    	    }
+    	}
     }
 
     // Estimate the size of the subbucket.  We just count the vertices
@@ -304,6 +308,7 @@ void Subbucket::_palettize()
     _contours.clear();
     _contours.resize(Bucket::palette->size());
     _contourLines.clear();
+    _edgeContours.clear();
 
     // First, triangles.
     const group_list& tris = _chunk.get_tris_v();
@@ -367,13 +372,16 @@ void Subbucket::_palettize()
 	    _chopTriangleFan(fans[i]);
 	}
     }
-
-    int ts = 0;
-    for (size_t i = 0; i < _contours.size(); i++) {
-    	ts += _contours[i].size();
-    }
-
     _edgeMap.clear();
+
+    // Add all contours that run along the shared edges of triangles
+    // to the _contourLines vector.
+    tr1::unordered_set<pair<int, int>, PairHash>::const_iterator i;
+    for (i = _edgeContours.begin(); i != _edgeContours.end(); i++) {
+	_contourLines.push_back(i->first);
+	_contourLines.push_back(i->second);
+    }
+    _edgeContours.clear();
 
     _palettized = true;
 }
@@ -448,8 +456,8 @@ void Subbucket::draw()
 	    // Draw "contours" objects (ie, objects coloured based on
 	    // their elevation).
 	    if (_airport) {
-		glDisableClientState(GL_NORMAL_ARRAY);
-		glNormal3f(_normals[0], _normals[1], _normals[2]);
+	    	glDisableClientState(GL_NORMAL_ARRAY);
+	    	glNormal3f(_normals[0], _normals[1], _normals[2]);
 	    } else {
 		glEnableClientState(GL_NORMAL_ARRAY);
 	    }
@@ -497,30 +505,24 @@ void Subbucket::draw()
 	glEndList();
     }
 
-    // EYE - Do inside display list generation?
-    glPushAttrib(GL_POLYGON_BIT); {
-	if (Bucket::contourLines) {
-	    // To successfully draw the contour lines on top of the
-	    // polygons, we need to push the polygons back a bit.
-	    glEnable(GL_POLYGON_OFFSET_FILL);
-	    glPolygonOffset(1.0, 1.0);
-	}
+    // Materials
+    glCallList(_materialsDL);
 
-	// Materials
-	glCallList(_materialsDL);
+    // Contours
+    glCallList(_contoursDL);
 
-	// Contours
-	glCallList(_contoursDL);
-
-	// Contour lines
-	if (Bucket::contourLines) {
-	    glDisable(GL_POLYGON_OFFSET_FILL);
+    // Contour lines
+    if (Bucket::contourLines) {
+	glPushAttrib(GL_DEPTH_BUFFER_BIT); {
+	    glDisable(GL_DEPTH_TEST);
 	    glCallList(_contourLinesDL);
 	}
+	glPopAttrib();
     }
-    glPopAttrib();
 }
 
+// Takes a vector representing a series of triangles (ie, GL_TRIANGLES
+// format) and chops each triangle along contour lines.
 void Subbucket::_chopTriangles(const int_list& triangles)
 {
     for (size_t i = 0; i < triangles.size(); i += 3) {
@@ -528,6 +530,8 @@ void Subbucket::_chopTriangles(const int_list& triangles)
     }
 }
 
+// Takes a vector representing a triangle strip (ie, GL_TRIANGLE_STRIP
+// format) and chops each triangle along contour lines.
 void Subbucket::_chopTriangleStrip(const int_list& strip)
 {
     for (size_t i = 0; i < strip.size() - 2; i++) {
@@ -539,6 +543,8 @@ void Subbucket::_chopTriangleStrip(const int_list& strip)
     }
 }
 
+// Takes a vector representing a triangle fan (ie, GL_TRIANGLE_FAN
+// format) and chops each triangle along contour lines.
 void Subbucket::_chopTriangleFan(const int_list& fan)
 {
     for (size_t i = 1; i < fan.size() - 1; i++) {
@@ -579,7 +585,9 @@ void Subbucket::_chopTriangle(int i0, int i1, int i2)
     // Note that other figures are possible depending on where the
     // contours cut through the triangle and the orientation of the
     // triangle.  We also have to be careful about the case when a
-    // contour cuts through one of the vertices i1 or i2.
+    // contour cuts through i1.  Finally, the edges of the triangle
+    // itself might lie along contours, so they have to be checked as
+    // well.
 
     // We start from the bottom vertex and work our way upward (doing
     // so makes the logic easier), so we first relabel our triangle so
@@ -607,15 +615,23 @@ void Subbucket::_chopTriangle(int i0, int i1, int i2)
     assert(e1 <= e2);
     assert(_elevations[i1] <= _elevations[i2]);
 
-    // Now chop the edges.  We find all the points along the edge
-    // through which a contour passes and create vertices (and normals
-    // and colours) for them.  The vertices are created sequentially,
-    // starting at the index returned by _chopEdge.  Therefore, the
-    // first contour above i0 in _chopEdge(i0, i1) is at index i0i1,
-    // the second at i0i1 + 1, ...
-    int i0i1 = _chopEdge(i0, i1),
-	i1i2 = _chopEdge(i1, i2),
-	i0i2 = _chopEdge(i0, i2);
+    // Now chop the edges.  We call _chopEdge, which finds all the
+    // points along an edge through which a contour passes and creates
+    // vertices (and normals and colours) for them.  It returns a pair
+    // of ints, the first being the index (in _vertices, _normals, and
+    // so on) of the first vertex created, the second being the number
+    // of vertices created (the vertices are created sequentially).
+    pair<int, int> i0i1, i1i2, i0i2;
+    i0i1 = _chopEdge(i0, i1);
+    i1i2 = _chopEdge(i1, i2);
+    i0i2 = _chopEdge(i0, i2);
+
+    // The number of crossing contours on the left (i0i2.second) should
+    // equal the number on the right (i0i1.second + i1i2.second).  If i1
+    // happens to be lying on a contour line, it must be counted as
+    // well.
+    assert(((i0i1.second + i1i2.second) == i0i2.second) ||
+	   ((i0i1.second + i1i2.second + 1) == i0i2.second));
 
     // The algorithm works by accumulating vertices in a deque (vs) as
     // we move up the triangle, drawing figures when we've accumulated
@@ -628,49 +644,57 @@ void Subbucket::_chopTriangle(int i0, int i1, int i2)
     vs.push_back(i0);
 
     int e = e0;
-    // This is true if i1 is on a contour.
-    bool contourVertex = 
-	(_elevations[i1] == Bucket::palette->contourAtIndex(e1).elevation);
-    // Deal with the bottom half of the triangle (below i1).
-    for (; e < e1; e++) {
-	// If the next contour slice passes through i1, use that
-	// instead of getting a point along i0 - i1.
-	if (contourVertex && (e + 1 == e1)) {
-	    vs.push_back(i1);
-	} else {
-	    vs.push_back(i0i1 + e - e0);
-	}
-	vs.push_back(i0i2 + e - e0);
-	_addElevationSlice(vs, e, cw);
+    // Deal with contours passing through the bottom half of the
+    // triangle (below i1).
+    for (; i0i1.second > 0; i0i1.second--, i0i2.second--) {
+	// These two points cut through the triangle, creating a
+	// contour line.
+	_contourLines.push_back(i0i1.first);
+	_contourLines.push_back(i0i2.first);
+
+	// Add the two points to the previously existing ones.  This
+	// will create a slice through the triangle at one contour
+	// level.
+	vs.push_back(i0i1.first++);
+	vs.push_back(i0i2.first++);
+	_addElevationSlice(vs, e++, cw);
     }
-    // If i1 is not a contour index, then the above loop stopped with
-    // the last slice below i1.  Add i1 and continue on.  This will
-    // give us our EDBFG object (or perhaps ABC, or maybe EDBCE,
-    // depending on which contours cut through the triangle).
-    if (!contourVertex) {
-	vs.push_back(i1);
+    // Add i1.
+    vs.push_back(i1);
+    // If i1 is on a contour and has an opposite along i0i2, add the
+    // opposite.
+    if ((i1i2.second + 1) == i0i2.second) {
+	_contourLines.push_back(i1);
+	_contourLines.push_back(i0i2.first);
+
+	vs.push_back(i0i2.first++);
+	i0i2.second--;
+	_addElevationSlice(vs, e++, cw);
     }
 
-    // This is true if i2 is on a contour.
-    contourVertex = (_elevations[i2] == 
-		     Bucket::palette->contourAtIndex(e2).elevation);
     // Deal with the top half of the triangle (above i1).
-    for (; e < e2; e++) {
-	// Create the next contour slice, but not if it passes through
-	// i2.
-	if ((e + 1 < e2) || !contourVertex) {
-	    vs.push_back(i1i2 + e - e1);
-	    vs.push_back(i0i2 + e - e0);
-	    _addElevationSlice(vs, e, cw);
-	}
+    for (; i1i2.second > 0; i1i2.second--, i0i2.second--) {
+	_contourLines.push_back(i1i2.first);
+	_contourLines.push_back(i0i2.first);
+
+	vs.push_back(i1i2.first++);
+	vs.push_back(i0i2.first++);
+	_addElevationSlice(vs, e++, cw);
     }
     vs.push_back(i2);
-    if (contourVertex) {
-	e--;
-    }
-    // Draw the last slice, but make sure the top is not treated as a
-    // contour.
-    _addElevationSlice(vs, e, cw, true);
+
+    // Draw the last slice.
+    _addElevationSlice(vs, e++, cw);
+
+    // Now a special case.  The above code handles contours cutting
+    // through the triangle, but not contours that run along the edge
+    // of the triangle.  These are special because the edge will be
+    // shared by an adjacent triangle, and we don't want to draw it
+    // twice.  So we accumulate them in a set, then, when we're done,
+    // we add the contents of the set to _contourLines.
+    _doEdgeContour(i0, i1, e0);
+    _doEdgeContour(i1, i2, e1);
+    _doEdgeContour(i0, i2, e0);
 }
 
 // Creates a single triangle from the given points.  This means adding
@@ -690,13 +714,12 @@ void Subbucket::_createTriangle(int i0, int i1, int i2, bool cw, int e)
     indices.push_back(i2);
 }
 
-// Given a single slice through a triangle, as given in vs, creates
-// one, two, or three triangles to represent it.  If cw is true, we
-// reverse the order of the first two vertices to restore a
-// counterclockwise winding.  If top is true, that means that the last
-// point represents the apex of the triangle, and so we don't need to
-// add a contour line segment to _contourLines.
-void Subbucket::_addElevationSlice(deque<int>& vs, int e, bool cw, bool top)
+// Given a single slice of a triangle, as given in vs, creates one,
+// two, or three triangles to represent it (if you look at the
+// documentation for _chopTriangle, vs would contain a figure like
+// B-A-i1-C-D, for example).  If cw is true, we reverse the order of
+// the first two vertices to restore a counterclockwise winding.
+void Subbucket::_addElevationSlice(deque<int>& vs, int e, bool cw)
 {
     assert((vs.size() >= 3) && (vs.size() <= 5));
     if (vs.size() == 3) {
@@ -719,24 +742,37 @@ void Subbucket::_addElevationSlice(deque<int>& vs, int e, bool cw, bool top)
     // reverse their order.
     vs.erase(vs.begin(), vs.end() - 2);
     swap(vs[0], vs[1]);
+}
 
-    // The remaining two points will be part of a contour line, unless
-    // we're drawing the top bit of the triangle.
-    if (!top) {
-	_contourLines.push_back(vs[0]);
-	_contourLines.push_back(vs[1]);
+// Checks if the edge connecting i0 and i1 (at elevation index e0)
+// runs along a contour.  If it does, it adds it to the _edgeContours
+// set.  Note that this is only intended to be called for the edges of
+// raw triangles, not the contours created by slicing triangles.
+void Subbucket::_doEdgeContour(int i0, int i1, int e0)
+{
+    if ((_elevations[i0] == _elevations[i1]) &&
+    	(_elevations[i0] == Bucket::palette->contourAtIndex(e0).elevation)) {
+    	if (i0 <= i1) {
+    	    _edgeContours.insert(make_pair(i0, i1));
+    	} else {
+    	    _edgeContours.insert(make_pair(i1, i0));
+    	}
     }
 }
 
-// Creates new vertices for each point between i0 and i1 that lies on
-// a contour.  We store the index of the first vertex created in
-// _edgeMap[(i0, i1)] (-1 if there are no vertices).  Returns the
-// index.  Can be safely called multiple times.
+// Creates new vertices (and elevations, and colours, and normals,
+// ...) for each point between i0 and i1 that lies on a contour.
+// Returns a pair giving the starting index of the first vertex
+// created, and the number of vertices created.  If no vertices are
+// created, it returns <0, 0>.  Can be safely called multiple times on
+// the same <i0, i1> pair.
 //
 // Note that this is where we spend most of our time (about 50%), so
 // it's imperative that it be as efficient as possible.
-int Subbucket::_chopEdge(int i0, int i1)
+pair<int, int> Subbucket::_chopEdge(int i0, int i1)
 {
+    pair<int, int> result = make_pair(0, 0);
+
     // For convenience, and to make sure we name edges consistently,
     // we force i0 to be lower (topographically) than i1.  If they're
     // at the same elevation, we sort by index.
@@ -746,31 +782,30 @@ int Subbucket::_chopEdge(int i0, int i1)
 	swap(i0, i1);
     }
 
-    if (i0 != i1) {
-    	// assert(_edgeMap.find(make_pair(i1, i0)) == _edgeMap.end());
-    } else {
-	// Believe it or not, BTG files sometimes have "edges" where
-	// the two endpoints are the same.
-	// fprintf(stderr, "%s: triangle has two identical vertices!\n",
-	// 	_path.file().c_str());
+    if (i0 == i1) {
+    	// Believe it or not, BTG files sometimes have "edges" where
+    	// the two endpoints are the same.
+    	// fprintf(stderr, "%s: triangle has two identical vertices!\n",
+    	// 	_path.file().c_str());
+    	return result;
     }
 
     // Now we're ready.  First see if the edge has been processed
     // already.  The following code is a bit of a trick, relying on
     // two things: (1) New vertices we create will never have an index
     // of 0, and (2) If the given edge doesn't exist, _edgeMap[]
-    // returns 0 (ie, a newly created int is given a default value of
-    // 0).
-    int& firstVertex = _edgeMap[make_pair(i0, i1)];
-    if (firstVertex != 0) {
-	return firstVertex;
+    // returns <0, 0> (ie, a newly created int is given a default
+    // value of 0).
+    result = _edgeMap[make_pair(i0, i1)];
+    if (result.first != 0) {
+	return result;
     }
 
     int e0 = _elevationIndices[i0], e1 = _elevationIndices[i1];
     float elev0 = _elevations[i0], elev1 = _elevations[i1];
-    firstVertex = -1;
 
     // If i0 and i1 are at the same level, then we can't add any points.
+    // EYE - compare e0 and e1 instead?
     if (elev0 == elev1) {
 	// Check if it forms part of a contour line.  If so, record
 	// the contour.
@@ -779,16 +814,16 @@ int Subbucket::_chopEdge(int i0, int i1)
 	    _contourLines.push_back(i1);
 	}
 
-	return firstVertex;
+	return result;
     }
 
-    firstVertex = _vertices.size() / 3;
+    result.first = _vertices.size() / 3;
     if (elev1 != Bucket::palette->contourAtIndex(e1).elevation) {
 	// If the upper point is not on a contour (ie, it's above it),
 	// then we need to create a vertex for that contour too.
 	e1++;
     }
-    int i = firstVertex;
+    int i = result.first;
     for (int e = e0 + 1; e < e1; e++, i++) {
 	const Palette::Contour& contour = Bucket::palette->contourAtIndex(e);
 	_elevations.push_back(contour.elevation);
@@ -827,7 +862,11 @@ int Subbucket::_chopEdge(int i0, int i1)
 	    _normals.push_back(n[1]);
 	    _normals.push_back(n[2]);
 	}
+
+	result.second++;
     }
 
-    return firstVertex;
+    _edgeMap[make_pair(i0, i1)] = result;
+
+    return result;
 }

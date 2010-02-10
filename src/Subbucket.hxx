@@ -37,6 +37,7 @@
 
 #include <vector>
 #include <deque>
+#include <tr1/unordered_set>
 #include <tr1/unordered_map>
 
 #include <simgear/misc/sg_path.hxx>
@@ -79,11 +80,11 @@ class Subbucket {
     void _chopTriangleStrip(const int_list& strip);
     void _chopTriangleFan(const int_list& fan);
     void _chopTriangle(int i0, int i1, int i2);
-    int _chopEdge(int i0, int i1);
+    std::pair<int, int> _chopEdge(int i0, int i1);
     void _createTriangle(int i0, int i1, int i2, bool cw, int e);
     void _checkTriangle(int i0, int i1, int i2, int e);
-    void _addElevationSlice(std::deque<int>& vs, int e, 
-			    bool cw, bool top = false);
+    void _doEdgeContour(int i0, int i1, int e0);
+    void _addElevationSlice(std::deque<int>& vs, int e, bool cw);
 
     SGPath _path;
     bool _loaded, _airport;
@@ -106,6 +107,8 @@ class Subbucket {
     std::vector<int> _elevationIndices;
     std::vector<float> _colours;
 
+    // This is true if we've used the current palette to slice, dice,
+    // and colour the subbucket triangles.
     bool _palettized;
 
     // The net result of drawing are these 3 display lists:
@@ -136,16 +139,25 @@ class Subbucket {
     std::vector<int_list> _contours;
     
     // A list of vertex index pairs, each one representing a contour
-    // line segment (ie, GL_LINES format).
+    // line segment (ie, GL_LINES format).  This is used for drawing
+    // contour lines.
     int_list _contourLines;
+    // A temporary varible used to handle a special case: contours
+    // that run along a triangle edge (as opposed to cutting through a
+    // triangle).  These may be shared by an adjacent triangle, and we
+    // don't want to draw them twice, so we accumulate them in a set,
+    // then add the contents of the set to _contourLines at the end.
+    std::tr1::unordered_set<std::pair<int, int>, PairHash> _edgeContours;
 
-    // This is used while building contour objects.  There is one
-    // entry per unique edge (which is identified by the vertex
-    // indices of the two endpoints).  For each edge we store the
-    // beginning index of its intermediate vertices, with one vertex
-    // per contour passing through the edge.  These vertices are
-    // created sequentially, so we only need to store the first index.
-    std::tr1::unordered_map<std::pair<int, int>, int, PairHash> _edgeMap;
+    // This is used while slicing triangles along contour lines.
+    // There is one entry per unique triangle edge (which is
+    // identified by the vertex indices of the two endpoints).  For
+    // each edge we store the beginning index of its intermediate
+    // vertices (one vertex per contour passing through the edge), and
+    // the number of intermediate vertices.  These vertices are
+    // created sequentially.
+    std::tr1::unordered_map<std::pair<int, int>, 
+			    std::pair<int, int>, PairHash> _edgeMap;
 };
 
 #endif // _SUBBUCKET_H_
