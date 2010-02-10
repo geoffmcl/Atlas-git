@@ -69,6 +69,7 @@ char *appName;
 // Specifies whether to create JPEGs or PNGs.
 static bool createJPEG = true;
 static unsigned int jpegQuality = 75;
+static bool renderToPixmap = true;
 // Turn the lights on or off?
 static bool lighting = true;
 // True if we want discrete elevation colours, false for smoothly
@@ -136,6 +137,9 @@ void renderMap(TileInfo *t)
 		}
 		printf("%u", i);
 		first = false;
+		if (!renderToPixmap) {
+		    glutSwapBuffers();
+		}
 	    }
 	}
 	printf("\n");
@@ -162,6 +166,8 @@ void print_help()
     printf("  --jpeg=integer     Create JPEG images with specified quality\n");
     printf("  --aafactor=integer Antialiasing factor (default = %u)\n",
 	   rescaleFactor);
+    printf("  --pixmap           Use pixmaps for rendering (default)\n");
+    printf("  --no-pixmap        Don't use pixmaps (which don't work on some systems)\n");
     printf("  --discrete-contour Don't blend contour colours (default)\n");
     printf("  --smooth-contour   Blend contour colours\n");
     printf("  --no-contour-lines Don't draw contour lines (default)\n");
@@ -204,6 +210,10 @@ bool parse_arg(char* arg)
 	contourLines = false;
     } else if (sscanf(arg, "--aafactor=%d", &rescaleFactor) == 1) {
 	;
+    } else if (strcmp(arg, "--pixmap") == 0) {
+	renderToPixmap = true;
+    } else if (strcmp(arg, "--no-pixmap") == 0) {
+	renderToPixmap = false;
     } else if (sscanf(arg, "--light=%f, %f", &azimuth, &elevation) == 2) {
 	// Force them to be in range.
 	azimuth = normalizeHeading(azimuth);
@@ -451,6 +461,18 @@ int main(int argc, char **argv)
 	printf("Scenery: %d tiles\n", (int)tileManager->tiles().size());
     }
 
+    // Find out what our maximum desired map and buffer sizes are.
+    int mapSize = 0;
+    const bitset<TileManager::MAX_MAP_LEVEL>& mapLevels = 
+	tileManager->mapLevels();
+    for (int i = TileManager::MAX_MAP_LEVEL - 1; i >= 0; i--) {
+	if (mapLevels[i]) {
+	    mapSize = 1 << i;
+	    break;
+	}
+    }
+    bufferSize = mapSize << rescaleFactor;
+
     // Note on framebuffers: I had considered trying to render to a
     // framebuffer.  Framebuffers are window-system agnostic, so I
     // should be able to write generic code that would work on all
@@ -478,32 +500,23 @@ int main(int argc, char **argv)
     // Initialize OpenGL.  It seems that using a RenderTexture means
     // that I must create a window.
     glutInit(&argc, argv);
-    glutInitDisplayMode(GLUT_SINGLE | GLUT_RGBA | GLUT_DEPTH);
-    glutCreateWindow("You should never see this");
+    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
+    glutInitWindowSize(bufferSize, bufferSize);
+    glutCreateWindow("Map");
   
-    // Find out what our maximum desired map size is.
-    int mapSize = 0;
-    const bitset<TileManager::MAX_MAP_LEVEL>& mapLevels = 
-	tileManager->mapLevels();
-    for (int i = TileManager::MAX_MAP_LEVEL - 1; i >= 0; i--) {
-	if (mapLevels[i]) {
-	    mapSize = 1 << i;
-	    break;
+    if (renderToPixmap) {
+	// Try to get a pixel buffer.  We might be given something
+	// smaller than what we want.
+	if (!getPixelBuffer(&bufferSize)) {
+	    fprintf(stderr, 
+		    "%s: Unable to initialize pixel buffer.\n",
+		    argv[0]);
+	    cleanup();
+	    exit(1);
 	}
-    }
-
-    // Try to get a pixel buffer.  We might be given something smaller
-    // than what we want.
-    bufferSize = mapSize * (1 << rescaleFactor);
-    if (!getPixelBuffer(&bufferSize)) {
-	fprintf(stderr, 
-		"%s: Unable to initialize pixel buffer.\n",
-		argv[0]);
-	cleanup();
-	exit(1);
-    }
-    if (verbose) {
-	printf("Pixel buffer size: %dx%d\n", bufferSize, bufferSize);
+	if (verbose) {
+	    printf("Pixel buffer size: %dx%d\n", bufferSize, bufferSize);
+	}
     }
 
     // Check if largest desired size will fit into a texture.  In some
@@ -527,7 +540,7 @@ int main(int argc, char **argv)
 	textureSize /= 2;
     };
     if (verbose) {
-	printf("Maximum supported texture size: %dx%d\n", 
+	printf("Maximum supported texture size <= map size: %dx%d\n", 
 	       (int)textureSize, (int)textureSize);
     }
 
