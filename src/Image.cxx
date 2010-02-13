@@ -31,6 +31,27 @@
 #include "Image.hxx"
 #include "misc.hxx"
 
+// Error-handling structures and code.
+struct my_error_mgr {
+    struct jpeg_error_mgr pub;	// "public" fields
+    jmp_buf setjmp_buffer;	// For return to caller
+};
+
+typedef struct my_error_mgr * my_error_ptr;
+
+// This routine replaces the standard error_exit method.  Instead of
+// just exiting, as the standard method does, we jump to the setjmp
+// point (there we will print an error message, clean up and return).
+METHODDEF(void) my_error_exit(j_common_ptr cinfo)
+{
+    // cinfo->err really points to a my_error_mgr struct, so coerce
+    // the pointer.
+    my_error_ptr myerr = (my_error_ptr)cinfo->err;
+
+    // Return control to the setjmp point.
+    longjmp(myerr->setjmp_buffer, 1);
+}
+
 char *loadJPEG(const char *filename, int *width, int *height, int *depth,
 	       float *maxElev)
 {
@@ -42,11 +63,29 @@ char *loadJPEG(const char *filename, int *width, int *height, int *depth,
     jpeg_decompress_struct cinfo;
     memset(&cinfo, 0, sizeof cinfo);
 
-    jpeg_error_mgr jerr;
+    // Set up the normal JPEG error routines, then override
+    // error_exit.
+    my_error_mgr jerr;
     memset(&jerr, 0, sizeof jerr);
+    cinfo.err = jpeg_std_error(&jerr.pub);
+    jerr.pub.error_exit = my_error_exit;
+    if (setjmp(jerr.setjmp_buffer)) {
+	// When an error occurs, we'll jump to this block of code.
+	// First, output the name of the file and the canned JPEG
+	// error message.
+	fprintf(stderr, "%s: ", filename);
+	(cinfo.err->output_message)((jpeg_common_struct *)&cinfo);
 
-    cinfo.err = jpeg_std_error(&jerr);
+	// Clean things up and return.
+	jpeg_destroy_decompress(&cinfo);
+	fclose(fp);
+	return NULL;
+    }
+
+    // Create the JPEG decompression object.
     jpeg_create_decompress(&cinfo);
+
+    // Specify the data source.
     jpeg_stdio_src(&cinfo, fp);
 
     // Map stores elevation information for the map in the APP1
@@ -292,7 +331,7 @@ void savePNG(const char *file,
     globalString.printf("%.0f", maxElev);
 
     png_text text_ptr[1];
-    text_ptr[0].key = "Map Maximum Elevation";
+    text_ptr[0].key = (char *)"Map Maximum Elevation";
     text_ptr[0].text = (char *)globalString.str();
     text_ptr[0].compression = PNG_TEXT_COMPRESSION_NONE;
     png_set_text(png_ptr, info_ptr, text_ptr, 1);
