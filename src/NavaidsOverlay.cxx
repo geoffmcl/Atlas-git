@@ -514,9 +514,9 @@ void NavaidsOverlay::_createVORSymbols()
 		glTranslatef(0.0, size * sqrt(3.0) / 2.0, 0.0);
 		glBegin(GL_QUADS); {
 		    glVertex2f(-size / 2.0, 0.0);
-		    glVertex2f(-size / 2.0, lobeThickness);
-		    glVertex2f(size / 2.0, lobeThickness);
 		    glVertex2f(size / 2.0, 0.0);
+		    glVertex2f(size / 2.0, lobeThickness);
+		    glVertex2f(-size / 2.0, lobeThickness);
 		}
 		glEnd();
 	    }
