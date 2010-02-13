@@ -223,7 +223,7 @@ static void print_help_for(int option, const char *indent)
 	break;
       case UPDATE_OPTION:
 	printOne(indent, "--update=<s>", 
-		 "Check for position updates every x seconds (defaults to",
+		 "Check for position updates every s seconds (defaults to",
 		 "1.0)", NULL);
 	break;
       case MAX_TRACK_OPTION:
@@ -243,8 +243,8 @@ static void print_help_for(int option, const char *indent)
  	break;
       case AIRPLANE_IMAGE_OPTION:
  	printOne(indent, "--airplane=<path>[@<size>] ",
-		 "Set path for image to be drawn as airplane symbol",
-		 "If not present, only a small line drawing is used",
+		 "Set path for image to be drawn as airplane symbol.",
+		 "If not present, only a small line drawing is used.",
 		 "The optional size argument is the size of the image",
 		 "in pixels (defaults to 50)", NULL);
 	break;
@@ -285,7 +285,7 @@ static void print_help_for(int option, const char *indent)
 	printOne(indent, "--light=azim,elev",
 		 "Set light position for live maps (default = 315,55)", 
 		 "Azimuth is light direction (0 = north, 90 = east, ...)",
-		 "Elevation is height above horizon (90 = overhead)",
+		 "Elevation is height in degrees above horizon (90 = overhead)",
 		 NULL);
 	break;
       case VERSION_OPTION:
