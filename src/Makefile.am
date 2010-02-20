@@ -53,7 +53,7 @@ Map_SOURCES = \
 
 Map_LDADD = \
 	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgdebug \
-	-lsgbucket -lsgstructure -lsgmath -lsgscreen \
+	-lsgbucket -lsgstructure -lsgmath \
 	-lplibfnt -lplibsg \
 	$(opengl_LIBS) \
 	-lpng -lz -ljpeg
