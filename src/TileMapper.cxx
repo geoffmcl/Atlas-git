@@ -137,7 +137,6 @@ void TileMapper::draw(unsigned int size)
     const float *c;
     assert(_palette);
     if ((c = _palette->colour("Ocean"))) {
-	glDisable(GL_DEPTH_TEST);
 	glBegin(GL_QUADS); {
 	    glColor4fv(c);
 	    glNormal3f(0.0, 0.0, 1.0);
@@ -149,14 +148,6 @@ void TileMapper::draw(unsigned int size)
 	}
 	glEnd();
     }
-
-    // Now clear the depth buffer, enable the depth test, and render
-    // the buckets.  Clearing the depth buffer ensures that buckets
-    // will be drawn over the ocean we just drew at sea level, even
-    // when they lie below sea level (as in the Dead Sea, for
-    // example).
-    glClear(GL_DEPTH_BUFFER_BIT);
-    glEnable(GL_DEPTH_TEST);
 
 #ifdef ROTATE_NORMALS
     // If ROTATE_NORMALS is defined, then vertex normals will be
