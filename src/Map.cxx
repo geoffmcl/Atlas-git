@@ -67,7 +67,7 @@ char *appName;
 // Specifies whether to create JPEGs or PNGs.
 static bool createJPEG = true;
 static unsigned int jpegQuality = 75;
-static bool renderToPixmap = true;
+static bool renderToFramebuffer = true;
 // Turn the lights on or off?
 static bool lighting = true;
 // True if we want discrete elevation colours, false for smoothly
@@ -137,7 +137,7 @@ void renderMap(TileInfo *t)
 		}
 		printf("%u", i);
 		first = false;
-		if (!renderToPixmap) {
+		if (!renderToFramebuffer) {
 		    glutSwapBuffers();
 		}
 	    }
@@ -166,8 +166,8 @@ void print_help()
     printf("  --jpeg=integer     Create JPEG images with specified quality\n");
     printf("  --aafactor=integer Antialiasing factor (default = %u)\n",
 	   rescaleFactor);
-    printf("  --pixmap           Use pixmaps for rendering (default)\n");
-    printf("  --no-pixmap        Don't use pixmaps (which don't work on some systems)\n");
+    printf("  --render-offscreen Render offscreen (default)\n");
+    printf("  --render-to-window Render to a window\n");
     printf("  --discrete-contour Don't blend contour colours (default)\n");
     printf("  --smooth-contour   Blend contour colours\n");
     printf("  --no-contour-lines Don't draw contour lines (default)\n");
@@ -210,10 +210,10 @@ bool parse_arg(char* arg)
 	contourLines = false;
     } else if (sscanf(arg, "--aafactor=%d", &rescaleFactor) == 1) {
 	;
-    } else if (strcmp(arg, "--pixmap") == 0) {
-	renderToPixmap = true;
-    } else if (strcmp(arg, "--no-pixmap") == 0) {
-	renderToPixmap = false;
+    } else if (strcmp(arg, "--render-offscreen") == 0) {
+	renderToFramebuffer = true;
+    } else if (strcmp(arg, "--render-to-window") == 0) {
+	renderToFramebuffer = false;
     } else if (sscanf(arg, "--light=%f, %f", &azimuth, &elevation) == 2) {
 	// Force them to be in range.
 	azimuth = normalizeHeading(azimuth);
@@ -486,7 +486,7 @@ int main(int argc, char **argv)
 
     // Initialize OpenGL.
     int windowSize = bufferSize;
-    if (renderToPixmap) {
+    if (renderToFramebuffer) {
 	// Just pick a small window size - we shouldn't see it anyway.
 	windowSize = 256;
     }
@@ -495,7 +495,7 @@ int main(int argc, char **argv)
     glutInitWindowSize(windowSize, windowSize);
     glutCreateWindow("Map");
   
-    if (renderToPixmap) {
+    if (renderToFramebuffer) {
 	// Try to get a framebuffer.  First, check if the requested
 	// size is supported.
 	GLint max;
