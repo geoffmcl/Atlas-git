@@ -52,8 +52,6 @@
 
 #include <plib/pu.h>
 #include <simgear/misc/sg_path.hxx>
-#include <simgear/screen/extensions.hxx>
-#include <simgear/screen/RenderTexture.h>
 
 #include <simgear/bucket/newbucket.hxx>
 
@@ -99,7 +97,9 @@ static bool verbose = false;
 static TileManager *tileManager;
 static SGPath scenery, fg_scenery, fg_root, atlas, palette;
 static Palette *atlasPalette;
-static RenderTexture *rt2;
+
+// Handles to our framebuffer and renderbuffer objects.
+GLuint fbo = 0, rbo = 0;
 static TileMapper *mapper;
 
 static int bufferSize;	// Size of rendering buffer.
@@ -248,34 +248,42 @@ bool parse_arg(char* arg)
     return true;
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// EYE - this is called 'getPixelBuffer'.  But what *is* a pixel
-// buffer exactly?  Should it be called 'getRenderTexture' instead?
-////////////////////////////////////////////////////////////////////////////////
-bool getPixelBuffer(int *textureSize) 
+bool getFramebuffer(int textureSize) 
 {
-    rt2 = new RenderTexture(); 
-    rt2->Reset("rgb tex2D");
+    glGenFramebuffersEXT(1, &fbo);
+    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo);
 
-    while ((*textureSize >= 1) && 
-	   !rt2->Initialize(*textureSize, *textureSize)) {
-	*textureSize >>= 1;
+    glGenRenderbuffersEXT(1, &rbo);
+    glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, rbo);
+    glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, 
+			     GL_RGB, textureSize, textureSize);
+    glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT,
+				 GL_COLOR_ATTACHMENT0_EXT,
+				 GL_RENDERBUFFER_EXT,
+				 rbo);
+
+    return (glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT) == 
+	    GL_FRAMEBUFFER_COMPLETE_EXT);
+}
+
+// Attempts to load a palette at the given path.  Returns the palette
+// if successful, NULL otherwise.
+Palette *loadPalette(const char *path)
+{
+    Palette *result = NULL;
+    if (verbose) {
+	printf("Trying to read palette file '%s'\n", path);
     }
-    if (*textureSize == 0) {
-	return false;
+    try {
+    	result = new Palette(path);
+    } catch (runtime_error e) {
     }
 
-    if (!rt2->BeginCapture()) {
-	delete rt2;
-	rt2 = NULL;
-	return false;
-    }
-
-    return true;
+    return result;
 }
 
 // Deletes whatever we've allocated.
-void cleanup()
+void cleanup(int exitCode)
 {
     if (atlasPalette) {
 	delete atlasPalette;
@@ -283,13 +291,17 @@ void cleanup()
     if (tileManager) {
 	delete tileManager;
     }
-    if (rt2) {
-	rt2->EndCapture();
-	delete rt2;
+    if (rbo != 0) {
+	glDeleteRenderbuffersEXT(1, &rbo);
+    }
+    if (fbo != 0) {
+	glDeleteFramebuffersEXT(1, &fbo);
     }
     if (mapper) {
 	delete mapper;
     }
+
+    exit(exitCode);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -316,6 +328,9 @@ int main(int argc, char **argv)
     } else {
 	fg_scenery.set(env);
     }
+
+    // Set a default palette.
+    palette.set("default.ap");
 
     // Process ~/.atlasmaprc.
     char* homedir = getenv("HOME");
@@ -346,7 +361,7 @@ int main(int argc, char **argv)
     // Process command line arguments.
     for (int arg = 1; arg < argc; arg++) {
 	if (!parse_arg(argv[arg])) {
-	    fprintf(stderr, "%s: unknown argument '%s'.\n", argv[0], argv[arg]);
+	    fprintf(stderr, "%s: unknown argument '%s'.\n", appName, argv[arg]);
 	    print_help();
 	    exit(1);
 	}
@@ -409,38 +424,34 @@ int main(int argc, char **argv)
     try {
 	tileManager = new TileManager(scenery, atlas, true);
     } catch (runtime_error &e) {
-	
+	fprintf(stderr, "%s: Unable to create tile manager: %s\n", 
+		appName, e.what());
+	cleanup(1);
     }
 
-    // Figure out which palette to use.  Put the path in the 'palette'
-    // variable.
-    if (!palette.str().empty()) {
-	// Specified on the command line and already in 'palette'.
-    } else if (!fg_root.str().empty()) {
-	// EYE - $FG_ROOT/Atlas/AtlasPalette?
-	// Default: $FG_ROOT/Atlas/Palettes/default
-	palette.set(fg_root.str());
-	palette.append("Atlas");
-	palette.append("Palettes");
-	palette.append("default.ap");
-    } else {
-	fprintf(stderr, "%s: No palette specified.", appName);
-	fprintf(stderr, "\tUse --palette= or --fg-root= to specify palette location.\n");
-	cleanup();
-	exit(1);
+    // Read the Atlas palette file.  If successful, atlasPalette will
+    // be set to the loaded palette.
+    SGPath palettePath;
+    palettePath.append(palette.str());
+    if ((atlasPalette = loadPalette(palettePath.c_str())) == NULL) {
+	palettePath.set(atlas.str());
+	palettePath.append("Palettes");
+	palettePath.append(palette.str());
+	if ((atlasPalette = loadPalette(palettePath.c_str())) == NULL) {
+	    palettePath.set(fg_root.str());
+	    palettePath.append("Atlas");
+	    palettePath.append("Palettes");
+	    palettePath.append(palette.str());
+	    atlasPalette = loadPalette(palettePath.c_str());
+	}
+    }
+    if (!atlasPalette) {
+	fprintf(stderr, "%s: Failed to read palette file '%s'\n",
+		appName, palettePath.c_str());
+    	cleanup(1);
     }
     if (verbose) {
-	printf("Palette file: %s\n", palette.str().c_str());
-    }
-
-    // Read the Atlas palette file.
-    try {
-	atlasPalette = new Palette(palette.c_str());
-    } catch (runtime_error e) {
-	printf("%s: Failed to read palette file '%s'\n", 
-	       appName, palette.c_str());
-	cleanup();
-	exit(1);
+	printf("Palette file: %s\n", palettePath.str().c_str());
     }
 
     if (verbose) {
@@ -473,49 +484,36 @@ int main(int argc, char **argv)
     }
     bufferSize = mapSize << rescaleFactor;
 
-    // Note on framebuffers: I had considered trying to render to a
-    // framebuffer.  Framebuffers are window-system agnostic, so I
-    // should be able to write generic code that would work on all
-    // systems with OpenGL.  However, that doesn't seem to be quite
-    // the case.
-    //
-    // First, the framebuffer extension, GL_EXT_framebuffer_object, is
-    // not guaranteed to be supported.  Fair enough.  Second, and more
-    // annoyingly, it *seems* that I am still required to create some
-    // kind of OpenGL context (not a window, but a context) to check
-    // if the extension is supported.  This means ... operating-system
-    // specific code.  Drats.
-    //
-    // For an Apple-specific example of getting renderer information,
-    // check out OpenGLProg_MacOSX.pdf, pages 67 and 68.
-    //
-    // For an example of GL_EXT_framebuffer_object, also check out the
-    // above PDF file, and
-    //
-    // http://blog.dexta.ch/2008/08/27/gl_ext_framebuffer_object-with-multisampling/
-    //
-    // Finally, are pixel buffers deprecated, and does getPixelBuffer
-    // really use a pixel buffer?
-
-    // Initialize OpenGL.  It seems that using a RenderTexture means
-    // that I must create a window.
+    // Initialize OpenGL.
+    int windowSize = bufferSize;
+    if (renderToPixmap) {
+	// Just pick a small window size - we shouldn't see it anyway.
+	windowSize = 256;
+    }
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
-    glutInitWindowSize(bufferSize, bufferSize);
+    glutInitWindowSize(windowSize, windowSize);
     glutCreateWindow("Map");
   
     if (renderToPixmap) {
-	// Try to get a pixel buffer.  We might be given something
-	// smaller than what we want.
-	if (!getPixelBuffer(&bufferSize)) {
+	// Try to get a framebuffer.  First, check if the requested
+	// size is supported.
+	GLint max;
+	glGetIntegerv(GL_MAX_RENDERBUFFER_SIZE_EXT, &max);
+	if (bufferSize > max) {
 	    fprintf(stderr, 
-		    "%s: Unable to initialize pixel buffer.\n",
-		    argv[0]);
-	    cleanup();
-	    exit(1);
+		    "%s: Requested buffer size (%d) > maximum supported buffer size (%d)\n", 
+		    appName, bufferSize, max);
+	    cleanup(1);
+	}
+	if (!getFramebuffer(bufferSize)) {
+	    fprintf(stderr, 
+		    "%s: Unable to initialize framebuffer.\n",
+		    appName);
+	    cleanup(1);
 	}
 	if (verbose) {
-	    printf("Pixel buffer size: %dx%d\n", bufferSize, bufferSize);
+	    printf("Framebuffer size: %dx%d\n", bufferSize, bufferSize);
 	}
     }
 
@@ -558,7 +556,7 @@ int main(int argc, char **argv)
 	// Print out a report, then exit.
 	printf("Scenery directory:\n\t%s\n", scenery.c_str());
 	printf("Atlas map directory:\n\t%s\n", atlas.c_str());
-	printf("Palette file:\n\t%s\n", palette.c_str());
+	printf("Palette file:\n\t%s\n", palettePath.c_str());
 
 	const map<string, TileInfo *>& tiles = tileManager->tiles();
 	printf("Scenery:\n\t%d tiles in total\n", (int)tiles.size());
@@ -599,7 +597,7 @@ int main(int argc, char **argv)
 	} else {
 	    printf("No maps to generate\n");
 	}
-	exit(0);
+	exit(1);
     }
 
     // Now we know where to get the scenery data, where to put the
@@ -608,14 +606,14 @@ int main(int argc, char **argv)
     mapper = new TileMapper(atlasPalette, discreteContours, contourLines,
 			    lightPosition, lighting, smoothShading);
 
-    const map<string, TileInfo *> tiles = tileManager->tiles();
+    const map<string, TileInfo *>& tiles = tileManager->tiles();
     map<string, TileInfo *>::const_iterator i = tiles.begin();
     for (; i != tiles.end(); i++) {
 	TileInfo *t = i->second;
 	renderMap(t);
     }
 
-    cleanup();
-
+    cleanup(0);
+    
     return 0;
 }
