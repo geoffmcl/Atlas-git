@@ -54,6 +54,17 @@ else
     SIMGEAR_DIR=
 fi
 
+dnl Specify the openscenegraph location
+AC_ARG_WITH(osg, [  --with-osg=prefix   specify the prefix path to openscenegraph])
+
+if test "x$with_osg" != "x" ; then
+    echo "OpenSceneGraph prefix path is $with_osg"
+    OSG_DIR="$with_osg"
+else 
+    echo "OpenSceneGraph not specified"
+    OSG_DIR=
+fi
+
 dnl Specify the base package location
 AC_ARG_WITH(fgbase, [  --with-fgbase=prefix    specify the location of the FlightGear base package])
 
@@ -97,7 +108,7 @@ AC_SUBST(AR)
 AC_SUBST(ARFLAGS)
 
 dnl extra library and include directories
-EXTRA_DIRS="${SIMGEAR_DIR} ${PLIB_DIR} ${LIBCURL_DIR} /usr/local/plib"
+EXTRA_DIRS="${SIMGEAR_DIR} ${PLIB_DIR} ${LIBCURL_DIR} ${OSG_DIR} /usr/local/plib"
 
 dnl Determine an extra directories to add to include/lib search paths
 case "${host}" in

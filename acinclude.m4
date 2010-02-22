@@ -8,7 +8,7 @@ incdir="$1"
 if test -r $incdir ; then
 	case "$CPPFLAGS" in
 		*-I${incdir}*)
-			# echo "   + already had $incdir" 1>&6
+			# echo "   + already had $incdir" 1>&AS_MESSAGE_LOG_FD
 			;;
 		*)
 			if test "$CPPFLAGS" = "" ; then
@@ -16,7 +16,7 @@ if test -r $incdir ; then
 			else
 				CPPFLAGS="$CPPFLAGS -I$incdir"
 			fi
-			echo "   + found $incdir" 1>&6
+			echo "   + found $incdir" 1>&AS_MESSAGE_LOG_FD
 			;;
 	esac
 fi
@@ -30,7 +30,7 @@ mylibdir="$1"
 if test -r $mylibdir ; then
 	case "$LDFLAGS" in
 		*-L${mylibdir}*)
-			# echo "   + already had $mylibdir" 1>&6
+			# echo "   + already had $mylibdir" 1>&AS_MESSAGE_LOG_FD
 			;;
 		*)
 			if test "$LDFLAGS" = "" ; then
@@ -38,7 +38,7 @@ if test -r $mylibdir ; then
 			else
 				LDFLAGS="$LDFLAGS -L$mylibdir"
 			fi
-			echo "   + found $mylibdir" 1>&6
+			echo "   + found $mylibdir" 1>&AS_MESSAGE_LOG_FD
 			;;
 	esac
 fi
@@ -52,10 +52,10 @@ progdir="$1"
 if test -r $progdir ; then
 	case "$PATH" in
 		*:${progdir}*)
-			# echo "   + already had $progdir" 1>&6
+			# echo "   + already had $progdir" 1>&AS_MESSAGE_LOG_FD
 			;;
 		*${progdir}:*)
-			# echo "   + already had $progdir" 1>&6
+			# echo "   + already had $progdir" 1>&AS_MESSAGE_LOG_FD
 			;;
 		*)
 			if test "$PATH" = "" ; then
@@ -63,7 +63,7 @@ if test -r $progdir ; then
 			else
 				PATH="$PATH:$progdir"
 			fi
-			echo "   + found $progdir" 1>&6
+			echo "   + found $progdir" 1>&AS_MESSAGE_LOG_FD
 			;;
 	esac
 fi
@@ -76,7 +76,7 @@ dnl
 dnl If you want to look for subdirectories in include/lib directories,
 dnl you pass the names in argument 3, otherwise pass a dash.
 dnl
-AC_DEFUN([wi_EXTRA_DIRS], [echo "checking for extra include and lib directories..." 1>&6
+AC_DEFUN([wi_EXTRA_DIRS], [echo "checking for extra include and lib directories..." 1>&AS_MESSAGE_LOG_FD
 ifelse([$1], yes, [dnl
 b1=`cd .. ; pwd`
 b2=`cd ../.. ; pwd`
