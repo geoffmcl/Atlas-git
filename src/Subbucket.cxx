@@ -24,7 +24,6 @@
 #include <cassert>
 
 #include "Subbucket.hxx"
-#include "Globals.hxx"
 
 using namespace std;
 
