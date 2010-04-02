@@ -249,6 +249,7 @@ void Texture::load(SGPath f, float *maximumElevation)
     if (depth == 3) {
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height,
 		     0, GL_RGB, GL_UNSIGNED_BYTE, data);
+	// EYE - replace with glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_TRUE);
 	// This looks nicer, although it slows things down a bit.
 	gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGB, width, height,
 			  GL_RGB, GL_UNSIGNED_BYTE, data);
@@ -384,7 +385,7 @@ void MapTexture::draw()
 	glBindTexture(GL_TEXTURE_2D, _t.name());
 
 	glBegin(GL_QUAD_STRIP); {
-	    int width = tileWidth(_lat);
+	    int width = TileManager::tileWidth(_lat);
 	    double s, n;
 	    s = _lat;
 	    n = _lat + 1;

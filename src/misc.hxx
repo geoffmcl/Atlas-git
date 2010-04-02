@@ -226,26 +226,19 @@ class AtlasString {
 // temporary work.  Save any results you want to keep!
 extern AtlasString globalString;
 
-// I use this for printing frequencies.  Frequencies on charts are
+// I use this for printing frequencies.  VHF frequencies on charts are
 // printed without trailing zeroes, except when that would mean
 // printing nothing after the decimal, in which case a zero is added
-// (ie, 126.0, 126.1, 126.15, 126.775).
+// (ie, 126.0, 126.1, 126.05, 126.775).
 //
-// This routine takes a frequency in Hertz (eg, 126000), and splits it
-// into two pieces, a MHz part (126 in this case) and the rest (0 in
-// this case).  Note that printf's %g option very nearly does this -
-// it only fails when we ask it to print 126.0, which it prints as
-// 126.
-void splitFrequency(int freq, int *mhz, int *rest);
-
-// Returns the width of the tile whose southern edge is given by lat.
-int tileWidth(int lat);
-
-// Returns the canonical name of the tile containing the given
-// latitude and longitude.  Copy the string if you need to save it.
-// Assumes latitudes and longitudes are in range (-90 <= lat < 90,
-// -180 <= lon < 180).
-const char *tileName(float latitude, float longitude);
+// This routine takes a frequency in *kHz* (eg, 126,000), and returns
+// a properly formatted string.  Note - the string is static and will
+// be changed on the next call to this function, so you should copy it
+// if you need to save it.
+//
+// This function can be used for printing LF/MF (ie, NDB) frequencies
+// as well.
+const char *formatFrequency(int freq);
 
 // Calculates the minimum elevation figure (MEF) for some area, given
 // the highest elevation (in feet) in that area.

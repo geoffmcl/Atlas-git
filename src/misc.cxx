@@ -535,62 +535,23 @@ AtlasString globalString;
 // }
 
 //////////////////////////////////////////////////////////////////////
-// splitFrequency
+// formatFrequency
 //////////////////////////////////////////////////////////////////////
 
-void splitFrequency(int freq, int *mhz, int *rest)
+const char *formatFrequency(int frequency)
 {
-    *mhz = freq / 1000;
-    *rest = freq % 1000;
-    while ((*rest != 0) && ((*rest % 10) == 0)) {
-	*rest /= 10;
-    }
-}
-
-//////////////////////////////////////////////////////////////////////
-// tileWidth, tileName
-//////////////////////////////////////////////////////////////////////
-
-int tileWidth(int lat)
-{
-    assert((-90 <= lat) && (lat <= 89));
-
-    if (lat < 0) {
-	lat = abs(lat + 1);
-    }
-
-    if (lat < 83) {
-	return 1;
-    } else if (lat < 86) {
-	return 2;
-    } else if (lat < 88) {
-	return 4;
-    } else if (lat < 89) {
-	return 8;
+    // The maximum allowable NDB frequency is 1750 kHz (according to
+    // Wikipedia).
+    const int maxNDBFrequency = 1750;
+    static AtlasString str;
+    if (frequency < maxNDBFrequency) {
+	str.printf("%d", frequency);
+    } else if ((frequency % 1000) == 0) {
+	str.printf("%.1f", frequency / 1000.0);
     } else {
-	return 360;
+	str.printf("%g", frequency / 1000.0);
     }
-}
-
-const char *tileName(float latitude, float longitude)
-{
-    static AtlasString name;
-
-    int lat = floor(latitude);
-    int lon = floor(longitude);
-    char ew = 'e', ns = 'n';
-    if (lat < 0) {
-	lat = -lat;
-	ns = 's';
-    }
-    if (lon < 0) {
-	lon = -lon;
-	ew = 'w';
-    }
-
-    name.printf("%c%03d%c%02d", ew, lon, ns, lat);
-
-    return name.str();
+    return str.str();
 }
 
 //////////////////////////////////////////////////////////////////////

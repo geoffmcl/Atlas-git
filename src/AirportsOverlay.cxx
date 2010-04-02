@@ -188,7 +188,8 @@ bool AirportsOverlay::load(const string& fgDir)
     arp = gzopen(f.c_str(), "rb");
     if (arp == NULL) {
 	// EYE - we might want to throw an error instead.
-	fprintf(stderr, "_loadAirports: Couldn't open \"%s\".\n", f.c_str());
+	fprintf(stderr, "AirportsOverlay::load: Couldn't open \"%s\".\n", 
+		f.c_str());
 	return false;
     } 
 
@@ -202,7 +203,7 @@ bool AirportsOverlay::load(const string& fgDir)
 	result = _load810(arp);
     } else {
 	// EYE - throw an error?
-	fprintf(stderr, "_loadAirports: \"%s\": unknown version %d.\n", 
+	fprintf(stderr, "AirportsOverlay::load: \"%s\": unknown version %d.\n", 
 		f.c_str(), version);
 	result = false;
     }
@@ -1109,9 +1110,7 @@ void AirportsOverlay::_labelAirport(ARP *ap, int rA)
 		lm.setFont(globals.boldFont, small);
 		set<int>::iterator j;
 		for (j = freqs.begin(); j != freqs.end(); j++) {
-		    int mhz, khz;
-		    splitFrequency(*j, &mhz, &khz);
-		    globalString.appendf(" %d.%d", mhz, khz);
+		    globalString.appendf(" %s", formatFrequency(*j));
 		}
 		lm.addText(globalString.str());
 	    }

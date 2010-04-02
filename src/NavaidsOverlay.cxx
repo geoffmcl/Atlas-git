@@ -2302,20 +2302,12 @@ Label *NavaidsOverlay::_makeLabel(const char *fmt, const NAV *n,
 		}
 		break;
 	      case 'F':
-		if (n->navtype == NAV_NDB) {
-		    line.appendf("%d", n->freq);
-		} else {
-		    int mhz, khz;
-		    splitFrequency(n->freq, &mhz, &khz);
-		    line.appendf("%d.%d", mhz, khz);
-		}
+		line.appendf("%s", formatFrequency(n->freq));
 		break;
 	      case 'f':
 		// DME frequency in an NDB-DME.
 		assert((n->navtype == NAV_NDB) && (n->navsubtype == NDB_DME));
-		int mhz, khz;
-		splitFrequency(n->freq2, &mhz, &khz);
-		line.appendf("%d.%d", mhz, khz);
+		line.appendf("%s", formatFrequency(n->freq2));
 		break;
 	      case '%':
 		line.appendf("%%");
