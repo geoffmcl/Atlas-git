@@ -39,7 +39,8 @@ class TileMapper {
     TileMapper(Palette *p, 
 	       bool discreteContours = true, 
 	       bool contourLines = false, 
-	       sgVec4 light = NULL,
+	       float azimuth = 315.0,
+	       float elevation = 55.0,
 	       bool lighting = true,
 	       bool smoothShading = true);
     ~TileMapper();
@@ -70,7 +71,7 @@ class TileMapper {
     // True if we should draw contour lines.
     bool _contourLines;
     // Position of light (in eye coordinates).
-    float *_lightPosition;
+    sgVec4 _lightPosition;
     // True if we have lighting.
     bool _lighting;
     // True if we smooth polygons, false if we want "chunky" polygons.

@@ -35,15 +35,23 @@ using namespace std;
 const float TileMapper::MIN_ELEVATION;
 
 TileMapper::TileMapper(Palette *p, bool discreteContours, bool contourLines,
-		       sgVec4 light, bool lighting, bool smoothShading):
+		       float azimuth, float elevation, bool lighting, 
+		       bool smoothShading):
     _palette(p), _discreteContours(discreteContours), 
-    _contourLines(contourLines), _lightPosition(light), 
-    _lighting(lighting), _smoothShading(smoothShading)
+    _contourLines(contourLines), _lighting(lighting),
+    _smoothShading(smoothShading)
 {
     // We must have a palette.
     if (!_palette) {
 	throw runtime_error("palette");
     }
+
+    float a = (90.0 - azimuth) * SG_DEGREES_TO_RADIANS;
+    float e = elevation * SG_DEGREES_TO_RADIANS;
+    _lightPosition[0] = cos(a) * cos(e);
+    _lightPosition[1] = sin(a) * cos(e);
+    _lightPosition[2] = sin(e);
+    _lightPosition[3] = 0.0;
 
     Bucket::palette = _palette;
     Bucket::discreteContours = _discreteContours;

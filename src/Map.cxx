@@ -78,8 +78,6 @@ static bool contourLines = false;
 // Position of light.  We always set the light at infinity (w = 0.0);
 // EYE - this must be shared with Atlas - make defaults global?
 static float azimuth = 315.0, elevation = 55.0;
-// static sgVec4 lightPosition = {-1.0, 1.0, 2.0, 0.0};
-static sgVec4 lightPosition;
 // True if we want smooth shading, false if we want flat shading.
 static bool smoothShading = true;
 
@@ -367,15 +365,6 @@ int main(int argc, char **argv)
 	}
     }
 
-    // Set lighting vector.
-    // EYE - put this code in misc or somewhere?
-    float a = (90.0 - azimuth) * SG_DEGREES_TO_RADIANS;
-    float e = elevation * SG_DEGREES_TO_RADIANS;
-    lightPosition[0] = cos(a) * cos(e);
-    lightPosition[1] = sin(a) * cos(e);
-    lightPosition[2] = sin(e);
-    lightPosition[3] = 0.0;
-
     // Figure out which scenery path to use.  We place the final path
     // in the 'scenery' variable.
     if (!scenery.str().empty()) {
@@ -581,6 +570,7 @@ int main(int argc, char **argv)
 		}
 		tileCount++;
 		printf("\t%s: ", t->name());
+		// EYE - use maps.count()?
 		for (unsigned int j = 0; j < TileManager::MAX_MAP_LEVEL; j++) {
 		    if (maps[j]) {
 			mapCount++;
@@ -604,7 +594,7 @@ int main(int argc, char **argv)
     // maps, the desired map sizes, the size of the buffers we can
     // use, and the palette to use.  Let's draw!
     mapper = new TileMapper(atlasPalette, discreteContours, contourLines,
-			    lightPosition, lighting, smoothShading);
+			    azimuth, elevation, lighting, smoothShading);
 
     const map<string, TileInfo *>& tiles = tileManager->tiles();
     map<string, TileInfo *>::const_iterator i = tiles.begin();
