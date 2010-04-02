@@ -28,6 +28,7 @@
 
 #include <vector>
 #include <simgear/misc/sg_path.hxx>
+#include <plib/sg.h>
 
 // This class (of which there should only be one instantiated), keeps
 // Atlas' preferences.  Preferences come from 3 places:

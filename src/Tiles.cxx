@@ -23,8 +23,11 @@
 
 #include <cassert>
 #include <stdexcept>
+#include <cmath>
 
 #include <simgear/misc/sg_path.hxx>
+#include <plib/ul.h>
+#include <plib/sg.h>
 
 #include "Tiles.hxx"
 

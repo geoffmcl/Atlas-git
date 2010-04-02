@@ -312,6 +312,7 @@ class Palettes {
     size_t _i;
     vector<Palette *> _palettes;
 };
+// EYE - make part of Globals?
 Palettes *palettes;
 
 Palettes::Palettes(const char *paletteDir): _i(0)
@@ -1095,7 +1096,6 @@ MainUI::MainUI(int x, int y): _dirty(true)
     // line up on the left (but they seem to on the right).  What
     // behaviour controls this?
     trackSizeText = new puText(curx, cury);
-    // EYE - set label or legend?
     trackSizeText->setLabel("Track size: ");
     cury += buttonHeight + bigSpace;
 
@@ -1354,7 +1354,7 @@ MainUI::MainUI(int x, int y): _dirty(true)
     // Mouse/centre: a text output
     mouseText = new puText(curx, cury);
     showMouse = false;		// EYE - use a method
-    elevText->setLabel("centre");
+    mouseText->setLabel("centre");
 
     curx = bigSpace;
     cury += buttonHeight + bigSpace;
@@ -1570,7 +1570,7 @@ InfoUI::InfoUI(int x, int y)
     const int textHeight = 15;
     const int bigSpace = 5;
     // EYE - magic numbers
-    const int textWidth = 175;
+    const int textWidth = 200;
 
     const int height = textHeight * 8 + 3 * bigSpace;
     const int width = textWidth * 2;
@@ -2482,9 +2482,12 @@ HelpUI::HelpUI(int x, int y, Preferences& prefs, TileManager& tm)
     globalString.appendf("    %s\n", prefs.scenery_root.c_str());
     globalString.appendf("Atlas maps\n");
     globalString.appendf("    %s\n", prefs.path.c_str());
+    // EYE - this can change!  We need to track changes in the
+    // palette, or indicate that this is the default palette.
     globalString.appendf("Atlas palette\n");
     globalString.appendf("    %s\n", prefs.palette.c_str());
 
+    // EYE - this can change!
     globalString.appendf("\n");
     globalString.appendf("Maps\n");
     globalString.appendf("    %d maps/tiles\n", tm.tiles().size());
@@ -2900,10 +2903,10 @@ void mouseMotion(int x, int y)
 	    sgdVec3 axis;
 	    sgdMat4 rot;
 
-	    sgdVectorProductVec3(axis, newC.sg(), oldC.sg());
+	    sgdVectorProductVec3(axis, newC.data(), oldC.data());
 	    double theta = SGD_RADIANS_TO_DEGREES *
 		atan2(sgdLengthVec3(axis), 
-		      sgdScalarProductVec3(oldC.sg(), newC.sg()));
+		      sgdScalarProductVec3(oldC.data(), newC.data()));
 	    sgdMakeRotMat4(rot, theta, axis);
 	    
 	    // Transform the eye point and the camera up vector.
@@ -3018,7 +3021,7 @@ void keyPressed(unsigned char key, int x, int y)
 	  case 'c': 
 	    // Center the map on the current mouse position.
 	    if (cursor.validLocation) {
-		movePosition(cursor.cart.sg());
+		movePosition(cursor.cart.data());
 	    }
 	    break;
 
@@ -3855,6 +3858,7 @@ int main(int argc, char **argv)
     fontDir = prefs.path;
     fontDir.append("Fonts");
 
+    // EYE - do we need to call fntInit()?
     fontFile = fontDir;
     fontFile.append("Helvetica.100.txf");
     globals.regularFont = new atlasFntTexFont;

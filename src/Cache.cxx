@@ -225,7 +225,7 @@ void Cache::_load()
 	_objectsSize += c->size();
 
 	t2.stamp();
-    } while ((_toBeLoaded.size() > 0) && ((t2 - t1) < microSeconds));
+    } while ((_toBeLoaded.size() > 0) && ((t2 - t1).get_usec() < microSeconds));
 
     // Return to the old window.
     glutPostWindowRedisplay(_window);
