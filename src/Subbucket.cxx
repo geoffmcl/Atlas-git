@@ -29,7 +29,8 @@ using namespace std;
 
 Subbucket::Subbucket(const SGPath &p): 
     _path(p), _loaded(false), _palettized(false),
-    _materialsDL(0), _contoursDL(0), _contourLinesDL(0), _size(0)
+    _materialsDL(0), _contoursDL(0), _contourLinesDL(0), 
+    _polygonEdgesDL(0), _size(0)
 {
 }
 
@@ -233,6 +234,8 @@ void Subbucket::unload()
     _contoursDL = 0;
     glDeleteLists(_contourLinesDL, 1);
     _contourLinesDL = 0;
+    glDeleteLists(_polygonEdgesDL, 1);
+    _polygonEdgesDL = 0;
 
     _loaded = false;
 }
@@ -248,6 +251,8 @@ void Subbucket::paletteChanged()
     _contoursDL = 0;
     glDeleteLists(_contourLinesDL, 1);
     _contourLinesDL = 0;
+    glDeleteLists(_polygonEdgesDL, 1);
+    _polygonEdgesDL = 0;
 
     _palettized = false;
 }
@@ -307,6 +312,7 @@ void Subbucket::_palettize()
     _contours.clear();
     _contours.resize(Bucket::palette->size());
     _contourLines.clear();
+    _polygonEdges.clear();
     _edgeContours.clear();
 
     // First, triangles.
@@ -323,6 +329,17 @@ void Subbucket::_palettize()
 	} else {
 	    // Contours.
 	    _chopTriangles(tris[i]);
+	}
+
+	// Polygon edges
+	assert((tris[i].size() % 3) == 0);
+	for (size_t j = 0; j < tris[i].size() / 3; j++) {
+	    _polygonEdges.push_back(tris[i][j * 3]);
+	    _polygonEdges.push_back(tris[i][j * 3 + 1]);
+	    _polygonEdges.push_back(tris[i][j * 3 + 1]);
+	    _polygonEdges.push_back(tris[i][j * 3 + 2]);
+	    _polygonEdges.push_back(tris[i][j * 3 + 2]);
+	    _polygonEdges.push_back(tris[i][j * 3]);
 	}
     }
 
@@ -349,6 +366,25 @@ void Subbucket::_palettize()
 	    // Contours.
 	    _chopTriangleStrip(strips[i]);
 	}
+
+	// Polygon edges
+	for (size_t j = 0; j < strips[i].size() - 2; j++) {
+	    if (j % 2 == 0) {
+		_polygonEdges.push_back(strips[i][j]);
+		_polygonEdges.push_back(strips[i][j + 1]);
+		_polygonEdges.push_back(strips[i][j + 1]);
+		_polygonEdges.push_back(strips[i][j + 2]);
+		_polygonEdges.push_back(strips[i][j + 2]);
+		_polygonEdges.push_back(strips[i][j]);
+	    } else {
+		_polygonEdges.push_back(strips[i][j + 1]);
+		_polygonEdges.push_back(strips[i][j]);
+		_polygonEdges.push_back(strips[i][j]);
+		_polygonEdges.push_back(strips[i][j + 2]);
+		_polygonEdges.push_back(strips[i][j + 2]);
+		_polygonEdges.push_back(strips[i][j + 1]);
+	    }
+	}
     }
 
     // Finally, triangle fans.
@@ -362,13 +398,23 @@ void Subbucket::_palettize()
 	    // _materials.
 	    vector<GLuint>& triangles = _materialsN[material];
 	    for (size_t j = 1; j < fans[i].size() - 1; j++) {
-		    triangles.push_back(fans[i][0]);
-		    triangles.push_back(fans[i][j]);
-		    triangles.push_back(fans[i][j + 1]);
+		triangles.push_back(fans[i][0]);
+		triangles.push_back(fans[i][j]);
+		triangles.push_back(fans[i][j + 1]);
 	    }
 	} else {
 	    // Contours.
 	    _chopTriangleFan(fans[i]);
+	}
+
+	// Polygon edges
+	for (size_t j = 1; j < fans[i].size() - 1; j++) {
+	    _polygonEdges.push_back(fans[i][0]);
+	    _polygonEdges.push_back(fans[i][j]);
+	    _polygonEdges.push_back(fans[i][j]);
+	    _polygonEdges.push_back(fans[i][j + 1]);
+	    _polygonEdges.push_back(fans[i][j + 1]);
+	    _polygonEdges.push_back(fans[i][0]);
 	}
     }
     _edgeMap.clear();
@@ -402,6 +448,7 @@ void Subbucket::draw()
     glNormalPointer(GL_FLOAT, 0, &_normals[0]);
     glColorPointer(4, GL_FLOAT, 0, &_colours[0]);
 
+    // Now create the display lists.
     // ---------- Materials ----------
     if (_materialsDL == 0) {
 	_materialsDL = glGenLists(1);
@@ -483,7 +530,10 @@ void Subbucket::draw()
     }
 
     // ---------- Contour lines ----------
-    if (_contourLinesDL == 0) {
+    // Contour lines and especially polygon edges are probably used
+    // rarely, so only create display lists for them if explicitly
+    // asked.
+    if ((_contourLinesDL == 0) && Bucket::contourLines) {
 	_contourLinesDL = glGenLists(1);
 	assert(_contourLinesDL != 0);
 
@@ -504,6 +554,28 @@ void Subbucket::draw()
 	glEndList();
     }
 
+    // ---------- Polygon edges ----------
+    if ((_polygonEdgesDL == 0) && Bucket::polygonEdges) {
+	_polygonEdgesDL = glGenLists(1);
+	assert(_polygonEdgesDL != 0);
+
+	glNewList(_polygonEdgesDL, GL_COMPILE);
+	glPushAttrib(GL_LINE_BIT);
+	glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT); {
+	    glEnableClientState(GL_VERTEX_ARRAY);
+	    glDisableClientState(GL_NORMAL_ARRAY);
+	    glDisableClientState(GL_COLOR_ARRAY);
+
+	    glLineWidth(0.5);
+	    glColor4f(1.0, 0.0, 0.0, 1.0);
+	    glDrawElements(GL_LINES, _polygonEdges.size(), GL_UNSIGNED_INT,
+	    		   &(_polygonEdges[0]));
+	}
+	glPopAttrib();
+	glPopClientAttrib();
+	glEndList();
+    }
+
     // Materials
     glCallList(_materialsDL);
 
@@ -515,6 +587,15 @@ void Subbucket::draw()
 	glPushAttrib(GL_DEPTH_BUFFER_BIT); {
 	    glDisable(GL_DEPTH_TEST);
 	    glCallList(_contourLinesDL);
+	}
+	glPopAttrib();
+    }
+
+    // Polygon edges
+    if (Bucket::polygonEdges) {
+	glPushAttrib(GL_DEPTH_BUFFER_BIT); {
+	    glDisable(GL_DEPTH_TEST);
+	    glCallList(_polygonEdgesDL);
 	}
 	glPopAttrib();
     }

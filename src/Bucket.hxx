@@ -43,14 +43,21 @@ class Subbucket;
 
 class Bucket {
 public:
-    // These variables are shared amongst all buckets and subbuckets.
+    // These variables are shared amongst all buckets and subbuckets
+    // and influence how subbuckets are to be drawn.  Palette
+    // determines material and contour colouring; discreteContours
+    // controls whether contour levels should blend into each other;
+    // contourLines toggles the drawing of contour lines; polygonEdges
+    // toggles the drawing the outline of raw scenery polygons (this
+    // is intended to be used for debugging only).
+    //
     // If you change palette or discreteContours, you should notify
     // all buckets via paletteChanged() and discreteContoursChanged(),
     // and then redraw.  It's not necessary to notify buckets about
-    // changes to contourLines (because it doesn't require any
-    // recalculations), but you still need to redraw.
+    // changes to contourLines or polygonEdges (because it doesn't
+    // require any recalculations), but you still need to redraw.
     static Palette *palette;
-    static bool discreteContours, contourLines;
+    static bool discreteContours, contourLines, polygonEdges;
 
     Bucket(const SGPath &p, long int index);
     ~Bucket();

@@ -47,6 +47,7 @@ using namespace std;
 Palette *Bucket::palette = NULL;
 bool Bucket::discreteContours = true;
 bool Bucket::contourLines = false;
+bool Bucket::polygonEdges = false;
 
 // EYE - chunk? tile? bucket?  In newbucket.hxx, it seems that a 1x1
 // square is a chunk, and the parts are called both tiles and buckets.

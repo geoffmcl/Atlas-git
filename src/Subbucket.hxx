@@ -111,12 +111,13 @@ class Subbucket {
     // and colour the subbucket triangles.
     bool _palettized;
 
-    // The net result of drawing are these 3 display lists:
+    // The net result of drawing are these 4 display lists:
     // _materialsDL draws all triangles coloured by their material
     // (ie, not their elevation), _contoursDL draws all triangles
-    // coloured by their elevation, and _contourLinesDL draws all
-    // contour lines.
-    GLuint _materialsDL, _contoursDL, _contourLinesDL;
+    // coloured by their elevation, _contourLinesDL draws all contour
+    // lines, and _polygonEdgesDL draws outlines of all scenery
+    // polygons (before being sliced).
+    GLuint _materialsDL, _contoursDL, _contourLinesDL, _polygonEdgesDL;
 
     unsigned int _size;	// Size of subbucket (approximately) in bytes.
 
@@ -142,6 +143,9 @@ class Subbucket {
     // line segment (ie, GL_LINES format).  This is used for drawing
     // contour lines.
     int_list _contourLines;
+    // Similar to _contourLines, except for the edges of raw scenery
+    // polygons.  This is intended for "debugging" scenery.
+    int_list _polygonEdges;
     // A temporary varible used to handle a special case: contours
     // that run along a triangle edge (as opposed to cutting through a
     // triangle).  These may be shared by an adjacent triangle, and we
