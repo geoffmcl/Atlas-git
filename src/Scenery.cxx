@@ -1138,25 +1138,24 @@ void Scenery::_label(bool live)
 // coordinates of that point.  With textures, we intersect with an
 // idealized earth ellipsoid.
 //
-// x and y are window coordinates, with (0.0, 0.0) being the *top*
-// left corner.  They represent a point, not a pixel.  For example, if
-// a window is 100 pixels wide and 50 pixels high, then the lower
-// right *pixel* is (99, 49).  However, the *point* (99.0, 49.0) is
-// the top left corner of that pixel.  The lower right corner of the
-// entire window is (100.0, 50.0).  If you are calling this with a
-// mouse coordinate, you probably should add 0.5 to both the x and y
-// coordinates, which is the centre of the pixel.
+// x and y are window coordinates which represent a point, not a
+// pixel.  For example, if a window is 100 pixels wide and 50 pixels
+// high, the lower right *pixel* is (99, 49).  However, the *point*
+// (99.0, 49.0) is the top left corner of that pixel.  The lower right
+// corner of the entire window is (100.0, 50.0).  If you are calling
+// this with a mouse coordinate, you probably should add 0.5 to both
+// the x and y coordinates, which is the centre of the pixel the mouse
+// is on.
+//
+// Note as well that if we intersect with live scenery, the elevation
+// value will be the maximum value in the 1x1 pixel area centred on
+// (x, y).
 bool Scenery::intersection(double x, double y, 
 			   SGVec3<double> *c, bool *validElevation)
 {
     GLint viewport[4];
     GLdouble mvmatrix[16], projmatrix[16];
     GLdouble wx, wy, wz;	// World x, y, z coords.
-
-    // EYE - I think I should do this.  However, it's then very
-    // important that this routine not be called from someone's draw()
-    // method (at least if it uses a different context).
-    // atlasWindow->atlasView->make_current();
 
     // Our line is given by two points: the intersection of our
     // viewing "ray" with the near depth plane and far depth planes.
@@ -1215,7 +1214,6 @@ bool Scenery::intersection(double x, double y,
 		    // intersection using one of its buckets (ie, live
 		    // scenery), we know that the elevation value is
 		    // valid.  We can also short-circuit our search.
-		    // liveIntersection = true;
 		    *validElevation = true;
 		    break;
 		}
