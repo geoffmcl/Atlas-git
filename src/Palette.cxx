@@ -32,7 +32,7 @@
 
 using namespace std;
 
-Palette::Palette(const char *path): _i(0)
+Palette::Palette(const char *path): _metres(true), _base(0.0), _i(1)
 {
     // EYE - throw errors?
     ifstream in(path);
@@ -47,7 +47,6 @@ Palette::Palette(const char *path): _i(0)
     map<string, _foodle> colourMap;
     string keyword, material, name;
     _foodle colour;
-    bool metres = true;
 
     while (getline(in, buf)) {
 	istringstream line(buf);
@@ -67,11 +66,11 @@ Palette::Palette(const char *path): _i(0)
 	    line >> name;
 	    if ((name == "feet") || 
 		(name == "ft")) {
-		metres = false;
+		_metres = false;
 	    } else if ((name == "metres") || 
 		       (name == "meters") || 
 		       (name == "m")) {
-		metres = true;
+		_metres = true;
 	    } else {
 		throw std::runtime_error("unknown unit");
 	    }
@@ -100,7 +99,7 @@ Palette::Palette(const char *path): _i(0)
 	    int height;
 	    if (sscanf(material.c_str(), "Elevation_%d", &height) == 1) {
 		Contour entry;
-		if (!metres) {
+		if (!_metres) {
 		    // Internally we use metres.
 		    height *= SG_FEET_TO_METER;
 		}
@@ -152,6 +151,10 @@ Palette::Palette(const char *path): _i(0)
     fake.elevation += _elevations[i].elevation - _elevations[i - 1].elevation;
     _elevations.push_back(fake);
 
+    // Copy the raw elevations data in _elevations to ones offset by
+    // _base, in _offsetElevations.
+    _offsetElevations = _elevations;
+
     _path = path;
 }
 
@@ -159,9 +162,21 @@ Palette::~Palette()
 {
 }
 
+void Palette::setBase(float f)
+{
+    if (f == _base) {
+	return;
+    }
+
+    _base = f;
+    for (size_t i = 0; i < _elevations.size(); i++) {
+	_offsetElevations[i].elevation = _elevations[i].elevation + _base;
+    }
+}
+
 const Palette::Contour& Palette::contour(float elevation)
 {
-    return _elevations[contourIndex(elevation)];
+    return _offsetElevations[contourIndex(elevation)];
 }
 
 const float *Palette::colour(const char *material) const
@@ -182,23 +197,24 @@ const float *Palette::colour(const char *material) const
 // means "everything at <x> or above is <colour>".
 //
 // Note that we return an index in the range <0, Palette::size()>, and
-// that a returned index i corresponds to _elevations[i + 1].  This is
-// because the palette has an extra <elevation, contour> pair inserted
-// at the beginning (and at the end).
+// that a returned index i corresponds to _offsetElevations[i + 1].
+// This is because the palette has an extra <elevation, contour> pair
+// inserted at the beginning (and at the end).
 unsigned int Palette::contourIndex(float elevation)
 {
     // Search up.  We use a class variable _i, which maintains its
     // value between calls, the logic being that successive calls to
     // this routine will be at similar elevations - by beginning a new
     // search at the end of the last one, we're likely to already be
-    // at the right place.
+    // at the right place.  The variable _i points to the *real*
+    // entry.
     for (; 
-	 (_i < _elevations.size() - 2) && 
-	     (elevation >= _elevations[_i + 1].elevation); 
+	 (_i < _offsetElevations.size() - 2) && 
+	     (elevation >= _offsetElevations[_i + 1].elevation); 
 	 _i++)
 	;
     // Search down.
-    for (; (_i > 1) && (elevation < _elevations[_i].elevation); _i--)
+    for (; (_i > 1) && (elevation < _offsetElevations[_i].elevation); _i--)
 	;
 
     // Adjust for the "fake" first pair.
@@ -208,18 +224,18 @@ unsigned int Palette::contourIndex(float elevation)
 // Returns the <elevation, colour> pair at the given index, which is
 // assumed to have come from a call contourIndex() (ie, it has been
 // adjusted for the extra pairs at the start and end of the
-// _elevations deque).
+// _offsetElevations deque).
 const Palette::Contour& Palette::contourAtIndex(unsigned int i) const
 {
     // Adjust for the "fake" first pair.
     i++;
     if (i < 1) {
 	i = 1;
-    } else if (i >= _elevations.size() - 2) {
-	i = _elevations.size() - 2;
+    } else if (i >= _offsetElevations.size() - 2) {
+	i = _offsetElevations.size() - 2;
     }
 
-    return _elevations[i];
+    return _offsetElevations[i];
 }
 
 // Creates a smoothed colour value for the given elevation.  Assume we
@@ -247,8 +263,8 @@ const Palette::Contour& Palette::contourAtIndex(unsigned int i) const
 // (5) an elevation of 200 gives a colour of c1 + c2 / 2.0.
 void Palette::smoothColour(float elevation, sgVec4 colour)
 {
-    // We directly access the _elevations deque in this routine, so we
-    // need to add one to the index returned by contourIndex.
+    // We directly access the _offsetElevations deque in this routine,
+    // so we need to add one to the index returned by contourIndex.
     unsigned int i = contourIndex(elevation) + 1;
 
     // These are used when smoothing colours:
@@ -260,23 +276,23 @@ void Palette::smoothColour(float elevation, sgVec4 colour)
     float range, delta, scale;
     const float *cu, *cl;		// Upper and lower colours.
 
-    range = _elevations[i + 1].elevation - _elevations[i].elevation;
-    delta = elevation - _elevations[i].elevation;
+    range = _offsetElevations[i + 1].elevation - _offsetElevations[i].elevation;
+    delta = elevation - _offsetElevations[i].elevation;
     scale = delta / range;
     if (scale > 0.5) {
 	// Blend with upper colour.  The lower colour varies from 1.0
 	// (in the middle) to 0.5 (at the border), the upper colour
 	// from 0.0 (in the middle) to 0.5 (at the border).
 	scale -= 0.5;
-	cu = _elevations[i + 1].colour;
-	cl = _elevations[i].colour;
+	cu = _offsetElevations[i + 1].colour;
+	cl = _offsetElevations[i].colour;
     } else {
 	// Blend with lower colour.  The upper colour varies from 1.0
 	// (in the middle) to 0.5 (at the border), the lower colour
 	// from 0.0 (in the middle) to 0.5 (at the border).
 	scale += 0.5;
-	cu = _elevations[i].colour;
-	cl = _elevations[i - 1].colour;
+	cu = _offsetElevations[i].colour;
+	cl = _offsetElevations[i - 1].colour;
     }
 
     sgSubVec4(colour, cu, cl);

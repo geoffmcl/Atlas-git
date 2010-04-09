@@ -42,13 +42,20 @@ class Palette {
 
     const char *path() const { return _path.c_str(); }
 
-    // This defines one contour interval.  All elevations above
-    // 'elevation' up to and including the next contour are given the
-    // RGBA colour 'colour'.
+    // This defines one contour interval.  All elevations at or above
+    // 'elevation', up to but not including the next contour are given
+    // the RGBA colour 'colour'.
     struct Contour {
 	float elevation;
 	sgVec4 colour;
     };
+
+    // The base is an offset to elevation values.  By default it is
+    // 0.0, which means that an elevation defined in the palette is
+    // absolute.  By setting the base to a non-zero value, elevations
+    // will be coloured relative to that point.
+    float base() { return _base; }
+    void setBase(float f);
 
     // Returns the contour struct for the given elevation.
     const Contour& contour(float elevation);
@@ -75,6 +82,12 @@ class Palette {
     // Our file.
     std::string _path;
 
+    // Our units - true if metres, false if feet.
+    bool _metres;
+
+    // An offset to add to all elevations.
+    float _base;
+
     // This is a hack to get around C/C++'s refusal to assign arrays.
     // By putting the array in a struct, it will do assignments for
     // us.  And no, 'foodle' doesn't mean anything.
@@ -88,7 +101,7 @@ class Palette {
     // Deque of <elevation, colour> pairs.  The first and last pairs
     // are generated internally by the Palette class to make
     // calculating smooth colour values easier.
-    std::deque<Contour> _elevations;
+    std::deque<Contour> _elevations, _offsetElevations;
     
     // Index of last colour index returned from contourIndex().  I'm
     // guessing that successive calls to this method will be for
