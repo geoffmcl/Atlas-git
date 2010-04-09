@@ -31,6 +31,10 @@
 #include "Image.hxx"
 #include "misc.hxx"
 
+// This is a constant representing "Not an Elevation" - it is
+// guaranteed to be less than any possible real elevation value.
+static const float NanE = -std::numeric_limits<float>::max();
+
 // Error-handling structures and code.
 struct my_error_mgr {
     struct jpeg_error_mgr pub;	// "public" fields
@@ -101,7 +105,7 @@ char *loadJPEG(const char *filename, int *width, int *height, int *depth,
     *depth = 0;
 
     if (maxElev) {
-	*maxElev = -1e6;
+	*maxElev = NanE;
 	jpeg_saved_marker_ptr marker;
 	for (marker = cinfo.marker_list; 
 	     marker != NULL; 
@@ -213,7 +217,7 @@ char *loadPNG(const char *filename, int *width, int *height, int *depth,
 
     // Read the maximum image height (if it exists);
     if (maxElev) {
-	*maxElev = -1e6;
+	*maxElev = NanE;
 	int num_text;
 	png_text *text_ptr;
 	png_get_text(png_ptr, info_ptr, &text_ptr, &num_text);
