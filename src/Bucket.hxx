@@ -59,6 +59,11 @@ public:
     static Palette *palette;
     static bool discreteContours, contourLines, polygonEdges;
 
+    // This is a constant representing "Not an Elevation" - it can be
+    // used to represent a nonsensical elevation value, and is
+    // guaranteed to be less than any possible real elevation value.
+    static const float NanE;
+
     Bucket(const SGPath &p, long int index);
     ~Bucket();
 

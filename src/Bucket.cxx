@@ -49,6 +49,8 @@ bool Bucket::discreteContours = true;
 bool Bucket::contourLines = false;
 bool Bucket::polygonEdges = false;
 
+const float Bucket::NanE = -std::numeric_limits<float>::max();
+
 // EYE - chunk? tile? bucket?  In newbucket.hxx, it seems that a 1x1
 // square is a chunk, and the parts are called both tiles and buckets.
 // In the HTML documentation, it seems that a chunk is just a vague
@@ -131,8 +133,7 @@ void Bucket::load(Projection projection)
     }
 
     // Find the highest point in the bucket and set _maxElevation.
-    // EYE - magic number!
-    _maxElevation = -1e6;
+    _maxElevation = Bucket::NanE;
     for (unsigned int i = 0; i < _subbuckets.size(); i++) {
 	if (_subbuckets[i]->maximumElevation() > _maxElevation) {
 	    _maxElevation = _subbuckets[i]->maximumElevation();

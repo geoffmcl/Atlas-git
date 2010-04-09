@@ -32,8 +32,6 @@
 
 using namespace std;
 
-const float TileMapper::MIN_ELEVATION;
-
 TileMapper::TileMapper(Palette *p, bool discreteContours, bool contourLines,
 		       float azimuth, float elevation, bool lighting, 
 		       bool smoothShading):
@@ -299,5 +297,5 @@ void TileMapper::_unloadBuckets()
     // This might be overkill, but presumably if we're unloading
     // buckets, that means we can no longer trust the maximum
     // elevation figure.
-    _maximumElevation = MIN_ELEVATION;
+    _maximumElevation = Bucket::NanE;
 }

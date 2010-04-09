@@ -46,7 +46,6 @@ class TileMapper {
     ~TileMapper();
 
     enum ImageType {PNG, JPEG};
-    static const float MIN_ELEVATION = -1e6;
 
     // Specify the tile upon which future operations will operate.
     // This will load the scenery for the tile.

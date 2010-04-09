@@ -43,10 +43,6 @@
 
 using namespace std;
 
-// A nonsensical elevation value.  This is used to represent an unset
-// maximum elevation value for a scenery tile or bucket.
-static const float NO_ELEVATION = -1e6;
-
 // Drawing scenery is a little bit complex, mostly because of a desire
 // to maintain reasonable response and performance.  We try to do only
 // the minimum amount of work, and we try not to do too much at one
@@ -323,9 +319,8 @@ GLuint Texture::name() const
 // Creates a texture cache object.  It's redundant to give the path
 // and the lat and lon, because the lat and lon can be extracted from
 // the path name, but it makes our life easier.
-// TextureCO::TextureCO(const SGPath &f, int lat, int lon): 
 MapTexture::MapTexture(const SGPath &f, int lat, int lon): 
-    _f(f), _lat(lat), _lon(lon), _dlist(0), _maxElevation(NO_ELEVATION)
+    _f(f), _lat(lat), _lon(lon), _dlist(0), _maxElevation(Bucket::NanE)
 {
 }
 
@@ -433,7 +428,7 @@ bool MapTexture::loaded() const
 }
 
 SceneryTile::SceneryTile(TileInfo *ti, Scenery *s): 
-    _ti(ti), _scenery(s), _levels(ti->mapLevels()), _maxElevation(NO_ELEVATION),
+    _ti(ti), _scenery(s), _levels(ti->mapLevels()), _maxElevation(Bucket::NanE),
     _buckets(NULL)
 {
     // Create a texture object for each level at which we have maps.
@@ -538,7 +533,7 @@ bool SceneryTile::load()
 
 	// Set our maximum elevation figure if it hasn't been set
 	// already.
-	if (_maxElevation == NO_ELEVATION) {
+	if (_maxElevation == Bucket::NanE) {
 	    _maxElevation = _textures[_mapToBeLoaded]->maximumElevation();
 	}
 
@@ -719,7 +714,7 @@ void SceneryTile::label(Culler::FrustumSearch& frustum, double metresPerPixel,
 	}
     } else {
 	// We're not live, so label the tile as a whole.
-	if (_maxElevation != NO_ELEVATION) {
+	if (_maxElevation != Bucket::NanE) {
 	    int mef = MEF(_maxElevation);
 	    double lat = _ti->lat() + 0.5;
 	    double lon = _ti->lon() + _ti->width() / 2.0;
