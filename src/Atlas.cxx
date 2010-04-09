@@ -412,17 +412,17 @@ const Palette *Palettes::unload()
 
 // Current cursor location.
 struct Cursor {
-    int x, y;
-    SGVec3<double> cart;
-    SGGeod geod;
-    bool validLocation, validElevation;
+    float x, y;			// Centre of cursor.
 } cursor;
 
 // View variables.
 // EYE - put in globals?  ('eye' is used in Scenery.cxx)
+// EYE - put in a struct?
 sgdVec3 eye;
 sgdVec3 eyeUp;
-sgdVec3 mark;
+struct Window {
+    int width, height;
+} window;
 
 // Take 10 steps (0.1) to zoom by a factor of 10.
 const double zoomFactor = pow(10.0, 0.1);
@@ -454,27 +454,6 @@ static void attach_cb(puObject *);
 static void network_serial_toggle_cb(puObject *o);
 static void network_serial_cb(puObject *obj);
 static void help_cb(puObject *obj);
-
-// Call this when the cursor or the scene moves.  It updates the
-// variables that depend on the cursor location.  It assumes that
-// 'cursor' has the current cursor x, y position.
-void cursorUpdate()
-{
-    // EYE - check for any out-of-window-bounds conditions.
-    // Don't do anything if the cursor x, y is negative.
-    if ((cursor.x < 0) || (cursor.y < 0)) {
-	return;
-    }
-
-    // Find out what point on the earth lies below the cursor.
-    cursor.validLocation = 
-	scenery->intersection(cursor.x, cursor.y, 
-			      &cursor.cart, &cursor.validElevation);
-    if (cursor.validLocation) {
-	SGGeod start;
-	SGGeodesy::SGCartToGeod(cursor.cart, cursor.geod);
-    }
-}
 
 // All of these routines alter OpenGL state (movePosition() and
 // rotatePosition() alter the camera location and rotation via
@@ -543,9 +522,6 @@ void _move()
     // Notify subscribers that we've moved.
     Notification::notify(Notification::Moved);
 
-    // Update cursor-dependent variables.
-    cursorUpdate();
-
     // Update interface.
     glutPostRedisplay();
 }
@@ -609,19 +585,14 @@ void zoomTo(double scale)
     globals.metresPerPixel = scale;
 
     // Adjust clip planes.
-    GLfloat viewport[4];
-    glGetFloatv(GL_VIEWPORT, viewport);
-    GLfloat width = viewport[2];
-    GLfloat height = viewport[3];
-
     glPushAttrib(GL_TRANSFORM_BIT); { // Save current matrix mode.
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 
 	double left, right, bottom, top, near, far;
-	right = width * globals.metresPerPixel / 2.0;
+	right = window.width * globals.metresPerPixel / 2.0;
 	left = -right;
-	top = height * globals.metresPerPixel / 2.0;
+	top = window.height * globals.metresPerPixel / 2.0;
 	bottom = -top;
 
 	double l = sgdLengthVec3(eye);
@@ -665,10 +636,6 @@ void zoomTo(double scale)
 
     // Tell all interested parties that we've zoomed.
     Notification::notify(Notification::Zoomed);
-
-    // Although the cursor hasn't moved, the scenery has, so we
-    // probably need to update cursor-dependent variables.
-    cursorUpdate();
 
     glutPostRedisplay();
 }
@@ -2588,6 +2555,9 @@ void HelpUI::setText(puObject *obj)
 // Called when the main window is resized.
 void reshapeMap(int _width, int _height)
 {
+    window.width = _width;
+    window.height = _height;
+
     glViewport (0, 0, (GLsizei) _width, (GLsizei) _height); 
     zoomBy(1.0);
 
@@ -2607,54 +2577,55 @@ void redrawMap()
 {
     assert(glutGetWindow() == main_window);
   
-    // EYE - do this in a move routine, or in MainUI
-    SGGeod geod;
-    bool validElevation;
+    // Update the text showing the centre/mouse position.  Why do this
+    // here?  It makes the code easier, especially because scenery
+    // gets loaded asynchronously.  Otherwise, we need to always be
+    // aware of things that would affect our position: moves, rotates,
+    // zooms, scenery loading, ...
+    double x, y;
     if (mainUI->showMouse) {
-	geod = cursor.geod;
-	validElevation = cursor.validElevation;
+	x = cursor.x;
+	y = cursor.y;
     } else {
-	GLfloat viewport[4];
-	glGetFloatv(GL_VIEWPORT, viewport);
-	GLfloat width = viewport[2];
-	GLfloat height = viewport[3];
-	// EYE - another strange correction (see also
-	// Scenery::intersection()).  Why?
-	double x = width / 2.0 + 1.0, y = height / 2.0;
-	SGVec3<double> cart;
-	// We ignore the return value because we know the eye point is
-	// always valid.
-	scenery->intersection(x, y, &cart, &validElevation);
+	x = window.width / 2.0;
+	y = window.height / 2.0;
+    }
+    bool validLocation, validElevation;
+    SGVec3<double> cart;
+    validLocation = scenery->intersection(x, y, &cart, &validElevation);
+
+    if (validLocation) {
+	SGGeod geod;
 	SGGeodesy::SGCartToGeod(cart, geod);
-    }
 
-    AtlasString latStr, lonStr, elevStr;
-    if (!mainUI->latInput->isAcceptingInput()) {
-	double lat = geod.getLatitudeDeg();
-	latStr.printf("%c%s", (lat < 0) ? 'S' : 'N', formatAngle(lat));
-	mainUI->latInput->setValue(latStr.str());
-    }
+	static AtlasString latStr, lonStr, elevStr;
+	if (!mainUI->latInput->isAcceptingInput()) {
+	    double lat = geod.getLatitudeDeg();
+	    latStr.printf("%c%s", (lat < 0) ? 'S' : 'N', formatAngle(lat));
+	    mainUI->latInput->setValue(latStr.str());
+	}
 
-    if (!mainUI->lonInput->isAcceptingInput()) {
-	double lon = geod.getLongitudeDeg();
-	lonStr.printf("%c%s", (lon < 0) ? 'W' : 'E', formatAngle(lon));
-	mainUI->lonInput->setValue(lonStr.str());
-    }
+	if (!mainUI->lonInput->isAcceptingInput()) {
+	    double lon = geod.getLongitudeDeg();
+	    lonStr.printf("%c%s", (lon < 0) ? 'W' : 'E', formatAngle(lon));
+	    mainUI->lonInput->setValue(lonStr.str());
+	}
 
-    if (validElevation) {
-	elevStr.printf("Elev: %.0f ft", geod.getElevationFt());
-    } else {
-	elevStr.printf("Elev: n/a");
-    }
-    mainUI->elevText->setLabel(elevStr.str());
-    if (!mainUI->zoomInput->isAcceptingInput()) {
-	mainUI->zoomInput->setValue((float)globals.metresPerPixel);
+	if (validElevation) {
+	    elevStr.printf("Elev: %.0f ft", geod.getElevationFt());
+	} else {
+	    elevStr.printf("Elev: n/a");
+	}
+	mainUI->elevText->setLabel(elevStr.str());
+	if (!mainUI->zoomInput->isAcceptingInput()) {
+	    mainUI->zoomInput->setValue((float)globals.metresPerPixel);
+	}
     }
 
     // Check errors before...
     GLenum error = glGetError();
     if (error != GL_NO_ERROR) {
-	printf("display (before): %s\n", gluErrorString(error));
+    	printf("display (before): %s\n", gluErrorString(error));
     }
 
     // Clear all pixels and depth buffer.
@@ -2863,8 +2834,7 @@ void mouseClick(int button, int state, int x, int y)
 	switch (button) {
 	  case GLUT_LEFT_BUTTON:
 	    if (state == GLUT_DOWN) {
-		if (cursor.validLocation) {
-		    oldC = cursor.cart;
+		if (scenery->intersection(x, y, &oldC)) {
 		    dragging = true;
 		}
 	    } else {
@@ -2889,12 +2859,19 @@ void mouseClick(int button, int state, int x, int y)
 
 void mouseMotion(int x, int y) 
 {
-    cursor.x = x;
-    cursor.y = y;
+#if defined(__APPLE__)
+    // EYE - the cursor crosshair's hotspot seems to be off by 1 in
+    // both x and y (at least on OS X).
+    x--;
+    y--;
+#endif
+    // The x, y given by GLUT marks the upper-left corner of the
+    // cursor (and y increases down in GLUT coordinates).  We add 0.5
+    // to both to get the centre of the cursor.
+    cursor.x = x + 0.5;
+    cursor.y = y + 0.5;
 
     if (dragging) {
-	cursor.x = x;
-	cursor.y = y;
 	SGVec3<double> newC;
 	if (scenery->intersection(x, y, &newC)) {
 	    // The two vectors, oldC and newC, define the plane and
@@ -2910,10 +2887,6 @@ void mouseMotion(int x, int y)
 	    sgdMakeRotMat4(rot, theta, axis);
 	    
 	    // Transform the eye point and the camera up vector.
-
-	    // EYE - this calls updateCursor(), which is redundant
-	    // (since the cursor's cartesian coordinates haven't
-	    // changed).
 	    rotatePosition(rot);
 	}
     } else {
@@ -2927,15 +2900,24 @@ void mouseMotion(int x, int y)
 
 void passivemotion(int x, int y) 
 {
-    cursor.x = x;
-    cursor.y = y;
-    cursorUpdate();
+#if defined(__APPLE__)
+    // EYE - the cursor crosshair's hotspot seems to be off by 1 in
+    // both x and y (at least on OS X).
+    x--;
+    y--;
+#endif
+    // The x, y given by GLUT marks the upper-left corner of the
+    // cursor (and y increases down in GLUT coordinates).  We add 0.5
+    // to both to get the centre of the cursor.
+    cursor.x = x + 0.5;
+    cursor.y = y + 0.5;
 
     glutPostRedisplay();
 }
 
 void prefixKeypressed(unsigned char key, int x, int y)
 {
+    static bool relative = false;
     switch (key) {
       case 'c':			// Contour lines on/off
 	lightingUI->lines->setValue(!lightingUI->lines->getValue());
@@ -2945,6 +2927,10 @@ void prefixKeypressed(unsigned char key, int x, int y)
 	lightingUI->contours->setValue(!lightingUI->contours->getValue());
 	lighting_cb(lightingUI->contours);
 	break;
+      case 'e':			// Polygon edges on/off
+	Bucket::polygonEdges = !Bucket::polygonEdges;
+	glutPostRedisplay();
+	break;
       case 'l':			// Lighting on/off
 	lightingUI->lighting->setValue(!lightingUI->lighting->getValue());
 	lighting_cb(lightingUI->lighting);
@@ -2952,6 +2938,53 @@ void prefixKeypressed(unsigned char key, int x, int y)
       case 'p':			// Smooth/flat polygon shading
 	lightingUI->polygons->setValue(!lightingUI->polygons->getValue());
 	lighting_cb(lightingUI->polygons);
+	break;
+      case 'r':			// Relative palette on
+	// Make palette base relative.  Relative to what?  If there's
+	// a displayed flight track, then make it relative to the
+	// aircraft's current elevation.  Else, if the mouse mode is
+	// 'mouse', make it relative to the elevation of the scenery
+	// under the mouse.  Otherwise, make it relative to the
+	// elevation of the scenery at the centre.
+	{
+	    relative = true;
+	    float elev = globals.palette()->base();
+	    // We use the absence of a crosshair to mean there's a
+	    // displayed flight track.
+	    if (!globals.overlays->isVisible(Overlays::CROSSHAIRS)) {
+		elev = globals.currentPoint()->alt * SG_FEET_TO_METER;
+	    } else {
+		double x, y;
+		if (mainUI->showMouse) {
+		    x = cursor.x;
+		    y = cursor.y;
+		} else {
+		    x = window.width / 2.0;
+		    y = window.height / 2.0;
+		}
+		SGVec3<double> cart;
+		bool validElevation;
+		if (scenery->intersection(x, y, &cart, &validElevation) &&
+		    validElevation) {
+		    SGGeod geod;
+		    SGGeodesy::SGCartToGeod(cart, geod);
+		    elev = geod.getElevationM();
+		}
+	    }
+	    if (globals.palette()->base() != elev) {
+		globals.palette()->setBase(elev);
+		Notification::notify(Notification::NewPalette);
+		glutPostRedisplay();
+	    }
+	}
+	break;
+      case 'R':			// Relative palette off
+	relative = false;
+	if (globals.palette()->base() != 0.0) {
+	    globals.palette()->setBase(0.0);
+	    Notification::notify(Notification::NewPalette);
+	    glutPostRedisplay();
+	}
 	break;
       default:
 	return;
@@ -3020,8 +3053,12 @@ void keyPressed(unsigned char key, int x, int y)
 
 	  case 'c': 
 	    // Center the map on the current mouse position.
-	    if (cursor.validLocation) {
-		movePosition(cursor.cart.data());
+	    {
+		SGVec3<double> cart;
+		bool elev;
+		if (scenery->intersection(cursor.x, cursor.y, &cart, &elev)) {
+		    movePosition(cart.data());
+		}
 	    }
 	    break;
 
@@ -3283,8 +3320,7 @@ void init()
     globals.overlays = new Overlays(prefs.fg_root.str());
 
     // EYE - probably we should make this a class with a constructor.
-    cursor.x = cursor.y = -1;
-    cursor.validLocation = false;
+    cursor.x = cursor.y = -1.0;
 }
 
 // I don't know if this constitues a hack or not, but doing something
@@ -3846,6 +3882,8 @@ int main(int argc, char **argv)
     // glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
     // EYE - see glutInitWindowPosition man page - call glutInit() after
     // this and pass argc, and argv to glutInit?
+    window.width = prefs.width;
+    window.height = prefs.height;
     glutInitWindowSize(prefs.width, prefs.height);
     main_window = glutCreateWindow("Atlas");
 
