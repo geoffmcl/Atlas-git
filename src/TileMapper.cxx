@@ -97,6 +97,16 @@ void TileMapper::draw(unsigned int size)
     // This is where we could add the tiling code.
     int width, height;
     _tile->mapSize(size, &width, &height);
+
+    // This is a slight hack.  For 99% of tiles, height >= width.
+    // This means that all limit checks can ignore width.  The
+    // exception, as always, are the poles - they are about 4 times
+    // wider than they are tall.  We could handle this by "tiling the
+    // tile" - doing it in chunks, but since the poles have no real
+    // data anyway, I'm punting on this by forcing them to be square.
+    if (width > height) {
+    	width = height;
+    }
     glViewport(0, 0, width, height);
 
     // When our buckets were loaded, all points were converted to lat,
@@ -220,6 +230,10 @@ void TileMapper::save(unsigned int level, ImageType t, unsigned int jpegQuality)
     // First, calculate the desired map size in pixels.
     int width, height;
     _tile->mapSize(level, &width, &height);
+    // See comment in TileMapper::draw() for the logic behind this.
+    if (width > height) {
+    	width = height;
+    }
 
     // Now get the size of our buffer.
     GLint viewport[4];

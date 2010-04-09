@@ -421,12 +421,12 @@ void TileInfo::mapSize(unsigned int level, int *width, int *height) const
 
     // The width is proportional to the height, scaled by the latitude
     // and the width of tiles at that latitude.
-    double w = *height * cos(_lat * SGD_DEGREES_TO_RADIANS) * _width;
+    double w = *height * cos(centreLat() * SGD_DEGREES_TO_RADIANS) * _width;
 
     // Oh yeah, and it has to be a power of 2, and non-zero.
     *width = pow(2.0, round(log2f(w)));
     if (*width == 0) {
-	*width = 1;
+    	*width = 1;
     }
 }
 
