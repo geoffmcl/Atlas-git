@@ -2490,8 +2490,12 @@ HelpUI::HelpUI(int x, int y, Preferences& prefs, TileManager& tm)
     fmt.printf("%%-%ds%%s\n", 8);
     globalString.printf(fmt.str(), "C-x c", "toggle contour lines");
     globalString.appendf(fmt.str(), "C-x d", "discrete/smooth contours");
+    globalString.appendf(fmt.str(), "C-x e", "polygon edges on/off");
     globalString.appendf(fmt.str(), "C-x l", "toggle lighting");
     globalString.appendf(fmt.str(), "C-x p", "smooth/flat polygon shading");
+    globalString.appendf(fmt.str(), "C-x r", 
+			 "palette contours relative to track/mouse/centre");
+    globalString.appendf(fmt.str(), "C-x R", "palette contours absolute");
 //     globalString.appendf("C-space\n");
     globalString.appendf(fmt.str(), "C-n", "next flight track");
     globalString.appendf(fmt.str(), "C-p", "previous flight track");
@@ -2594,6 +2598,9 @@ void redrawMap()
     SGVec3<double> cart;
     validLocation = scenery->intersection(x, y, &cart, &validElevation);
 
+    // EYE - if the keyboard focus leaves one of these text fields,
+    // the fields don't update unless an event happens (like wiggling
+    // the mouse).  This should be fixed.
     if (validLocation) {
 	SGGeod geod;
 	SGGeodesy::SGCartToGeod(cart, geod);
@@ -3203,6 +3210,57 @@ void keyPressed(unsigned char key, int x, int y)
 	      }
 	    break;
 
+	  case 'r':
+	    // Compare eye position with intersection() position.
+	    // This is here for debugging.
+	    {
+		SGGeod eyeGeod;
+		SGVec3<double> eyeCart(eye);
+		SGGeodesy::SGCartToGeod(eyeCart, eyeGeod);
+
+		SGGeod centreGeod;
+		SGVec3<double> centreCart;
+		bool foo;
+		scenery->intersection(window.width / 2.0, window.height / 2.0,
+				      &centreCart, &foo);
+		SGGeodesy::SGCartToGeod(centreCart, centreGeod);
+
+		printf("%.8f, %.8f, %f\n",
+		       eyeGeod.getLatitudeDeg() - centreGeod.getLatitudeDeg(),
+		       eyeGeod.getLongitudeDeg() - centreGeod.getLongitudeDeg(),
+		       eyeGeod.getElevationM() - centreGeod.getElevationM());
+
+		// Use SGGeod to find a point 1000m below the eye
+		// point, then do a gluLookAt that point from the eye
+		// point.  Repeat the intersection call and see if the
+		// results differ.
+		SGGeod lookAtGeod = SGGeod::fromGeodM(eyeGeod, -1000.0);
+		SGVec3<double> lookAtCart;
+		SGGeodesy::SGGeodToCart(lookAtGeod, lookAtCart);
+
+		// Now adjust the view axis.
+		glLoadIdentity();
+		gluLookAt(eye[0], eye[1], eye[2],
+			  lookAtCart[0], lookAtCart[1], lookAtCart[2],
+			  eyeUp[0], eyeUp[1], eyeUp[2]);
+		glGetDoublev(GL_MODELVIEW_MATRIX, 
+			     (GLdouble *)globals.modelViewMatrix);
+
+		scenery->intersection(window.width / 2.0, window.height / 2.0,
+				      &centreCart, &foo);
+		SGGeodesy::SGCartToGeod(centreCart, centreGeod);
+
+		printf("\t%.8f, %.8f, %f\n",
+		       eyeGeod.getLatitudeDeg() - centreGeod.getLatitudeDeg(),
+		       eyeGeod.getLongitudeDeg() - centreGeod.getLongitudeDeg(),
+		       eyeGeod.getElevationM() - centreGeod.getElevationM());
+
+		// Reset our viewpoint.
+		_move();
+	    }
+	    
+	    break;
+
 	  case 's':
 	    // Save the current track.
 	    if (!globals.track()) {
@@ -3474,36 +3532,48 @@ static void show_cb(puObject *cb)
     glutPostRedisplay();
 }
 
-static void position_cb(puObject *cb) 
+// Parses the latitude or longitude in the given puInput and returns
+// the corresponding value.  Southern latitudes and western longitudes
+// are negative.  If the string cannot be parsed, returns
+// numeric_limits<double>::max().
+static double scanLatLon(puInput *p)
 {
+    float result = std::numeric_limits<double>::max();
     char *buffer;
-    cb->getValue(&buffer);
+    p->getValue(&buffer);
 
-    char ns, deg_ch, min_ch = ' ', sec_ch = ' ';
+    char nsew, deg_ch, min_ch = ' ', sec_ch = ' ';
     float degrees = 0.0, minutes = 0.0, seconds = 0.0;
 
     // Free-format entry: "N51", "N50.99*", "N50*59 24.1", etc.
     int n_items = 
 	sscanf(buffer, " %c %f%c %f%c %f%c",
-	       &ns, &degrees, &deg_ch, &minutes, &min_ch, &seconds, &sec_ch);
-    if (n_items < 2) {
+	       &nsew, &degrees, &deg_ch, &minutes, &min_ch, &seconds, &sec_ch);
+    if (n_items >= 2) {
+	result = (degrees + minutes / 60 + seconds / 3600);
+	if (strchr("SsWw", nsew) != NULL) {
+	    result = -result;
+	}
+    }
+    
+    return result;
+}
+
+static void position_cb(puObject *cb) 
+{
+    if (((puInput *)cb)->isAcceptingInput()) {
+	// Text field has just received keyboard focus, so do nothing.
 	return;
     }
-    float angle = (degrees + minutes / 60 + seconds / 3600);
-    double latitude, longitude;
-    // EYE - do this in a move() routine, or just read the value from
-    // the text field.
-    SGGeod geod;
-    SGGeodesy::SGCartToGeod(SGVec3<double>(eye), geod);
-    if (cb == mainUI->latInput) {
-	latitude = ((ns=='S'||ns=='s')?-1.0f:1.0f) * angle;
-	longitude = geod.getLongitudeDeg();
-    } else {
-	longitude = ((ns=='W'||ns=='w')?-1.0f:1.0f) * angle;
-	latitude = geod.getLatitudeDeg();
+
+    double lat = scanLatLon(mainUI->latInput);
+    double lon = scanLatLon(mainUI->lonInput);
+    if ((lat != std::numeric_limits<double>::max()) &&
+	(lon != std::numeric_limits<double>::max())) {
+	// Both values are valid, so move to the point they specify.
+	movePosition(lat, lon);
+	glutPostRedisplay();
     }
-    movePosition(latitude, longitude);
-    glutPostRedisplay();
 }
 
 static void clear_ftrack_cb(puObject *) 
