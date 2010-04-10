@@ -929,9 +929,12 @@ void Scenery::zoom(const sgdFrustum& frustum, double metresPerPixel)
 
     // Calculate the ideal level.  We calculate the height in pixels
     // of a map tile at the current zoom level.  We then take the
-    // base-2 log to get the "level".
+    // base-2 log to get the "level".  Because idealLevel is unsigned,
+    // we have to make sure it isn't assigned a negative value (which
+    // will be cast into a very large positive value).
     unsigned int idealLevel = 
-	ceil(log2(SGGeodesy::EQURAD * SGD_PI / 180.0 / metresPerPixel));
+    	max(ceil(log2(SGGeodesy::EQURAD * SGD_PI / 180.0 / metresPerPixel)),
+    	    0.0);
 
     // Find the best matching level.  We define "best" to be the
     // closest level greater than or equal to the ideal level.  If
