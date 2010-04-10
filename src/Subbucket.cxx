@@ -915,6 +915,14 @@ pair<int, int> Subbucket::_chopEdge(int i0, int i1)
 	_colours.push_back(colour[2]);
 	_colours.push_back(colour[3]);
 
+	// Calculate a scale factor.  Strictly speaking, linear
+	// interpolation is not correct, because the earth is not
+	// flat.  If you have an edge between two points, one with an
+	// elevation of 150 metres and the other with an elevation of
+	// 50 metres, the midpoint probably won't be at an elevation
+	// of 100 metres - it will probably be less.  The error
+	// increases as the distance between the two points increase.
+	// However, for our purposes, it's Close Enough (tm).
 	float scaling = (contour.elevation - elev0) / (elev1 - elev0);
 	// EYE - really it should be '<' not '<=', but roundoff errors
 	// sometimes force it to 0.0 or 1.0.  Perhaps we should intercept

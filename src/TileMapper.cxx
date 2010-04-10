@@ -94,7 +94,9 @@ void TileMapper::draw(unsigned int size)
     // pixels and set our viewport correspondingly.
 
     // EYE - we also need to see if our current buffer is big enough.
-    // This is where we could add the tiling code.
+    // This is where we could add the tiling code.  See
+    // http://www.mesa3d.org/brianp/TR.html
+    // http://www.opengl.org/resources/code/samples/sig99/advanced99/notes/node30.html
     int width, height;
     _tile->mapSize(size, &width, &height);
 
