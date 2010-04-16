@@ -27,15 +27,20 @@
 
 using namespace std;
 
-LayoutManager::LayoutManager(): _font(NULL), _italics(0.0), _noOfChunks(0)
+// EYE - make a common constructor?
+LayoutManager::LayoutManager(): _anchor(CC), _font(NULL), _italics(0.0), 
+				_boxed(false), _margin(0.0), _noOfChunks(0)
 {
+    sgSetVec4(_backgroundColour, 1.0, 1.0, 1.0, 0.5);
 }
 
 // Lay out a single string, using the given font and point size.
-LayoutManager::LayoutManager(const std::string &s, atlasFntTexFont *f, 
+LayoutManager::LayoutManager(const std::string& s, atlasFntTexFont *f, 
 			     float pointSize):
-    _font(f), _pointSize(pointSize), _italics(0.0), _noOfChunks(0)
+    _anchor(CC), _font(f), _pointSize(pointSize), _italics(0.0), _boxed(false),
+    _margin(0.0), _noOfChunks(0)
 {
+    sgSetVec4(_backgroundColour, 1.0, 1.0, 1.0, 0.5);
     begin();
     addText(s);
     end();
@@ -43,8 +48,11 @@ LayoutManager::LayoutManager(const std::string &s, atlasFntTexFont *f,
 
 LayoutManager::LayoutManager(const char *s, atlasFntTexFont *f, 
 			     float pointSize):
-    _font(f), _pointSize(pointSize), _italics(0.0), _noOfChunks(0)
+    _anchor(CC), _font(f), _pointSize(pointSize), _italics(0.0), _boxed(false),
+    _margin(0.0), _noOfChunks(0)
+
 {
+    sgSetVec4(_backgroundColour, 1.0, 1.0, 1.0, 0.5);
     begin();
     addText(s);
     end();
@@ -57,11 +65,44 @@ LayoutManager::~LayoutManager()
     begin(0.0, 0.0);
 }
 
-void LayoutManager::begin(float x, float y)
+void LayoutManager::setBoxed(bool boxed, bool background, bool outline)
+{
+    _boxed = boxed;
+    _hasBackground = background;
+    _hasOutline = outline;
+
+    // By default, we draw the outline in the "natural" outline
+    // colour, which is the whatever colour we use to draw the text
+    // (ie, the colour current at the time when drawText() is called).
+    // EYE - what if setBoxed() is called multiple times?
+    _useNaturalOutlineColour = true;
+
+    // EYE - we need to set some rules about what can be done when.
+    if (_boxed) {
+	_margin = _pointSize / 5.0;
+    } else {
+	_margin = 0.0;
+    }
+}
+
+void LayoutManager::setBackgroundColour(const sgVec4& colour)
+{
+    sgCopyVec4(_backgroundColour, colour);
+}
+
+void LayoutManager::setOutlineColour(const sgVec4& colour)
+{
+    sgCopyVec4(_backgroundColour, colour);
+    _useNaturalOutlineColour = false;
+}
+
+
+void LayoutManager::begin(float x, float y, Point p)
 {
     _layingOut = true;
     _x = x;
     _y = y;
+    _anchor = p;
 
     assert(_noOfChunks == _chunkMap.size());
     for (unsigned int i = 0; i < _chunkMap.size(); i++) {
@@ -79,6 +120,11 @@ void LayoutManager::begin(float x, float y)
     _lines.clear();
     _noOfChunks = 0;
     _chunkMap.clear();
+}
+
+void LayoutManager::begin(float x, float y)
+{
+    begin(x, y, _anchor);
 }
 
 void LayoutManager::setFont(atlasFntTexFont *f, float pointSize, float italics)
@@ -170,25 +216,24 @@ void LayoutManager::end()
 
     _layingOut = false;
     
-    // Find out the extents of our box.
-    _height = _width = 0;
+    _textHeight = _textWidth = 0;
     for (unsigned int i = 0; i < _lines.size(); i++) {
 	Line &l = _lines[i];
-	_height += l.ascent - l.descent;
-	if (l.width > _width) {
-	    _width = l.width;
+	_textHeight += l.ascent - l.descent;
+	if (l.width > _textWidth) {
+	    _textWidth = l.width;
 	}
     }
 
     // Now adjust all the lines so that our centre is at <_x, _y> and
     // each line is centre justified.
-    float deltaX = _x - (_width / 2.0);
-    float deltaY = _y + (_height / 2.0);
+    float deltaX = _x - (_textWidth / 2.0);
+    float deltaY = _y + (_textHeight / 2.0);
     for (size_t i = 0; i < _lines.size(); i++) {
 	Line &l = _lines[i];
 	deltaY -= l.ascent;
 
-	float indent = (_width - l.width) / 2.0;
+	float indent = (_textWidth - l.width) / 2.0;
 	l.x += deltaX + indent; 
 	l.y += deltaY;
 	for (unsigned int j = 0; j < l.chunks.size(); j++) {
@@ -216,49 +261,32 @@ void LayoutManager::setText(const char *s)
 
 void LayoutManager::size(float *width, float *height)
 {
-    *width = _width;
-    *height = _height;
+    *width = LayoutManager::width();
+    *height = LayoutManager::height();
 }
 
 // Return the x coordinate at the given point on the bounding box.
 float LayoutManager::x(Point p)
 {
-    if ((p == UL) || (p == CL) || (p == LL)) {
-	return _x - _width / 2.0;
-    } else if ((p == UR) || (p == CR) || (p == LR)) {
-	return _x + _width / 2.0;
-    } else {
-	return _x;
-    }
+    return _x + _deltaX();
 }
 
 // Return the y coordinate at the given point on the bounding box.
 float LayoutManager::y(Point p)
 {
-    if ((p == UL) || (p == UC) || (p == UR)) {
-	return _y + _height / 2.0;
-    } else if ((p == LL) || (p == LC) || (p == LR)) {
-	return _y - _height / 2.0;
-    } else {
-	return _y;
-    }
+    return _y + _deltaY();
+}
+
+void LayoutManager::moveTo(float x, float y)
+{
+    moveTo(x, y, _anchor);
 }
 
 void LayoutManager::moveTo(float x, float y, Point p)
 {
-    float incX = x - _x, incY = y - _y;
-    
-    if ((p == UL) || (p == CL) || (p == LL)) {
-	incX += _width / 2.0;
-    } else if ((p == UR) || (p == CR) || (p == LR)) {
-	incX -= _width / 2.0;
-    }
-    if ((p == UL) || (p == UC) || (p == UR)) {
-	incY -= _height / 2.0;
-    } else if ((p == LL) || (p == LC) || (p == LR)) {
-	incY += _height / 2.0;
-    }
+    _anchor = p;
 
+    float incX = x - _x, incY = y - _y;
     _x = x;
     _y = y;
     for (unsigned int i = 0; i < _lines.size(); i++) {
@@ -278,16 +306,39 @@ void LayoutManager::nthChunk(int n, float *x, float *y)
 {
     Chunk *c = _chunkMap[n];
     if (c) {
-	*x = c->x;
-	*y = c->y;
+	*x = c->x + _deltaX();
+	*y = c->y + _deltaY();
     } else {
 	*x = 0.0;
 	*y = 0.0;
     }
 }
 
+// Render the text.
 void LayoutManager::drawText()
 {
+    float width_2 = width() / 2.0, height_2 = height() / 2.0;;
+    float deltaX = _deltaX(), deltaY = _deltaY();
+
+    if (_boxed && _hasBackground) {
+	// Draw background.
+	glPushAttrib(GL_CURRENT_BIT); { // For current colour
+	    float x = _x + deltaX;
+	    float y = _y + deltaY;
+	    glColor4fv(_backgroundColour);
+	    glBegin(GL_QUADS); {
+		glColor4f(1.0, 1.0, 1.0, 0.5);
+		glVertex2f(x - width_2, y - height_2);
+		glVertex2f(x + width_2, y - height_2);
+		glVertex2f(x + width_2, y + height_2);
+		glVertex2f(x - width_2, y + height_2);
+	    }
+	    glEnd();
+	}
+	glPopAttrib();
+    }
+
+    // Draw text.
     for (unsigned int i = 0; i < _lines.size(); i++) {
 	Line &l = _lines[i];
 	for (unsigned int j = 0; j < l.chunks.size(); j++) {
@@ -296,9 +347,58 @@ void LayoutManager::drawText()
 		_renderer.setPointSize(c->pointSize);
 		_renderer.setFont(c->f);
 		_renderer.setSlant(c->italics);
-		_renderer.start3f(c->x, c->y, 0.0);
+		_renderer.start3f(c->x + deltaX, c->y + deltaY, 0.0);
 		_renderer.puts(c->s.c_str());
 	    }
 	}
     }    
+
+    if (_boxed && _hasOutline) {
+	// Draw outline.
+	glPushAttrib(GL_CURRENT_BIT); { // For current colour
+	    if (!_useNaturalOutlineColour) {
+		glColor4fv(_outlineColour);
+	    }
+	    float x = _x + deltaX;
+	    float y = _y + deltaY;
+	    glBegin(GL_LINE_LOOP); {
+		glVertex2f(x - width_2, y - height_2);
+		glVertex2f(x + width_2, y - height_2);
+		glVertex2f(x + width_2, y + height_2);
+		glVertex2f(x - width_2, y + height_2);
+	    }
+	    glEnd();
+	}
+	glPopAttrib();
+    }
+}
+
+float LayoutManager::_deltaX()
+{
+    float width_2 = width() / 2.0;
+    float result;
+    if ((_anchor == UL) || (_anchor == CL) || (_anchor == LL)) {
+	result = width_2;
+    } else if ((_anchor == UR) || (_anchor == CR) || (_anchor == LR)) {
+	result = -width_2;
+    } else {
+	result = 0.0;
+    }
+
+    return result;
+}
+
+float LayoutManager::_deltaY()
+{
+    float height_2 = height() / 2.0;
+    float result;
+    if ((_anchor == UL) || (_anchor == UC) || (_anchor == UR)) {
+	result = -height_2;
+    } else if ((_anchor == LL) || (_anchor == LC) || (_anchor == LR)) {
+	result = height_2;
+    } else {
+	result = 0.0;
+    }
+
+    return result;
 }

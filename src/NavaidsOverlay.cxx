@@ -1592,51 +1592,42 @@ void NavaidsOverlay::_renderVOR(const NAV *n)
 	////////////////////
 	// VOR label
 	////////////////////
-
-	// Only add a label if the icon is being drawn full size.
-// 	if (radius > iconSize) {
 	if (_overlays.isVisible(Overlays::LABELS) && (radius > iconSize)) {
 	    // EYE - this DME business is hacky.  Create a
-	    // _renderTACAN routine.
+	    // _renderTACAN routine?
 	    Label *l;
 	    float pointSize = labelPointSize * _metresPerPixel;
-	    if (radius > 100.0) {
-		if (n->navtype == NAV_VOR) {
-		    l = _makeLabel("%N\n%F %I %M", n, pointSize, 0, 0);
-		} else {
-		    l = _makeLabel("%N\nDME %F %I %M", n, pointSize, 0, 0);
-		}
-	    } else if (radius > 50.0) {
-		if (n->navtype == NAV_VOR) {
-		    l = _makeLabel("%F %I", n, pointSize, 0, 0);
-		} else {
-		    l = _makeLabel("DME %F %I", n, pointSize, 0, 0);
-		}
-	    } else {
-		l = _makeLabel("%I", n, pointSize, 0, 0);
-	    }
 
 	    // Place the centre of the label halfway between the VOR
 	    // centre and the southern rim, as long as it won't result
 	    // in the label overwriting the icon.  For TACANs, place
 	    // it just below the icon.
-	    float labelOffset;
-	    if (n->navtype == NAV_VOR) {
-		labelOffset = radius / 2.0;
+	    float roseCentre = -radius / 2.0 * _metresPerPixel,
+		iconEdge = -(iconSize + 4) * _metresPerPixel;
+	    if (radius > 100.0) {
+		if (n->navtype == NAV_VOR) {
+		    l = _makeLabel("%N\n%F %I %M", n, pointSize, 0, roseCentre);
+		} else {
+		    l = _makeLabel("%N\nDME %F %I %M", n, pointSize, 
+				   0, iconEdge, LayoutManager::UC);
+		}
+	    } else if (radius > 50.0) {
+		if (n->navtype == NAV_VOR) {
+		    l = _makeLabel("%F %I", n, pointSize, 0, roseCentre);
+		} else {
+		    l = _makeLabel("DME %F %I", n, pointSize, 
+				   0, iconEdge, LayoutManager::UC);
+		}
 	    } else {
-		labelOffset = 0;
-	    }
-	    // EYE - without 4.0, this butts the label right against
-	    // the icon for the VOR, and slightly overlaps the TACAN,
-	    // VOR-DME, and VORTAC icons.
-	    float min = iconSize + 4.0 + (l->height / _metresPerPixel / 2.0);
-	    if (labelOffset < min) {
-		labelOffset = min;
+		l = _makeLabel("%I", n, pointSize, 
+			       0, iconEdge, LayoutManager::UC);
 	    }
 
-	    // Convert to metres.
-	    l->y -= labelOffset * _metresPerPixel;
-	    l->lm.moveTo(l->x, l->y);
+	    if ((n->navtype == NAV_VOR) && 
+		(l->lm.y(LayoutManager::UC) > iconEdge)) {
+		l->lm.moveTo(0.0, iconEdge);
+		l->lm.setAnchor(LayoutManager::UC);
+	    }
 	    _drawLabel(l);
 
 	    delete l;
@@ -1760,35 +1751,27 @@ void NavaidsOverlay::_renderNDB(const NAV *n)
 	////////////////////
 	if (_overlays.isVisible(Overlays::LABELS) && 
 	    (radius > iconSize / 5.0)) {
-	    Label *l; 
 	    float pointSize = labelPointSize * _metresPerPixel;
+	    float labelOffset = (radius + 2.0) * _metresPerPixel;
+	    LayoutManager::Point p = LayoutManager::LC;
 	    if (fabs(radius - iconSize) < 0.01) {
 		if (n->navsubtype != NDB_DME) {
-		    l = _makeLabel("%N\n%F %I %M", n, pointSize, 0, 0);
+		    _drawLabel("%N\n%F %I %M", n, pointSize, 0, labelOffset, p);
 		} else {
 		    // EYE - and a different colour?
-		    l = _makeLabel("%N\n%F (%f) %I %M", n, pointSize, 0, 0);
+		    _drawLabel("%N\n%F (%f) %I %M", n, pointSize, 
+			       0, labelOffset, p);
 		}
 	    } else if (radius > iconSize / 2.0) {
 		if (n->navsubtype != NDB_DME) {
-		    l = _makeLabel("%F %I", n, pointSize, 0, 0);
+		    _drawLabel("%F %I", n, pointSize, 0, labelOffset, p);
 		} else {
 		    // EYE - and a different colour?
-		    l = _makeLabel("%F (%f) %I", n, pointSize, 0, 0);
+		    _drawLabel("%F (%f) %I", n, pointSize, 0, labelOffset, p);
 		}
 	    } else {
-		l = _makeLabel("%I", n, pointSize, 0, 0);
+		_drawLabel("%I", n, pointSize, 0, labelOffset, p);
 	    }
-
-	    // Place the bottom of the label 2 pixels above the icon.
-	    float labelOffset = 
-		radius + 2.0 + (l->height / _metresPerPixel / 2.0);
-	    // Convert to metres.
-	    l->y += labelOffset * _metresPerPixel;
-	    l->lm.moveTo(l->x, l->y);
-	    _drawLabel(l);
-
-	    delete l;
 	}
     }
     geodPopMatrix();
@@ -1953,7 +1936,7 @@ void NavaidsOverlay::_renderILS(const NAV *n)
 
 		// Degree symbol (EYE - magic number)
 		const unsigned char degreeSymbol = 176; 
-		globalString.printf("%d%C%s", heading, degreeSymbol, magTrue);
+		globalString.printf("%03d%C%s", heading, degreeSymbol, magTrue);
 		lm.addText(globalString.str());
 		lm.end();
 
@@ -2039,28 +2022,16 @@ void NavaidsOverlay::_renderDME(const NAV *n)
 	    // box above the icon.  The box has a translucent white
 	    // background with a solid border to make it easier to
 	    // read.
-	    Label *l;
-	    // EYE - need a shorthand for this point size business
-	    globals.fontRenderer.setPointSize(labelPointSize * _metresPerPixel);
-	    float pointSize = globals.fontRenderer.getPointSize();
+	    float pointSize = labelPointSize * _metresPerPixel;
+	    float offset = radius * _metresPerPixel;
+	    LayoutManager::Point p = LayoutManager::UC;
 	    if (fabs(radius - iconSize) < 0.01) {
-		l = _makeLabel("%N\n%F %I %M", n, pointSize, 0.0, 0.0);
+		_drawLabel("%N\n%F %I %M", n, pointSize, 0.0, offset, p);
 	    } else if (radius > iconSize / 2.0) {
-		l = _makeLabel("%F %I", n, pointSize, 0.0, 0.0);
+		_drawLabel("%F %I", n, pointSize, 0.0, offset, p);
 	    } else {
-		l = _makeLabel("%I", n, pointSize, 0.0, 0.0);
+		_drawLabel("%I", n, pointSize, 0.0, offset, p);
 	    }
-
-	    // Place the bottom of the label 2 pixels above the icon.
-	    // EYE - this seems to give us a bit more than 2 pixels.  Why?
-	    float labelOffset = 
-		(radius / sqrt(2.0)) + 2.0 + (l->height / _metresPerPixel / 2.0);
-	    // Convert to metres.
-	    l->y += labelOffset * _metresPerPixel;
-	    l->lm.moveTo(l->x, l->y);
-	    _drawLabel(l);
-
-	    delete l;
 	}
     }
     geodPopMatrix();
@@ -2121,18 +2092,8 @@ void NavaidsOverlay::_renderDMEILS(const NAV *n)
 	    // translucent white background with a solid border to
 	    // make it easier to read.
 	    float pointSize = labelPointSize * _metresPerPixel;
-	    Label *l = _makeLabel("%I", n, pointSize, 0.0, 0.0);
-
-	    // Place the bottom of the label 2 pixels above the icon.
-	    // EYE - this seems to give us a bit more than 2 pixels.  Why?
-	    float labelOffset = 
-		(radius / sqrt(2.0)) + 2.0 + (l->height / _metresPerPixel / 2.0);
-	    // Convert to metres.
-	    l->y += labelOffset * _metresPerPixel;
-	    l->lm.moveTo(l->x, l->y);
-	    _drawLabel(l);
-
-	    delete l;
+	    float offset = radius * _metresPerPixel;
+	    _drawLabel("%I", n, pointSize, 0.0, offset, LayoutManager::LC);
 	}
     }
     geodPopMatrix();
@@ -2231,10 +2192,12 @@ float NavaidsOverlay::_renderMorse(const string& id, float height,
 // All of the data for the conversion specifications comes from the
 // *single* NAV parameter (unlike printf).
 //
-// Each line of text is centered.
+// Each line of text is centered, and the point p of the bounding box
+// is placed at <x, y>.
 Label *NavaidsOverlay::_makeLabel(const char *fmt, const NAV *n,
 				  float labelPointSize,
-				  float x, float y)
+				  float x, float y,
+				  LayoutManager::Point p)
 {
     // The label consists of a list of lines.  Each line consists of
     // intermixed text and morse.  The label, each line, and text and
@@ -2331,49 +2294,40 @@ Label *NavaidsOverlay::_makeLabel(const char *fmt, const NAV *n,
     switch (n->navtype) {
       case NAV_VOR:
 	memcpy(l->colour, vor_colour, sizeof(float) * 4);
-	l->box = true;
+	l->lm.setBoxed(true);
 	break;
       case NAV_DME:
 	memcpy(l->colour, dme_colour, sizeof(float) * 4);
-	l->box = true;
+	l->lm.setBoxed(true);
 	break;
       case NAV_NDB:
 	memcpy(l->colour, ndb_colour, sizeof(float) * 4);
-	l->box = true;
+	l->lm.setBoxed(true);
 	break;
       case NAV_ILS:
 	memcpy(l->colour, ils_label_colour, sizeof(float) * 4);
-	l->box = false;
 	break;
       default:
 	break;
     }
 
-    // EYE - make this part of the label?
-    const float border = labelPointSize / 5.0;
-
-    l->x = x;
-    l->y = y;
-    l->lm.size(&(l->width), &(l->height));
-    if (l->box) {
-	l->width += 2.0 * border;
-	l->height += 2.0 * border;
-    }
+    l->lm.setAnchor(p);
 
     return l;
 }
 
-// Draws the label, centered at x, y.  The label will be drawn in the
-// current font, at the given point size.  VORs, DMEs and NDBs are
-// drawn with a box around the text and a translucent white background
-// behind the text.
+// Draws the label, with point p on the label placed at x, y.  The
+// label will be drawn in the current font, at the given point size.
+// VORs, DMEs and NDBs are drawn with a box around the text and a
+// translucent white background behind the text.
 void NavaidsOverlay::_drawLabel(const char *fmt, const NAV *n,
 				float labelPointSize,
-				float x, float y)
+				float x, float y,
+				LayoutManager::Point p)
 {
     Label *l;
 
-    l = _makeLabel(fmt, n, labelPointSize, x, y);
+    l = _makeLabel(fmt, n, labelPointSize, x, y, p);
     _drawLabel(l);
 
     delete l;
@@ -2381,25 +2335,8 @@ void NavaidsOverlay::_drawLabel(const char *fmt, const NAV *n,
 
 void NavaidsOverlay::_drawLabel(Label *l)
 {
-    float x = l->x, y = l->y, width = l->width, height = l->height;
-
-    ////////////////////
-    // Draw background.
-    ////////////////////
-    if (l->box) {
-	glBegin(GL_QUADS); {
-	    glColor4f(1.0, 1.0, 1.0, 0.5);
-	    glVertex2f(x - width / 2.0, y - height / 2.0);
-	    glVertex2f(x + width / 2.0, y - height / 2.0);
-	    glVertex2f(x + width / 2.0, y + height / 2.0);
-	    glVertex2f(x - width / 2.0, y + height / 2.0);
-	}
-	glEnd();
-    }
-
-    ////////////////////
-    // Render strings.
-    ////////////////////
+    // Mostly we just draw the text, but we need to do some special
+    // processing for morse code.
     glColor4fv(l->colour);
     l->lm.drawText();
     if (l->morseChunk >= 0) {
@@ -2409,19 +2346,6 @@ void NavaidsOverlay::_drawLabel(Label *l)
 
 	l->lm.nthChunk(l->morseChunk, &chunkX, &chunkY);
 	_renderMorse(l->id, ascent, chunkX, chunkY);
-    }
-
-    ////////////////////
-    // Bounding box.
-    ////////////////////
-    if (l->box) {
-	glBegin(GL_LINE_LOOP); {
-	    glVertex2f(x - width / 2.0, y - height / 2.0);
-	    glVertex2f(x - width / 2.0, y + height / 2.0);
-	    glVertex2f(x + width / 2.0, y + height / 2.0);
-	    glVertex2f(x + width / 2.0, y - height / 2.0);
-	}
-	glEnd();
     }
 }
 

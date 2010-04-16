@@ -86,9 +86,7 @@ struct NAV: public Searchable, Cullable {
 
 // Used for drawing labels on navaids.
 struct Label {
-    float x, y, width, height;
     float colour[4];
-    bool box;
     // EYE - barf!
     int morseChunk;
     std::string id;
@@ -133,12 +131,14 @@ class NavaidsOverlay: public Subscriber {
     void _renderDME(const NAV *n);
     void _renderDMEILS(const NAV *n);
 
-    void _drawLabel(const char *fmt, const NAV *n,
-		    float labelPointSize,
-		    float x, float y);
     Label *_makeLabel(const char *fmt, const NAV *n,
 		      float labelPointSize,
-		      float x, float y);
+		      float x, float y, 
+		      LayoutManager::Point p = LayoutManager::CC);
+    void _drawLabel(const char *fmt, const NAV *n,
+		    float labelPointSize,
+		    float x, float y,
+		    LayoutManager::Point p = LayoutManager::CC);
     void _drawLabel(Label *l);
 
     float _morseWidth(const std::string& id, float height);

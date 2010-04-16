@@ -29,6 +29,7 @@
 
 #include "Globals.hxx"
 #include "misc.hxx"
+#include "Geographics.hxx"
 
 #include "AirwaysOverlay.hxx"
 
@@ -95,6 +96,11 @@ const float awy_high_colour[4] = {0.176, 0.435, 0.667, 0.7};
 // J{d}+ (US) - jet route, high altitude, above FL180
 // {l}{d}+ (Eur) - air route (low altitude), 10nm wide, up to FL195
 // U{l}{d}+ (Eur) - upper air route (high altitude), above FL195
+
+// Airway label colours
+sgVec4 nameColour = {1.0, 0.0, 0.0, 1.0};
+sgVec4 elevationColour = {0.0, 1.0, 0.0, 1.0};
+sgVec4 distanceColour = {0.0, 0.0, 1.0, 1.0};
 
 //////////////////////////////////////////////////////////////////////
 // AirwaysOverlay
@@ -455,54 +461,22 @@ void AirwaysOverlay::_render(const AWY *a) const
     glEnd();
 }
 
-// Draws a single text box.  The background is white, the text and a
-// box outline are drawn in colour.  The box is drawn with the centre
-// at <x, 0>.
-static void _drawLabel(LayoutManager &lm, float *colour,
-		       float x, float width, float height)
-{
-    // Background box.
-    glBegin(GL_QUADS); {
-	glColor4f(1.0, 1.0, 1.0, 1.0);
-	glVertex2f(x - width / 2.0, -height / 2.0);
-	glVertex2f(x + width / 2.0, -height / 2.0);
-	glVertex2f(x + width / 2.0, height / 2.0);
-	glVertex2f(x - width / 2.0, height / 2.0);
-    }
-    glEnd();
-
-    // Text.
-    glColor4fv(colour);
-    lm.moveTo(x, 0.0); 
-    lm.drawText();
-
-    // Box outline.
-    glBegin(GL_LINE_LOOP); {
-	glVertex2f(x - width / 2.0, -height / 2.0);
-	glVertex2f(x - width / 2.0, height / 2.0);
-	glVertex2f(x + width / 2.0, height / 2.0);
-	glVertex2f(x + width / 2.0, -height / 2.0);
-    }
-    glEnd();
-}
-
 // Labels the given airway.  Does nothing if there isn't enough room
 // to label the segment.
 bool AirwaysOverlay::_label(const AWY *a) const
 {
-    // The labels are placed in the middle of the segment, oriented
-    // along the segment.
-    sgdVec3 start, end, middle;
-    atlasGeodToCart(a->start.lat, a->start.lon, 0.0, start);
-    atlasGeodToCart(a->end.lat, a->end.lon, 0.0, end);
-
     // We need at least minDist pixels of space to write any labels.
     const double minDist = 50.0;
     if ((a->length / _metresPerPixel) < minDist) {
 	return false;
     }
 
-    // We have space, so calculate the middle of the segment.
+    // We have space, so calculate the middle of the segment.  The
+    // labels are placed in the middle of the segment, oriented along
+    // the segment.
+    sgdVec3 start, end, middle;
+    atlasGeodToCart(a->start.lat, a->start.lon, 0.0, start);
+    atlasGeodToCart(a->end.lat, a->end.lon, 0.0, end);
     sgdAddVec3(middle, start, end);
     sgdScaleVec3(middle, 0.5);
 
@@ -511,11 +485,7 @@ bool AirwaysOverlay::_label(const AWY *a) const
     const float minPointSize = 1.0;
     float pointSize;
     // EYE - magic number
-    const float border = 4.0 * _metresPerPixel; // 4 pixel border
-    float nameWidth, nameHeight;
-    float elevWidth, elevHeight;
-    float distWidth, distHeight;
-//     float startWidth, startHeight, endWidth, endHeight;
+    const float space = 4.0 * _metresPerPixel; // 4 pixel space between boxes
 
     // Strategy - point size ranges from a minimum of minPointSize to
     // a maximum of maxPointSize.  We set it based on scale.
@@ -539,54 +509,38 @@ bool AirwaysOverlay::_label(const AWY *a) const
     }
     pointSize *= _metresPerPixel;
 
-    // Name
+    // Airway name label
     LayoutManager lmName(a->name, globals.regularFont, pointSize);
-    lmName.size(&nameWidth, &nameHeight);
-    nameWidth += border;
-    nameHeight += border;
-
-    if (nameWidth + (border * 2.0) > a->length) {
+    lmName.setBoxed(true);
+    if (lmName.width() + (space * 2.0) > a->length) {
 	return false;
     }
 
-    // Top and base of airway
+    // Airway top and base label
 
     // EYE - start adding these to high routes at around 1000 m/pixel.
     // The lows can be added immediately (500 or less).  Or maybe just
     // add them to the sides of the name, and only do so when there's
     // room?
     LayoutManager lmElev;
-    lmElev.begin();
-    // EYE - magic number
+    lmElev.setBoxed(true);
     lmElev.setFont(globals.regularFont, pointSize * 0.75);
-    globalString.printf("%d", a->isLow ? a->top * 100 : a->top);
-    lmElev.addText(globalString.str());
-    lmElev.newline();
 
-    globalString.printf("%d", a->isLow ? a->base * 100 : a->base);
-    lmElev.addText(globalString.str());
+    lmElev.begin(); {
+	globalString.printf("%d", a->isLow ? a->top * 100 : a->top);
+	lmElev.addText(globalString.str());
+	lmElev.newline();
+	globalString.printf("%d", a->isLow ? a->base * 100 : a->base);
+	lmElev.addText(globalString.str());
+    }
     lmElev.end();
 
-    lmElev.size(&elevWidth, &elevHeight);
-    elevWidth += border;
-    elevHeight += border;
-
-    if ((elevWidth + nameWidth / 2.0 + (border * 2.0)) > (a->length / 2.0)) {
-	elevWidth = 0.0;
-    }
-
-    // Length
+    // Airway length label
     globalString.printf("%.0f", a->length * SG_METER_TO_NM);
     // EYE - magic number
     LayoutManager lmDist(globalString.str(), globals.regularFont, 
 			 pointSize * 0.75);
-    lmDist.size(&distWidth, &distHeight);
-    distWidth += border;
-    distHeight += border;
-
-    if ((distWidth + nameWidth / 2.0 + (border * 2.0)) > (a->length / 2.0)) {
-	distWidth = 0.0;
-    }
+    lmDist.setBoxed(true);
 
     // EYE - draw NDB segments different than VOR segments?  This is
     // done on Canadian air charts.  We'd have to check what navaids
@@ -636,52 +590,46 @@ bool AirwaysOverlay::_label(const AWY *a) const
 // 	}
 //     }
 
-    glPushMatrix(); {
-	glTranslated(middle[0], middle[1], middle[2]);
+    // The labels will be drawn in the centre of the airway, and we
+    // need to make sure the text isn't upside-down.
+    double lat, lon, elev, hdg, junk;
+    atlasCartToGeod(middle, &lat, &lon, &elev);
 
-	// Make sure the text isn't upside-down.
+    // EYE - is this overkill?  Can we use a simpler calculation
+    // to get the heading?  Just use geodDrawText()?
+    geo_inverse_wgs_84(lat, lon, a->end.lat, a->end.lon, 
+		       &hdg, &junk, &junk);
+    if (hdg > 180.0) {
+	hdg -= 180.0;
+    }
+    hdg -= 90.0;
 
-	// EYE - is this overkill?  Can we use a simpler calculation
-	// to get the heading?
-	double lat, lon, elev, hdg, junk;
-	sgCartToGeod(middle, &lat, &lon, &elev);
-	lat *= SGD_RADIANS_TO_DEGREES;
-	lon *= SGD_RADIANS_TO_DEGREES;
-
-	geo_inverse_wgs_84(lat, lon, a->end.lat, a->end.lon, 
-			   &hdg, &junk, &junk);
-	if (hdg > 180.0) {
-	    hdg -= 180.0;
-	}
-	hdg -= 90.0;
-
-	glRotatef(lon + 90.0, 0.0, 0.0, 1.0);
-	glRotatef(90.0 - lat, 1.0, 0.0, 0.0);
-	glRotatef(-hdg, 0.0, 0.0, 1.0);
-
+    // Now that we've calculated everything, draw the labels.
+    geodPushMatrix(middle, lat, lon, hdg); {
 	// Draw the name in the centre of the segment.
-	// EYE - magic "number"
-	sgVec4 nameColour = {1.0, 0.0, 0.0, 1.0};
-	_drawLabel(lmName, nameColour, 0.0, nameWidth, nameHeight);
+	glColor4fv(nameColour);
+	lmName.drawText();
 
 	// Draw the base and top elevations (if we have room) on the
 	// left.
-	if (elevWidth > 0.0) {
-	    float xOffset = elevWidth / 2.0 + border + nameWidth / 2.0;
-	    // EYE - magic "number"
-	    sgVec4 colour = {0.0, 1.0, 0.0, 1.0};
-	    _drawLabel(lmElev, colour, -xOffset, elevWidth, elevHeight);
+	if ((lmElev.width() + lmName.width() / 2.0 + (space * 2.0)) <
+	    (a->length / 2.0)) {
+	    float xOffset = lmElev.width() / 2.0 + space + lmName.width() / 2.0;
+	    glColor4fv(elevationColour);
+	    lmElev.moveTo(-xOffset, 0.0);
+	    lmElev.drawText();
 	}
 
 	// Draw the length (if we have room) on the right.
-	if (distWidth > 0.0) {
-	    float xOffset = distWidth / 2.0 + border + nameWidth / 2.0;
-	    // EYE - magic "number"
-	    sgVec4 colour = {0.0, 0.0, 1.0, 1.0};
-	    _drawLabel(lmDist, colour, xOffset, distWidth, distHeight);
+	if ((lmDist.width() + lmName.width() / 2.0 + (space * 2.0)) <
+	    (a->length / 2.0)) {
+	    float xOffset = lmDist.width() / 2.0 + space + lmName.width() / 2.0;
+	    glColor4fv(distanceColour);
+	    lmDist.moveTo(xOffset, 0.0);
+	    lmDist.drawText();
 	}
     }
-    glPopMatrix();
+    geodPopMatrix();
 
     return true;
 }

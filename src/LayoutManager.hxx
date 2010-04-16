@@ -11,9 +11,9 @@
   can contain anything - the layout manager just reserves space for
   them), and the layout manager will try to align everything nicely.
   It can handle changes in fonts.  Text is laid out with positive x
-  pointing to the right and positive y pointing up.  The centre of the
-  text can be placed at an arbitrary location (the default is <0.0,
-  0.0>).  Lines are centre justified.
+  pointing to the right and positive y pointing up.  The text can be
+  placed at an arbitrary location (the default is <0.0, 0.0>).  Lines
+  are centre justified.
 
   When creating a piece of laid-out text, you must call begin() first.
   Add the text and boxes that you want (including newlines, which must
@@ -55,11 +55,57 @@ class LayoutManager {
   public:
     LayoutManager();
     // These constructors makes it easy to lay out a single string.
-    LayoutManager(const std::string &s, atlasFntTexFont *f, float pointSize);
+    // They call begin() and end().  The text is centred at 0,0.
+    LayoutManager(const std::string& s, atlasFntTexFont *f, float pointSize);
     LayoutManager(const char *s, atlasFntTexFont *f, float pointSize);
     ~LayoutManager();
 
-    // Begin a layout session, with the lower-left corner at <x, y>.
+    // Points on the bounding box.  U = upper, C = centre, L =
+    // lower/left, R = right, with the Y position given before the X
+    // position.  Therefore, for example, LC means "lower-centre" (the
+    // mid-point of the bottom of the box), while CL means
+    // "centre-left" (the mid-point of the left side).
+    enum Point { UL, UC, UR, 
+		 CL, CC, CR, 
+		 LL, LC, LR };
+
+    // Returns and sets the "anchor point" (the point of the bounding
+    // box placed on the <x, y> location specified in begin()).  This
+    // can be changed anytime.  By default, the anchor point is CC
+    // (the centre of the bounding box).
+    Point anchor() const { return _anchor; }
+    void setAnchor(Point p) { _anchor = p; }
+
+    // Text can be set with an invisible (or, if you have a box,
+    // visible) margin.  By default, with no box, the margin is zero.
+    // Note that if you call setBoxed(true), the margin will be set to
+    // pointSize / 5.0, clobbering whatever was there before.  If you
+    // call setBox(false), the margin will be set to 0.0.
+    float margin() const { return _margin; }
+    void setMargin(float size) { _margin = size; }
+
+    // The text can be drawn in a box.  The box is outlined and has a
+    // background by default, but both of these can be turned off, and
+    // their colours adjusted.  As well, the margin around the text
+    // can be adjusted.  By default, the box is drawn with a
+    // translucent white background, the margin is pointSize / 5.0
+    // units (which means there must be a valid point size when it's
+    // called), and the outline is drawn in the same colour as the
+    // text.
+    void setBoxed(bool boxed, bool background = true, bool outline = true);
+    bool isBoxed() const { return _boxed; }
+    bool hasBackground() const { return _hasBackground; }
+    bool hasOutline() const { return _hasOutline; }
+
+    const sgVec4& backgroundColour() const { return _backgroundColour; }
+    const sgVec4& outlineColour() const { return _outlineColour; }
+
+    void setBackgroundColour(const sgVec4& colour);
+    void setOutlineColour(const sgVec4& colour);
+
+    // Begin a layout session, with the anchor point (p) at <x, y>.
+    void begin(float x, float y, Point p);
+    // Begin a layout session at <x, y>, using the current anchor point.
     void begin(float x = 0.0, float y = 0.0);
     // Set the font to the given PLIB font renderer.
     void setFont(atlasFntTexFont *f, float pointSize, float italics = 0.0);
@@ -81,7 +127,9 @@ class LayoutManager {
     // the previous chunk on the line, and y is relative to the
     // baseline of the current line).  If <x, y> is <0, 0>, then the
     // lower-left corner of the box will be placed on the baseline of
-    // the current line at the current x position.
+    // the current line at the current x position.  Returns an
+    // identifier for the box that can be used in a call to
+    // nthChunk() to find out where it was typeset.
     int addBox(float width, float height, float x = 0.0, float y = 0.0);
     void newline();
     void end();
@@ -91,49 +139,59 @@ class LayoutManager {
     void setText(const std::string &s);
     void setText(const char *s);
 
+    //----------------------------------------------------------------------
     // Do not call the following routines until end() has been called.
+    // They all depend on the final bounding box having been
+    // calculated, and this is not done until end() is called.
 
-    // Get the width and height of the laid-out text.  Not valid
-    // unless end() has been called.
+    // Get the width and height of the laid-out text.
     void size(float *width, float *height);
-    float width() { return _width; }
-    float height() { return _height; }
-
-    // Points on the bounding box.  U = upper, C = centre, L =
-    // lower/left, R = right, with the Y position given before the X
-    // position.  Therefore, for example, LC means "lower-centre" (the
-    // mid-point of the bottom of the box), while CL means
-    // "centre-left" (the mid-point of the left side).
-    enum Point { UL, UC, UR, 
-		 CL, CC, CR, 
-		 LL, LC, LR };
+    float width() { return _textWidth + (_margin * 2.0); }
+    float height() { return _textHeight + (_margin * 2.0); }
 
     // Returns the coordinate of the given point on the bounding box.
     float x(Point p = CC);
     float y(Point p = CC);
 
-    // Position the text on the given point.  By default we move the
-    // centre to the point, but you can specify other points on the
-    // bounding box as well.
-    void moveTo(float x, float y, Point p = CC);
+    // Adjust the text so that the anchor point is at <x, y>.
+    void moveTo(float x, float y);
+    // Adjust the text <x, y> and the anchor.
+    void moveTo(float x, float y, Point p);
 
     // Get the lower-left corner of the nth chunk.
     void nthChunk(int n, float *x, float *y);
+    //----------------------------------------------------------------------
 
+    // Renders the text (but not generic boxes added via addBox()).
     void drawText();
 
   protected:
     // True if begin() has been called but end() has not.
     bool _layingOut;
-    // Our metrics (<_x, _y> gives the *centre* of the layout).  These
-    // are not valid until end() is called.
-    float _x, _y, _width, _height;
+    // Our metrics.  These are not valid until end() is called.
+    // Internally, <_x, _y> always specifies the centre of the
+    // bounding box (after end() has been called, that is).
+    float _x, _y, _textWidth, _textHeight;
+    // The anchor specifies how <_x, _y> should be adjusted when the
+    // text is rendered.  By default, _anchor = CC (ie, <_x, _y>
+    // specifies the centre of the bounding box).
+    Point _anchor;
+    // These return the distance from the anchor to the centre.
+    float _deltaX();
+    float _deltaY();
+
     atlasFntRenderer _renderer;
 
     // Current font properties.  Whenever addText() is called, these
     // are used to set the properties for that chunk of text.
     atlasFntTexFont *_font;
     float _pointSize, _italics;
+
+    // Box properties.
+    bool _boxed, _hasBackground, _hasOutline;
+    bool _useNaturalOutlineColour;
+    sgVec4 _backgroundColour, _outlineColour;
+    float _margin;
 
     class Chunk {
       public:
