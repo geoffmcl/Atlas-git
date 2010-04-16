@@ -135,7 +135,8 @@ const char *toMorse(char c);
 char *lastToken(char *str, char *from = NULL);
 
 // Returns the *current* magnetic variation at the given location.
-// Angles are in degrees, elevation in metres.
+// Angles are in degrees, elevation in metres.  It should be
+// subtracted from a true heading to get the correct magnetic heading.
 double magneticVariation(double lat, double lon, double elev = 0.0);
 
 // Calculates the intersection of a ray and a sphere.  The line
@@ -262,5 +263,7 @@ int MEF(double elevation);
 // A wrapper for sgGeodToCart that takes latitude and longitude in
 // degrees (alt is in metres, as with sgGeodToCart).
 void atlasGeodToCart(double lat, double lon, double alt, double *cart);
+// Ditto, but for sgCartToGeod.
+void atlasCartToGeod(double *cart, double *lat, double *lon, double *alt);
 
 #endif

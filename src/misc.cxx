@@ -564,7 +564,7 @@ int MEF(double elevation)
 }
 
 //////////////////////////////////////////////////////////////////////
-// atlasGeodToCart
+// atlasGeodToCart, atlasCartToGeod
 //////////////////////////////////////////////////////////////////////
 
 void atlasGeodToCart(double lat, double lon, double alt, double *cart)
@@ -573,4 +573,11 @@ void atlasGeodToCart(double lat, double lon, double alt, double *cart)
 		 lon * SGD_DEGREES_TO_RADIANS,
 		 alt,
 		 cart);
+}
+
+void atlasCartToGeod(double *cart, double *lat, double *lon, double *alt)
+{
+    sgCartToGeod(cart, lat, lon, alt);
+    *lat *= SGD_RADIANS_TO_DEGREES;
+    *lon *= SGD_RADIANS_TO_DEGREES;
 }
