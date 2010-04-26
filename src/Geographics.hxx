@@ -26,25 +26,42 @@
 #ifndef _GEOGRAPHICS_H
 #define _GEOGRAPHICS_H
 
+// EYE - why include the layout manager?  Geographics should be more
+// basic than that.  Perhaps geodDrawText should be moved elsewhere.
 #include "LayoutManager.hxx"
 
 // Draws the given laid-out text flat on the earth's surface at the
 // given lat, lon and heading (all in degrees).  A heading of 0.0
 // means that the text is drawn with 'up' corresponding to true north.
+// It uses the current OpenGL colour.
 //
-// If 'alwaysUp' is true, the text will be flipped if upside-down (ie,
-// the heading is between 90 and 270).  Uses the current OpenGL
-// colour.
+// "Fiddling" refers to changes to text orientation.  When NO_FIDDLING
+// is on, no adjustment is made - the text will be oriented as given
+// by hdg.
 //
-// The second version is a bit faster, because it can use the
-// precomputed Cartesian coordinates.  The first version must
-// calculate the coordinates itself.
-void geodDrawText(LayoutManager& lm, 
-		  double lat, double lon, double hdg = 0.0, 
-		  bool alwaysUp = true);
+// If FIDDLE_TEXT is on (the default), the text bounding box gets
+// rotated by hdg, but we flip the text if it is upside-down.
+//
+// FIDDLE_ALL is like FIDDLE_TEXT, except that when the text is
+// flipped, the bounding box offset is also flipped.  What this means
+// is that, if the box is above the point (let's assume north is up)
+// when the text is upside-right, the box will be moved to still be
+// above the point when the text is flipped.  This is useful if, for
+// example, you want labels on a line to always be above the line.
+//
+// The first version is a bit faster, because it can use the
+// precomputed coordinates.  The second and third versions must derive
+// the missing values.
+enum GeodTextFiddling {NO_FIDDLING, FIDDLE_TEXT, FIDDLE_ALL};
 void geodDrawText(LayoutManager& lm, 
 		  const sgdVec3 cart, double lat, double lon, double hdg = 0.0,
-		  bool alwaysUp = true);
+		  GeodTextFiddling fiddling = FIDDLE_TEXT);
+void geodDrawText(LayoutManager& lm, 
+		  double lat, double lon, double hdg = 0.0, 
+		  GeodTextFiddling fiddling = FIDDLE_TEXT);
+void geodDrawText(LayoutManager& lm, 
+		  const sgdVec3 cart, double hdg = 0.0,
+		  GeodTextFiddling fiddling = FIDDLE_TEXT);
 
 // Draws a vertex at the given lat/lon, given in degrees.  Also
 // specifies the normal if asked.
@@ -53,13 +70,13 @@ void geodVertex3f(double lat, double lon, bool normals = true);
 // Equivalent to the glPushMatrix()/glPopMatrix() pair, except that it
 // places us at the correct location and orientation.
 //
-// Basically it places a sheet of graph paper flat on the earth at the
-// given point oriented north, then rotates it clockwise by the
-// heading.  Positive Z is away from the earth.
+// Basically it places a sheet of graph paper flat on the earth with
+// its origin at the given point, oriented north, then rotates it
+// clockwise by the heading.  Positive Z is away from the earth.
 //
-// The first version is a bit faster, because it uses a pre-computed
-// cartesian location; the second does the calculation internally,
-// setting the location to the given <lat, lon, elev>.
+// The first version is a bit faster, because it uses pre-computed
+// cartesian and geodesic locations; the second and third need to
+// derive the missing information.
 //
 // Angles are in degrees, elevations in feet.
 //
@@ -71,6 +88,72 @@ void geodPushMatrix(const sgdVec3 cart, double lat, double lon,
 		    double hdg = 0.0);
 void geodPushMatrix(double lat, double lon, double hdg = 0.0, 
 		    double elev = 0.0);
+void geodPushMatrix(const sgdVec3 cart, double hdg = 0.0);
 void geodPopMatrix();
+
+// This class represents a great circle route between two points.  In
+// addition to calculating the basics of the great circle, it will
+// draw it, trying to do so in an efficient way.
+class GreatCircle {
+  public:
+    GreatCircle(SGGeod& start, SGGeod& end);
+    ~GreatCircle();
+
+    double toAzimuth() const { return _toAz; }
+    double fromAzimuth() const { return _fromAz; }
+    double distance() const { return _distance; }
+    const SGGeod& from() const { return _start; }
+    const SGGeod& to() const { return _end; }
+
+    // Draws the great circle (but only the bits that appear within
+    // the viewing frustum after being rotated by the modelview matrix
+    // m), using the current OpenGL colour and line settings.  The
+    // circle is chopped up into pieces, the number of which depending
+    // on the scale (metresPerPixel).
+    void draw(double metresPerPixel, 
+	      const sgdFrustum& frustum,
+	      const sgdMat4& m);
+
+  protected:
+    // A great circle is represented as a bunch of short segments (the
+    // number and size depending on the scale at which we're drawing
+    // and what's visible).  This class will do the work of
+    // subdividing itself into the proper-sized pieces and throwing
+    // out the bits which aren't visible.
+    class _Segment {
+      public:
+	_Segment(SGGeod& start, SGGeod& end, double toAz, double fromAz,
+		 double distance);
+	~_Segment();
+
+	// Subdivides the segment into pieces no larger than
+	// minimumLength and which are visible according to the
+	// frustum and modelview matrix.
+	void subdivide(const sgdFrustum& frustum, 
+		       const sgdMat4& m,
+		       double minimumLength,
+		       std::vector<SGVec3<double> >& points);
+
+      protected:
+	void _prune();
+
+	SGGeod _start, _end, _middle;
+	atlasSphere _bounds;
+	// These are the same as in GreatCircle.
+	double _toAz, _fromAz, _distance;
+	// This is the azimuth from the middle back to the start.
+	double _midAz;
+	// A subdivided segment consists of two segments of half our size.
+	_Segment *_A, *_B;
+    };
+
+    // Start and end points
+    SGGeod _start, _end;
+
+    // _toAz: azimuth from _start to _end, in true degrees
+    // _fromAz: azimuth from _end to _start, in true degrees
+    // _distance: great circle distance from _start to _end, in metres
+    double _toAz, _fromAz, _distance;
+};
 
 #endif
