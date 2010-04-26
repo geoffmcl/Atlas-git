@@ -102,6 +102,10 @@ class atlasFntRenderer: public fntRenderer {
     void puts(const char *s);
 };
 
+// Atlas' special font has a degree symbol.  It can be put into a
+// string via printf("%C", degreeSymbol).
+const unsigned char degreeSymbol = 176;
+
 // A slightly modified version of zlib's gzgets().  This one *always*
 // gets the entire line, and *never* includes the trailing CR/LF.
 //
