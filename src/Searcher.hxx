@@ -138,6 +138,23 @@ class Searcher {
     std::set<Searchable *, SearchableLessThan> *_matches;
     // Our current comparator for _matches.
     SearchableLessThan _comparator;
+
+    // The following variables are all used in findMatches().  They
+    // maintain the state of the search between calls.
+
+    // The value of 'str' in the previous call.
+    std::string _lastSearchString;
+    // The end of the last search.
+    std::multimap<std::string, Searchable *, CaseFreeLessThan>::const_iterator 
+      _end;
+    // The complete search token(s).
+    std::vector<std::string> _completeSearchTokens;
+    // Partial search token.
+    std::string _partialSearchToken;
+    // The token we've chosen to do our initial search with.
+    std::string _aToken;
+    // True if '_aToken' is a partial token.
+    bool _isPartial;
 };
 
 #endif // _SEARCHER_H_

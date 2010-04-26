@@ -37,8 +37,13 @@
 
 #include <vector>
 #include <deque>
-#include <tr1/unordered_set>
-#include <tr1/unordered_map>
+#ifdef _MSC_VER
+    #include <boost/tr1/unordered_set.hpp>
+    #include <boost/tr1/unordered_map.hpp>
+#else
+    #include <tr1/unordered_set>
+    #include <tr1/unordered_map>
+#endif
 
 #include <simgear/misc/sg_path.hxx>
 #include <simgear/io/sg_binobj.hxx>

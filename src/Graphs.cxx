@@ -21,6 +21,10 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <cassert>
 #include <limits>
 #include <algorithm>		// min(), max()
@@ -1387,7 +1391,7 @@ void Graphs::Values::_update()
 
     // Break it down into an exponent (base-10) and mantissa.
     int exponent = floor(log10(actual));
-    float mantissa = actual / pow(10, exponent);
+    float mantissa = actual / pow(10.0, exponent);
 
     // Our heuristic: good mantissa values are 2, 5, and 10.  We move
     // up from our actual mantissa to the next good mantissa value,
@@ -1397,13 +1401,13 @@ void Graphs::Values::_update()
     // negative - I assume that printf() is smart enough to handle
     // this.
     if (mantissa < 2) {
-	_d = 2 * pow(10, exponent);
+	_d = 2 * pow(10.0, exponent);
 	_decimals = -exponent - 1;
     } else if (mantissa < 5) {
-	_d = 5 * pow(10, exponent);
+	_d = 5 * pow(10.0, exponent);
 	_decimals = -exponent;
     } else {
-	_d = 10 * pow(10, exponent);
+	_d = 10 * pow(10.0, exponent);
 	_decimals = -exponent - 1;
     }
     // Large ticks are always placed every 5 small ticks.
@@ -1749,7 +1753,7 @@ void Graphs::Altitudes::_extractHeadingSlope(NAV *n, double *heading,
     // The glideslope's heading is given by the lower 3 digits of the
     // magvar variable.  The thousands and above give slope:
     // ssshhh.hhh.
-    *heading = fmod(n->magvar, 1000.0);
+    *heading = fmod((double)n->magvar, 1000.0);
     *slope = (n->magvar - *heading) / 1e5;
 }
 

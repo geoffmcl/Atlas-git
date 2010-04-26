@@ -21,6 +21,10 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <cassert>
 
 #include <simgear/misc/sg_path.hxx>
@@ -31,6 +35,13 @@
 #include "Globals.hxx"
 #include "misc.hxx"
 #include "Geographics.hxx"
+
+#ifdef _MSC_VER
+#include <simgear/math/SGMisc.hxx>
+#define ROUND(a) SGMisc<double>::round(a)
+#else
+#define ROUND(d)    round(d)
+#endif
 
 using namespace std;
 
@@ -1151,7 +1162,7 @@ void AirportsOverlay::_labelAirport(ARP *ap, int rA)
 	// it may be different on VFR charts.  For now, though, we'll
 	// use the '70 rule'.
 	globalString.printf("%.0f",
-			    round((maxRwy * SG_METER_TO_FEET - 20) / 100));
+			    ROUND((maxRwy * SG_METER_TO_FEET - 20) / 100));
 	lm.addText(globalString.str());
     }
 

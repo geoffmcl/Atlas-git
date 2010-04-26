@@ -187,7 +187,7 @@ void Bucket::draw()
 // and why we need to pass near and far and how they should be
 // defined.  Should the RaySphere test be moved out?  (Because it may
 // not be 100% reliable, and/or because it belongs higher up).
-bool Bucket::intersection(SGVec3<double> near, SGVec3<double> far,
+bool Bucket::intersection(SGVec3<double> nnear, SGVec3<double> ffar,
 			  SGVec3<double> *c)
 {
     // We don't try to do a "live" intersection unless we've actually
@@ -204,7 +204,7 @@ bool Bucket::intersection(SGVec3<double> near, SGVec3<double> far,
     // EYE - is it possible to *not* intersect the bounding sphere but
     // to intersect the bucket?  We should check carefully how the
     // bounding sphere is defined.
-    if (!RaySphere(near, far, SGVec3<double>(_bounds.center), _bounds.radius, 
+    if (!RaySphere(nnear, ffar, SGVec3<double>(_bounds.center), _bounds.radius, 
 		  &mu1, &mu2)) {
 	// Doesn't intersect our bounding sphere, so return false
 	// immediately.
@@ -245,7 +245,7 @@ bool Bucket::intersection(SGVec3<double> near, SGVec3<double> far,
     const double scale = (double)numeric_limits<GLuint>::max();
     double minZ = selectBuf[1] / scale;
 
-    *c = (far - near) * minZ + near;
+    *c = (ffar - nnear) * minZ + nnear;
 
     return true;
 }

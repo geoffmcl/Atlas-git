@@ -21,6 +21,10 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
 ---------------------------------------------------------------------------*/
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include "Searcher.hxx"
 
 #include <sstream>
@@ -41,7 +45,7 @@ void Searchable::tokenize(const string& str, vector<string>& tokens)
     }
 }
 
-Searcher::Searcher()
+Searcher::Searcher(): _lastSearchString("")
 {
     // Create a default value _matches.  This will be thrown out
     // immediately, since by default our comparator uses an impossible
@@ -117,19 +121,6 @@ void Searcher::add(Searchable *s)
 bool Searcher::findMatches(const string& str, const sgdVec3 centre, 
 			   int maxMatches)
 {
-    // The value of 'str' in the previous call.
-    static string lastSearchString;
-    // The end of the last search (-1 if a new search).
-    static multimap<string, Searchable *>::const_iterator end = _tokens.end();
-    // The complete search token(s).
-    static vector<string> completeSearchTokens;
-    // Partial search token.
-    static string partialSearchToken;
-    // The token we've chose to do our initial search with.
-    static string aToken;
-    // True if 'aToken' is a partial token.
-    static bool isPartial;
-
     // True if we change _matches.  This is our return value.
     bool changed = false;
     
@@ -143,52 +134,52 @@ bool Searcher::findMatches(const string& str, const sgdVec3 centre,
     }
 
     // We need to start a new search if the search string has changed.
-    if (str != lastSearchString) {
+    if (str != _lastSearchString) {
 	// New.  Reset and regenerate the static variables.
-	lastSearchString = str;
-	end = _tokens.end();
+	_lastSearchString = str;
+	_end = _tokens.end();
 	_matches->clear();
 	changed = true;
 
 	// Tokenize the search string.  All tokens except the last are
 	// complete tokens.  The last may or may not be complete.
-	completeSearchTokens.clear();
-	partialSearchToken = "";
-	aToken = "";
-	isPartial = false;
+	_completeSearchTokens.clear();
+	_partialSearchToken = "";
+	_aToken = "";
+	_isPartial = false;
 
 	istringstream stream(str);
-	stream >> aToken;
+	stream >> _aToken;
 	while (stream) {
 	    // To determine if the current token is complete or not, we
 	    // just see if we've gone to the end of the stream.  If we're
 	    // at the very end, then the current token is incomplete.
 	    unsigned int loc = stream.tellg();
 	    if (loc == str.length()) {
-		partialSearchToken = aToken;
+		_partialSearchToken = _aToken;
 	    } else {
-		completeSearchTokens.push_back(aToken);
+		_completeSearchTokens.push_back(_aToken);
 	    }
-	    stream >> aToken;
+	    stream >> _aToken;
 	}
 
 	// Now grab a search token.  It doesn't really matter which
 	// one we choose, so we select the last complete token, or, if
 	// there are no complete tokens, the partial token.
-	if (completeSearchTokens.size() > 0) {
-	    aToken = completeSearchTokens.back();
-	    completeSearchTokens.pop_back();
-	    isPartial = false;
-	} else if (partialSearchToken.length() > 0) {
-	    aToken = partialSearchToken;
-	    isPartial = true;
-	    partialSearchToken = "";
+	if (_completeSearchTokens.size() > 0) {
+	    _aToken = _completeSearchTokens.back();
+	    _completeSearchTokens.pop_back();
+	    _isPartial = false;
+	} else if (_partialSearchToken.length() > 0) {
+	    _aToken = _partialSearchToken;
+	    _isPartial = true;
+	    _partialSearchToken = "";
 	} else {
 	    // No tokens in the search string at all.  Does that mean
 	    // we match everything, or nothing?  I choose nothing.  We
 	    // set aToken to an empty string, which will cause us to
 	    // return immediately later.
-	    aToken = "";
+	    _aToken = "";
 	}
     }
 
@@ -216,25 +207,27 @@ bool Searcher::findMatches(const string& str, const sgdVec3 centre,
     }
 
     // If there's no token to search for, just return now.
-    if (aToken.empty()) {
+    if (_aToken.empty()) {
 	return changed;
     }
 
-    multimap<string, Searchable *>::const_iterator i;
+    multimap<string, Searchable *, CaseFreeLessThan>::const_iterator i;
     int noOfMatches;
 
+    // EYE - what happens if new tokens are added during a search?
+
     // If end is _tokens.end(), that means we're beginning a new search.
-    if (end == _tokens.end()) {
+    if (_end == _tokens.end()) {
 	// Search for the first matching token.  We need to do a
 	// different kind of comparison depending on whether it's a
 	// complete or partial token.
 	for (i = _tokens.begin(); i != _tokens.end(); i++) {
 	    int res;
-	    if (isPartial) {
-		res = strncasecmp(aToken.c_str(), i->first.c_str(), 
-				  aToken.length());
+	    if (_isPartial) {
+		res = strncasecmp(_aToken.c_str(), i->first.c_str(), 
+				  _aToken.length());
 	    } else {
-		res = strcasecmp(aToken.c_str(), i->first.c_str());
+		res = strcasecmp(_aToken.c_str(), i->first.c_str());
 	    }
 	    if (res == 0) {
 		// We found the start of the range.
@@ -249,21 +242,21 @@ bool Searcher::findMatches(const string& str, const sgdVec3 centre,
 	}
 
 	// Yes.
-	end = --i;
+	_end = --i;
     }
 
     // At this point, end is just before the range we want to check.
     // We keep going until we get maxMatches more matches, we run out
     // of matches, or we hit the end of the _tokens map.
-    i = ++end;
+    i = ++_end;
     noOfMatches = 0;
     while ((noOfMatches < maxMatches) && (i != _tokens.end())) {
 	int res;
-	if (isPartial) {
-	    res = 
-		strncasecmp(aToken.c_str(), i->first.c_str(), aToken.length());
+	if (_isPartial) {
+	    res = strncasecmp(_aToken.c_str(), i->first.c_str(), 
+			      _aToken.length());
 	} else {
-	    res = strcasecmp(aToken.c_str(), i->first.c_str());
+	    res = strcasecmp(_aToken.c_str(), i->first.c_str());
 	}
 	if (res != 0) {
 	    // We've run out of matches for this token, so bail.
@@ -271,7 +264,7 @@ bool Searcher::findMatches(const string& str, const sgdVec3 centre,
 	}
 	// A token from this searchable matches aToken.  See if
 	// matches all the tokens in the given search string.
-	if (_match(i->second, completeSearchTokens, partialSearchToken)) {
+	if (_match(i->second, _completeSearchTokens, _partialSearchToken)) {
 	    // It does.  If it isn't in the list already, add it.
 	    Searchable *s = i->second;
 	    if (_matches->find(s) == _matches->end()) {
@@ -282,7 +275,7 @@ bool Searcher::findMatches(const string& str, const sgdVec3 centre,
 	}
 	i++;
     }
-    end = --i;
+    _end = --i;
 
     return changed;
 }
@@ -294,7 +287,8 @@ Searchable *Searcher::getMatch(unsigned int i)
     }
 
     // EYE - not too efficient.
-    set<Searchable *>::const_iterator iter = _matches->begin();
+    set<Searchable *, SearchableLessThan>::const_iterator iter = 
+	_matches->begin();
     for (unsigned int j = 0; j < i; j++) {
 	iter++;
     }

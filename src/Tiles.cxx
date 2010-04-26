@@ -21,6 +21,10 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <cassert>
 #include <stdexcept>
 #include <cmath>
@@ -30,6 +34,13 @@
 #include <plib/sg.h>
 
 #include "Tiles.hxx"
+
+#ifdef _MSC_VER
+#include <simgear/math/SGMisc.hxx>
+#define ROUND(a) SGMisc<double>::round(a)
+#else
+#define ROUND(d)    round(d)
+#endif
 
 using namespace std;
 
@@ -342,7 +353,7 @@ TileInfo::TileInfo(const char *name, const SGPath& maps,
     _missingMaps = mapLevels;
 
     // Get the SW corner of our tile.
-    char ns, ew;
+    char ns = 'n', ew = 'e';
     assert(sscanf(name, "%c%3d%c%2d", &ew, &_lon, &ns, &_lat) == 4);
     if (ew == 'w') {
 	_lon = -_lon;
@@ -424,7 +435,7 @@ void TileInfo::mapSize(unsigned int level, int *width, int *height) const
     double w = *height * cos(centreLat() * SGD_DEGREES_TO_RADIANS) * _width;
 
     // Oh yeah, and it has to be a power of 2, and non-zero.
-    *width = pow(2.0, round(log2f(w)));
+    *width = pow(2.0, ROUND(log2f(w)));
     if (*width == 0) {
     	*width = 1;
     }

@@ -21,6 +21,10 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
 ---------------------------------------------------------------------------*/
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <cassert>
 
 #include "Subbucket.hxx"
@@ -470,9 +474,11 @@ void Subbucket::draw()
 		const string& material = m->first;
 		vector<GLuint>& triangles = m->second;
 
-		glColor4fv(Bucket::palette->colour(material.c_str()));
-		glDrawElements(GL_TRIANGLES, triangles.size(),
-			       GL_UNSIGNED_INT, &(triangles[0]));
+		if (!triangles.empty()) {
+		    glColor4fv(Bucket::palette->colour(material.c_str()));
+		    glDrawElements(GL_TRIANGLES, triangles.size(),
+				   GL_UNSIGNED_INT, &(triangles[0]));
+		}
 	    }
 
 	    // Now draw ones that use the normals array.
@@ -481,9 +487,11 @@ void Subbucket::draw()
 		const string& material = m->first;
 		vector<GLuint>& triangles = m->second;
 
-		glColor4fv(Bucket::palette->colour(material.c_str()));
-		glDrawElements(GL_TRIANGLES, triangles.size(),
-			       GL_UNSIGNED_INT, &(triangles[0]));
+		if (!triangles.empty()) {
+		    glColor4fv(Bucket::palette->colour(material.c_str()));
+		    glDrawElements(GL_TRIANGLES, triangles.size(),
+				   GL_UNSIGNED_INT, &(triangles[0]));
+		}
 	    }
 	}
 	glPopClientAttrib();
@@ -521,8 +529,10 @@ void Subbucket::draw()
 		}
 	
 		int_list& indices = _contours[i];
-		glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 
-			       &(indices[0]));
+		if (!indices.empty()) {
+		    glDrawElements(GL_TRIANGLES, indices.size(), 
+				   GL_UNSIGNED_INT, &(indices[0]));
+		}
 	    }
 	}
 	glPopClientAttrib();
@@ -532,13 +542,14 @@ void Subbucket::draw()
     // ---------- Contour lines ----------
     // Contour lines and especially polygon edges are probably used
     // rarely, so only create display lists for them if explicitly
-    // asked.
-    if ((_contourLinesDL == 0) && Bucket::contourLines) {
+    // asked and we actually have some.
+    if ((_contourLinesDL == 0) && Bucket::contourLines && 
+    	!_contourLines.empty()) {
 	_contourLinesDL = glGenLists(1);
 	assert(_contourLinesDL != 0);
 
 	glNewList(_contourLinesDL, GL_COMPILE);
-	glPushAttrib(GL_LINE_BIT);
+	glPushAttrib(GL_LINE_BIT | GL_CURRENT_BIT);
 	glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT); {
 	    glEnableClientState(GL_VERTEX_ARRAY);
 	    glDisableClientState(GL_NORMAL_ARRAY);
@@ -549,18 +560,19 @@ void Subbucket::draw()
 	    glDrawElements(GL_LINES, _contourLines.size(), GL_UNSIGNED_INT,
 	    		   &(_contourLines[0]));
 	}
-	glPopAttrib();
 	glPopClientAttrib();
+	glPopAttrib();
 	glEndList();
     }
 
     // ---------- Polygon edges ----------
-    if ((_polygonEdgesDL == 0) && Bucket::polygonEdges) {
+    if ((_polygonEdgesDL == 0) && Bucket::polygonEdges &&
+	!_polygonEdges.empty()) {
 	_polygonEdgesDL = glGenLists(1);
 	assert(_polygonEdgesDL != 0);
 
 	glNewList(_polygonEdgesDL, GL_COMPILE);
-	glPushAttrib(GL_LINE_BIT);
+	glPushAttrib(GL_LINE_BIT | GL_CURRENT_BIT);
 	glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT); {
 	    glEnableClientState(GL_VERTEX_ARRAY);
 	    glDisableClientState(GL_NORMAL_ARRAY);
@@ -571,8 +583,8 @@ void Subbucket::draw()
 	    glDrawElements(GL_LINES, _polygonEdges.size(), GL_UNSIGNED_INT,
 	    		   &(_polygonEdges[0]));
 	}
-	glPopAttrib();
 	glPopClientAttrib();
+	glPopAttrib();
 	glEndList();
     }
 
@@ -583,7 +595,7 @@ void Subbucket::draw()
     glCallList(_contoursDL);
 
     // Contour lines
-    if (Bucket::contourLines) {
+    if (Bucket::contourLines && _contourLinesDL) {
 	glPushAttrib(GL_DEPTH_BUFFER_BIT); {
 	    glDisable(GL_DEPTH_TEST);
 	    glCallList(_contourLinesDL);
@@ -592,7 +604,7 @@ void Subbucket::draw()
     }
 
     // Polygon edges
-    if (Bucket::polygonEdges) {
+    if (Bucket::polygonEdges && _polygonEdgesDL) {
 	glPushAttrib(GL_DEPTH_BUFFER_BIT); {
 	    glDisable(GL_DEPTH_TEST);
 	    glCallList(_polygonEdgesDL);

@@ -22,6 +22,10 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
 ---------------------------------------------------------------------------*/
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <memory.h>
 #include <stdio.h>
 
@@ -37,8 +41,6 @@
 #include <map>
 #include <stdexcept>
 
-#include "config.h"		// For our version number
-
 #include "FlightTrack.hxx"
 #include "Tiles.hxx"
 #include "Search.hxx"
@@ -53,6 +55,13 @@
 #include "Palette.hxx"
 #include "Bucket.hxx"
 #include "Geographics.hxx"
+
+#ifdef _MSC_VER
+#include <io.h>     // for access()
+#ifndef F_OK
+#define F_OK    0
+#endif
+#endif
 
 using namespace std;
 
@@ -872,22 +881,23 @@ void zoomTo(double scale)
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 
-	double left, right, bottom, top, near, far;
+	// Why 'nnear' and 'ffar', not 'near' and 'far'?  Windows.
+	double left, right, bottom, top, nnear, ffar;
 	right = window.width * globals.metresPerPixel / 2.0;
 	left = -right;
 	top = window.height * globals.metresPerPixel / 2.0;
 	bottom = -top;
 
 	double l = sgdLengthVec3(eye);
-	//     near = l - SGGeodesy::EQURAD - 10000;
-	near = -100000.0;		// EYE - magic number
-	far = l;			// EYE - need better magic
+	//     nnear = l - SGGeodesy::EQURAD - 10000;
+	nnear = -100000.0;		// EYE - magic number
+	ffar = l;			// EYE - need better magic
 					// number (use bounds?)
-	glOrtho(left, right, bottom, top, near, far);
+	glOrtho(left, right, bottom, top, nnear, ffar);
 
 	// Set our global frustum.  This is used by various subsystems
 	// to find out what's going on.
-	globals.frustum.setOrtho(left, right, bottom, top, near, far);
+	globals.frustum.setOrtho(left, right, bottom, top, nnear, ffar);
     }
     glPopAttrib();
     
@@ -3414,7 +3424,6 @@ void keyPressed(unsigned char key, int x, int y)
 
 	  case 14:		// ctrl-n
 	    // Next flight track.
-	    // EYE - check what happens if there are no tracks
 	    track_select_cb(mainUI->nextTrackButton);
 	    break;
 
@@ -3899,10 +3908,10 @@ static void show_cb(puObject *cb)
 // Parses the latitude or longitude in the given puInput and returns
 // the corresponding value.  Southern latitudes and western longitudes
 // are negative.  If the string cannot be parsed, returns
-// numeric_limits<double>::max().
+// numeric_limits<float>::max().
 static double scanLatLon(puInput *p)
 {
-    float result = std::numeric_limits<double>::max();
+    float result = std::numeric_limits<float>::max();
     char *buffer;
     p->getValue(&buffer);
 

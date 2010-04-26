@@ -259,6 +259,19 @@ bool parse_arg(char* arg)
 
 bool getFramebuffer(int textureSize) 
 {
+#if (defined(__GLEW_H__) || defined(__glew_h__))
+    GLenum err = glewInit();
+    if (err != GLEW_OK)
+	{
+	    // Problem: glewInit failed, something is seriously wrong.
+	    fprintf(stderr, "Error: glewInit FAILED!\n%s\n", 
+		    glewGetErrorString(err));
+	    exit(1);
+	}
+    if (verbose)
+        printf("Status: Using GLEW %s\n", glewGetString(GLEW_VERSION));
+#endif
+
     glGenFramebuffersEXT(1, &fbo);
     glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo);
 

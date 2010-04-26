@@ -21,10 +21,15 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <stdlib.h>
 #include <getopt.h>
-#include "config.h"
+#ifndef _MSC_VER
 #include "libgen.h"
+#endif
 #include <stdarg.h>
 
 #include <cassert>

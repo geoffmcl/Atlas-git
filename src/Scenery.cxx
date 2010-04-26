@@ -21,6 +21,10 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
 ---------------------------------------------------------------------------*/
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <cassert>
 
 #include <simgear/math/sg_geodesy.hxx>
@@ -164,7 +168,6 @@ class SceneryTile: public Cullable, public CacheObject, Subscriber {
     unsigned int _size;
 };
 
-const int Texture::__defaultSize;
 GLubyte Texture::__defaultImage[Texture::__defaultSize][Texture::__defaultSize][3];
 GLuint Texture::__defaultTexture = 0;
 
@@ -1170,11 +1173,11 @@ bool Scenery::intersection(double x, double y,
 
     // Near depth plane intersection.
     gluUnProject (x, y, 0.0, mvmatrix, projmatrix, viewport, &wx, &wy, &wz);
-    SGVec3<double> near(wx, wy, wz);
+    SGVec3<double> nnear(wx, wy, wz);
 
     // Far depth plane intersection.
     gluUnProject (x, y, 1.0, mvmatrix, projmatrix, viewport, &wx, &wy, &wz);
-    SGVec3<double> far(wx, wy, wz);
+    SGVec3<double> ffar(wx, wy, wz);
     
     // If validElevation is not NULL, that means the caller is
     // interested in a valid elevation result, which means we must
@@ -1207,7 +1210,7 @@ bool Scenery::intersection(double x, double y,
 		if (!t) {
 		    continue;
 		}
-		if (t->intersection(near, far, c)) {
+		if (t->intersection(nnear, ffar, c)) {
 		    // Found one!  Since the tile found the
 		    // intersection using one of its buckets (ie, live
 		    // scenery), we know that the elevation value is
@@ -1239,16 +1242,16 @@ bool Scenery::intersection(double x, double y,
     assert((validElevation == NULL) || (*validElevation == false));
     SGVec3<double> centre(0.0, 0.0, 0.0);
     double mu1, mu2;
-    near[2] *= SGGeodesy::STRETCH;
-    far[2] *= SGGeodesy::STRETCH;
-    if (RaySphere(near, far, centre, SGGeodesy::EQURAD, &mu1, &mu2)) {
+    nnear[2] *= SGGeodesy::STRETCH;
+    ffar[2] *= SGGeodesy::STRETCH;
+    if (RaySphere(nnear, ffar, centre, SGGeodesy::EQURAD, &mu1, &mu2)) {
 	SGVec3<double> s1, s2;
-	s1 = near + mu1 * (far - near);
-	s2 = near + mu2 * (far - near);
+	s1 = nnear + mu1 * (ffar - nnear);
+	s2 = nnear + mu2 * (ffar - nnear);
 
 	// Take the nearest intersection (the other is on the other
 	// side of the world).
-	if (dist(near, s1) < dist(near, s2)) {
+	if (dist(nnear, s1) < dist(nnear, s2)) {
 	    // Unstretch the world.
 	    s1[2] /= SGGeodesy::STRETCH;
 	    *c = s1;

@@ -21,6 +21,10 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
 ---------------------------------------------------------------------------*/
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include "Culler.hxx"
 #include "Globals.hxx"
 
@@ -466,11 +470,11 @@ Culler::FrustumSearch::~FrustumSearch()
 
 void Culler::FrustumSearch::zoom(double left, double right, 
 				 double bottom, double top,
-				 double near, double far)
+				 double nnear, double ffar)
 {
     // EYE - change to setOrtho(w, h), and have near and far set to
     // contants (eg, earth radius)?
-    _frustum.setOrtho(left, right, bottom, top, near, far);
+    _frustum.setOrtho(left, right, bottom, top, nnear, ffar);
     _setDirty(true);
 }
 
