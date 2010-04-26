@@ -38,8 +38,9 @@
                     Move fg_set_scenery to a specific file.
 ---------------------------------------------------------------------------*/
 
-// EYE - put in configure.ac somehow?
-#define VERSION "0.4.0"
+#ifdef HAVE_CONFIG_H
+#include "config.h"    // For version, and lots more ;=))
+#endif
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -49,6 +50,16 @@
 #endif
 
 #include <stdexcept>
+
+#ifdef _MSC_VER
+#include <windows.h>
+#endif
+
+#ifndef __APPLE__
+#define GL_GLEXT_PROTOTYPES
+#include <GL/gl.h>
+#include <GL/glext.h>
+#endif
 
 #include <plib/pu.h>
 #include <simgear/misc/sg_path.hxx>
