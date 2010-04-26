@@ -85,12 +85,12 @@ struct NAV: public Searchable, Cullable {
 };
 
 // Used for drawing labels on navaids.
+// EYE - make Label a class?
 struct Label {
     float colour[4];
-    // EYE - barf!
-    int morseChunk;
     std::string id;
     LayoutManager lm;
+    float metresPerPixel;
 };
 
 class Overlays;
@@ -140,10 +140,6 @@ class NavaidsOverlay: public Subscriber {
 		    float x, float y,
 		    LayoutManager::Point p = LayoutManager::CC);
     void _drawLabel(Label *l);
-
-    float _morseWidth(const std::string& id, float height);
-    float _renderMorse(const std::string& id, float height,
-		       float x, float y, bool render = true);
 
     Overlays& _overlays;
     Culler *_culler;

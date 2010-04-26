@@ -1623,8 +1623,7 @@ void NavaidsOverlay::_renderVOR(const NAV *n)
 			       0, iconEdge, LayoutManager::UC);
 	    }
 
-	    if ((n->navtype == NAV_VOR) && 
-		(l->lm.y(LayoutManager::UC) > iconEdge)) {
+	    if ((n->navtype == NAV_VOR) && (l->lm.y() > iconEdge)) {
 		l->lm.moveTo(0.0, iconEdge);
 		l->lm.setAnchor(LayoutManager::UC);
 	    }
@@ -1934,8 +1933,6 @@ void NavaidsOverlay::_renderILS(const NAV *n)
 		// EYE - we should add the glideslope too, if it has
 		// one (eg, "284@3.00")
 
-		// Degree symbol (EYE - magic number)
-		const unsigned char degreeSymbol = 176; 
 		globalString.printf("%03d%C%s", heading, degreeSymbol, magTrue);
 		lm.addText(globalString.str());
 		lm.end();
@@ -2099,22 +2096,24 @@ void NavaidsOverlay::_renderDMEILS(const NAV *n)
     geodPopMatrix();
 }
 
+float _renderMorse(const string& id, float height,
+		   float x, float y, float metresPerPixel, bool render = true);
 // Returns width necessary to render the given string in morse code,
 // at the current point size.
-float NavaidsOverlay::_morseWidth(const string& id, float height)
+float _morseWidth(const string& id, float height, float metresPerPixel)
 {
-    return _renderMorse(id, height, 0.0, 0.0, false);
+    return _renderMorse(id, height, 0.0, 0.0, metresPerPixel, false);
 }
 
 // Either draws the given string in morse code at the given location
 // (if render is true), OR returns the width necessary to draw it (if
 // render is false.  In this case, x and y are ignored).  If drawn, we
 // draw the morse stacked on top of each other to fill one line (which
-// we assume to be pointSize high).  We assume that the current OpenGL
-// units are metres.  The location (x, y) specifies the lower-left
-// corner of the rendered morse text.
-float NavaidsOverlay::_renderMorse(const string& id, float height,
-				   float x, float y, bool render)
+// is height high).  We assume that the current OpenGL units are
+// metres.  The location (x, y) specifies the lower-left corner of the
+// rendered morse text.
+float _renderMorse(const string& id, float height,
+		   float x, float y, float metresPerPixel, bool render)
 {
     float maxWidth = 0.0;
 
@@ -2129,7 +2128,7 @@ float NavaidsOverlay::_renderMorse(const string& id, float height,
     if (render) {
 	// We only do the OpenGL stuff if we're actually rendering.
 	glPushAttrib(GL_LINE_BIT);
-	glLineWidth(dotWidth / _metresPerPixel);
+	glLineWidth(dotWidth / metresPerPixel);
 	glBegin(GL_LINES);
     }
 
@@ -2177,6 +2176,14 @@ float NavaidsOverlay::_renderMorse(const string& id, float height,
     return maxWidth;
 }
 
+// Called from the layout manager when it encounters an addBox() box.
+void _morseCallback(LayoutManager *lm, float x, float y, void *userData)
+{
+    Label *l = (Label *)userData;
+    float ascent = lm->font()->ascent() * lm->pointSize();
+    _renderMorse(l->id, ascent, x, y, l->metresPerPixel);
+}
+
 // Create a navaid label.  We use a printf-style format string to
 // specify the style.  The format string can include text (including
 // linefeeds, specified with '\n') and conversion specifications, a la
@@ -2204,18 +2211,16 @@ Label *NavaidsOverlay::_makeLabel(const char *fmt, const NAV *n,
     // morse unit has a width, height, and origin.
     Label *l = new Label;
 
-    // Find out what our ascent is (_morseWidth and _renderMorse need
-    // it).
-    globals.fontRenderer.setPointSize(labelPointSize);
-    atlasFntTexFont *f = (atlasFntTexFont *)globals.fontRenderer.getFont();
-    float ascent = f->ascent() * labelPointSize;
+    // Set our font and find out what our ascent is (_morseWidth and
+    // _renderMorse need it).
+    l->lm.setFont(globals.regularFont, labelPointSize);
+    float ascent = l->lm.font()->ascent() * labelPointSize;
 
     // Go through the format string once, using the layout manager to
     // calculate sizes.
-    l->lm.setFont(globals.regularFont, labelPointSize);
     l->lm.begin(x, y);
     bool spec = false;
-    l->morseChunk = -1;
+    // l->morseChunk = -1;
     AtlasString line;
     for (const char *c = fmt; *c; c++) {
 	if ((*c == '%') && !spec) {
@@ -2228,9 +2233,10 @@ Label *NavaidsOverlay::_makeLabel(const char *fmt, const NAV *n,
 	      case 'M':
 		l->lm.addText(line.str());
 		line.clear();
-		l->morseChunk = 
-		    l->lm.addBox(_morseWidth(n->id, ascent), 0.0);
+		l->lm.addBox(_morseWidth(n->id, ascent, _metresPerPixel), 0.0,
+			     _morseCallback, (void *)l);
 		l->id = n->id;
+		l->metresPerPixel = _metresPerPixel;
 		break;
 	      case 'N':
 		line.appendf("%s", n->name.c_str());
@@ -2335,18 +2341,9 @@ void NavaidsOverlay::_drawLabel(const char *fmt, const NAV *n,
 
 void NavaidsOverlay::_drawLabel(Label *l)
 {
-    // Mostly we just draw the text, but we need to do some special
-    // processing for morse code.
+    // Draw the text.
     glColor4fv(l->colour);
     l->lm.drawText();
-    if (l->morseChunk >= 0) {
-	atlasFntTexFont *f = (atlasFntTexFont *)globals.fontRenderer.getFont();
-	float ascent = f->ascent() * globals.fontRenderer.getPointSize();
-	float chunkX, chunkY;
-
-	l->lm.nthChunk(l->morseChunk, &chunkX, &chunkY);
-	_renderMorse(l->id, ascent, chunkX, chunkY);
-    }
 }
 
 bool NavaidsOverlay::notification(Notification::type n)
