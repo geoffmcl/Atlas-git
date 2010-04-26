@@ -163,6 +163,7 @@ dnl Checks for libraries.
 null_LIBS="$LIBS"
 
 AC_CHECK_LIB(m, cos)
+AC_SEARCH_LIBS(clock_gettime, rt)
 
 base_LIBS="$LIBS"
 
