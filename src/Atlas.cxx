@@ -52,6 +52,7 @@
 #include "Notifications.hxx"
 #include "Palette.hxx"
 #include "Bucket.hxx"
+#include "Geographics.hxx"
 
 using namespace std;
 
@@ -428,6 +429,288 @@ struct Window {
 const double zoomFactor = pow(10.0, 0.1);
 
 //////////////////////////////////////////////////////////////////////
+// 
+// Route
+//
+// A route is a set of great circle segments.
+//
+// EYE - eventually this should be moved out of this file
+class Route {
+  public:
+    Route();
+    ~Route();
+
+    void addPoint(SGGeod& p);
+    void deleteLastPoint();
+    void clear();
+
+    SGGeod lastPoint();
+
+    float distance();
+
+    void draw(double metresPerPixel, const sgdFrustum& frustum,
+	      const sgdMat4& m, sgdVec3 eye);
+    
+    // EYE - move out later?
+    bool active;
+
+  protected:
+    void _draw(bool start, const SGGeod& loc, float az, double metresPerPixel);
+    void _draw(GreatCircle& gc, float distance, double metresPerPixel, 
+	       const sgdFrustum& frustum, const sgdMat4& m);
+
+    vector<SGGeod> _points;
+    vector<GreatCircle> _segments;
+
+    // EYE - check if this kind of static const declaration can be
+    // used elsewhere
+    // The text size in pixels.  This must be multiplied by the
+    // current scale (metresPerPixel) to be in the appropriate units.
+    static const float _pointSize = 10.0;
+};
+
+Route::Route(): active(false)
+{
+}
+
+Route::~Route()
+{
+}
+
+void Route::addPoint(SGGeod& p)
+{
+    _points.push_back(p);
+    if (_points.size() > 1) {
+	size_t i = _points.size() - 2;
+	_segments.push_back(GreatCircle(_points[i], _points[i + 1]));
+    }
+}
+
+void Route::deleteLastPoint()
+{
+    // You'd think STL would do this check for us ...
+    if (!_points.empty()) {
+	_points.pop_back();
+    }
+    if (!_points.empty()) {
+	_segments.pop_back();
+    }
+}
+
+void Route::clear()
+{
+    _points.clear();
+    _segments.clear();
+}
+
+SGGeod Route::lastPoint()
+{
+    if (_points.empty()) {
+	// EYE - magic number - use Bucket::NanE?  Move Bucket::NanE
+	// to Geographics?
+	return SGGeod::fromDegM(0.0, 0.0, -100000.0);
+    } else {
+	return _points.back();
+    }
+}
+
+float Route::distance()
+{
+    float result = 0.0;
+
+    for (size_t i = 0; i < _segments.size(); i++) {
+	GreatCircle& gc = _segments[i];
+	result += gc.distance();
+    }
+
+    return result;
+}
+
+void Route::draw(double metresPerPixel, const sgdFrustum& frustum, 
+		 const sgdMat4& m, sgdVec3 eye)
+{
+    float distance = 0.0;
+    for (size_t i = 0; i < _segments.size(); i++) {
+	GreatCircle& gc = _segments[i];
+	distance += gc.distance();
+	_draw(gc, distance, metresPerPixel, frustum, m);
+    }
+    if (active && !_points.empty()) {
+	SGGeod from = lastPoint(), to;
+	SGGeodesy::SGCartToGeod(SGVec3<double>(eye[0], eye[1], eye[2]), to);
+	GreatCircle gc(from, to);
+
+	glPushAttrib(GL_LINE_BIT); {
+	    glEnable(GL_LINE_STIPPLE);
+	    glLineStipple(2, 0xAAAA);
+	    distance += gc.distance();
+	    _draw(gc, distance, metresPerPixel, frustum, m);
+	}
+	glPopAttrib();
+    }
+}
+
+void _arrowCallback(LayoutManager *lm, float x, float y, void *userData)
+{
+    // True if the arrow points right.
+    bool right = (bool)userData;
+    atlasFntTexFont *f = (atlasFntTexFont *)lm->font();
+    float pointSize = lm->pointSize();
+    float ascent = f->ascent() * pointSize;
+
+    float xMin, xMax;
+    if (right) {
+	xMin = x + pointSize * 0.1;
+	xMax = x + pointSize;
+    } else {
+	xMin = x + pointSize * 0.9;
+	xMax = x;
+    }
+    glBegin(GL_LINES); {
+	glVertex2f(xMin, y + ascent / 2.0);
+	glVertex2f(xMax, y + ascent / 2.0);
+
+	glVertex2f(xMax, y + ascent / 2.0);
+	glVertex2f(x + pointSize / 2.0, y + ascent * 0.75);
+		    
+	glVertex2f(xMax, y + ascent / 2.0);
+	glVertex2f(x + pointSize / 2.0, y + ascent * 0.25);
+    }
+    glEnd();
+}
+
+// Draws one end.
+void Route::_draw(bool start, const SGGeod& loc, float az, 
+		  double metresPerPixel)
+{
+    float lat = loc.getLatitudeDeg(), lon = loc.getLongitudeDeg();
+    float magvar = 0.0;
+    const char *magTrue = "T";
+    if (globals.magnetic) {
+	magTrue = "";
+	magvar = magneticVariation(lat, lon);
+    }
+    float radial = normalizeHeading(rint(az - magvar), false);
+    AtlasString str;
+    str.printf("%03.0f%C%s", radial, degreeSymbol, magTrue);
+
+    // Create the label, which consists of the azimuth string
+    // and an arrow.
+    az = normalizeHeading(az);
+    // True if the azimuth is pointing right (0 to 180 degrees).
+    bool right = ((az >= 0.0) && (az < 180.0));
+
+    LayoutManager lm;
+    const float pointSize = _pointSize * metresPerPixel;
+    lm.setFont(globals.regularFont, pointSize);
+    lm.setBoxed(true, true, false);
+    lm.setMargin(0.0);
+    if (start) {
+	lm.setAnchor(LayoutManager::LL);
+    } else {
+	lm.setAnchor(LayoutManager::LR);
+    }
+    lm.begin(); {
+	if (right) {
+	    lm.addText(str.str());
+	    lm.addBox(pointSize, 0.0, _arrowCallback, (void *)true);
+	} else {
+	    lm.addBox(pointSize, 0.0, _arrowCallback, (void *)false);
+	    lm.addText(str.str());
+	}
+    }
+    lm.end();
+
+    float offset = 5.0 * metresPerPixel;
+    if (start) {
+	lm.moveTo(offset, offset);
+    } else {
+    	az += 180;
+	lm.moveTo(-offset, offset);
+    }
+
+    geodDrawText(lm, lat, lon, az - 90.0, FIDDLE_ALL);
+}
+
+// Draws one great circle segment.
+void Route::_draw(GreatCircle& gc, float distance, double metresPerPixel, 
+		  const sgdFrustum& frustum, const sgdMat4& m)
+{
+    glPushAttrib(GL_DEPTH_BUFFER_BIT | GL_POINT_BIT); {
+	glDisable(GL_DEPTH_TEST);
+
+	if (active) {
+	    glColor3f(1.0, 0.0, 0.0);
+	} else {
+	    glColor3f(1.0, 0.4, 0.4); // salmon
+	}
+	gc.draw(metresPerPixel, frustum, m);
+
+	// EYE - for all this stuff, should we somehow check for visibility?
+	// EYE - check for space for labels?  Share code with airways?
+
+	// Draw a dot at the beginning and end of the segment.
+	glPointSize(3.0);
+	glBegin(GL_POINTS); {
+	    geodVertex3f(gc.from().getLatitudeDeg(),
+			 gc.from().getLongitudeDeg());
+	    geodVertex3f(gc.to().getLatitudeDeg(),
+			 gc.to().getLongitudeDeg());
+	}
+	glEnd();
+
+	//--------------------
+	// Draw the azimuth and arrow at the beginning of the segment.
+	_draw(true, gc.from(), gc.toAzimuth(), metresPerPixel);
+	// EYE - control the other end with a switch?
+	// _draw(false, gc.to(), gc.fromAzimuth(), metresPerPixel);
+
+	//--------------------
+	// Print the segment length in the middle.
+	LayoutManager lm;
+	const float pointSize = _pointSize * metresPerPixel;
+	float offset = 5.0 * metresPerPixel;
+	// EYE - have a separate constant for segment length point size?
+	lm.setFont(globals.regularFont, pointSize * 0.8);
+	lm.setBoxed(true, true, false);
+	lm.setMargin(0.0);
+	lm.moveTo(0.0, -offset, LayoutManager::UC);
+
+	AtlasString str;
+	str.printf("%.0f nm", gc.distance() * SG_METER_TO_NM);
+	lm.setText(str.str());
+
+	// EYE - have this function in GreatCircle?
+	SGGeod midGeod;
+	double fromAz;
+	geo_direct_wgs_84(gc.from(), gc.toAzimuth(), gc.distance() / 2.0, 
+			  midGeod, &fromAz);
+	
+	// EYE - magic "number"
+	glColor3f(0.0, 0.0, 1.0);
+	geodDrawText(lm, 
+		     midGeod.getLatitudeDeg(), midGeod.getLongitudeDeg(),
+		     fromAz + 90.0, FIDDLE_ALL);
+
+	//--------------------
+	// Print the total route length at the end.
+	str.printf("%.0f nm", distance * SG_METER_TO_NM);
+	lm.setPointSize(pointSize);
+	lm.setText(str.str());
+	lm.moveTo(-offset, offset, LayoutManager::LR);
+
+	geodDrawText(lm, 
+		     gc.to().getLatitudeDeg(), gc.to().getLongitudeDeg(),
+		     gc.fromAzimuth() + 90.0, FIDDLE_ALL);
+    }
+    glPopAttrib();
+}
+
+// Global route.
+// EYE - move into globals?  Allow many to be created?
+Route route;
+
+//////////////////////////////////////////////////////////////////////
 // Forward declarations of all callbacks.
 //////////////////////////////////////////////////////////////////////
 static void lighting_cb(puObject *lightingUIObject);
@@ -604,7 +887,7 @@ void zoomTo(double scale)
 
 	// Set our global frustum.  This is used by various subsystems
 	// to find out what's going on.
-	globals.frustum.setFrustum(left, right, bottom, top, near, far);
+	globals.frustum.setOrtho(left, right, bottom, top, near, far);
     }
     glPopAttrib();
     
@@ -623,7 +906,7 @@ void zoomTo(double scale)
 //     }
 
 //     sgdFrustum f;
-//     f.setFrustum(planes[0], planes[1],
+//     f.setOrtho(planes[0], planes[1],
 // 		 planes[2], planes[3],
 // 		 -planes[4], -planes[5]);
 
@@ -648,8 +931,6 @@ void zoomBy(double factor)
 ////////////////////////////////////////////////////////////////////////
 // Format angle as dd mm'ss.s" (DMS-Format) or dd.dddd (decimal degrees)
 ////////////////////////////////////////////////////////////////////////
-// EYE - put this in misc.hxx?
-const unsigned char degreeSymbol = 176;
 static const char *formatAngle(double degrees)
 {
     degrees = fabs(degrees);
@@ -1765,7 +2046,7 @@ static void ILSsAsString(vector<NAV *>& navs, int x,
     if (x > 0) {
 	str.appendf(" %d", x);
     }
-    str.appendf(": %.2f@%.0f%C", freq / 1000.0, radial, degreeSymbol);
+    str.appendf(": %.2f@%03.0f%C", freq / 1000.0, radial, degreeSymbol);
 
     // Navaid information
     if (chosen != NULL) {
@@ -1793,7 +2074,7 @@ static void ILSsAsString(vector<NAV *>& navs, int x,
 	str.appendf(" (%s", id->c_str());
 
 	if (loc != NULL) {
-	    str.appendf(", %.0f%C%s", normalizeHeading(rint(ar), false), 
+	    str.appendf(", %03.0f%C%s", normalizeHeading(rint(ar), false), 
 			degreeSymbol, magTrue);
 	}
 
@@ -1925,7 +2206,7 @@ void InfoUI::setText()
 	    hdg -= magneticVariation(p->lat, p->lon, p->alt * SG_FEET_TO_METER);
 	}
 	hdg = normalizeHeading(rint(hdg), false);
-	hdgStr.printf("Track: %.0f%C%s", hdg, degreeSymbol, magTrue);
+	hdgStr.printf("Track: %03.0f%C%s", hdg, degreeSymbol, magTrue);
 	spdStr.printf("Speed: %.0f kt GS", p->spd);
     }
     altStr.printf("Alt: %.0f ft MSL", p->alt);
@@ -2496,9 +2777,11 @@ HelpUI::HelpUI(int x, int y, Preferences& prefs, TileManager& tm)
     globalString.appendf(fmt.str(), "C-x r", 
 			 "palette contours relative to track/mouse/centre");
     globalString.appendf(fmt.str(), "C-x R", "palette contours absolute");
-//     globalString.appendf("C-space\n");
+    globalString.appendf(fmt.str(), "C-space", "mark a point in a route");
+    globalString.appendf(fmt.str(), "C-space C-space", "deactivate route");
     globalString.appendf(fmt.str(), "C-n", "next flight track");
     globalString.appendf(fmt.str(), "C-p", "previous flight track");
+    globalString.appendf(fmt.str(), "space", "toggle main interface");
     globalString.appendf(fmt.str(), "+", "zoom in");
     globalString.appendf(fmt.str(), "-", "zoom out");
     globalString.appendf(fmt.str(), "?", "toggle this help");
@@ -2507,6 +2790,8 @@ HelpUI::HelpUI(int x, int y, Preferences& prefs, TileManager& tm)
     globalString.appendf(fmt.str(), "c", "centre the map on the mouse");
     globalString.appendf(fmt.str(), "d", "toggle info interface and graphs window");
     globalString.appendf(fmt.str(), "f", "toggle flight tracks");
+    globalString.appendf(fmt.str(), "i", "enlarge airplane image");
+    globalString.appendf(fmt.str(), "I", "shrink airplane image");
     globalString.appendf(fmt.str(), "j", "toggle search interface");
     globalString.appendf(fmt.str(), "l", "toggle lighting interface");
     globalString.appendf(fmt.str(), "m", "toggle mouse and centre mode");
@@ -2517,12 +2802,15 @@ HelpUI::HelpUI(int x, int y, Preferences& prefs, TileManager& tm)
     globalString.appendf(fmt.str(), "p", "centre map on aircraft");
     globalString.appendf(fmt.str(), "P", "toggle auto-centering");
     globalString.appendf(fmt.str(), "q", "quit");
+    globalString.appendf(fmt.str(), "r", "activate/deactivate route");
+    globalString.appendf(fmt.str(), "R", "clear route");
     globalString.appendf(fmt.str(), "s", "save current track");
     globalString.appendf(fmt.str(), "w", "close current flight track");
     globalString.appendf(fmt.str(), "u", "detach (unattach) current connection");
     globalString.appendf(fmt.str(), "v", "toggle labels");
     globalString.appendf(fmt.str(), "x", "toggle x-axis type (time/dist)");
-    globalString.appendf(fmt.str(), "space", "toggle main interface");
+    globalString.appendf(fmt.str(), "delete", 
+			 "delete inactive route/last point of active route");
     globalString.appendf("\n");	// puaLargeInput seems to require an extra LF
 
     _keyboardText = strdup(globalString.str());
@@ -2659,6 +2947,10 @@ void redrawMap()
 
     // Overlays.
     globals.overlays->draw();
+
+    // Draw our route.
+    route.draw(globals.metresPerPixel, globals.frustum, 
+    	       globals.modelViewMatrix, eye);
 
     // Render the widgets.
     puDisplay();
@@ -2842,6 +3134,8 @@ void mouseClick(int button, int state, int x, int y)
 	  case GLUT_LEFT_BUTTON:
 	    if (state == GLUT_DOWN) {
 		if (scenery->intersection(x, y, &oldC)) {
+		    // EYE - do we need to set dragging here, or
+		    // should we wait until mouseMotion gets called?
 		    dragging = true;
 		}
 	    } else {
@@ -2850,12 +3144,12 @@ void mouseClick(int button, int state, int x, int y)
 	    break;
 	  case 3:		// WM_MOUSEWHEEL (away)
 	    if (state == GLUT_DOWN) {
-		keyPressed('-', x, y);
+		keyPressed('+', x, y);
 	    }
 	    break;
 	  case 4:		// WM_MOUSEWHEEL (towards)
 	    if (state == GLUT_DOWN) {
-		keyPressed('+', x, y);
+		keyPressed('-', x, y);
 	    }
 	    break;
 	  default:
@@ -2896,12 +3190,9 @@ void mouseMotion(int x, int y)
 	    // Transform the eye point and the camera up vector.
 	    rotatePosition(rot);
 	}
-    } else {
-	// EYE - which policy is correct?
-// 	puMouse(x, y);
-	if (puMouse(x, y)) {
-	    glutPostRedisplay();
-	}
+    } else if (puMouse(x, y)) {
+	puDisplay();
+	glutPostRedisplay();
     }
 }
 
@@ -2922,7 +3213,7 @@ void passivemotion(int x, int y)
     glutPostRedisplay();
 }
 
-void prefixKeypressed(unsigned char key, int x, int y)
+void lightingPrefixKeypressed(unsigned char key, int x, int y)
 {
     static bool relative = false;
     switch (key) {
@@ -2998,13 +3289,91 @@ void prefixKeypressed(unsigned char key, int x, int y)
     }
 }
 
+void debugPrefixKeypressed(unsigned char key, int x, int y)
+{
+    switch (key) {
+      case 'r':
+	// We maintain our current position in eye, which is the point
+	// on the earth's surface (not adjusted for local terrain) at
+	// the centre of the screen.  
+	//
+	// Ideally, if we use the intersection() function to tell us
+	// what's at the centre, it should return the same result.
+	// However, it usually doesn't.  I think this is because our
+	// viewing vector is defined by the eye point and the earth's
+	// centre.  This means that it is not quite perpendicular to
+	// the earth (which is not quite a sphere).
+	//
+	// However, these are just guesses.  It could be a problem in
+	// the SimGear geography library.  It could be a
+	// rounding/precision problem.  It would be nice to find out
+	// for sure what is going on.
+	{
+	    // First compare eye with the results of a call to
+	    // intersection().
+	    SGGeod eyeGeod;
+	    SGVec3<double> eyeCart(eye);
+	    SGGeodesy::SGCartToGeod(eyeCart, eyeGeod);
+
+	    SGGeod centreGeod;
+	    SGVec3<double> centreCart;
+	    bool foo;
+	    scenery->intersection(window.width / 2.0, window.height / 2.0,
+				  &centreCart, &foo);
+	    SGGeodesy::SGCartToGeod(centreCart, centreGeod);
+
+	    printf("%.8f, %.8f, %f (%f metres)\n",
+		   eyeGeod.getLatitudeDeg() - centreGeod.getLatitudeDeg(),
+		   eyeGeod.getLongitudeDeg() - centreGeod.getLongitudeDeg(),
+		   eyeGeod.getElevationM() - centreGeod.getElevationM(),
+		   dist(eyeCart, centreCart));
+
+	    // Use SGGeod to find a point 1000m below the eye point,
+	    // then do a gluLookAt that point from the eye point.
+	    // This should ensure that we are perpendicular to the
+	    // surface.  Repeat the intersection call and see if the
+	    // results differ.
+	    SGGeod lookAtGeod = SGGeod::fromGeodM(eyeGeod, -1000.0);
+	    SGVec3<double> lookAtCart;
+	    SGGeodesy::SGGeodToCart(lookAtGeod, lookAtCart);
+
+	    // Now adjust the view axis.
+	    glLoadIdentity();
+	    gluLookAt(eye[0], eye[1], eye[2],
+		      lookAtCart[0], lookAtCart[1], lookAtCart[2],
+		      eyeUp[0], eyeUp[1], eyeUp[2]);
+	    glGetDoublev(GL_MODELVIEW_MATRIX, 
+			 (GLdouble *)globals.modelViewMatrix);
+
+	    scenery->intersection(window.width / 2.0, window.height / 2.0,
+				  &centreCart, &foo);
+	    SGGeodesy::SGCartToGeod(centreCart, centreGeod);
+
+	    printf("\t%.8f, %.8f, %f (%f metres)\n",
+		   eyeGeod.getLatitudeDeg() - centreGeod.getLatitudeDeg(),
+		   eyeGeod.getLongitudeDeg() - centreGeod.getLongitudeDeg(),
+		   eyeGeod.getElevationM() - centreGeod.getElevationM(),
+		   dist(eyeCart, centreCart));
+
+	    // Reset our viewpoint.
+	    _move();
+	  }
+      break;
+    }
+}
+
 void keyPressed(unsigned char key, int x, int y) 
 {
-    static bool prefixKey = false;
+    static bool lightingPrefixKey = false, debugPrefixKey = false;
 
-    if (prefixKey) {
-	prefixKeypressed(key, x, y);
-	prefixKey = false;
+    if (lightingPrefixKey) {
+	lightingPrefixKeypressed(key, x, y);
+	lightingPrefixKey = false;
+
+	return;
+    } else if (debugPrefixKey) {
+	debugPrefixKeypressed(key, x, y);
+	debugPrefixKey = false;
 
 	return;
     }
@@ -3013,17 +3382,56 @@ void keyPressed(unsigned char key, int x, int y)
 	switch (key) {
 	  case '':
 	    // Ctrl-x is a prefix key (a la emacs).
-	    prefixKey = true;
+	    lightingPrefixKey = true;
+	    break;
+
+	  case '':
+	    // Ditto, for debugging stuff.
+	    debugPrefixKey = true;
+	    break;
+
+	  case ' ':		// ctrl-space
+	    if (!route.active) {
+		// EYE - later we should push a new route onto the route stack.
+		route.clear();
+		route.active = true;
+	    }
+	    {
+		// EYE - we should continually maintain eye as both a
+		// geodetic and a cartesian location.
+		SGGeod geod;
+		SGGeodesy::SGCartToGeod(SGVec3<double>(eye[0], eye[1], eye[2]), 
+					geod);
+		if (geod == route.lastPoint()) {
+		    // EYE - check if there have been intervening
+		    // moves, keypresses, ...?
+		    route.active = false;
+		} else {
+		    route.addPoint(geod);
+		}
+	    }
+	    glutPostRedisplay();
 	    break;
 
 	  case '':
 	    // Next flight track.
+	    // EYE - check what happens if there are no tracks
 	    track_select_cb(mainUI->nextTrackButton);
 	    break;
 
 	  case '':
 	    // Previous flight track.
 	    track_select_cb(mainUI->prevTrackButton);
+	    break;
+
+	  case ' ':
+	    // Toggle main interface.
+	    if (!mainUI->gui->isVisible()) {
+		mainUI->gui->reveal();
+	    } else {
+		mainUI->gui->hide();
+	    }
+	    glutPostRedisplay();
 	    break;
 
 	  case '+':
@@ -3105,7 +3513,9 @@ void keyPressed(unsigned char key, int x, int y)
  	    prefs.airplaneImageSize *= 1.1;
 	    glutPostRedisplay();
  	    break;
+
  	  case 'I':
+	    // Shrink airplane image.
  	    prefs.airplaneImageSize /= 1.1;
 	    glutPostRedisplay();
  	    break;
@@ -3211,54 +3621,13 @@ void keyPressed(unsigned char key, int x, int y)
 	    break;
 
 	  case 'r':
-	    // Compare eye position with intersection() position.
-	    // This is here for debugging.
-	    {
-		SGGeod eyeGeod;
-		SGVec3<double> eyeCart(eye);
-		SGGeodesy::SGCartToGeod(eyeCart, eyeGeod);
+	    route.active = !route.active;
+	    glutPostRedisplay();
+	    break;
 
-		SGGeod centreGeod;
-		SGVec3<double> centreCart;
-		bool foo;
-		scenery->intersection(window.width / 2.0, window.height / 2.0,
-				      &centreCart, &foo);
-		SGGeodesy::SGCartToGeod(centreCart, centreGeod);
-
-		printf("%.8f, %.8f, %f\n",
-		       eyeGeod.getLatitudeDeg() - centreGeod.getLatitudeDeg(),
-		       eyeGeod.getLongitudeDeg() - centreGeod.getLongitudeDeg(),
-		       eyeGeod.getElevationM() - centreGeod.getElevationM());
-
-		// Use SGGeod to find a point 1000m below the eye
-		// point, then do a gluLookAt that point from the eye
-		// point.  Repeat the intersection call and see if the
-		// results differ.
-		SGGeod lookAtGeod = SGGeod::fromGeodM(eyeGeod, -1000.0);
-		SGVec3<double> lookAtCart;
-		SGGeodesy::SGGeodToCart(lookAtGeod, lookAtCart);
-
-		// Now adjust the view axis.
-		glLoadIdentity();
-		gluLookAt(eye[0], eye[1], eye[2],
-			  lookAtCart[0], lookAtCart[1], lookAtCart[2],
-			  eyeUp[0], eyeUp[1], eyeUp[2]);
-		glGetDoublev(GL_MODELVIEW_MATRIX, 
-			     (GLdouble *)globals.modelViewMatrix);
-
-		scenery->intersection(window.width / 2.0, window.height / 2.0,
-				      &centreCart, &foo);
-		SGGeodesy::SGCartToGeod(centreCart, centreGeod);
-
-		printf("\t%.8f, %.8f, %f\n",
-		       eyeGeod.getLatitudeDeg() - centreGeod.getLatitudeDeg(),
-		       eyeGeod.getLongitudeDeg() - centreGeod.getLongitudeDeg(),
-		       eyeGeod.getElevationM() - centreGeod.getElevationM());
-
-		// Reset our viewpoint.
-		_move();
-	    }
-	    
+	  case 'R':
+	    route.clear();
+	    glutPostRedisplay();
 	    break;
 
 	  case 's':
@@ -3297,14 +3666,15 @@ void keyPressed(unsigned char key, int x, int y)
 	    graphs->toggleXAxisType();
 	    break;
 
-	  case ' ':
-	    // Toggle main interface.
-	    if (!mainUI->gui->isVisible()) {
-		mainUI->gui->reveal();
+	  case '':	// delete
+	    // EYE - delete same on non-OS X systems?
+	    if (route.active) {
+		route.deleteLastPoint();
 	    } else {
-		mainUI->gui->hide();
+		route.clear();
 	    }
 	    glutPostRedisplay();
+	    break;
 	}
     } else {
 	// EYE - really?
