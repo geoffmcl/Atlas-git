@@ -2803,7 +2803,6 @@ HelpUI::HelpUI(int x, int y, Preferences& prefs, TileManager& tm)
     globalString.appendf(fmt.str(), "P", "toggle auto-centering");
     globalString.appendf(fmt.str(), "q", "quit");
     globalString.appendf(fmt.str(), "r", "activate/deactivate route");
-    globalString.appendf(fmt.str(), "R", "clear route");
     globalString.appendf(fmt.str(), "s", "save current track");
     globalString.appendf(fmt.str(), "w", "close current flight track");
     globalString.appendf(fmt.str(), "u", "detach (unattach) current connection");
@@ -3380,17 +3379,17 @@ void keyPressed(unsigned char key, int x, int y)
 
     if (!puKeyboard(key, PU_DOWN)) {
 	switch (key) {
-	  case '':
+	  case 24:	       // ctrl-x
 	    // Ctrl-x is a prefix key (a la emacs).
 	    lightingPrefixKey = true;
 	    break;
 
-	  case '':
+	  case 8:		// ctrl-h
 	    // Ditto, for debugging stuff.
 	    debugPrefixKey = true;
 	    break;
 
-	  case ' ':		// ctrl-space
+	  case 0:		// ctrl-space
 	    if (!route.active) {
 		// EYE - later we should push a new route onto the route stack.
 		route.clear();
@@ -3413,13 +3412,13 @@ void keyPressed(unsigned char key, int x, int y)
 	    glutPostRedisplay();
 	    break;
 
-	  case '':
+	  case 14:		// ctrl-n
 	    // Next flight track.
 	    // EYE - check what happens if there are no tracks
 	    track_select_cb(mainUI->nextTrackButton);
 	    break;
 
-	  case '':
+	  case 16:		// ctrl-p
 	    // Previous flight track.
 	    track_select_cb(mainUI->prevTrackButton);
 	    break;
@@ -3625,11 +3624,6 @@ void keyPressed(unsigned char key, int x, int y)
 	    glutPostRedisplay();
 	    break;
 
-	  case 'R':
-	    route.clear();
-	    glutPostRedisplay();
-	    break;
-
 	  case 's':
 	    // Save the current track.
 	    if (!globals.track()) {
@@ -3666,7 +3660,7 @@ void keyPressed(unsigned char key, int x, int y)
 	    graphs->toggleXAxisType();
 	    break;
 
-	  case '':	// delete
+	  case 127:	// delete
 	    // EYE - delete same on non-OS X systems?
 	    if (route.active) {
 		route.deleteLastPoint();
