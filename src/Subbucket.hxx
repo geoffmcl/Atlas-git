@@ -37,7 +37,7 @@
 
 #include <vector>
 #include <deque>
-#ifdef _MSC_VER
+#if (defined(_MSC_VER) && !defined(HAVE_TRI_UNORDERED))
     #include <boost/tr1/unordered_set.hpp>
     #include <boost/tr1/unordered_map.hpp>
 #else
