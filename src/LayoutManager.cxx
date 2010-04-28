@@ -22,6 +22,7 @@
   ---------------------------------------------------------------------------*/
 
 #include <cassert>
+#include <typeinfo>
 
 #include "LayoutManager.hxx"
 
