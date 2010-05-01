@@ -33,7 +33,7 @@ else
 fi
 
 dnl Specify the libcurl location
-AC_ARG_WITH(plib, [  --with-libcurl=prefix      specify the prefix path to libcurl])
+AC_ARG_WITH(libcurl, [  --with-libcurl=prefix      specify the prefix path to libcurl])
 
 if test "x$with_libcurl" != "x" ; then
     echo "libcurl prefix path is $with_libcurl"
