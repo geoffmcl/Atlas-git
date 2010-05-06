@@ -245,6 +245,15 @@ extern AtlasString globalString;
 // as well.
 const char *formatFrequency(int freq);
 
+// Formats angles.  If dms is true, then degrees is formated in
+// degrees/minutes/seconds format (dd mm' ss.ss", seconds to 2 decimal
+// places).  If false, then it is formatted in decimal degrees
+// (dd.dddddddd, to eight decimal places).  Its sign is ignored.
+//
+// Like formatFrequency, you should copy the string if you need to
+// hang on to it.
+const char *formatAngle(double degrees, bool dms);
+
 // Calculates the minimum elevation figure (MEF) for some area, given
 // the highest elevation (in feet) in that area.
 //
