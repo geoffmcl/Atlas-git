@@ -75,13 +75,16 @@ class MainUI {
   public:
     MainUI(int x, int y);
 
+    void updateLocation(double lat, double lon, double elev);
+    void updateZoom(double scale);
+    void updateTracks();
+
     void setTrackListDirty() { _dirty = true; }
     void setTrackList();
-    void update();
     void setTrackSize(int i);
     void setCurrentItem(int i);
 
-    void setDMS(bool magnetic);
+    void setDMS(bool dms);
     void setMagnetic(bool magnetic);
 
     puGroup *gui;
@@ -295,6 +298,10 @@ Scenery *scenery;
 // EYE - put in preferences?  MainUI?
 // True if we want to label scenery tiles with a MEF.
 bool elevationLabels = true;
+// EYE - temporary
+// If true, the palette will be adjusted on each elevation change (if
+// scenery is live).
+bool relativePalette = false;
 
 // We keep a list of all palettes.  Initially this is set to the
 // installed palettes in Atlas' Palettes directory, but it can expand
@@ -420,19 +427,118 @@ const Palette *Palettes::unload()
     }
 }
 
-// Current cursor location.
-struct Cursor {
-    float x, y;			// Centre of cursor.
-} cursor;
+// ScreenLocation maintains a window x, y coordinate, and its
+// corresponding location on the earth.  ScreenLocation does not track
+// changes to the view, so it must be told when to recalculate its
+// location, via the invalidate() call.
+class ScreenLocation {
+  public:
+    ScreenLocation();
+
+    // Set x, y.  This also causes us to be invalidated.
+    void set(float x, float y);
+
+    float x() const { return _x; }
+    float y() const { return _y; }
+
+    // True if the x, y location has a real elevation value (ie,
+    // there's live scenery at that point).
+    bool validElevation() const { return _validElevation; }
+    // Invalidates us, forcing us to recalculate our location the next
+    // time coord() is called.
+    void invalidate();
+
+    // Return the actual coordinates.  If we are invalid, this will
+    // force an intersection test.
+    AtlasCoord& coord();
+    const SGGeod& geod() { return coord().geod(); }
+    double lat() { return coord().lat(); }
+    double lon() { return coord().lon(); }
+    double elev() { return coord().elev(); }
+    const SGVec3<double>& cart() { return coord().cart(); }
+    const double *data() { return coord().data(); }
+
+  protected:
+    // Note that both ScreenLocation and AtlasCoord have notions of
+    // validity.  When the ScreenLocation is valid (_valid = true),
+    // that means we've called intersection() with the current x, y
+    // coordinates.  When the AtlasCoord is valid (_loc.valid() =
+    // true), that means the intersection hit the earth.  Finally,
+    // _validElevation tells us if the intersection was with live
+    // scenery.
+    bool _valid, _validElevation;
+    float _x, _y;
+    AtlasCoord _loc;
+};
+
+ScreenLocation::ScreenLocation(): _valid(false), _validElevation(false)
+{
+}
+
+void ScreenLocation::set(float x, float y)
+{
+    invalidate();
+    _x = x;
+    _y = y;
+}
+
+void ScreenLocation::invalidate()
+{
+    _loc.invalidate();
+    _valid = _validElevation = false;
+}
+
+AtlasCoord& ScreenLocation::coord()
+{
+    if (!_valid) {
+    	SGVec3<double> cart;
+    	_valid = scenery->intersection(_x, _y, &cart, &_validElevation);
+    	if (_valid) {
+    	    _loc.set(cart);
+    	} else {
+    	    // We don't throw an error - the user needs to check _loc
+    	    _loc.invalidate();
+    	}
+    }
+
+    return _loc;
+}
+
+// EYE - very very temporary.  I created this just to get
+// notifications of new scenery.
+class AtlasController: public Subscriber {
+  public:
+    AtlasController();
+    bool notification(Notification::type n);
+};
+
+AtlasController::AtlasController()
+{
+    subscribe(Notification::NewScenery);
+}
+
+void updateLocation(Notification::type n);
+bool AtlasController::notification(Notification::type n)
+{
+    if (n == Notification::NewScenery) {
+	updateLocation(n);
+    } else {
+	assert(false);
+    }
+
+    return true;
+}
+
+AtlasController controller;
+
+// Current cursor and window centre locations.
+ScreenLocation cursor, centre;
 
 // View variables.
 // EYE - put in globals?  ('eye' is used in Scenery.cxx)
 // EYE - put in a struct?
 sgdVec3 eye;
 sgdVec3 eyeUp;
-struct Window {
-    int width, height;
-} window;
 
 // Take 10 steps (0.1) to zoom by a factor of 10.
 const double zoomFactor = pow(10.0, 0.1);
@@ -719,6 +825,85 @@ void Route::_draw(GreatCircle& gc, float distance, double metresPerPixel,
 // EYE - move into globals?  Allow many to be created?
 Route route;
 
+// EYE - temporary - make part of globals? overlays? mainUI? atlasController?
+bool displayedFlightTrack()
+{
+    return (globals.track() &&
+	    mainUI->tracksToggle->getIntegerValue() &&
+	    mainUI->trackAircraftToggle->getIntegerValue());
+}
+
+// EYE - temporary
+// Make palette base relative.  Relative to what?  If there's a
+// displayed flight track, then make it relative to the aircraft's
+// current elevation.  Else, if the mouse mode is 'mouse', make it
+// relative to the elevation of the scenery under the mouse.
+// Otherwise, make it relative to the elevation of the scenery at the
+// centre.
+void makePaletteRelative()
+{
+    float elev = globals.palette()->base();
+    if (displayedFlightTrack()) {
+	elev = globals.currentPoint()->alt * SG_FEET_TO_METER;
+    } else if (mainUI->showMouse && cursor.validElevation()) {
+	elev = cursor.elev();
+    } else if (!mainUI->showMouse && centre.validElevation()) {
+	elev = centre.elev();
+    }
+    if (globals.palette()->base() != elev) {
+	globals.palette()->setBase(elev);
+	Notification::notify(Notification::NewPalette);
+	glutPostRedisplay();
+    }
+}
+
+// Returns the currently active screen "location" - either where the
+// mouse is pointing, or the centre of the screen.
+ScreenLocation& currentLocation()
+{
+    if (mainUI->showMouse) {
+	return cursor;
+    } else {
+	return centre;
+    }
+}
+
+// Updates the lat/lon/elev text fields on the main interface, based
+// on either the current mouse position or the centre of the window.
+void updateLocation()
+{
+    ScreenLocation& loc = currentLocation();
+    if (loc.coord().valid()) {
+	double lat = loc.lat();
+	double lon = loc.lon();
+	double elev = Bucket::NanE;
+	if (loc.validElevation()) {
+	    elev = loc.elev();
+	}
+	mainUI->updateLocation(lat, lon, elev);
+    }
+}
+
+// When the eyepoint changes, this should be called to update the
+// screen location variables.
+// EYE - temporary - move to some kind of AtlasController?
+void updateLocation(Notification::type n)
+{
+    // Any kind of movement will invalidate the cursor location.
+    cursor.invalidate();
+    if ((n == Notification::Moved) || (n == Notification::NewScenery)) {
+	// But the centre location is only affected if we move or if
+	// new scenery is loaded.
+	centre.invalidate();
+    } else if (!mainUI->showMouse) {
+	// And if we're showing the centre and it's not a move,
+	// there's nothing to do.
+	return;
+    }
+
+    updateLocation();
+}
+
 //////////////////////////////////////////////////////////////////////
 // Forward declarations of all callbacks.
 //////////////////////////////////////////////////////////////////////
@@ -791,6 +976,13 @@ void _rotate(double hdg)
 
     sgdVec3 up = {0.0, 0.0, 1.0};
     sgdXformVec3(eyeUp, up, rot);
+
+    // Notify subscribers that we've rotated.
+    Notification::notify(Notification::Rotated);
+
+    // Update our displayed location.
+    updateLocation(Notification::Rotated);
+    // EYE - glutPostRedisplay()?
 }
 
 // Called after a change to the eye position or up vector.  Sets the
@@ -813,6 +1005,15 @@ void _move()
 
     // Notify subscribers that we've moved.
     Notification::notify(Notification::Moved);
+
+    // Update our displayed location.
+    updateLocation(Notification::Moved);
+
+    // EYE - temporary - add notification to palettes or palette
+    // manager?  Also we need to know about mouse movements.
+    if (relativePalette) {
+	makePaletteRelative();
+    }
 
     // Update interface.
     glutPostRedisplay();
@@ -872,6 +1073,7 @@ void rotatePosition(sgdMat4 rot)
 }
 
 // Sets zoom level.
+// EYE - call it _zoom (to be consistent with _move and _rotate)?
 void zoomTo(double scale)
 {
     globals.metresPerPixel = scale;
@@ -883,9 +1085,12 @@ void zoomTo(double scale)
 
 	// Why 'nnear' and 'ffar', not 'near' and 'far'?  Windows.
 	double left, right, bottom, top, nnear, ffar;
-	right = window.width * globals.metresPerPixel / 2.0;
+	// The x, y coordinates of the centre ScreenLocation variable
+	// are equivalent to half of the window width and height
+	// respectively.
+	right = centre.x() * globals.metresPerPixel;
 	left = -right;
-	top = window.height * globals.metresPerPixel / 2.0;
+	top = centre.y() * globals.metresPerPixel;
 	bottom = -top;
 
 	double l = sgdLengthVec3(eye);
@@ -930,44 +1135,17 @@ void zoomTo(double scale)
     // Tell all interested parties that we've zoomed.
     Notification::notify(Notification::Zoomed);
 
+    // Update our zoom and displayed location (this could change if
+    // we're displaying the mouse location).
+    mainUI->updateZoom(globals.metresPerPixel);
+    updateLocation(Notification::Zoomed);
+
     glutPostRedisplay();
 }
 
 void zoomBy(double factor)
 {
     zoomTo(globals.metresPerPixel * factor);
-}
-
-////////////////////////////////////////////////////////////////////////
-// Format angle as dd mm'ss.s" (DMS-Format) or dd.dddd (decimal degrees)
-////////////////////////////////////////////////////////////////////////
-static const char *formatAngle(double degrees)
-{
-    degrees = fabs(degrees);
-
-    if (mainUI->degMinSec) {
-	int deg_part;
-	int min_part;
-	float sec_part;
-
-	deg_part = (int)degrees;
-	min_part = (int)(60.0f * (degrees - deg_part));
-	sec_part = 3600.0f * (degrees - deg_part - min_part / 60.0f);
-
-	/* Round off hundredths */
-	if (sec_part + 0.005f >= 60.0f)
-	    sec_part -= 60.0f, min_part += 1;
-	if (min_part >= 60)
-	    min_part -= 60, deg_part += 1;
-
-	// EYE - need to check for texture fonts if we do this
-	globalString.printf("%02d%C %02d' %05.2f\"",
-			    deg_part, degreeSymbol, min_part, sec_part);
-    } else {
-	globalString.printf("%.8f%C", degrees, degreeSymbol);
-    }
-
-    return globalString.str();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1046,7 +1224,7 @@ void newFlightTrack()
     }
 
     // Set status of the flight track buttons.
-    mainUI->update();
+    mainUI->updateTracks();
     // EYE - combine with update()?
     // EYE - make protected and force callers to use setTrackListDirty()?
     mainUI->setTrackList();
@@ -1659,9 +1837,44 @@ MainUI::MainUI(int x, int y): _dirty(true)
 			curx + boxWidth, cury + boxHeight,
 			(char **)magTrueBoxLabels, TRUE);
     magTrueBox->setCallback(magTrue_cb);
-//     magnetic = true;
 
     gui->close();
+}
+
+// Updates the lat/lon/elev text fields.  If elevation is not valid,
+// pass in Bucket::NanE - the elevation text field will be set to
+// "n/a".
+void MainUI::updateLocation(double lat, double lon, double elev)
+{
+    // EYE - if the keyboard focus leaves one of these text fields,
+    // the fields don't update unless an event happens (like wiggling
+    // the mouse).  This should be fixed.
+    static AtlasString latStr, lonStr, elevStr;
+    if (!mainUI->latInput->isAcceptingInput()) {
+	latStr.printf("%c%s", (lat < 0) ? 'S' : 'N', 
+		      formatAngle(lat, mainUI->degMinSec));
+	mainUI->latInput->setValue(latStr.str());
+    }
+
+    if (!mainUI->lonInput->isAcceptingInput()) {
+	lonStr.printf("%c%s", (lon < 0) ? 'W' : 'E', 
+		      formatAngle(lon, mainUI->degMinSec));
+	mainUI->lonInput->setValue(lonStr.str());
+    }
+
+    if (elev != Bucket::NanE) {
+	elevStr.printf("Elev: %.0f ft", elev * SG_METER_TO_FEET);
+    } else {
+	elevStr.printf("Elev: n/a");
+    }
+    mainUI->elevText->setLabel(elevStr.str());
+}
+
+void MainUI::updateZoom(double scale)
+{
+    if (!mainUI->zoomInput->isAcceptingInput()) {
+	mainUI->zoomInput->setValue((float)scale);
+    }
 }
 
 // Resets the strings in the tracks combo box to match those in
@@ -1698,7 +1911,7 @@ void MainUI::setTrackList()
 
 // Updates the main user interface based on the current track and
 // track number.
-void MainUI::update()
+void MainUI::updateTracks()
 {
     FlightTrack *track = globals.track();
     size_t trackNo = globals.currentTrackNo();
@@ -2194,8 +2407,10 @@ void InfoUI::setText()
     static AtlasString latStr, lonStr, altStr, hdgStr, spdStr, hmsStr,
 	dstStr, vor1Str, vor2Str, adfStr;
 
-    latStr.printf("Lat: %c%s", (p->lat < 0) ? 'S':'N', formatAngle(p->lat));
-    lonStr.printf("Lon: %c%s", (p->lon < 0) ? 'W':'E', formatAngle(p->lon));
+    latStr.printf("Lat: %c%s", (p->lat < 0) ? 'S':'N', 
+		  formatAngle(p->lat, mainUI->degMinSec));
+    lonStr.printf("Lon: %c%s", (p->lon < 0) ? 'W':'E', 
+		  formatAngle(p->lon, mainUI->degMinSec));
     if (globals.track()->isAtlasProtocol()) {
 	const char *magTrue = "T";
 	double hdg = p->hdg;
@@ -2786,7 +3001,9 @@ HelpUI::HelpUI(int x, int y, Preferences& prefs, TileManager& tm)
     globalString.appendf(fmt.str(), "C-x p", "smooth/flat polygon shading");
     globalString.appendf(fmt.str(), "C-x r", 
 			 "palette contours relative to track/mouse/centre");
-    globalString.appendf(fmt.str(), "C-x R", "palette contours absolute");
+    globalString.appendf(fmt.str(), "C-x R", 
+			 "palette contours follow track/mouse/centre");
+    globalString.appendf(fmt.str(), "C-x 0", "set palette base to 0.0");
     globalString.appendf(fmt.str(), "C-space", "mark a point in a route");
     globalString.appendf(fmt.str(), "C-space C-space", "deactivate route");
     globalString.appendf(fmt.str(), "C-n", "next flight track");
@@ -2856,8 +3073,7 @@ void HelpUI::setText(puObject *obj)
 // Called when the main window is resized.
 void reshapeMap(int _width, int _height)
 {
-    window.width = _width;
-    window.height = _height;
+    centre.set(_width / 2.0, _height / 2.0);
 
     glViewport (0, 0, (GLsizei) _width, (GLsizei) _height); 
     zoomBy(1.0);
@@ -2878,54 +3094,6 @@ void redrawMap()
 {
     assert(glutGetWindow() == main_window);
   
-    // Update the text showing the centre/mouse position.  Why do this
-    // here?  It makes the code easier, especially because scenery
-    // gets loaded asynchronously.  Otherwise, we need to always be
-    // aware of things that would affect our position: moves, rotates,
-    // zooms, scenery loading, ...
-    double x, y;
-    if (mainUI->showMouse) {
-	x = cursor.x;
-	y = cursor.y;
-    } else {
-	x = window.width / 2.0;
-	y = window.height / 2.0;
-    }
-    bool validLocation, validElevation;
-    SGVec3<double> cart;
-    validLocation = scenery->intersection(x, y, &cart, &validElevation);
-
-    // EYE - if the keyboard focus leaves one of these text fields,
-    // the fields don't update unless an event happens (like wiggling
-    // the mouse).  This should be fixed.
-    if (validLocation) {
-	SGGeod geod;
-	SGGeodesy::SGCartToGeod(cart, geod);
-
-	static AtlasString latStr, lonStr, elevStr;
-	if (!mainUI->latInput->isAcceptingInput()) {
-	    double lat = geod.getLatitudeDeg();
-	    latStr.printf("%c%s", (lat < 0) ? 'S' : 'N', formatAngle(lat));
-	    mainUI->latInput->setValue(latStr.str());
-	}
-
-	if (!mainUI->lonInput->isAcceptingInput()) {
-	    double lon = geod.getLongitudeDeg();
-	    lonStr.printf("%c%s", (lon < 0) ? 'W' : 'E', formatAngle(lon));
-	    mainUI->lonInput->setValue(lonStr.str());
-	}
-
-	if (validElevation) {
-	    elevStr.printf("Elev: %.0f ft", geod.getElevationFt());
-	} else {
-	    elevStr.printf("Elev: n/a");
-	}
-	mainUI->elevText->setLabel(elevStr.str());
-	if (!mainUI->zoomInput->isAcceptingInput()) {
-	    mainUI->zoomInput->setValue((float)globals.metresPerPixel);
-	}
-    }
-
     // Check errors before...
     GLenum error = glGetError();
     if (error != GL_NO_ERROR) {
@@ -2935,21 +3103,16 @@ void redrawMap()
     // Clear all pixels and depth buffer.
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // The status of the crosshairs overlay depends on the current
-    // track, and other overlays.  Draw a crosshair if:
-    //
-    // (a) there's no track, OR
-    // (b) the tracks layer is off, OR
-    // (c) there's a track, but we don't auto-centre on it
-    //
-    // In other words, if there's a track AND the tracks layer is on
-    // AND we're auto-centering, then DON'T draw the crosshair.
-
-    // EYE - turn off crosshairs in mouse mode too?
-    bool on = !(globals.track() &&
-		mainUI->tracksToggle->getIntegerValue() &&
-		mainUI->trackAircraftToggle->getIntegerValue());
-    globals.overlays->setVisibility(Overlays::CROSSHAIRS, on);
+    // The status of the cursor and the crosshairs overlay depends on
+    // the mouse mode - if we're in mouse mode, use a crosshairs
+    // cursor and don't draw a central crosshair.
+    if (mainUI->showMouse) {
+	globals.overlays->setVisibility(Overlays::CROSSHAIRS, false);
+	glutSetCursor(GLUT_CURSOR_CROSSHAIR);
+    } else {
+	globals.overlays->setVisibility(Overlays::CROSSHAIRS, true);
+	glutSetCursor(GLUT_CURSOR_LEFT_ARROW);
+    }
 
     // Scenery.
     scenery->draw(elevationLabels);
@@ -2966,7 +3129,7 @@ void redrawMap()
 
     glutSwapBuffers();
 
-    // ... and at the end.
+    // ... and check errors at the end.
     error = glGetError();
     if (error != GL_NO_ERROR) {
 	printf("display (after): %s\n", gluErrorString(error));
@@ -3178,8 +3341,7 @@ void mouseMotion(int x, int y)
     // The x, y given by GLUT marks the upper-left corner of the
     // cursor (and y increases down in GLUT coordinates).  We add 0.5
     // to both to get the centre of the cursor.
-    cursor.x = x + 0.5;
-    cursor.y = y + 0.5;
+    cursor.set(x + 0.5, y + 0.5);
 
     if (dragging) {
 	SGVec3<double> newC;
@@ -3216,15 +3378,17 @@ void passivemotion(int x, int y)
     // The x, y given by GLUT marks the upper-left corner of the
     // cursor (and y increases down in GLUT coordinates).  We add 0.5
     // to both to get the centre of the cursor.
-    cursor.x = x + 0.5;
-    cursor.y = y + 0.5;
-
-    glutPostRedisplay();
+    cursor.set(x + 0.5, y + 0.5);
+    if (mainUI->showMouse) {
+	updateLocation();
+	glutPostRedisplay();
+    }
 }
 
 void lightingPrefixKeypressed(unsigned char key, int x, int y)
 {
-    static bool relative = false;
+    // // EYE - move out of here?
+    // static bool relative = false;
     switch (key) {
       case 'c':			// Contour lines on/off
 	lightingUI->lines->setValue(!lightingUI->lines->getValue());
@@ -3246,47 +3410,22 @@ void lightingPrefixKeypressed(unsigned char key, int x, int y)
 	lightingUI->polygons->setValue(!lightingUI->polygons->getValue());
 	lighting_cb(lightingUI->polygons);
 	break;
-      case 'r':			// Relative palette on
-	// Make palette base relative.  Relative to what?  If there's
-	// a displayed flight track, then make it relative to the
-	// aircraft's current elevation.  Else, if the mouse mode is
-	// 'mouse', make it relative to the elevation of the scenery
-	// under the mouse.  Otherwise, make it relative to the
-	// elevation of the scenery at the centre.
-	{
-	    relative = true;
-	    float elev = globals.palette()->base();
-	    // We use the absence of a crosshair to mean there's a
-	    // displayed flight track.
-	    if (!globals.overlays->isVisible(Overlays::CROSSHAIRS)) {
-		elev = globals.currentPoint()->alt * SG_FEET_TO_METER;
-	    } else {
-		double x, y;
-		if (mainUI->showMouse) {
-		    x = cursor.x;
-		    y = cursor.y;
-		} else {
-		    x = window.width / 2.0;
-		    y = window.height / 2.0;
-		}
-		SGVec3<double> cart;
-		bool validElevation;
-		if (scenery->intersection(x, y, &cart, &validElevation) &&
-		    validElevation) {
-		    SGGeod geod;
-		    SGGeodesy::SGCartToGeod(cart, geod);
-		    elev = geod.getElevationM();
-		}
-	    }
-	    if (globals.palette()->base() != elev) {
-		globals.palette()->setBase(elev);
-		Notification::notify(Notification::NewPalette);
-		glutPostRedisplay();
-	    }
+      case 'r':			// Set base to current elevation
+	makePaletteRelative();
+	break;
+      case 'R':			// Base continously tracks elevation
+	relativePalette = !relativePalette;
+	if (relativePalette) {
+	    makePaletteRelative();
+	} else if (globals.palette()->base() != 0.0) {
+	    globals.palette()->setBase(0.0);
+	    Notification::notify(Notification::NewPalette);
+	    glutPostRedisplay();
 	}
 	break;
-      case 'R':			// Relative palette off
-	relative = false;
+      case '0':			// Set base to 0.0 (the default)
+	// EYE - most of this is the same as 'R' - combine?
+	relativePalette = false;
 	if (globals.palette()->base() != 0.0) {
 	    globals.palette()->setBase(0.0);
 	    Notification::notify(Notification::NewPalette);
@@ -3318,8 +3457,8 @@ void debugPrefixKeypressed(unsigned char key, int x, int y)
 	// rounding/precision problem.  It would be nice to find out
 	// for sure what is going on.
 	{
-	    // First compare eye with the results of a call to
-	    // intersection().
+	    // First compare eye with the results of an an
+	    // intersection() call at the centre of the screen.
 	    SGGeod eyeGeod;
 	    SGVec3<double> eyeCart(eye);
 	    SGGeodesy::SGCartToGeod(eyeCart, eyeGeod);
@@ -3327,15 +3466,14 @@ void debugPrefixKeypressed(unsigned char key, int x, int y)
 	    SGGeod centreGeod;
 	    SGVec3<double> centreCart;
 	    bool foo;
-	    scenery->intersection(window.width / 2.0, window.height / 2.0,
-				  &centreCart, &foo);
-	    SGGeodesy::SGCartToGeod(centreCart, centreGeod);
-
-	    printf("%.8f, %.8f, %f (%f metres)\n",
-		   eyeGeod.getLatitudeDeg() - centreGeod.getLatitudeDeg(),
-		   eyeGeod.getLongitudeDeg() - centreGeod.getLongitudeDeg(),
-		   eyeGeod.getElevationM() - centreGeod.getElevationM(),
-		   dist(eyeCart, centreCart));
+ 	    scenery->intersection(centre.x(), centre.y(), &centreCart, &foo);
+ 	    SGGeodesy::SGCartToGeod(centreCart, centreGeod);
+ 
+ 	    printf("%.8f, %.8f, %f (%f metres)\n",
+ 	    	   eyeGeod.getLatitudeDeg() - centreGeod.getLatitudeDeg(),
+ 	    	   eyeGeod.getLongitudeDeg() - centreGeod.getLongitudeDeg(),
+ 	    	   eyeGeod.getElevationM() - centreGeod.getElevationM(),
+ 	    	   dist(eyeCart, centreCart));
 
 	    // Use SGGeod to find a point 1000m below the eye point,
 	    // then do a gluLookAt that point from the eye point.
@@ -3354,8 +3492,7 @@ void debugPrefixKeypressed(unsigned char key, int x, int y)
 	    glGetDoublev(GL_MODELVIEW_MATRIX, 
 			 (GLdouble *)globals.modelViewMatrix);
 
-	    scenery->intersection(window.width / 2.0, window.height / 2.0,
-				  &centreCart, &foo);
+	    scenery->intersection(centre.x(), centre.y(), &centreCart, &foo);
 	    SGGeodesy::SGCartToGeod(centreCart, centreGeod);
 
 	    printf("\t%.8f, %.8f, %f (%f metres)\n",
@@ -3475,13 +3612,8 @@ void keyPressed(unsigned char key, int x, int y)
 	    break;
 
 	  case 'c': 
-	    // Center the map on the current mouse position.
-	    {
-		SGVec3<double> cart;
-		bool elev;
-		if (scenery->intersection(cursor.x, cursor.y, &cart, &elev)) {
-		    movePosition(cart.data());
-		}
+	    if (cursor.coord().valid()) {
+		movePosition(cursor.data());
 	    }
 	    break;
 
@@ -3749,9 +3881,6 @@ void init()
     scenery->setBackgroundImage(world);
 
     globals.overlays = new Overlays(prefs.fg_root.str());
-
-    // EYE - probably we should make this a class with a constructor.
-    cursor.x = cursor.y = -1.0;
 }
 
 // I don't know if this constitues a hack or not, but doing something
@@ -3900,6 +4029,7 @@ static void show_cb(puObject *cb)
 	} else {
 	    mainUI->mouseText->setLabel("centre");
 	}
+	updateLocation();
     }
 
     glutPostRedisplay();
@@ -3968,8 +4098,8 @@ static void degMinSec_cb(puObject *cb)
     // PLIB smart enough to update its widgets?
     // EYE - might it be better to set the value based on the widget?
     // EYE - really need some kind of notification mechanism
-//     mainUI->degMinSec = !mainUI->degMinSec;
     mainUI->setDMS(!mainUI->degMinSec);
+    updateLocation();
     infoUI->setText();
 }
 
@@ -4325,13 +4455,9 @@ int main(int argc, char **argv)
     // glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
     // EYE - see glutInitWindowPosition man page - call glutInit() after
     // this and pass argc, and argv to glutInit?
-    window.width = prefs.width;
-    window.height = prefs.height;
+    centre.set(prefs.width / 2.0, prefs.height / 2.0);
     glutInitWindowSize(prefs.width, prefs.height);
     main_window = glutCreateWindow("Atlas");
-
-    // Use a crosshair cursor.
-    glutSetCursor(GLUT_CURSOR_CROSSHAIR);
 
     // Load our scenery fonts.
     // EYE - put in preferences
@@ -4416,7 +4542,6 @@ int main(int argc, char **argv)
     // Initial position (this may be changed by the --airport option,
     // or by load flight tracks).
     double latitude = prefs.latitude, longitude = prefs.longitude;
-    movePosition(latitude, longitude);
     
     // Handle --airport option.
     if (strlen(prefs.icao) != 0) {
