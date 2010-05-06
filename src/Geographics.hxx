@@ -156,4 +156,68 @@ class GreatCircle {
     double _toAz, _fromAz, _distance;
 };
 
+// AtlasCoord - a combination of SGGeod and SGVec3<double>
+//
+// I forever seem to be converting between geodetic and cartesian
+// coordinates, and needing to maintain both representations for a
+// given point.  This class makes it easier, by maintaining both a
+// geodetic and cartesian representation of a point.  It will convert
+// from one to the other, but only if required, as the conversion is
+// expensive.
+//
+// Note that if neither the geodetic or cartesian coordinates have
+// been initialized, attempts to access their values will result in a
+// runtime error being thrown.  Note as well that, because we're
+// maintaining both a geodetic and cartesian representation, this
+// class uses twice as much space as either alone.
+class AtlasCoord {
+  public:
+    // Default constructor - both coordinates will be marked as false
+    // until a location is set().
+    AtlasCoord();
+
+    AtlasCoord(double lat, double lon, double elev = 0.0);
+    AtlasCoord(SGGeod& geod);
+
+    AtlasCoord(SGVec3<double>& cart);
+    AtlasCoord(sgdVec3 cart);
+
+    // True if either the geodetic or cartesian coordinates are valid.
+    bool valid() const;
+    // Marks both coordinates as invalid.
+    void invalidate();
+
+    // Accessors.  All of these may require a conversion between
+    // geodetic and cartesian coordinates.  Latitude and longitude are
+    // in degrees, elevation and the cartesian coordinates are in
+    // metres.
+    const SGGeod& geod();
+    double lat();
+    double lon();
+    double elev();
+    const SGVec3<double>& cart();
+    const double *data();
+    double x();
+    double y();
+    double z();
+
+    // Setters.
+    void set(double lat, double lon, double elev = 0.0);
+    void set(SGGeod& geod);
+    void set(SGVec3<double>& cart);
+    void set(sgdVec3 cart);
+
+  protected:
+    // Conversion methods.  These will be called whenever we need to
+    // convert from one coordinate system to the other.
+    void _cartToGeod();
+    void _geodToCart();
+
+    // Our data.
+    SGGeod _geod;
+    bool _geodValid;
+    SGVec3<double> _cart;
+    bool _cartValid;
+};
+
 #endif

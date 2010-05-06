@@ -21,6 +21,8 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
+#include <stdexcept>
+
 #include "Geographics.hxx"
 
 // Draw text at the given latitude and longitude, with hdg pointing
@@ -277,3 +279,146 @@ void GreatCircle::_Segment::_prune()
 	delete _B;
     }
 }
+
+//////////////////////////////////////////////////////////////////////
+// AtlasCoord
+//////////////////////////////////////////////////////////////////////
+
+AtlasCoord::AtlasCoord(): _geodValid(false), _cartValid(false)
+{
+}
+
+AtlasCoord::AtlasCoord(double lat, double lon, double elev): 
+    _cartValid(false)
+{
+    set(lat, lon, elev);
+}
+
+AtlasCoord::AtlasCoord(SGGeod& geod): _cartValid(false)
+{
+    set(geod);
+}
+
+AtlasCoord::AtlasCoord(SGVec3<double>& cart): _geodValid(false)
+{
+    set(cart);
+}
+
+AtlasCoord::AtlasCoord(sgdVec3 cart): _geodValid(false)
+{
+    set(cart);
+}
+
+bool AtlasCoord::valid() const
+{
+    return (_geodValid || _cartValid);
+}
+
+void AtlasCoord::invalidate()
+{
+    _geodValid = _cartValid = false;
+}
+
+const SGGeod& AtlasCoord::geod()
+{
+    if (!valid()) {
+	throw std::runtime_error("invalid AtlasCoord");
+    }
+    if (!_geodValid) {
+	_cartToGeod();
+    }
+    return _geod;
+}
+
+double AtlasCoord::lat()
+{
+    return geod().getLatitudeDeg();
+}
+
+double AtlasCoord::lon()
+{
+    return geod().getLongitudeDeg();
+}
+
+double AtlasCoord::elev()
+{
+    return geod().getElevationM();
+}
+
+const SGVec3<double>& AtlasCoord::cart()
+{
+    if (!valid()) {
+	throw std::runtime_error("invalid AtlasCoord");
+    }
+    if (!_cartValid) {
+	_geodToCart();
+    }
+    return _cart;
+}
+
+const double *AtlasCoord::data()
+{
+    return cart().data();
+}
+
+double AtlasCoord::x()
+{
+    return cart().x();
+}
+
+double AtlasCoord::y()
+{
+    return cart().y();
+}
+
+double AtlasCoord::z()
+{
+    return cart().z();
+}
+
+void AtlasCoord::set(double lat, double lon, double elev)
+{
+    _geod.setLatitudeDeg(lat);
+    _geod.setLongitudeDeg(lon);
+    _geod.setElevationM(elev);
+    _geodValid = true;
+    _cartValid = false;
+}
+
+void AtlasCoord::set(SGGeod& geod)
+{
+    _geod = geod;
+    _geodValid = true;
+    _cartValid = false;
+}
+
+void AtlasCoord::set(SGVec3<double>& cart)
+{
+    _cart = cart;
+    _cartValid = true;
+    _geodValid = false;
+}
+
+void AtlasCoord::set(sgdVec3 cart)
+{
+    _cart[0] = cart[0];
+    _cart[1] = cart[2];
+    _cart[2] = cart[3];
+    _cartValid = true;
+    _geodValid = false;
+}
+
+void AtlasCoord::_cartToGeod()
+{
+    assert(_cartValid && !_geodValid);
+    SGGeodesy::SGCartToGeod(_cart, _geod);
+    _geodValid = true;
+}
+
+void AtlasCoord::_geodToCart()
+{
+    assert(_geodValid && !_cartValid);
+    SGGeodesy::SGGeodToCart(_geod, _cart);
+    _cartValid = true;
+}
+
