@@ -542,6 +542,9 @@ bool SceneryTile::load()
 
 	_mapToBeLoaded = TileManager::MAX_MAP_LEVEL;
 
+	// Tell others that live scenery has been loaded.
+	Notification::notify(Notification::NewScenery);
+
 	// If we still have buckets to load, tell the cache we're not
 	// done.
 	return _bucketsToBeLoaded.empty();
@@ -552,6 +555,9 @@ bool SceneryTile::load()
 	_bucketsToBeLoaded.pop_back();
 	b->load();
 	_calcSize();
+
+	// Tell others that live scenery has been loaded.
+	Notification::notify(Notification::NewScenery);
 
 	return _bucketsToBeLoaded.empty();
     }

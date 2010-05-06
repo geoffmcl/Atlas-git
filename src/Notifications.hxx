@@ -36,10 +36,22 @@
 
 class Subscriber;
 
+// The notification class acts as the messaging centre.  All
+// notifications are sent here, and then sent out to subscribers.
+// Note that the constructor and destructor are private and all
+// variables and methods are class variables and methods - we never
+// allow instances of this class to be created.
+//
+// The only method of interest is notify() - you call this whenever
+// you want to tell others that one of the events below happened.  If
+// you want to create a new type of event, you must add it to the
+// enumeration.
 class Notification {
   public:
     enum type {Moved = 0, 	 // Eyepoint moved
 	       Zoomed, 		 // Zoomed in/out
+	       Rotated,		 // View rotated about centre
+	       NewScenery,	 // New live scenery loaded
 	       AircraftMoved,
 	       FlightTrackModified,
 	       NewFlightTrack,
@@ -48,13 +60,15 @@ class Notification {
 	       NewPalette,	 // Loaded new palette
 	       All};		 // This must not be removed
 
-    static bool subscribe(Subscriber *s, type n);
-    static void unsubscribe(Subscriber *s, type n = All);
     static void notify(type n);
 
   protected:
     Notification();
     ~Notification();
+
+    friend class Subscriber;
+    static bool subscribe(Subscriber *s, type n);
+    static void unsubscribe(Subscriber *s, type n = All);
 
     static std::vector<std::set<Subscriber *> > _notifications;
 };
@@ -64,9 +78,17 @@ class Subscriber {
     Subscriber();
     virtual ~Subscriber() = 0;
 
+    // Subscribe to an event.  Returns true if the subscription was
+    // successful (it always is, unless you try to subscribe to 'All',
+    // which is not allowed).
     bool subscribe(Notification::type n);
+    // Unsubscribe.  If you subscribe from 'All', all current
+    // subscriptions will be cancelled.
     void unsubscribe(Notification::type n = Notification::All);
 
+    // This must be implemented by subclasses.  It will be called
+    // whenever Notification::notify() is called with something we've
+    // subscribed to.
     virtual bool notification(Notification::type n) = 0;
 };
 
