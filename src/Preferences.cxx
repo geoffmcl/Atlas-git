@@ -309,14 +309,11 @@ static void print_help() {
   // EYE - use executable name here?
   printf("Atlas <options> [<flight file>] ...\n\n");
   for (int i = FIRST_OPTION + 1; i < LAST_OPTION; i++) {
-//       printf("   ");
       print_help_for(i, "   ");
   }
 }
 
-const unsigned int Preferences::defaultPort = 5500;
 const char *Preferences::defaultSerialDevice = "/dev/ttyS0";
-const int Preferences::defaultBaudRate = 4800;
 
 // All preferences should be given default values here.
 Preferences::Preferences()

@@ -119,10 +119,10 @@ public:
     float update;
     int max_track;
     vector<int> networkConnections;
-    static const unsigned int defaultPort;
+    static const unsigned int defaultPort = 5500;
     vector<SerialConnection> serialConnections;
     static const char *defaultSerialDevice;
-    static const int defaultBaudRate;
+    static const int defaultBaudRate = 4800;
 
     // Lighting
     bool discreteContours, contourLines, lightingOn, smoothShading;
