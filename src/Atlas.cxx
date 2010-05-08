@@ -529,8 +529,6 @@ bool AtlasController::notification(Notification::type n)
     return true;
 }
 
-AtlasController controller;
-
 // Current cursor and window centre locations.
 ScreenLocation cursor, centre;
 
@@ -4672,6 +4670,9 @@ int main(int argc, char **argv)
     }
     // Update all our track information.
     newFlightTrack();
+
+    // EYE - remove this later
+    AtlasController controller;
 
     glutMainLoop();
  
