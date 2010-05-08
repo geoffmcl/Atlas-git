@@ -2582,18 +2582,13 @@ LightingUI::LightingUI(int x, int y)
 	elevationSlider->setStepSize(1.0);
 	elevationSlider->setCallback(lighting_cb);
 
-	// That this assumes that globals.lightPosition has already been
-	// set and is normalized.  Note that on the azimuth dial, 0
-	// degrees is down, 90 degrees left, 180 degrees up, and 270
-	// degrees right.
-	float azimuth = 
-	    atan2(globals.lightPosition[1], globals.lightPosition[0]);
-	azimuth = normalizeHeading(270.0 - azimuth * SG_RADIANS_TO_DEGREES);
+	// This assumes that prefs.azimuth and prefs.elevation exist
+	// and are correct.  Note that on the azimuth dial, 0 degrees
+	// is down, 90 degrees left, 180 degrees up, and 270 degrees
+	// right.
+	float azimuth = normalizeHeading(180.0 + prefs.azimuth);
 	azimuthDial->setValue(azimuth);
-
-	float elevation = 
-	    asin(globals.lightPosition[2]) * SG_RADIANS_TO_DEGREES;
-	elevationSlider->setValue(elevation);
+	elevationSlider->setValue(prefs.elevation);
 
 	// Call setLightPosition() to set the dial and slider legends.
 	setLightPosition();
@@ -2728,7 +2723,16 @@ void LightingUI::setLightPosition()
     elStr.printf("%.0f", elevation);
     elevationSlider->setLegend(elStr.str());
 
-    azimElevToXYZW(azimuth, elevation, globals.lightPosition);
+    // Set the light position (in eye coordinates, not world
+    // coordinates).
+    sgVec4 lightPosition;
+    azimElevToXYZW(azimuth, elevation, lightPosition);
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix(); {
+	glLoadIdentity();
+	glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
+    }
+    glPopMatrix();
 }
 
 // Select the previous palette (if there is one).
@@ -3836,11 +3840,6 @@ void setLighting()
     globals.discreteContours = prefs.discreteContours;
     globals.contourLines = prefs.contourLines;
     globals.lightingOn = prefs.lightingOn;
-    globals.smoothShading = prefs.smoothShading;
-
-    // Convert azimuth, elevation to x, y, z, w.
-    LightingUI::azimElevToXYZW(prefs.azimuth, prefs.elevation, 
-			       globals.lightPosition);
 }
 
 void initStandardOpenGLAttribs()
@@ -3853,6 +3852,18 @@ void initStandardOpenGLAttribs()
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glLineWidth(1.0);
     glPointSize(1.0);
+
+    // Tie material ambient and diffuse values to the current colour.
+    glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE);
+    glEnable(GL_COLOR_MATERIAL);
+
+    // Set the light brightness.
+    const float brightness = 0.8;
+    GLfloat diffuse[] = {brightness, brightness, brightness, 1.0};
+    glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse);
+
+    // We use light0.
+    glEnable(GL_LIGHT0);
 }
 
 // Does graphics-related initialization of the main window.
@@ -3928,7 +3939,8 @@ static void lighting_cb(puObject *lightingUIObject)
     } else if (lightingUIObject == lightingUI->lighting) {
 	globals.lightingOn = (lightingUI->lighting->getValue() == 0);
     } else if (lightingUIObject == lightingUI->polygons) {
-	globals.smoothShading = (lightingUI->polygons->getValue() == 0);
+	bool smoothShading = (lightingUI->polygons->getValue() == 0);
+	glShadeModel(smoothShading ? GL_SMOOTH : GL_FLAT);
     } else if (lightingUIObject == lightingUI->azimuthDial) {
 	lightingUI->setLightPosition();
     } else if (lightingUIObject == lightingUI->elevationSlider) {

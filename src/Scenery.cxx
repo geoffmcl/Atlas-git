@@ -984,8 +984,8 @@ void Scenery::zoom(const sgdFrustum& frustum, double metresPerPixel)
 
 void Scenery::draw(bool elevationLabels)
 {
-    // We assume that when called, the depth test is on, lighting
-    // is off, and that we have smooth shading.
+    // We assume that when called, the depth test is on and lighting
+    // is off.
     assert(glIsEnabled(GL_DEPTH_TEST) && !glIsEnabled(GL_LIGHTING));
 
     // Has our view of the world changed?
@@ -1045,26 +1045,8 @@ void Scenery::draw(bool elevationLabels)
 
     // Render "live" scenery too if we're zoomed in close enough.
     if (_live) {
-	glShadeModel(globals.smoothShading ? GL_SMOOTH : GL_FLAT);
 	if (globals.lightingOn) {
-	    float BRIGHTNESS = 0.8;
-	    GLfloat diffuse[] = {BRIGHTNESS, BRIGHTNESS, BRIGHTNESS, 1.0};
-	    glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse);
-	    
-	    // Set the light position (in eye coordinates, not world
-	    // coordinates).
-	    glMatrixMode(GL_MODELVIEW);
-	    glPushMatrix(); {
-		glLoadIdentity();
-		glLightfv(GL_LIGHT0, GL_POSITION, globals.lightPosition);
-	    }
-	    glPopMatrix();
-
-	    glEnable(GL_LIGHT0);
 	    glEnable(GL_LIGHTING);
-
-	    glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE);
-	    glEnable(GL_COLOR_MATERIAL);
 	}
 
 	// Clear depth buffer.  Generally scenery tiles will be in
@@ -1085,7 +1067,6 @@ void Scenery::draw(bool elevationLabels)
 	}
 
 	glDisable(GL_LIGHTING);
-	glDisable(GL_COLOR_MATERIAL);
     }
 
     if (elevationLabels) {
@@ -1204,6 +1185,9 @@ bool Scenery::intersection(double x, double y,
 	    gluPickMatrix(x, y, 1.0, 1.0, viewport);
 	    glMultMatrixd(projmatrix);
 
+	    if (globals.lightingOn) {
+		glEnable(GL_LIGHTING);
+	    }
 	    // Now that we have our viewing ray (although, technically
 	    // speaking, it should actually be a very narrow viewing
 	    // frustum, but a ray is good enough), get the
@@ -1225,6 +1209,7 @@ bool Scenery::intersection(double x, double y,
 		    break;
 		}
 	    }
+	    glDisable(GL_LIGHTING);
 	    glMatrixMode(GL_PROJECTION);
 	}
 	glPopMatrix();

@@ -77,8 +77,7 @@ class Globals {
     Searcher searcher;
 
     // Scenery lighting.
-    bool discreteContours, contourLines, lightingOn, smoothShading;
-    sgVec4 lightPosition;
+    bool discreteContours, contourLines, lightingOn;
 
     // Current palette.
     Palette *palette() { return _palette; }
