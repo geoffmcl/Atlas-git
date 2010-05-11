@@ -575,12 +575,14 @@ class Route {
     vector<SGGeod> _points;
     vector<GreatCircle> _segments;
 
-    // EYE - check if this kind of static const declaration can be
-    // used elsewhere
     // The text size in pixels.  This must be multiplied by the
     // current scale (metresPerPixel) to be in the appropriate units.
-    static const float _pointSize = 10.0;
+    static const float _pointSize;
 };
+
+// Some compilers don't allow floats to be initialized in the class
+// declaration, so we do it out here.
+const float Route::_pointSize = 10.0;
 
 Route::Route(): active(false)
 {

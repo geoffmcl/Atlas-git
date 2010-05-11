@@ -47,6 +47,11 @@
 
 using namespace std;
 
+// This is defined in glext.h, which is unavailable in Windows.
+#ifndef GL_CLAMP_TO_EDGE	
+#define GL_CLAMP_TO_EDGE 0x812F
+#endif
+
 // Drawing scenery is a little bit complex, mostly because of a desire
 // to maintain reasonable response and performance.  We try to do only
 // the minimum amount of work, and we try not to do too much at one

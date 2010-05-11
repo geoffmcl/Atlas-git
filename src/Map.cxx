@@ -39,14 +39,14 @@
 ---------------------------------------------------------------------------*/
 
 #ifdef HAVE_CONFIG_H
-#include "config.h"    // For version, and lots more ;=))
+  #include "config.h"    // For version, and lots more ;=))
 #endif
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #ifndef _MSC_VER
-#  include <unistd.h>
+  #include <unistd.h>
 #endif
 
 #include <stdexcept>
@@ -56,9 +56,15 @@
 #endif
 
 #ifndef __APPLE__
-#define GL_GLEXT_PROTOTYPES
-#include <GL/gl.h>
-#include <GL/glext.h>
+  #define GL_GLEXT_PROTOTYPES
+  #include <GL/gl.h>
+  #if (defined(HAVE_GLEXT_H) || !defined(EXCLUDE_GLEXT_H))
+    #include <GL/glext.h>
+  #else
+    #ifdef HAVE_SGGLEXT_H
+      #include "MapEXT.hxx"
+    #endif
+  #endif
 #endif
 
 #include <plib/pu.h>
@@ -246,6 +252,9 @@ bool parse_arg(char* arg)
 	verbose = true;
     } else if (strcmp(arg, "--version") == 0) {
 	printf("Map version %s\n", VERSION);
+#ifdef _MSC_VER
+	print_version_details();
+#endif
 	exit(0);
     } else if (strcmp(arg, "--help") == 0) {
 	print_help();
@@ -257,6 +266,7 @@ bool parse_arg(char* arg)
     return true;
 }
 
+#if (defined(HAVE_GLEXT_H) || !defined(EXCLUDE_GLEXT_H))
 bool getFramebuffer(int textureSize) 
 {
 #if (defined(__GLEW_H__) || defined(__glew_h__))
@@ -287,6 +297,7 @@ bool getFramebuffer(int textureSize)
     return (glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT) == 
 	    GL_FRAMEBUFFER_COMPLETE_EXT);
 }
+#endif
 
 // Attempts to load a palette at the given path.  Returns the palette
 // if successful, NULL otherwise.
@@ -313,13 +324,19 @@ void cleanup(int exitCode)
     if (tileManager) {
 	delete tileManager;
     }
+#if (defined(HAVE_GLEXT_H) || !defined(EXCLUDE_GLEXT_H))
     if (rbo != 0) {
 	glDeleteRenderbuffersEXT(1, &rbo);
     }
     if (fbo != 0) {
 	glDeleteFramebuffersEXT(1, &fbo);
     }
-    if (mapper) {
+#else
+  #ifdef HAVE_SGGLEXT_H
+    Map_Exit_Ext( &fbo, &rbo );
+  #endif
+#endif
+   if (mapper) {
 	delete mapper;
     }
 
@@ -508,6 +525,7 @@ int main(int argc, char **argv)
     glutInitWindowSize(windowSize, windowSize);
     glutCreateWindow("Map");
   
+#if (defined(HAVE_GLEXT_H) || !defined(EXCLUDE_GLEXT_H))
     if (renderToFramebuffer) {
 	// Try to get a framebuffer.  First, check if the requested
 	// size is supported.
@@ -529,6 +547,26 @@ int main(int argc, char **argv)
 	    printf("Framebuffer size: %dx%d\n", bufferSize, bufferSize);
 	}
     }
+#else
+    // NO <GL/glext.h> available, as in native windows
+    if (renderToFramebuffer)
+    {
+  #ifdef HAVE_SGGLEXT_H
+        // Use SimGear GL extension support - really only for windows
+        if (!Map_Init_Ext(&fbo,&rbo,bufferSize))
+        {
+    	    fprintf(stderr, "%s: Unable to initialize framebuffer.\n", appName);
+            cleanup(1);
+        }
+    	if (verbose) {
+	        printf("Framebuffer size: %dx%d\n", bufferSize, bufferSize);
+	    }
+  #else
+        fprintf(stderr, "%s: GL Extended functions NOT supported!\n", appName);
+        cleanup(1);
+  #endif
+    }
+#endif
 
     // Check if largest desired size will fit into a texture.  In some
     // ways this is immaterial to Map.  However, the user should be
@@ -611,7 +649,7 @@ int main(int argc, char **argv)
 	} else {
 	    printf("No maps to generate\n");
 	}
-	exit(1);
+	cleanup(1);
     }
 
     // Now we know where to get the scenery data, where to put the

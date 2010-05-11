@@ -128,13 +128,25 @@ TileManager::TileManager(const SGPath& scenery, const SGPath& maps,
     // be certain it treats _maps as a directory.  So, if SGPath
     // thinks _maps has a file at the end, we add an empty item, thus
     // changing the path to "/Foo/Bar/", which will convince it that
-    // the last thing is in fact a directory.
-    if (!_maps.file().empty()) {
+    // the last thing is in fact a directory.  Furthermore, in Windows
+    // the empty() test just plain doesn't work, and the exists() test
+    // doesn't work on directories (we're getting close to writing our
+    // own SGPath here ...).
+#ifdef _MSC_VER
+    size_t len = _maps.str().length();
+    if (( len != 0 ) && (_maps.str().rfind("/") != (len - 1))) {
+#else
+   if (!_maps.file().empty()) {
+#endif
 	_maps.append("");
     }
 
     // If the maps directory doesn't exist, try creating it if requested.
+#ifdef _MSC_VER
+    if (!is_valid_path(_maps.str()) && createDirs) {
+#else
     if (!_maps.exists() && createDirs) {
+#endif
 	if (_maps.create_dir(0755) < 0) {
 	    // If we can't create it, throw an error.
 	    throw runtime_error("couldn't create maps directory");

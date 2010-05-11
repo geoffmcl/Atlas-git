@@ -35,6 +35,13 @@
 #include <simgear/magvar/magvar.hxx>
 #include <simgear/timing/sg_time.hxx>
 
+#ifdef _MSC_VER
+#include <simgear/math/SGMisc.hxx>
+#define LROUND(a) SGMisc<double>::round(a)
+#else
+#define LROUND(d) lround(d)
+#endif
+
 //////////////////////////////////////////////////////////////////////
 // atlasSphere
 //////////////////////////////////////////////////////////////////////
@@ -570,7 +577,7 @@ const char *formatAngle(double degrees, bool dms)
     if (dms) {
 	// Round degrees to the nearest hundredth of a second, then
 	// chop it up into minutes and seconds.
-	double degs = lround(degrees * 3600.0 * 100.0) / (3600.0 * 100.0);
+	double degs = LROUND(degrees * 3600.0 * 100.0) / (3600.0 * 100.0);
 	double mins = modf(degs, &degs) * 60.0;
 	double secs = modf(mins, &mins) * 60.0;
 	str.printf("%02.0f%C %02.0f' %05.2f\"", degs, degreeSymbol, mins, secs);

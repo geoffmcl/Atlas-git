@@ -1,9 +1,9 @@
-dnl Process this file with aclocal ; automake -a ; autoconf to produce a 
+dnl Process this file with aclocal ; automake -a ; autoconf to produce a
 dnl working configure script.
 dnl
 dnl $Id$
 
-AC_INIT([Atlas], [0.4.0])
+AC_INIT([Atlas], [0.4.8])
 AC_CONFIG_SRCDIR([src/Atlas.cxx])
 
 dnl Initialize the automake stuff
@@ -49,7 +49,7 @@ AC_ARG_WITH(simgear, [  --with-simgear=prefix   specify the prefix path to simge
 if test "x$with_simgear" != "x" ; then
     echo "SimGear prefix path is $with_simgear"
     SIMGEAR_DIR="$with_simgear"
-else 
+else
     echo "SimGear not specified"
     SIMGEAR_DIR=
 fi
@@ -60,7 +60,7 @@ AC_ARG_WITH(osg, [  --with-osg=prefix   specify the prefix path to openscenegrap
 if test "x$with_osg" != "x" ; then
     echo "OpenSceneGraph prefix path is $with_osg"
     OSG_DIR="$with_osg"
-else 
+else
     echo "OpenSceneGraph not specified"
     OSG_DIR=
 fi
@@ -135,7 +135,7 @@ case "${host}" in
 esac
 wi_EXTRA_DIRS(no, ${EXTRA_DIRS})
 
-dnl Using AM_CONDITIONAL is a step out of the protected little 
+dnl Using AM_CONDITIONAL is a step out of the protected little
 dnl automake fold so it is potentially dangerous.  But, we are
 dnl beginning to run into cases where the standard checks are not
 dnl enough.  AM_CONDITIONALS are then referenced to conditionally
