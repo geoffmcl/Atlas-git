@@ -4607,6 +4607,8 @@ int main(int argc, char **argv)
     show_cb(mainUI->awyLow);
     mainUI->showMouse = false;
     show_cb(mainUI->mouseText);
+    mainUI->trackAircraftToggle->setValue(prefs.autocenter_mode);
+    show_cb(mainUI->trackAircraftToggle);
 
     // Set initial values for the lighting UI.  Note that, given the
     // layout of the radio buttons on the interface, if a value is
