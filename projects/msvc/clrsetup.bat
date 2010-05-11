@@ -1,0 +1,20 @@
+@set TEMPAT=
+@set TEMPS=
+@set TEMPFS=
+@set TEMPSAP=
+@set TEMPAP=
+@set TEMPROOT=
+@set TEMPSBG=
+@set TEMPBG=
+@set TEMPF=
+@set TEMPF1=
+@set TEMPF2=
+@set TEMPSF1=
+@set TEMPSF2=
+@set TEMPSAPD=
+@set TEMPAPD=
+@set TEMPX=
+@set TEMPXM=
+@set TEMPXA=
+@set TEMPCMD=
+

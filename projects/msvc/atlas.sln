@@ -1,0 +1,45 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 10.00
+# Visual C++ Express 2008
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Map", "Map.vcproj", "{4ECE9B47-4C73-4018-80B8-2F457EBEAC70}"
+	ProjectSection(ProjectDependencies) = postProject
+		{4472E39D-700B-4D1A-81C3-8877B29021A7} = {4472E39D-700B-4D1A-81C3-8877B29021A7}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Atlas", "Atlas.vcproj", "{0FE9A694-A9AD-4ACC-9040-054E8EE7F737}"
+	ProjectSection(ProjectDependencies) = postProject
+		{4472E39D-700B-4D1A-81C3-8877B29021A7} = {4472E39D-700B-4D1A-81C3-8877B29021A7}
+		{4ECE9B47-4C73-4018-80B8-2F457EBEAC70} = {4ECE9B47-4C73-4018-80B8-2F457EBEAC70}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "win_ulib", "win_ulib.vcproj", "{4472E39D-700B-4D1A-81C3-8877B29021A7}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GetMap", "GetMap.vcproj", "{C31230EC-9CA7-4126-AB63-7244BC70E642}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{4ECE9B47-4C73-4018-80B8-2F457EBEAC70}.Debug|Win32.ActiveCfg = Debug|Win32
+		{4ECE9B47-4C73-4018-80B8-2F457EBEAC70}.Debug|Win32.Build.0 = Debug|Win32
+		{4ECE9B47-4C73-4018-80B8-2F457EBEAC70}.Release|Win32.ActiveCfg = Release|Win32
+		{4ECE9B47-4C73-4018-80B8-2F457EBEAC70}.Release|Win32.Build.0 = Release|Win32
+		{0FE9A694-A9AD-4ACC-9040-054E8EE7F737}.Debug|Win32.ActiveCfg = Debug|Win32
+		{0FE9A694-A9AD-4ACC-9040-054E8EE7F737}.Debug|Win32.Build.0 = Debug|Win32
+		{0FE9A694-A9AD-4ACC-9040-054E8EE7F737}.Release|Win32.ActiveCfg = Release|Win32
+		{0FE9A694-A9AD-4ACC-9040-054E8EE7F737}.Release|Win32.Build.0 = Release|Win32
+		{4472E39D-700B-4D1A-81C3-8877B29021A7}.Debug|Win32.ActiveCfg = Debug|Win32
+		{4472E39D-700B-4D1A-81C3-8877B29021A7}.Debug|Win32.Build.0 = Debug|Win32
+		{4472E39D-700B-4D1A-81C3-8877B29021A7}.Release|Win32.ActiveCfg = Release|Win32
+		{4472E39D-700B-4D1A-81C3-8877B29021A7}.Release|Win32.Build.0 = Release|Win32
+		{C31230EC-9CA7-4126-AB63-7244BC70E642}.Debug|Win32.ActiveCfg = Debug|Win32
+		{C31230EC-9CA7-4126-AB63-7244BC70E642}.Debug|Win32.Build.0 = Debug|Win32
+		{C31230EC-9CA7-4126-AB63-7244BC70E642}.Release|Win32.ActiveCfg = Release|Win32
+		{C31230EC-9CA7-4126-AB63-7244BC70E642}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
