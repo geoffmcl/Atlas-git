@@ -1937,7 +1937,7 @@ void NavaidsOverlay::_renderILS(const NAV *n)
 		// EYE - we should add the glideslope too, if it has
 		// one (eg, "284@3.00")
 
-		globalString.printf("%03d%C%s", heading, degreeSymbol, magTrue);
+		globalString.printf("%03d%c%s", heading, degreeSymbol, magTrue);
 		lm.addText(globalString.str());
 		lm.end();
 

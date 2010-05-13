@@ -707,7 +707,7 @@ void Route::_draw(bool start, const SGGeod& loc, float az,
     }
     float radial = normalizeHeading(rint(az - magvar), false);
     AtlasString str;
-    str.printf("%03.0f%C%s", radial, degreeSymbol, magTrue);
+    str.printf("%03.0f%c%s", radial, degreeSymbol, magTrue);
 
     // Create the label, which consists of the azimuth string
     // and an arrow.
@@ -2176,7 +2176,7 @@ static void VORsAsString(vector<NAV *>& navs, int x,
     if (x > 0) {
 	str.appendf(" %d", x);
     }
-    str.appendf(": %.2f@%03.0f%C", freq / 1000.0, radial, degreeSymbol);
+    str.appendf(": %.2f@%03.0f%c", freq / 1000.0, radial, degreeSymbol);
 
     if (navs.size() > 0) {
 	str.appendf(" (%s", id->c_str());
@@ -2207,7 +2207,7 @@ static void VORsAsString(vector<NAV *>& navs, int x,
 		ar = normalizeHeading(ar - 180.0, false);
 	    }
 
-	    str.appendf(", %03.0f%C %s", normalizeHeading(rint(ar), false), 
+	    str.appendf(", %03.0f%c %s", normalizeHeading(rint(ar), false), 
 			degreeSymbol, fromStr);
 	}
 
@@ -2269,7 +2269,7 @@ static void ILSsAsString(vector<NAV *>& navs, int x,
     if (x > 0) {
 	str.appendf(" %d", x);
     }
-    str.appendf(": %.2f@%03.0f%C", freq / 1000.0, radial, degreeSymbol);
+    str.appendf(": %.2f@%03.0f%c", freq / 1000.0, radial, degreeSymbol);
 
     // Navaid information
     if (chosen != NULL) {
@@ -2297,7 +2297,7 @@ static void ILSsAsString(vector<NAV *>& navs, int x,
 	str.appendf(" (%s", id->c_str());
 
 	if (loc != NULL) {
-	    str.appendf(", %03.0f%C%s", normalizeHeading(rint(ar), false), 
+	    str.appendf(", %03.0f%c%s", normalizeHeading(rint(ar), false), 
 			degreeSymbol, magTrue);
 	}
 
@@ -2385,7 +2385,7 @@ static void NDBsAsString(vector<NAV *>& ndbs, int x,
 		magneticVariation(p->lat, p->lon, p->alt * SG_FEET_TO_METER);
 	}
 
-	str.appendf(" (%s, %03.0f%C%cB, %03.0f%CRB)",
+	str.appendf(" (%s, %03.0f%c%cB, %03.0f%cRB)",
 		    match->id.c_str(), 
 		    normalizeHeading(rint(ab), false), degreeSymbol, magTrue,
 		    normalizeHeading(rint(rb), false), degreeSymbol);
@@ -2420,7 +2420,7 @@ void InfoUI::setText()
 	    hdg -= magneticVariation(p->lat, p->lon, p->alt * SG_FEET_TO_METER);
 	}
 	hdg = normalizeHeading(rint(hdg), false);
-	hdgStr.printf("Hdg: %03.0f%C%s", hdg, degreeSymbol, magTrue);
+	hdgStr.printf("Hdg: %03.0f%c%s", hdg, degreeSymbol, magTrue);
 	spdStr.printf("Speed: %.0f kt EAS", p->spd);
     } else {
 	const char *magTrue = "T";
@@ -2431,7 +2431,7 @@ void InfoUI::setText()
 	    hdg -= magneticVariation(p->lat, p->lon, p->alt * SG_FEET_TO_METER);
 	}
 	hdg = normalizeHeading(rint(hdg), false);
-	hdgStr.printf("Track: %03.0f%C%s", hdg, degreeSymbol, magTrue);
+	hdgStr.printf("Track: %03.0f%c%s", hdg, degreeSymbol, magTrue);
 	spdStr.printf("Speed: %.0f kt GS", p->spd);
     }
     altStr.printf("Alt: %.0f ft MSL", p->alt);

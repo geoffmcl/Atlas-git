@@ -580,9 +580,9 @@ const char *formatAngle(double degrees, bool dms)
 	double degs = LROUND(degrees * 3600.0 * 100.0) / (3600.0 * 100.0);
 	double mins = modf(degs, &degs) * 60.0;
 	double secs = modf(mins, &mins) * 60.0;
-	str.printf("%02.0f%C %02.0f' %05.2f\"", degs, degreeSymbol, mins, secs);
+	str.printf("%02.0f%c %02.0f' %05.2f\"", degs, degreeSymbol, mins, secs);
     } else {
-	str.printf("%.8f%C", degrees, degreeSymbol);
+	str.printf("%.8f%c", degrees, degreeSymbol);
     }
 
     return str.str();
