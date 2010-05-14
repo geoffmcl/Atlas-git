@@ -1397,9 +1397,8 @@ void Graphs::Values::_update()
     // up from our actual mantissa to the next good mantissa value,
     // which means that our ticks are spaced no less than 'minimum'
     // pixels apart.  We also calculate how many digits should be
-    // printed after the decimal place.  Note that _decimals could be
-    // negative - I assume that printf() is smart enough to handle
-    // this.
+    // printed after the decimal place.  This will be used in a printf
+    // statement precision string.
     if (mantissa < 2) {
 	_d = 2 * pow(10.0, exponent);
 	_decimals = -exponent - 1;
@@ -1410,6 +1409,11 @@ void Graphs::Values::_update()
 	_d = 10 * pow(10.0, exponent);
 	_decimals = -exponent - 1;
     }
+    // Some printf's treat negative precision values as 0 (which would
+    // work for us), but some just skip over them, so we make sure
+    // that _decimals is never less than 0.
+    _decimals = std::max(_decimals, 0);
+
     // Large ticks are always placed every 5 small ticks.
     _D = _d * 5;
 
