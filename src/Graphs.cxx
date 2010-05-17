@@ -1238,7 +1238,12 @@ void Graphs::Values::setScale(float scale)
 
 void Graphs::Values::drawAxis(float from, float to, int height, int margin)
 {
-    const float epsilon = std::numeric_limits<float>::epsilon();
+    // numeric_limits::epsilon() is the difference between 1.0 and the
+    // smallest number greater than 1.0.  We multiply it by 'to',
+    // since, because of the way floating-point numbers are
+    // represented, epsilon is larger for larger numbers.  Hopefully
+    // the relationship is linear.
+    float epsilon = std::numeric_limits<float>::epsilon() * to;
 
     // Update all our values.  We do this here, then access the
     // derived values directly, just to save a teeny-tiny bit of time.
