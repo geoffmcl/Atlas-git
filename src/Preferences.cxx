@@ -73,6 +73,7 @@ enum {FIRST_OPTION,
       AUTO_CENTER_MODE_OPTION,
       LINE_WIDTH_OPTION,
       AIRPLANE_IMAGE_OPTION,
+      AIRPLANE_SIZE_OPTION,
       DISCRETE_CONTOURS_OPTION,
       SMOOTH_CONTOURS_OPTION,
       CONTOUR_LINES_OPTION,
@@ -108,6 +109,7 @@ static struct option long_options[] = {
     {"autocenter-mode", no_argument, 0, AUTO_CENTER_MODE_OPTION},
     {"line-width", required_argument, 0, LINE_WIDTH_OPTION},
     {"airplane", required_argument, 0, AIRPLANE_IMAGE_OPTION},
+    {"airplane-size", required_argument, 0, AIRPLANE_SIZE_OPTION},
     {"discrete-contours", no_argument, 0, DISCRETE_CONTOURS_OPTION},
     {"smooth-contours", no_argument, 0, SMOOTH_CONTOURS_OPTION},
     {"contour-lines", no_argument, 0, CONTOUR_LINES_OPTION},
@@ -130,9 +132,10 @@ static void print_short_help(char *name)
     printf("\t[--airport=<icao>] [--glutfonts] [--geometry=<w>x<h>]\n");
     printf("\t[--softcursor] [--udp[=<port>]] [--serial=[<dev>]] [--baud=<rate>]\n");
     printf("\t[--autocenter-mode] [--discrete-contour] [--smooth-contour]\n");
-    printf("\t[--contour-lines] [--no-contour-lines]\n");
-    printf("\t[--lighting] [--no-lighting] [--light=azim,elev] [--smooth-shading]\n");
-    printf("\t[--flat-shading] [--line-width=<w>] [--airplane=<path>[@<size]] [--version]\n");
+    printf("\t[--contour-lines] [--no-contour-lines] [--lighting]\n");
+    printf("\t[--no-lighting] [--light=azim,elev] [--smooth-shading]\n");
+    printf("\t[--flat-shading] [--line-width=<w>] [--airplane=<path>]\n");
+    printf("\t[--airplane-size=<size>] [--version]\n");
     printf("\t[--help] [<flight file>] ...\n");
 }
 
@@ -166,6 +169,7 @@ static void printOne(const char *indent, const char *option,
 // Prints a long entry for the given option.
 static void print_help_for(int option, const char *indent)
 {
+    static AtlasString defaultStr;
     switch(option) {
       case FG_ROOT_OPTION:
 	printOne(indent, "--fg-root=<path>", 
@@ -179,15 +183,20 @@ static void print_help_for(int option, const char *indent)
 	printOne(indent, "--atlas=<path>", "Set path for map images", NULL);
 	break;
       case PALETTE_OPTION:
-	printOne(indent, "--palette=<path>", "Specify location of Atlas palette", NULL);
+	printOne(indent, "--palette=<path>", 
+		 "Specify Atlas palette", NULL);
 	break;
       case LAT_OPTION:
+	defaultStr.printf("Default: %.2f", Preferences::defaultLatitude);
 	printOne(indent, "--lat=<x>", 
-		 "Start browsing at latitude x (south is neg.)", NULL);
+		 "Start browsing at latitude x (south is negative)", 
+		 defaultStr.str(), NULL);
 	break;
       case LON_OPTION:
+	defaultStr.printf("Default %.2f", Preferences::defaultLongitude);
 	printOne(indent, "--lon=<x>",
-		 "Start browsing at longitude x (west is neg.)", NULL);
+		 "Start browsing at longitude x (west is negative)", 
+		 defaultStr.str(), NULL);
 	break;
       case AIRPORT_OPTION:
 	printOne(indent, "--airport=<str>", 
@@ -195,63 +204,77 @@ static void print_help_for(int option, const char *indent)
 		 "or airport name", NULL);
 	break;
       case ZOOM_OPTION:
-	printOne(indent, "--zoom=<x>", "Set zoom level to x metres/pixel", NULL);
+	defaultStr.printf("Default %.2f", Preferences::defaultZoom);
+	printOne(indent, "--zoom=<x>", "Set zoom level to x metres/pixel", 
+		 defaultStr.str(), NULL);
 	break;
       case GLUTFONTS_OPTION:
 	printOne(indent, "--glutfonts", 
 		 "Use GLUT bitmap fonts (fast for software rendering)", NULL);
 	break;
       case GEOMETRY_OPTION:
-	printOne(indent, "--geometry=<w>x<h>", "Set initial window size", NULL);
+	defaultStr.printf("Default: %dx%d", 
+		       Preferences::defaultWidth, Preferences::defaultHeight);
+	printOne(indent, "--geometry=<w>x<h>", "Set initial window size", 
+		 defaultStr.str(), NULL);
 	break;
       case SOFTCURSOR_OPTION:
 	printOne(indent, "--softcursor", 
 		 "Draw mouse cursor using OpenGL (for fullscreen Voodoo",
-		 " cards)", NULL);
+		 "cards)", NULL);
 	break;
       case UDP_OPTION:
-	// EYE - should fill in default from Preferences::defaultPort
+	defaultStr.printf("Default: %d", Preferences::defaultPort);
 	printOne(indent, "--udp[=<port>]",
 		 "Input read from UDP socket at specified port", 
-		 "(defaults to 5500)", NULL);
+		 defaultStr.str(), NULL);
 	break;
       case SERIAL_OPTION:
-	// EYE - should fill in default from Preferences::defaultSerialDevice
+	defaultStr.printf("Default: %s", Preferences::defaultSerialDevice);
 	printOne(indent, "--serial[=<dev>]", 
 		 "Input read from serial port with specified device",
-		 "(defaults to /dev/ttyS0)", NULL);
+		 defaultStr.str(), NULL);
 	break;
       case BAUD_OPTION:
-	// EYE - should fill in default from Preferences::defaultBaudRate
+	defaultStr.printf("Default: %d", Preferences::defaultBaudRate);
 	printOne(indent, "--baud=<rate>",
-		 "Set serial port baud rate (defaults to 4800)", NULL);
+		 "Set serial port baud rate", defaultStr.str(), NULL);
 	break;
       case UPDATE_OPTION:
+	defaultStr.printf("Default: %.2f", Preferences::defaultUpdate);
 	printOne(indent, "--update=<s>", 
-		 "Check for position updates every s seconds (defaults to",
-		 "1.0)", NULL);
+		 "Check for position updates every s seconds",
+		 defaultStr.str(), NULL);
 	break;
       case MAX_TRACK_OPTION:
+	defaultStr.printf("Default: %d", Preferences::defaultMaxTrack);
 	printOne(indent, "--max-track=<x>",
 		 "Maximum number of points to record while tracking a",
-		 "flight (defaults to 2000, 0 = unlimited)", NULL);
+		 "flight (0 = unlimited)", defaultStr.str(), NULL);
 	break;
       case AUTO_CENTER_MODE_OPTION:
+	defaultStr.printf("Default: %s", Preferences::defaultAutocenterMode ? 
+			  "true" : "false");
 	printOne(indent, "--autocenter-mode",
-		 "Automatically center map on aircraft (default is",
-		 "to not auto-center)", NULL);
+		 "Automatically center map on aircraft",
+		 defaultStr.str(), NULL);
 	break;
       case LINE_WIDTH_OPTION:
+	defaultStr.printf("Default: %.2f", Preferences::defaultLineWidth);
  	printOne(indent, "--line-width=<w>",
-		 "Set line width of flight track overlays ",
-		 "(in pixels, defaults to 1.0)", NULL);
+		 "Set line width of flight track overlays (in pixels)",
+		 defaultStr.str(), NULL);
  	break;
       case AIRPLANE_IMAGE_OPTION:
- 	printOne(indent, "--airplane=<path>[@<size>] ",
-		 "Set path for image to be drawn as airplane symbol.",
-		 "If not present, only a small line drawing is used.",
-		 "The optional size argument is the size of the image",
-		 "in pixels (defaults to 50)", NULL);
+ 	printOne(indent, "--airplane=<path>",
+		 "Specify image to be used as airplane symbol in flight",
+		 "tracks.  If not present, a default image is used.", NULL);
+	break;
+      case AIRPLANE_SIZE_OPTION:
+	defaultStr.printf("Default: %.2f", Preferences::defaultAirplaneSize);
+ 	printOne(indent, "--airplane-size=<x>",
+		 "Set the size of the airplane image in pixels",
+		 defaultStr.str(), NULL);
 	break;
       case DISCRETE_CONTOURS_OPTION:
 	printOne(indent, "--discrete-contours",
@@ -276,7 +299,7 @@ static void print_help_for(int option, const char *indent)
 	break;
       case LIGHTING_OFF_OPTION:
 	printOne(indent, "--no-lighting",
-		 "Don't light the terrain on live maps (flat light)", NULL);
+		 "Don't light the terrain on live maps (ie, flat light)", NULL);
 	break;
       case SMOOTH_SHADING_OPTION:
 	printOne(indent, "--smooth-shading",
@@ -287,11 +310,13 @@ static void print_help_for(int option, const char *indent)
 		 "Don't smooth polygons on live maps", NULL);
 	break;
       case LIGHT_POSITION_OPTION:
+	defaultStr.printf("Default: %.1f,%.1f", Preferences::defaultAzimuth, 
+			  Preferences::defaultElevation);
 	printOne(indent, "--light=azim,elev",
-		 "Set light position for live maps (default = 315,55)", 
+		 "Set light position for live maps (all units in degrees)", 
 		 "Azimuth is light direction (0 = north, 90 = east, ...)",
-		 "Elevation is height in degrees above horizon (90 = overhead)",
-		 NULL);
+		 "Elevation is height above horizon (90 = overhead)",
+		 defaultStr.str(), NULL);
 	break;
       case VERSION_OPTION:
 	printOne(indent, "--version", "Print version number", NULL);
@@ -313,14 +338,22 @@ static void print_help() {
   }
 }
 
+const float Preferences::defaultLatitude = 37.5;
+const float Preferences::defaultLongitude = -122.25;
+const float Preferences::defaultZoom = 125.0;
+const float Preferences::defaultLineWidth = 1.0;
+const float Preferences::defaultAirplaneSize = 25.0;
+const float Preferences::defaultUpdate = 1.0;
 const char *Preferences::defaultSerialDevice = "/dev/ttyS0";
+const float Preferences::defaultAzimuth = 315.0;
+const float Preferences::defaultElevation = 55.0;
 
 // All preferences should be given default values here.
 Preferences::Preferences()
 {
-    latitude = 37.5;
-    longitude = -122.25;
-    zoom = 125.0;		// metres/pixel
+    latitude = defaultLatitude;
+    longitude = defaultLongitude;
+    zoom = defaultZoom;		// metres/pixel
     icao = strdup("");
 
     char *env = getenv("FG_ROOT");
@@ -350,26 +383,27 @@ Preferences::Preferences()
     palette.append("default.ap");
 
     textureFonts = true;
-    width = 800;
-    height = 600;
+    width = defaultWidth;
+    height = defaultHeight;
     softcursor = false;
-    _port = 5500;
-    _serial.device = strdup("/dev/ttyS0");
-    _serial.baud = 4800;
-    update = 1.0;
-    max_track = 2000;
-    autocenter_mode = false;
-    lineWidth = 1.0;
-    airplaneImage.set("");
-    airplaneImageSize = 50.0;
+    _port = defaultPort;
+    _serial.device = strdup(defaultSerialDevice);
+    _serial.baud = defaultBaudRate;
+    update = defaultUpdate;
+    max_track = defaultMaxTrack;
+    autocenter_mode = defaultAutocenterMode;
+    lineWidth = defaultLineWidth;
+    airplaneImage.set(path.str());
+    airplaneImage.append("airplane_image.png");
+    airplaneImageSize = defaultAirplaneSize;
 
     // Lighting and rendering stuff.
     discreteContours = true;
     contourLines = false;
     lightingOn = true;
     smoothShading = true;
-    azimuth = 315;
-    elevation = 55;
+    azimuth = defaultAzimuth;
+    elevation = defaultElevation;
 }
 
 // First loads preferences from ~/.atlasrc (if it exists), then checks
@@ -618,24 +652,12 @@ bool Preferences::_loadPreferences(int argc, char *argv[])
  	    OPTION_CHECK(sscanf(optarg, "%f", &lineWidth), 1, 
 			 LINE_WIDTH_OPTION);
  	    break;
- 	  case AIRPLANE_IMAGE_OPTION: {
-	      string optargstr = optarg; // Convert to std::string for find etc.
-	      // Check if a size for the image was appended (like
-	      // --airplane=image.png@100)
-	      string::size_type pos = optargstr.find('@');
-	      if (pos != string::npos) { // Did we find a '@'?
-		  // Image path is the part before the @.
-		  airplaneImage.set(optargstr.substr(0, pos)); 
-		  // Size the part after the @.
-		  optargstr = optargstr.substr(pos + 1, 
-					       optargstr.length() - pos - 1); 
-		  OPTION_CHECK(sscanf(optargstr.c_str(), "%f", 
-				      &airplaneImageSize), 1, 
-			       LINE_WIDTH_OPTION);
-	      } else {
-		  airplaneImage.set(optarg); // No size given
-	      }
- 	  }
+ 	  case AIRPLANE_IMAGE_OPTION:
+	    airplaneImage.set(optarg); 
+ 	    break;
+ 	  case AIRPLANE_SIZE_OPTION:
+	    OPTION_CHECK(sscanf(optarg, "%f", &airplaneImageSize), 1,
+			 AIRPLANE_SIZE_OPTION);
  	    break;
 	  case HELP_OPTION:
 	    print_help();

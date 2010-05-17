@@ -119,15 +119,25 @@ public:
     float update;
     int max_track;
     vector<int> networkConnections;
-    static const unsigned int defaultPort = 5500;
     vector<SerialConnection> serialConnections;
-    static const char *defaultSerialDevice;
-    static const int defaultBaudRate = 4800;
 
     // Lighting
     bool discreteContours, contourLines, lightingOn, smoothShading;
     float azimuth, elevation;
     sgVec4 lightPosition;
+
+    // Factory defaults
+    static const float defaultLatitude, defaultLongitude, defaultZoom;
+    static const int defaultWidth = 800, defaultHeight = 600;
+    static const bool defaultAutocenterMode = false;
+    static const float defaultLineWidth;
+    static const float defaultAirplaneSize;
+    static const int defaultMaxTrack = 0;
+    static const float defaultUpdate;
+    static const unsigned int defaultPort = 5500;
+    static const char *defaultSerialDevice;
+    static const int defaultBaudRate = 4800;
+    static const float defaultAzimuth, defaultElevation;
 
 protected:
     bool _loadPreferences(int argc, char *argv[]);
