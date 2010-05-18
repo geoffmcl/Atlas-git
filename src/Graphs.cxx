@@ -181,7 +181,11 @@ GraphsUI::GraphsUI(Graphs& g): _graphs(g)
     fontFile.append("Fonts");
     fontFile.append("Helvetica.100.txf");
     _texFont = new atlasFntTexFont;
-    assert(_texFont->load(fontFile.c_str()) == TRUE);
+    if (_texFont->load(fontFile.c_str()) != TRUE) {
+	fprintf(stderr, "Required font file '%s' not found.\n",
+		fontFile.c_str());
+	exit(-1);
+    }
     _font.initialize(_texFont, 10.0);
     puFont legend, label;
     puGetDefaultFonts(&legend, &label);

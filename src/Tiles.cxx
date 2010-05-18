@@ -366,7 +366,8 @@ TileInfo::TileInfo(const char *name, const SGPath& maps,
 
     // Get the SW corner of our tile.
     char ns = 'n', ew = 'e';
-    assert(sscanf(name, "%c%3d%c%2d", &ew, &_lon, &ns, &_lat) == 4);
+    int result = sscanf(name, "%c%3d%c%2d", &ew, &_lon, &ns, &_lat);
+    assert(result == 4);
     if (ew == 'w') {
 	_lon = -_lon;
     }
