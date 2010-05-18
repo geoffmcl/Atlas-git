@@ -4481,21 +4481,30 @@ int main(int argc, char **argv)
     fontFile = fontDir;
     fontFile.append("Helvetica.100.txf");
     globals.regularFont = new atlasFntTexFont;
-    assert(globals.regularFont->load(fontFile.c_str()) == TRUE);
+    if (globals.regularFont->load(fontFile.c_str()) != TRUE) {
+	fprintf(stderr, "Required font file '%s' not found.\n",
+		fontFile.c_str());
+	exit(-1);
+    }
 
     fontFile = fontDir;
     fontFile.append("Helvetica-Bold.100.txf");
     globals.boldFont = new atlasFntTexFont;
-    assert(globals.boldFont->load(fontFile.c_str()) == TRUE);
+    if (globals.boldFont->load(fontFile.c_str()) != TRUE) {
+	fprintf(stderr, "Required font file '%s' not found.\n",
+		fontFile.c_str());
+	exit(-1);
+    }
 
     globals.regular();
 
     // Create a tile manager.  In its creator it will see which scenery
     // directories we have, and whether there are maps generated for
     // those directories.
-    printf("Please wait while checking existing scenery ... "); fflush(stdout);
+    printf("Checking scenery and maps from\n  %s\n  %s\n", 
+	   prefs.scenery_root.c_str(), prefs.path.c_str());
     tileManager = new TileManager(prefs.scenery_root, prefs.path);
-    printf("done.\n");
+    printf("  ... done\n");
 
     // This does some OpenGL initialization.
     init();
@@ -4625,14 +4634,7 @@ int main(int argc, char **argv)
     lighting_cb(lightingUI->polygons);
     lightingUI->updatePalettes();
 
-    // Create the graphs window, placed below the main.  First, get the
-    // position of the first window.  We must do this now, because the
-    // glutGet call works on the current window.
-    int x, y, h;
-    x = glutGet(GLUT_WINDOW_X);
-    y = glutGet(GLUT_WINDOW_Y);
-    h = glutGet(GLUT_WINDOW_HEIGHT);
-
+    // Create the graphs window.
     graphs_window = glutCreateWindow("-- graphs --");
     glutDisplayFunc(redrawGraphs);
     glutReshapeFunc(reshapeGraphs);
@@ -4645,7 +4647,6 @@ int main(int argc, char **argv)
     // EYE - add keyboard function: space (play in real time, pause)
 
     glutReshapeWindow(800, 200);
-    glutPositionWindow(x, y + h);
     glutHideWindow();
 
     // Initialize some standard OpenGL attributes.
