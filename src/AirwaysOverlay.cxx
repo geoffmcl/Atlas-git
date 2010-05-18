@@ -148,6 +148,7 @@ bool AirwaysOverlay::load(const string& fgDir)
     gzFile arp;
     char *line;
 
+    printf("Loading airways from\n  %s\n", f.c_str());
     arp = gzopen(f.c_str(), "rb");
     if (arp == NULL) {
 	// EYE - we might want to throw an error instead.
@@ -171,6 +172,7 @@ bool AirwaysOverlay::load(const string& fgDir)
     }
 
     gzclose(arp);
+    printf("  ... done\n");
 
     return result;
 }
@@ -181,7 +183,6 @@ bool AirwaysOverlay::_load640(const gzFile& arp)
 
     AWY *a;
 
-    fprintf(stderr, "Loading airways ...\n");
     while (gzGetLine(arp, &line)) {
 	if (strcmp(line, "") == 0) {
 	    // Blank line.

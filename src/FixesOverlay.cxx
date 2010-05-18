@@ -124,6 +124,7 @@ bool FixesOverlay::load(const string& fgDir)
     gzFile arp;
     char *line;
 
+    printf("Loading fixes from\n  %s\n", f.c_str());
     arp = gzopen(f.c_str(), "rb");
     if (arp == NULL) {
 	// EYE - we might want to throw an error instead.
@@ -147,6 +148,7 @@ bool FixesOverlay::load(const string& fgDir)
     }
 
     gzclose(arp);
+    printf("  ... done\n");
 
     return result;
 }
@@ -157,7 +159,6 @@ bool FixesOverlay::_load600(const gzFile& arp)
 
     FIX *f;
 
-    fprintf(stderr, "Loading fixes ...\n");
     while (gzGetLine(arp, &line)) {
 	if (strcmp(line, "") == 0) {
 	    // Blank line.
@@ -176,8 +177,11 @@ bool FixesOverlay::_load600(const gzFile& arp)
 	//
 	// <lat> <lon> <name>
 	//
-	// EYE - do a real error check
-	assert(sscanf(line, "%lf %lf %s", &f->lat, &f->lon, f->name) == 3);
+	if (sscanf(line, "%lf %lf %s", &f->lat, &f->lon, f->name) != 3) {
+	    fprintf(stderr, "FixesOverlay::_load600(): bad line in file:\n");
+	    fprintf(stderr, "\t'%s'\n", line);
+	    continue;
+	}
 
 	// Add to the culler.
 	sgdVec3 point;

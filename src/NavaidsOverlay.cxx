@@ -313,6 +313,7 @@ bool NavaidsOverlay::load(const string& fgDir)
     gzFile arp;
     char *line;
 
+    printf("Loading navaids from\n  %s\n", f.c_str());
     arp = gzopen(f.c_str(), "rb");
     if (arp == NULL) {
 	// EYE - we might want to throw an error instead.
@@ -352,6 +353,7 @@ bool NavaidsOverlay::load(const string& fgDir)
     }
 
     gzclose(arp);
+    printf("  ... done\n");
 
     return result;
 }
@@ -950,7 +952,6 @@ bool NavaidsOverlay::_load810(float cycle, const gzFile& arp)
 
     NAV *n;
 
-    fprintf(stderr, "Loading navaids ...\n");
     while (gzGetLine(arp, &line)) {
 	NavType navtype;
 	NavSubType navsubtype;
