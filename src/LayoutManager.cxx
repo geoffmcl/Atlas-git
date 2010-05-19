@@ -109,6 +109,10 @@ void LayoutManager::begin(float x, float y, Point p)
     _currentLine.chunks.clear();
 
     _lines.clear();
+    for (size_t i = 0; i < _allChunks.size(); i++) {
+	delete _allChunks[i];
+    }
+    _allChunks.clear();
 }
 
 void LayoutManager::begin(float x, float y)
@@ -170,6 +174,7 @@ void LayoutManager::addBox(float width, float height, lmCallback cb,
     GenericChunk *chunk = new GenericChunk;
 
     chunk->x = _currentLine.width;
+    chunk->y = 0.0;
     chunk->width = width;
     chunk->ascent = height;
     chunk->descent = 0.0;
@@ -298,16 +303,16 @@ void LayoutManager::drawText()
 	Line &l = _lines[i];
 	for (unsigned int j = 0; j < l.chunks.size(); j++) {
 	    if (dynamic_cast<TextChunk *>(l.chunks[j])) {
-		TextChunk *c = dynamic_cast<TextChunk *>(l.chunks[j]);
-		assert(c);
+	    	TextChunk *c = dynamic_cast<TextChunk *>(l.chunks[j]);
+	    	assert(c);
 		_renderer.setPointSize(c->pointSize);
 		_renderer.setFont(c->f);
 		_renderer.setSlant(c->italics);
 		_renderer.start3f(c->x + deltaX, c->y + deltaY, 0.0);
 		_renderer.puts(c->s.c_str());
 	    } else if (dynamic_cast<GenericChunk *>(l.chunks[j])) {
-		GenericChunk *c = dynamic_cast<GenericChunk *>(l.chunks[j]);
-		assert(c);
+	    	GenericChunk *c = dynamic_cast<GenericChunk *>(l.chunks[j]);
+	    	assert(c);
 		(*(c->cb))(this, c->x + deltaX, c->y + deltaY, c->userData);
 	    } else {
 		printf("%s\n", typeid(l.chunks[j]).name());
@@ -394,4 +399,5 @@ void LayoutManager::_addChunk(Chunk *chunk)
     if (_currentLine.descent > chunk->descent) {
 	_currentLine.descent = chunk->descent;
     }
+    _allChunks.push_back(chunk);
 }

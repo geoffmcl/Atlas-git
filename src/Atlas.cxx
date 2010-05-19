@@ -355,6 +355,7 @@ Palettes::Palettes(const char *paletteDir): _i(0)
 	    }
 	}
     }
+    ulCloseDir(dir);
 }
 
 Palette *Palettes::currentPalette()

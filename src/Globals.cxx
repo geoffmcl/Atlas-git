@@ -43,6 +43,7 @@ Globals::Globals():
 
 Globals::~Globals()
 {
+    delete overlays;
     delete regularFont;
     delete boldFont;
 }

@@ -267,6 +267,11 @@ class LayoutManager {
 
     // Add a newly created chunk to the current line.
     void _addChunk(Chunk *chunk);
+
+    // This keeps track of all allocated chunks.  When the layout
+    // manager destructor is called, we delete them.  Is it a stupid
+    // way to do things?  Probably, but it works.
+    std::vector<Chunk *> _allChunks;
 };
 
 #endif

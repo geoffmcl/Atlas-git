@@ -56,10 +56,6 @@ Searcher::Searcher(): _lastSearchString("")
 
 Searcher::~Searcher()
 {
-    for (unsigned int i = 0; i < _searchables.size(); i++) {
-	delete _searchables[i];
-    }
-
     delete _matches;
 }
 

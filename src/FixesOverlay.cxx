@@ -110,8 +110,8 @@ FixesOverlay::~FixesOverlay()
 {
     glDeleteLists(_DL, 1);
 
-    delete _culler;
     delete _frustum;
+    delete _culler;
 }
 
 bool FixesOverlay::load(const string& fgDir)
