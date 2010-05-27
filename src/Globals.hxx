@@ -43,8 +43,6 @@
 
 class Globals {
  public:
-    static const size_t npos;
-
     Globals();
     ~Globals();
 
@@ -54,7 +52,7 @@ class Globals {
     // Flight tracks.  There will always be a valid current track and
     // a valid current track number, except when the tracks vector is
     // empty, in which case the track will be NULL and the track
-    // number will be Globals::npos.
+    // number will be FlightTrack::npos.
     FlightData *currentPoint();
     const vector<FlightTrack *>& tracks() { return _tracks; }
     size_t currentTrackNo() { return _currentTrackNo; }

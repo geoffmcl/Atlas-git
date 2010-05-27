@@ -33,11 +33,9 @@
 
 Globals globals;
 
-const size_t Globals::npos = std::numeric_limits<size_t>::max();
-
 Globals::Globals(): 
     regularFont(NULL), boldFont(NULL), magnetic(true), 
-    _track(NULL), _currentTrackNo(npos), _palette(NULL)
+    _track(NULL), _currentTrackNo(FlightTrack::npos), _palette(NULL)
 {
 }
 
@@ -118,7 +116,7 @@ FlightTrack *Globals::removeTrack(size_t i)
     if (result == _track) {
 	// We removed the current track, so make a new one current.
 	if (_tracks.empty()) {
-	    _currentTrackNo = npos;
+	    _currentTrackNo = FlightTrack::npos;
 	    _track = NULL;
 	} else if (_currentTrackNo >= _tracks.size()) {
 	    _currentTrackNo = _tracks.size() - 1;
