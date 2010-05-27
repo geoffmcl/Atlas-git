@@ -300,6 +300,10 @@ NavaidsOverlay::~NavaidsOverlay()
     glDeleteLists(_ILSMarkerDLs[0], 1);
     glDeleteLists(_ILSMarkerDLs[1], 1);
     glDeleteLists(_ILSMarkerDLs[2], 1);
+
+    delete _point;
+    delete _frustum;
+    delete _culler;
 }
 
 bool NavaidsOverlay::load(const string& fgDir)
