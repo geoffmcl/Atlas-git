@@ -30,6 +30,7 @@
 #include "FlightTracksOverlay.hxx"
 #include "Globals.hxx"
 #include "Preferences.hxx"
+#include "Geographics.hxx"
 
 using namespace std;
 
@@ -187,11 +188,7 @@ void FlightTracksOverlay::_drawAirplane(FlightData *d, const sgVec4 colour)
 
     // EYE - draw a trail (eg, 10s) as well?
     glColor4fv(colour);
-    glPushMatrix(); {
-	glTranslated(d->cart[0], d->cart[1], d->cart[2]);
-	glRotatef(d->lon + 90.0, 0.0, 0.0, 1.0);
-	glRotatef(90.0 - d->lat, 1.0, 0.0, 0.0);
-	glRotatef(-d->hdg, 0.0, 0.0, 1.0);
+    geodPushMatrix(d->cart, d->lat, d->lon, d->hdg); {
 	double scale = globals.metresPerPixel;
 	glScaled(scale, scale, scale);
 
@@ -228,5 +225,5 @@ void FlightTracksOverlay::_drawAirplane(FlightData *d, const sgVec4 colour)
 	    glEnd();
 	}
     }
-    glPopMatrix();
+    geodPopMatrix();
 }
