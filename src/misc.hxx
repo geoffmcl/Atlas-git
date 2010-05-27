@@ -103,7 +103,7 @@ class atlasFntRenderer: public fntRenderer {
 };
 
 // Atlas' special font has a degree symbol.  It can be put into a
-// string via printf("%C", degreeSymbol).
+// string via printf("%c", degreeSymbol).
 const unsigned char degreeSymbol = 176;
 
 // A slightly modified version of zlib's gzgets().  This one *always*
@@ -220,6 +220,8 @@ class AtlasString {
     const char *appendf(const char *fmt, ...);
 
   protected:
+    // Our buffer, which is of size _size bytes, and which contains a
+    // string of length _strlen (not including the final '\0').
     char *_buf;
     size_t _size, _strlen;
     static const size_t _increment = 16;

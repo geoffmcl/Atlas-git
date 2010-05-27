@@ -259,7 +259,11 @@ bool gzGetLine(const gzFile& f, char **linePtr)
 
     // First read as much of the line as we can.
     // EYE - check return code, use gzerror() to report error.
-    assert(gzgets(f, readPoint, toRead) != Z_NULL);
+    if (gzgets(f, readPoint, toRead) == Z_NULL) {
+	int errnum;
+	fprintf(stderr, "gzGetLine error: %s\n", gzerror(f, &errnum));
+	return false;
+    }
     do {
 	// Now see if we've hit the end of the line.
 	unsigned int crlf = strcspn(readPoint, "\n\r");
@@ -275,7 +279,11 @@ bool gzGetLine(const gzFile& f, char **linePtr)
 	    // just add chunkSize to readPoint).
 	    readPoint = buf + length - chunkSize;
 	    toRead = chunkSize;
-	    assert(gzgets(f, readPoint, toRead) != Z_NULL);
+	    if (gzgets(f, readPoint, toRead) == Z_NULL) {
+		int errnum;
+		fprintf(stderr, "gzGetLine error: %s\n", gzerror(f, &errnum));
+		return false;
+	    }
 	} else {
 	    readPoint[crlf] = '\0';
 	    eoln = true;
@@ -503,10 +511,24 @@ const char *AtlasString::appendf(const char *fmt, ...)
 
 const char *AtlasString::_appendf(const char *fmt, va_list ap)
 {
+    size_t newLen;
+#ifdef _MSC_VER
+    // Window's verion of vsnprintf() unhelpfully returns -1 when the
+    // string won't fit, so we need to keep trying with larger buffers
+    // until it does.
+    while ((newLen = vsnprintf_s(_buf + _strlen, _size - _strlen, _TRUNCATE, 
+				 fmt, ap)) < 0) {
+        _size += _increment;
+	char *newBuf;
+	if ((newBuf = (char *)realloc(_buf, _size)) == NULL) {
+	    return NULL;
+        }
+    }
+#else
     va_list ap_copy;
     va_copy(ap_copy, ap);
 
-    size_t newLen = vsnprintf(_buf + _strlen, _size - _strlen, fmt, ap);
+    newLen = vsnprintf(_buf + _strlen, _size - _strlen, fmt, ap);
     if ((newLen + 1) > (_size - _strlen)) {
 	// This just finds the next multiple of _increment greater
 	// than the size we need.  Perhaps nicer would be to find the
@@ -520,8 +542,9 @@ const char *AtlasString::_appendf(const char *fmt, va_list ap)
 	_buf = newBuf;
 	vsnprintf(_buf + _strlen, _size - _strlen, fmt, ap_copy);
     }
-    _strlen += newLen;
     va_end(ap_copy);
+#endif
+    _strlen += newLen;
 
     return _buf;
 }
