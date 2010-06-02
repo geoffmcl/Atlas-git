@@ -523,6 +523,7 @@ const char *AtlasString::_appendf(const char *fmt, va_list ap)
 	if ((newBuf = (char *)realloc(_buf, _size)) == NULL) {
 	    return NULL;
         }
+	_buf = newBuf;
     }
 #else
     va_list ap_copy;
