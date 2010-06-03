@@ -513,9 +513,9 @@ const char *AtlasString::_appendf(const char *fmt, va_list ap)
 {
     size_t newLen;
 #ifdef _MSC_VER
-    // Window's verion of vsnprintf() unhelpfully returns -1 when the
-    // string won't fit, so we need to keep trying with larger buffers
-    // until it does.
+    // Window's verion of vsnprintf() returns -1 when the string won't
+    // fit, so we need to keep trying with larger buffers until it
+    // does.
     while ((newLen = vsnprintf_s(_buf + _strlen, _size - _strlen, _TRUNCATE, 
 				 fmt, ap)) < 0) {
         _size += _increment;

@@ -52,10 +52,11 @@ public:
     // is intended to be used for debugging only).
     //
     // If you change palette or discreteContours, you should notify
-    // all buckets via paletteChanged() and discreteContoursChanged(),
-    // and then redraw.  It's not necessary to notify buckets about
-    // changes to contourLines or polygonEdges (because it doesn't
-    // require any recalculations), but you still need to redraw.
+    // all buckets via paletteChanged() or discreteContoursChanged()
+    // respectively, and then draw().  It's not necessary to notify
+    // buckets about changes to contourLines or polygonEdges (because
+    // it doesn't require any recalculations), but you still need to
+    // call draw() of course.
     static Palette *palette;
     static bool discreteContours, contourLines, polygonEdges;
 
