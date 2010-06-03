@@ -519,11 +519,8 @@ const char *AtlasString::_appendf(const char *fmt, va_list ap)
     while ((newLen = vsnprintf_s(_buf + _strlen, _size - _strlen, _TRUNCATE, 
 				 fmt, ap)) < 0) {
         _size += _increment;
-	char *newBuf;
-	if ((newBuf = (char *)realloc(_buf, _size)) == NULL) {
-	    return NULL;
-        }
-	_buf = newBuf;
+	_buf = (char *)realloc(_buf, _size);
+	assert(_buf != NULL);
     }
 #else
     va_list ap_copy;
@@ -535,12 +532,8 @@ const char *AtlasString::_appendf(const char *fmt, va_list ap)
 	// than the size we need.  Perhaps nicer would be to find the
 	// next power of 2?
 	_size = (_strlen + newLen + 1 + _increment) / _increment * _increment;
-	char *newBuf;
-	if ((newBuf = (char *)realloc(_buf, _size)) == NULL) {
-	    va_end(ap_copy);
-	    return NULL;
-	}
-	_buf = newBuf;
+	_buf = (char *)realloc(_buf, _size);
+	assert(_buf != NULL);
 	vsnprintf(_buf + _strlen, _size - _strlen, fmt, ap_copy);
     }
     va_end(ap_copy);
