@@ -287,7 +287,6 @@ void LayoutManager::drawText()
 	glPushAttrib(GL_CURRENT_BIT); { // For current colour
 	    glColor4fv(_backgroundColour);
 	    glBegin(GL_QUADS); {
-		glColor4f(1.0, 1.0, 1.0, 0.5);
 		glVertex2f(deltaX - width_2, deltaY - height_2);
 		glVertex2f(deltaX + width_2, deltaY - height_2);
 		glVertex2f(deltaX + width_2, deltaY + height_2);
