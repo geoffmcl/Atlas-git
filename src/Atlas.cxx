@@ -57,10 +57,10 @@
 #include "Geographics.hxx"
 
 #ifdef _MSC_VER
-#include <io.h>     // for access()
-#ifndef F_OK
-#define F_OK    0
-#endif
+  #include <io.h>     // For access()
+  #ifndef F_OK
+    #define F_OK 0
+  #endif
 #endif
 
 using namespace std;
@@ -265,7 +265,7 @@ Search *search_interface;
 sgdVec3 searchFrom;
 
 // Altitude/Speed interface.
-Graphs *graphs;
+Graphs *graphs = NULL;
 
 // File dialog.
 puaFileSelector *fileDialog = NULL;
@@ -276,8 +276,11 @@ puaFileSelector *fileDialog = NULL;
 bool showGraphWindow = true;
 
 // Some default colours.
-float trackColour[4] = {0.0, 0.0, 1.0, 1.0};
-float markColour[4] = {1.0, 1.0, 0.0, 1.0};
+// float trackColour[4] = {0.0, 0.0, 1.0, 1.0};
+// float markColour[4] = {1.0, 1.0, 0.0, 1.0};
+// EYE - make plane and track translucent?
+float trackColour[4] = {0.0, 0.0, 1.0, 0.7};
+float markColour[4] = {1.0, 1.0, 0.0, 0.7};
 // EYE - eventually these should be placed in preferences.  Also,
 // we'll eventually need to deal with more than 3 radios.
 float vor1Colour[4] = {0.000, 0.420, 0.624, 0.7};
@@ -286,7 +289,7 @@ float vor2Colour[4] = {0.420, 0.624, 0.0, 0.7};
 float adfColour[4] = {0.525, 0.294, 0.498, 0.7};
 
 // The tile manager keeps track of tiles.
-TileManager *tileManager;
+TileManager *tileManager = NULL;
 
 //////////////////////////////////////////////////////////////////////
 // Live scenery stuff
@@ -330,7 +333,7 @@ class Palettes {
     vector<Palette *> _palettes;
 };
 // EYE - make part of Globals?
-Palettes *palettes;
+Palettes *palettes = NULL;
 
 Palettes::Palettes(const char *paletteDir): _i(0)
 {
@@ -356,6 +359,14 @@ Palettes::Palettes(const char *paletteDir): _i(0)
 	}
     }
     ulCloseDir(dir);
+}
+
+Palettes::~Palettes()
+{
+    for (size_t i = 0; i < _palettes.size(); i++) {
+	delete _palettes[i];
+    }
+    _palettes.clear();
 }
 
 Palette *Palettes::currentPalette()
@@ -3050,9 +3061,11 @@ HelpUI::HelpUI(int x, int y, Preferences& prefs, TileManager& tm)
     setText(generalButton);
 }
 
+// EYE - add destructors to other UI classes.
 HelpUI::~HelpUI()
 {
-    puDeleteObject(gui);
+    // EYE - this call never returns.  Why?
+    // puDeleteObject(gui);
     delete _label;
     delete _generalText;
     delete _keyboardText;
@@ -3080,7 +3093,7 @@ void reshapeMap(int _width, int _height)
 {
     centre.set(_width / 2.0, _height / 2.0);
 
-    glViewport (0, 0, (GLsizei) _width, (GLsizei) _height); 
+    glViewport(0, 0, (GLsizei) _width, (GLsizei) _height); 
     zoomBy(1.0);
 
     // Ensure that the 'jump to location' widget stays in the upper
@@ -3392,8 +3405,6 @@ void passivemotion(int x, int y)
 
 void lightingPrefixKeypressed(unsigned char key, int x, int y)
 {
-    // // EYE - move out of here?
-    // static bool relative = false;
     switch (key) {
       case 'c':			// Contour lines on/off
 	lightingUI->lines->setValue(!lightingUI->lines->getValue());
@@ -4419,8 +4430,22 @@ static void help_cb(puObject *obj)
 // End of callbacks
 ///////////////////////////////////////////////////////////////////////////////
 
+void cleanup()
+{
+    delete graphs;
+    delete helpUI;
+    delete lightingUI;
+    delete infoUI;
+    delete mainUI;
+    delete tileManager;
+    delete palettes;
+}
+
 int main(int argc, char **argv) 
 {
+    // Our cleanup routine.
+    atexit(cleanup);
+
     // Load our preferences.  If there's a problem with any of the
     // arguments, it will print some errors to stderr, and return false.
     if (!prefs.loadPreferences(argc, argv)) {
@@ -4481,6 +4506,7 @@ int main(int argc, char **argv)
     // EYE - do we need to call fntInit()?
     fontFile = fontDir;
     fontFile.append("Helvetica.100.txf");
+    // EYE - do this in Globals::Globals
     globals.regularFont = new atlasFntTexFont;
     if (globals.regularFont->load(fontFile.c_str()) != TRUE) {
 	fprintf(stderr, "Required font file '%s' not found.\n",
