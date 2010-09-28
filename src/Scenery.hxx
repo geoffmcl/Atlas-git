@@ -135,7 +135,7 @@ class Scenery: public Subscriber {
 
     // A SceneryTile object manages all the textures and live scenery for a 1
     // degree by 1 degree (usually) chunk of the earth.
-    vector<SceneryTile *>_tiles;
+    std::vector<SceneryTile *>_tiles;
 
     // The cache is used to manage the loading of textures and buckets
     // (live scenery).

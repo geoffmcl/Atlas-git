@@ -84,7 +84,7 @@ class TileMapper {
     float _maximumElevation;
 
     // Our scenery.
-    vector<Bucket *> _buckets;
+    std::vector<Bucket *> _buckets;
 };
 
 #endif	// _TILEMAPPER_H_

@@ -109,7 +109,7 @@ public:
     bool softcursor;
 
     // Flight paths
-    vector<SGPath> flightFiles;
+    std::vector<SGPath> flightFiles;
     bool autocenter_mode;
     float lineWidth;
     SGPath airplaneImage;
@@ -118,8 +118,8 @@ public:
     // FlightGear connection(s)
     float update;
     int max_track;
-    vector<int> networkConnections;
-    vector<SerialConnection> serialConnections;
+    std::vector<int> networkConnections;
+    std::vector<SerialConnection> serialConnections;
 
     // Lighting
     bool discreteContours, contourLines, lightingOn, smoothShading;

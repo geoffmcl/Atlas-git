@@ -101,7 +101,7 @@ public:
 
     // A bucket is divided into a bunch of pieces, which we call
     // subbuckets.
-    vector<Subbucket *> _subbuckets;
+    std::vector<Subbucket *> _subbuckets;
     double _maxElevation;
 
     bool _loaded;
