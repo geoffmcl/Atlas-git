@@ -1909,7 +1909,7 @@ void MainUI::setTrackList()
 	free(trackList);
     }
 
-    trackList = (char **)malloc(sizeof(char *) * globals.tracks().size() + 1);
+    trackList = (char **)malloc(sizeof(char *) * (globals.tracks().size() + 1));
     for (unsigned int i = 0; i < globals.tracks().size(); i++) {
 	// The display styles are the same as in the graphs window.
 	trackList[i] = strdup(globals.track(i)->niceName());
@@ -2808,7 +2808,7 @@ void LightingUI::updatePalettes()
     }
 
     const vector<Palette *>& p = palettes->palettes();
-    paletteList = (char **)malloc(sizeof(char *) * p.size() + 1);
+    paletteList = (char **)malloc(sizeof(char *) * (p.size() + 1));
     for (unsigned int i = 0; i < p.size(); i++) {
 	// Display the filename of the palette (but not the path).
 	SGPath full(p[i]->path());
