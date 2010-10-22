@@ -105,6 +105,8 @@ void geodDrawText(LayoutManager& lm, const sgdVec3 cart, double hdg,
 {
     double lat, lon, alt;
     sgCartToGeod(cart, &lat, &lon, &alt);
+    lat *= SGD_RADIANS_TO_DEGREES;
+    lon *= SGD_RADIANS_TO_DEGREES;
     geodDrawText(lm, cart, lat, lon, hdg, fiddling);
 }
 
