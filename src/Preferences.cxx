@@ -35,6 +35,8 @@
 #include <cassert>
 #include <fstream>
 
+using namespace std;
+
 // This is a space-saving macro used when parsing command-line
 // arguments.  The function 'f' is assumed to be sscanf().
 #define OPTION_CHECK(f,n,t) if ((f) != (n)) {\
@@ -420,7 +422,7 @@ bool Preferences::loadPreferences(int argc, char *argv[])
 	rcpath.set(atlasrc);
     }
 
-    std::ifstream rc(rcpath.c_str());
+    ifstream rc(rcpath.c_str());
     if (rc.is_open()) {
 	char *lines[2];
 	string line;
