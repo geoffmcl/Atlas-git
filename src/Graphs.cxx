@@ -468,6 +468,10 @@ Graphs::Graphs(int window):
 	_values[i]->setSlider(_ySliders[i]);
     }
 
+    // This ensures that all PUI widgets end up in the graphs window.
+    glutSetWindow(_window);
+
+    // Create the UI.
     _ui = new GraphsUI(*this);
 
     // Subscribe to things that interest us.
