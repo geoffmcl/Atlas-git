@@ -255,12 +255,16 @@ void TileManager::scanScenery()
 		    if (ent1->d_isdir &&
 			(sscanf(ent1->d_name, "%*1c%3d%*1c%2d", &lon, &lat) 
 			 == 2)) {
-			// Whew!  Looks like we've got ourselves a scenery
-			// directory!  Add the tile to our "database".
+			// Whew!  Looks like we've got ourselves a
+			// scenery directory!  Add the tile to our
+			// "database", and set its scenery directory
+			// (unless it had been set already).
 			SGPath scenery1 = scenery10;
 			scenery1.append(ent1->d_name);
 			TileInfo *t = _getTile(ent1->d_name);
-			t->_setScenery(scenery1);
+			if (t->sceneryDir().str() == "") {
+			    t->_setScenery(scenery1);
+			}
 		    }
 		}
 		ulCloseDir(dir1);
