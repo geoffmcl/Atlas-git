@@ -389,25 +389,25 @@ void AtlasCoord::set(double lat, double lon, double elev)
     _cartValid = false;
 }
 
-void AtlasCoord::set(SGGeod& geod)
+void AtlasCoord::set(const SGGeod& geod)
 {
     _geod = geod;
     _geodValid = true;
     _cartValid = false;
 }
 
-void AtlasCoord::set(SGVec3<double>& cart)
+void AtlasCoord::set(const SGVec3<double>& cart)
 {
     _cart = cart;
     _cartValid = true;
     _geodValid = false;
 }
 
-void AtlasCoord::set(sgdVec3 cart)
+void AtlasCoord::set(const sgdVec3 cart)
 {
     _cart[0] = cart[0];
-    _cart[1] = cart[2];
-    _cart[2] = cart[3];
+    _cart[1] = cart[1];
+    _cart[2] = cart[2];
     _cartValid = true;
     _geodValid = false;
 }

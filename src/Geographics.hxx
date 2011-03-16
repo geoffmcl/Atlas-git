@@ -203,9 +203,9 @@ class AtlasCoord {
 
     // Setters.
     void set(double lat, double lon, double elev = 0.0);
-    void set(SGGeod& geod);
-    void set(SGVec3<double>& cart);
-    void set(sgdVec3 cart);
+    void set(const SGGeod& geod);
+    void set(const SGVec3<double>& cart);
+    void set(const sgdVec3 cart);
 
   protected:
     // Conversion methods.  These will be called whenever we need to
