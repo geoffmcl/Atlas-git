@@ -214,8 +214,8 @@ void TileMapper::draw(unsigned int size)
     for (unsigned int i = 0; i < _buckets.size(); i++) {
 	// Buckets are smart enough to save a display list and used
 	// that if asked to be drawn more than once.  Therefore
-	// calling Tile::draw() more than once is relatively cheap, if
-	// the buckets have not been unloaded.
+	// calling TileMapper::draw() more than once is relatively
+	// cheap, if the buckets have not been unloaded.
 	_buckets[i]->draw();
     }
 
