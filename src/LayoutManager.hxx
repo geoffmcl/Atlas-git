@@ -96,11 +96,12 @@ class LayoutManager {
     void setBackgroundColour(const sgVec4& colour);
     void setOutlineColour(const sgVec4& colour);
 
-    // Margins are generally used only with boxes, but you can set a
-    // margin even without a box.  Note that calls to setBox() will
-    // clobber any previously set margins; setBox(true) sets the
-    // margin to pointSize / 5.0, and setBox(false) sets the margin to
-    // 0.0.
+    // By default, the bounding box is the smallest box that surrounds
+    // the text.  Setting a margin expands that bounding box.  Margins
+    // are generally used only with boxes, but you can set a margin
+    // even without a box.  Note that calls to setBox() will clobber
+    // any previously set margins; setBox(true) sets the margin to
+    // pointSize / 5.0, and setBox(false) sets the margin to 0.0.
     float margin() const { return _margin; }
     void setMargin(float size) { _margin = size; }
 
