@@ -279,7 +279,7 @@ void Texture::unload()
 
 // Returns our texture (name).  If _name is 0 (ie, load() wasn't
 // called, or it had an error), we substitute a default texture, which
-// is a black and white checkerboard.
+// is a red and white checkerboard.
 GLuint Texture::name() const
 {
     if (loaded()) {
