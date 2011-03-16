@@ -1396,7 +1396,7 @@ void exit_ok_cb(puObject *widget)
     }
 }
 
-// Called if the hits a button on the close track dialog box.
+// Called if the user hits a button on the close track dialog box.
 void close_ok_cb(puObject *widget)
 {
     bool okay = widget->getDefaultIntegerValue();
@@ -2107,8 +2107,8 @@ InfoUI::InfoUI(int x, int y)
     gui->reveal();
 }
 
-// Given a point in 3D space, pc, and a frequency of interest, freq,
-// returns the most powerful matching navaid from navaids, where
+// Given a point in 3D space, p, and a frequency of interest, freq,
+// returns the most powerful matching navaid from navs, where
 // "matching" means "having the same frequency", and "most powerful"
 // means "having the greatest signal strength at our location".  It
 // also returns, by reference, the distance to the navaid in metres
@@ -3367,6 +3367,13 @@ void mouseMotion(int x, int y)
 	    // The two vectors, oldC and newC, define the plane and
 	    // angle of rotation.  A line perpendicular to this plane,
 	    // passing through the origin, is our axis of rotation.
+	    // However, if the two vectors are the same, there is no
+	    // motion (nor do they define a plane), so we just return
+	    // immediately.
+	    if (oldC == newC) {
+		return;
+	    }
+
 	    sgdVec3 axis;
 	    sgdMat4 rot;
 
