@@ -1064,9 +1064,9 @@ void AirportsOverlay::_labelAirport(ARP *ap, int rA)
     // EYE - magic number
 //     const float pointSize = _metresPerPixel * 24.0 * scale;
     const float pointSize = _metresPerPixel * 18.0 * scale;
-    const float medium = pointSize * 0.75;
-    const float small = pointSize * 0.5;
-    const float tiny = pointSize * 0.4;
+    const float mediumFontSize = pointSize * 0.75;
+    const float smallFontSize = pointSize * 0.5;
+    const float tinyFontSize = pointSize * 0.4;
 
     // EYE - magic number (pointSize is in metres)
     if (pointSize / _metresPerPixel < 5.0) {
@@ -1114,12 +1114,12 @@ void AirportsOverlay::_labelAirport(ARP *ap, int rA)
 		}
 
 		// First, the frequency name.
-		lm.setFont(globals.regularFont, tiny);
+		lm.setFont(globals.regularFont, tinyFontSize);
 		lm.addText(freq->first);
 
 		// Now, the frequencies themselves.
 		globalString.clear();
-		lm.setFont(globals.boldFont, small);
+		lm.setFont(globals.boldFont, smallFontSize);
 		set<int>::iterator j;
 		for (j = freqs.begin(); j != freqs.end(); j++) {
 		    globalString.appendf(" %s", formatFrequency(*j));
@@ -1135,7 +1135,7 @@ void AirportsOverlay::_labelAirport(ARP *ap, int rA)
 	lm.newline();
 
 	// Airport elevation - set in regular italics.
-	lm.setFont(globals.regularFont, medium, 0.25);
+	lm.setFont(globals.regularFont, mediumFontSize, 0.25);
 	// We need to ensure that the number is at least 2 digits
 	// long (ie, '6' must be written '06').
 	globalString.printf("%02.0f  ", ap->elev * SG_METER_TO_FEET);
