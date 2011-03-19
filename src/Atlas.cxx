@@ -3548,6 +3548,16 @@ void keyPressed(unsigned char key, int x, int y)
 	return;
     }
 
+    // EYE - this is a temporary patch, because of a bug in the
+    // Windows implementation of FreeGLUT (as of March 2011).  This
+    // should be checked periodically to see if the bug still exists
+    // and removed if it has been fixed.
+#ifdef _MSC_VER
+    if (( key == ' ' ) &&
+        ( glutGetModifiers() & GLUT_ACTIVE_CONTROL ))
+        key = 0;
+#endif // _MSC_VER
+
     if (!puKeyboard(key, PU_DOWN)) {
 	switch (key) {
 	  case 24:	       // ctrl-x
