@@ -615,11 +615,12 @@ void Route::addPoint(SGGeod& p)
 
 void Route::deleteLastPoint()
 {
-    // You'd think STL would do this check for us ...
+    // You'd think pop_back() would be smart enough to check for an
+    // empty vector, but it's not.
     if (!_points.empty()) {
 	_points.pop_back();
     }
-    if (!_points.empty()) {
+    if (!_segments.empty()) {
 	_segments.pop_back();
     }
 }
@@ -1292,8 +1293,8 @@ void searchFinished(Search *s, int i)
 {
     if (i != -1) {
 	// User hit return.  Jump to the selected point.
-	const Searchable *s = globals.searcher.getMatch(i);
-	movePosition(s->location());
+	const Searchable *match = globals.searcher.getMatch(i);
+	movePosition(match->location());
     } else {
 	// User hit escape, so return to our original point.
 	// EYE - restore original orientation too
