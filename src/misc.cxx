@@ -511,18 +511,19 @@ const char *AtlasString::appendf(const char *fmt, ...)
 
 const char *AtlasString::_appendf(const char *fmt, va_list ap)
 {
-    size_t newLen;
 #ifdef _MSC_VER
     // Window's verion of vsnprintf() returns -1 when the string won't
     // fit, so we need to keep trying with larger buffers until it
     // does.
-    while ((newLen = vsnprintf_s(_buf + _strlen, _size - _strlen, _TRUNCATE, 
-				 fmt, ap)) < 0) {
+    int newLen;
+    while ((newLen = vsnprintf_s(_buf + _strlen, _size - _strlen,
+				 _size - _strlen - 1, fmt, ap)) < 0) {
         _size += _increment;
 	_buf = (char *)realloc(_buf, _size);
 	assert(_buf != NULL);
     }
 #else
+    size_t newLen;
     va_list ap_copy;
     va_copy(ap_copy, ap);
 
