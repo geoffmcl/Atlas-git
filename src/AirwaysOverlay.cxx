@@ -216,10 +216,6 @@ bool AirwaysOverlay::_load640(const gzFile& arp)
 	    assert(false);
 	}
 
-	// Check that the first id is alphabetically less than the
-	// second.  We use this assumption in other parts of the code.
-	assert(a->start.id < a->end.id);
-
 	// Add to the culler.  The airway bounds are given by its two
 	// endpoints.
 	// EYE - save these two points
