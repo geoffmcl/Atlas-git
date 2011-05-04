@@ -281,7 +281,7 @@ void saveJPEG(const char *file, int quality,
     // is 8 bits wide.
     jpeg_write_marker(&cinfo, JPEG_APP0 + 1, 
 		      (const JOCTET *)globalString.str(), 
-		      strlen(globalString.str()));
+		      strlen(globalString.str()) + 1);
 
     while (cinfo.next_scanline < cinfo.image_height) {
 	// A little bit of hackiness.  The jpeg library expects an
