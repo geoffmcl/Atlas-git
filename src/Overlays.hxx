@@ -37,6 +37,7 @@
 #include "FixesOverlay.hxx"
 #include "FlightTracksOverlay.hxx"
 #include "CrosshairsOverlay.hxx"
+#include "RangeRingsOverlay.hxx"
 
 struct NAVPOINT {
     bool isNavaid;		// True if navaid, false if fix.
@@ -54,6 +55,7 @@ class AirwaysOverlay;
 class FixesOverlay;
 class FlightTracksOverlay;
 class CrosshairsOverlay;
+class RangeRingsOverlay;
 
 class Overlays {
   public:
@@ -63,17 +65,19 @@ class Overlays {
     void draw();
 
     enum OverlayType {NAVAIDS = 0, VOR, NDB, ILS, DME, FIXES, AIRPORTS, 
-		      AIRWAYS, HIGH, LOW, LABELS, TRACKS, CROSSHAIRS, _LAST};
+		      AIRWAYS, HIGH, LOW, LABELS, TRACKS, CROSSHAIRS, 
+		      RANGE_RINGS, _LAST};
 
     void setVisibility(OverlayType type, bool value);
     bool isVisible(OverlayType type);
 
     AirportsOverlay* airportsOverlay() { return _airports; }
-    AirwaysOverlay* airwaysOverlay() { return _airways; }
-    CrosshairsOverlay* crosshairsOverlay() { return _crosshairs; }
-    FixesOverlay* fixesOverlay() { return _fixes; }
     NavaidsOverlay* navaidsOverlay() { return _navaids; }
+    AirwaysOverlay* airwaysOverlay() { return _airways; }
+    FixesOverlay* fixesOverlay() { return _fixes; }
     FlightTracksOverlay* flightTracksOverlay() { return _tracks; }
+    CrosshairsOverlay* crosshairsOverlay() { return _crosshairs; }
+    RangeRingsOverlay* rangeRingsOverlay() { return _rangeRings; }
 
   protected:
     std::bitset<_LAST> _overlays;
@@ -84,6 +88,7 @@ class Overlays {
     FixesOverlay *_fixes;
     FlightTracksOverlay *_tracks;
     CrosshairsOverlay *_crosshairs;
+    RangeRingsOverlay *_rangeRings;
 };
 
 #endif

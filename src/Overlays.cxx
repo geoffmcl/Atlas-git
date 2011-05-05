@@ -66,6 +66,7 @@ Overlays::Overlays(const string& fgDir)
     _airways->load(fgDir);
     _tracks = new FlightTracksOverlay(*this);
     _crosshairs = new CrosshairsOverlay(*this);
+    _rangeRings = new RangeRingsOverlay(*this);
 }
 
 Overlays::~Overlays()
@@ -76,6 +77,7 @@ Overlays::~Overlays()
     delete _fixes;
     delete _tracks;
     delete _crosshairs;
+    delete _rangeRings;
 }
 
 // Draws all the overlays.
@@ -120,6 +122,9 @@ void Overlays::draw()
 	}
 	if (_overlays[CROSSHAIRS]) {
 	    _crosshairs->draw();
+	}
+	if (_overlays[RANGE_RINGS]) {
+	    _rangeRings->draw();
 	}
 	if (_overlays[TRACKS]) {
 	    _tracks->draw();
