@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2008 Brian Schack
+  Copyright (C) 2008 - 2011 Brian Schack
 
   The scenery object is responsible for loading and displaying
   scenery, whether that scenery comes in the form of pre-rendered maps
@@ -103,6 +103,9 @@ class Scenery: public Subscriber {
     // coordinates, with <0.0, 0.0> at the top left corner, and <w, h>
     // at the bottom right corner (where w and h are the window width
     // and height respectively).
+
+    // EYE - we should also return the bucket id so that we can
+    // quickly get map information.
     bool intersection(double x, double y, SGVec3<double> *c, 
 		      bool *validElevation = NULL);
 

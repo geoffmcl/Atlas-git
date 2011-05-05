@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2008 Brian Schack
+  Copyright (C) 2008 - 2011 Brian Schack
 
   This file is part of Atlas.
 
@@ -547,7 +547,7 @@ bool SceneryTile::load()
 
 	_mapToBeLoaded = TileManager::MAX_MAP_LEVEL;
 
-	// Tell others that live scenery has been loaded.
+	// Tell others that new scenery has been loaded.
 	Notification::notify(Notification::NewScenery);
 
 	// If we still have buckets to load, tell the cache we're not
@@ -561,7 +561,7 @@ bool SceneryTile::load()
 	b->load();
 	_calcSize();
 
-	// Tell others that live scenery has been loaded.
+	// Tell others that new scenery has been loaded.
 	Notification::notify(Notification::NewScenery);
 
 	return _bucketsToBeLoaded.empty();
