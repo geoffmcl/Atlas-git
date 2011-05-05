@@ -15,14 +15,18 @@
   placed at an arbitrary location (the default is <0.0, 0.0>).  Lines
   are centre justified.
 
-  When creating a piece of laid-out text, you must call begin() first.
-  Add the text and boxes that you want (including newlines, which must
-  be specified explicitly), the terminate everything with an end().
-  At this point it can be drawn with drawText().  Boxes have to be
-  drawn "by hand" - query the layout manager using nthChunk() to find
-  out where they ended up (the addBox() method returns an id that can
-  be passed to nthChunk()), then use those coordinates to draw the
-  box.  As I said - cheesy.
+  When creating a complicated piece of laid-out text, you must call
+  begin() first.  Add the text and boxes that you want (including
+  newlines, which must be specified explicitly), the terminate
+  everything with an end().  At this point it can be drawn with
+  drawText().  Boxes have to be drawn "by hand" - query the layout
+  manager using nthChunk() to find out where they ended up (the
+  addBox() method returns an id that can be passed to nthChunk()),
+  then use those coordinates to draw the box.  As I said - cheesy.
+
+  For simple strings, there are constructors which take a string, a
+  font, and a point size and lay out the string using typical
+  defaults.  There is no need to call begin() and end().
 
   This file is part of Atlas.
 
@@ -109,7 +113,8 @@ class LayoutManager {
     // lower/left, R = right, with the Y position given before the X
     // position.  Therefore, for example, LC means "lower-centre" (the
     // mid-point of the bottom of the box), while CL means
-    // "centre-left" (the mid-point of the left side).
+    // "centre-left" (the mid-point of the left side).  The default is
+    // CC.
     enum Point { UL, UC, UR, 
 		 CL, CC, CR, 
 		 LL, LC, LR };
