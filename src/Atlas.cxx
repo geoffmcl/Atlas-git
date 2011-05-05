@@ -4,7 +4,7 @@
 
   Written by Per Liedman, started February 2000.
   Copyright (C) 2000 Per Liedman, liedman@home.se
-  Copyright (C) 2009 Brian Schack
+  Copyright (C) 2009 - 2011 Brian Schack
 
   This file is part of Atlas.
 
@@ -121,9 +121,15 @@ class MainUI {
     AtlasString trackSizeLabel;
     puInput *trackLimitInput;
 
-    // True if the mouse coordinates should be shown, false if the
-    // centre coordinates should be shown.
-    bool showMouse;
+    // This determines what we draw in the centre of the screen, and
+    // what to display for our position information.  "CROSSHAIRS"
+    // draws a crosshairs at the centre and displays position
+    // information for the centre; "RANGE_RINGS" adds a set of range
+    // rings (scaled appropriately).  "MOUSE" displays information
+    // about whatever point is under the mouse (and changes the cursor
+    // to a set of crosshairs).
+    enum CentreType { MOUSE, CROSSHAIRS, RANGE_RINGS };
+    CentreType centreType;
 
   protected:
     // True if the tracks list has changed.
@@ -463,6 +469,8 @@ class ScreenLocation {
     // Return the actual coordinates.  If we are invalid, this will
     // force an intersection test.
     AtlasCoord& coord();
+
+    // Convenience accessors.
     const SGGeod& geod() { return coord().geod(); }
     double lat() { return coord().lat(); }
     double lon() { return coord().lon(); }
@@ -858,9 +866,11 @@ void makePaletteRelative()
     float elev = globals.palette()->base();
     if (displayedFlightTrack()) {
 	elev = globals.currentPoint()->alt * SG_FEET_TO_METER;
-    } else if (mainUI->showMouse && cursor.validElevation()) {
+    } else if ((mainUI->centreType == MainUI::MOUSE) && 
+	       cursor.validElevation()) {
 	elev = cursor.elev();
-    } else if (!mainUI->showMouse && centre.validElevation()) {
+    } else if ((mainUI->centreType != MainUI::MOUSE) && 
+	       centre.validElevation()) {
 	elev = centre.elev();
     }
     if (globals.palette()->base() != elev) {
@@ -874,7 +884,7 @@ void makePaletteRelative()
 // mouse is pointing, or the centre of the screen.
 ScreenLocation& currentLocation()
 {
-    if (mainUI->showMouse) {
+    if (mainUI->centreType == MainUI::MOUSE) {
 	return cursor;
     } else {
 	return centre;
@@ -908,7 +918,7 @@ void updateLocation(Notification::type n)
 	// But the centre location is only affected if we move or if
 	// new scenery is loaded.
 	centre.invalidate();
-    } else if (!mainUI->showMouse) {
+    } else if (mainUI->centreType != MainUI::MOUSE) {
 	// And if we're showing the centre and it's not a move,
 	// there's nothing to do.
 	return;
@@ -1802,7 +1812,7 @@ MainUI::MainUI(int x, int y): _dirty(true)
 
     // Mouse/centre: a text output
     mouseText = new puText(curx, cury);
-    showMouse = false;		// EYE - use a method
+    centreType = CROSSHAIRS;		// EYE - use a method
     mouseText->setLabel("centre");
 
     curx = bigSpace;
@@ -3109,6 +3119,8 @@ void reshapeMap(int _width, int _height)
     lightingUI->setPosition(_width - w - 20, 20);
 }
 
+// #include "MPAircraft.hxx"
+// map<string, MPAircraft *> MPAircraftMap;
 void redrawMap() 
 {
     assert(glutGetWindow() == main_window);
@@ -3122,14 +3134,23 @@ void redrawMap()
     // Clear all pixels and depth buffer.
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // The status of the cursor and the crosshairs overlay depends on
-    // the mouse mode - if we're in mouse mode, use a crosshairs
-    // cursor and don't draw a central crosshair.
-    if (mainUI->showMouse) {
+    // The status of the cursor and the crosshairs/range rings
+    // overlays depends on the mouse mode - if we're in mouse mode,
+    // use a crosshairs cursor and turn off both overlays.  If we're
+    // in crossharis mode, use a regular cursor and select the
+    // crosshairs overlay.  Finally, in range rings mode, use a
+    // regular cursor and turn on the range rings overlay.
+    if (mainUI->centreType == MainUI::MOUSE) {
 	globals.overlays->setVisibility(Overlays::CROSSHAIRS, false);
+	globals.overlays->setVisibility(Overlays::RANGE_RINGS, false);
 	glutSetCursor(GLUT_CURSOR_CROSSHAIR);
-    } else {
+    } else if (mainUI->centreType == MainUI::CROSSHAIRS) {
 	globals.overlays->setVisibility(Overlays::CROSSHAIRS, true);
+	globals.overlays->setVisibility(Overlays::RANGE_RINGS, false);
+	glutSetCursor(GLUT_CURSOR_LEFT_ARROW);
+    } else {
+	globals.overlays->setVisibility(Overlays::CROSSHAIRS, false);
+	globals.overlays->setVisibility(Overlays::RANGE_RINGS, true);
 	glutSetCursor(GLUT_CURSOR_LEFT_ARROW);
     }
 
@@ -3142,6 +3163,13 @@ void redrawMap()
     // Draw our route.
     route.draw(globals.metresPerPixel, globals.frustum, 
     	       globals.modelViewMatrix, eye);
+
+    // // Draw the MP aircraft.
+    // map<string, MPAircraft*>::const_iterator i = MPAircraftMap.begin();
+    // for (; i != MPAircraftMap.end(); i++) {
+    // 	MPAircraft *t = i->second;
+    // 	t->draw();
+    // }
 
     // Render the widgets.
     puDisplay();
@@ -3265,6 +3293,81 @@ void specialGraphs(int key, int x, int y)
     glutSetWindow(graphs_window);
     glutPostRedisplay();
 }
+
+// #include <sstream>
+// // EYE - need a destructor
+// // const int MPTimerInterval = 5000;	// 5000ms = 5s
+// const int MPTimerInterval = 2500;	// 2500ms = 2.5s
+// void MPAircraftTimer(int value)
+// {
+//     // EYE - hard-wired for now
+//     // EYE - need to check for live internet connection
+//     SGSocket *io = new SGSocket("mpserver02.flightgear.org", "5001", "tcp");
+//     // EYE - we need to be OUT, even though we're just reading
+//     // information.  Apparently we qualify as a "client".
+//     if (!io->open(SG_IO_OUT)) {
+// 	fprintf(stderr, "Couldn't open socket!\n");
+// 	// EYE - just return
+// 	// exit(1);
+// 	return;
+//     }
+
+//     const int bufferSize = 1024;
+//     int noOfBytes;
+//     char bytes[bufferSize];
+//     string str;
+//     noOfBytes = io->read(bytes, bufferSize);
+//     // EYE - -2 = timeout
+//     while ((noOfBytes == -2) || (noOfBytes > 0)) {
+// 	if (noOfBytes > 0) {
+// 	    str.append(bytes, noOfBytes);
+// 	}
+// 	noOfBytes = io->read(bytes, bufferSize);
+//     }
+//     io->close();
+
+//     istringstream stream(str);
+//     string line;
+//     getline(stream, line);
+//     while (!stream.eof()) {
+// 	// Only process it if it's not a comment line.
+// 	if (line[0] != '#') {
+// 	    istringstream stream(line);
+// 	    string id;
+// 	    float x, y, z, lat, lon, alt, x_orient, y_orient, z_orient;
+// 	    string model;
+// 	    stream >> id
+// 		   >> x >> y >> z
+// 		   >> lat >> lon >> alt
+// 		   >> x_orient >> y_orient >> z_orient
+// 		   >> model;
+// 	    // Example id: "ugadec4@85.214.37.14"
+// 	    id = id.substr(0, id.find("@"));
+// 	    // Example model: "Aircraft/747-200/Models/boeing747-200.xml"
+// 	    model = model.substr(model.find("/") + 1);
+// 	    model = model.substr(0, model.find("/"));
+
+// 	    // EYE - need a way to clear out deadwood
+// 	    map<string, MPAircraft *>::const_iterator i = 
+// 		MPAircraftMap.find(id);
+// 	    MPAircraft *a;
+// 	    if (i == MPAircraftMap.end()) {
+// 		a = new MPAircraft(id, model);
+// 		MPAircraftMap[id] = a;
+// 	    } else {
+// 		a = i->second;
+// 	    }
+// 	    sgdVec3 cart;
+// 	    sgdSetVec3(cart, x, y, z);
+// 	    a->addPoint(cart);
+// 	}
+
+// 	getline(stream, line);
+//     }
+//     glutPostRedisplay();
+
+//     glutTimerFunc(MPTimerInterval, MPAircraftTimer, value + 1);
+// }
 
 // Called periodically to check for input on network and serial ports.
 void timer(int value) 
@@ -3405,7 +3508,7 @@ void passivemotion(int x, int y)
     // cursor (and y increases down in GLUT coordinates).  We add 0.5
     // to both to get the centre of the cursor.
     cursor.set(x + 0.5, y + 0.5);
-    if (mainUI->showMouse) {
+    if (mainUI->centreType == MainUI::MOUSE) {
 	updateLocation();
 	glutPostRedisplay();
     }
@@ -3464,6 +3567,17 @@ void lightingPrefixKeypressed(unsigned char key, int x, int y)
 void debugPrefixKeypressed(unsigned char key, int x, int y)
 {
     switch (key) {
+      case 'm':
+	// Dump information about the tile at the centre of the
+	// window.
+	{
+	    double lat = centre.lat(), lon = centre.lon(), elev = centre.elev();
+	    // EYE - can we trust this SGBucket constructor?
+	    SGBucket b(lon, lat);
+	    printf("<%f, %f> %fm, %s/%ld.btg\n", 
+		   lat, lon, elev, b.gen_base_path().c_str(), b.gen_index());
+        }
+	break;
       case 'r':
 	// We maintain our current position in eye, which is the point
 	// on the earth's surface (not adjusted for local terrain) at
@@ -3727,8 +3841,14 @@ void keyPressed(unsigned char key, int x, int y)
 	    break;
 
 	  case 'm':
-	    // Toggle between mouse and centre modes.
-	    mainUI->showMouse = !mainUI->showMouse;
+	    // Toggle between mouse, crosshairs, and range rings modes.
+	    if (mainUI->centreType == MainUI::MOUSE) {
+		mainUI->centreType = MainUI::CROSSHAIRS;
+	    } else if (mainUI->centreType == MainUI::CROSSHAIRS) {
+		mainUI->centreType = MainUI::RANGE_RINGS;
+	    } else {
+		mainUI->centreType = MainUI::MOUSE;
+	    }
 	    show_cb(mainUI->mouseText);
 	    glutPostRedisplay(); // EYE - overkill
 	    break;
@@ -3917,6 +4037,17 @@ void init()
     scenery = new Scenery(tileManager, main_window);
 
     // Background map image.
+
+    // EYE - I think we need three possible backgrounds:
+    //
+    // (1) An arbitrary image (basically what we have now)
+    //
+    // (2) Blue ocean (ideal for those with complete scenery)
+    //
+    // (3) FlightGear scenery tile map
+    //
+    // So we could have a default: backgroundType: file, ocean, scenery
+    // And for the file option, have another: backgroundFilename
     SGPath world = prefs.path;
     world.append("background");
     scenery->setBackgroundImage(world);
@@ -4066,7 +4197,7 @@ static void show_cb(puObject *cb)
     } else if (cb == mainUI->MEFToggle) {
 	elevationLabels = on;
     } else if (cb == mainUI->mouseText) {
-	if (mainUI->showMouse) {
+	if (mainUI->centreType == MainUI::MOUSE) {
 	    mainUI->mouseText->setLabel("mouse");
 	} else {
 	    mainUI->mouseText->setLabel("centre");
@@ -4659,7 +4790,7 @@ int main(int argc, char **argv)
     show_cb(mainUI->airwaysToggle);
     mainUI->awyLow->setValue(true);
     show_cb(mainUI->awyLow);
-    mainUI->showMouse = false;
+    mainUI->centreType = MainUI::CROSSHAIRS;
     show_cb(mainUI->mouseText);
     mainUI->trackAircraftToggle->setValue(prefs.autocenter_mode);
     show_cb(mainUI->trackAircraftToggle);
@@ -4723,6 +4854,9 @@ int main(int argc, char **argv)
 
     // EYE - remove this later
     AtlasController controller;
+
+    // // EYE - hacked in for now.
+    // glutTimerFunc(MPTimerInterval, MPAircraftTimer, 0);
 
     glutMainLoop();
  
