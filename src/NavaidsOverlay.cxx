@@ -370,8 +370,6 @@ bool NavaidsOverlay::load(const string& fgDir)
 // width.
 void NavaidsOverlay::_createVORRose()
 {
-    atlasFntRenderer& f = globals.fontRenderer;
-
     // Draw a standard VOR rose or radius 1.  It is drawn in the XY
     // plane, with north in the positive Y direction, and east in the
     // positive X direction.
@@ -444,23 +442,20 @@ void NavaidsOverlay::_createVORRose()
 	}
 	glEnd();
 
-	// Label the rose.
-	const float pointSize = 10.0;
-	f.setPointSize(pointSize);
+	// Label the rose.  Make the text about 1/10 the size of the
+	// radius.
+	const float pointSize = 0.1;
 	for (int i = 0; i < 360; i += 30) {
 	    glPushMatrix(); {
 		glRotatef(-i, 0.0, 0.0, 1.0);
 		glTranslatef(0.0, 1.0, 0.0);
-		glScalef(0.01, 0.01, 1.0);
 
-		char label[4];
-		sprintf(label, "%d", i / 10);
+		AtlasString label;
+		label.printf("%d", i / 10);
 
-		float left, right, bottom, top;
-		f.getFont()->getBBox(label, pointSize, 0.0,
-				     &left, &right, &bottom, &top);
-		f.start3f(-(left + right) / 2.0, 0.2 * pointSize, 0.0);
-		f.puts(label);
+		LayoutManager lm(label.str(), globals.regularFont, pointSize);
+		lm.setAnchor(LayoutManager::LC);
+		lm.drawText();
 	    }
 	    glPopMatrix();
 	}
