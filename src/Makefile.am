@@ -18,6 +18,7 @@ Atlas_SOURCES = \
 	NavaidsOverlay.hxx NavaidsOverlay.cxx \
 	FlightTracksOverlay.hxx FlightTracksOverlay.cxx \
 	CrosshairsOverlay.hxx CrosshairsOverlay.cxx \
+	RangeRingsOverlay.hxx RangeRingsOverlay.cxx \
 	Tiles.cxx Tiles.hxx \
 	Searcher.cxx Searcher.hxx \
 	Search.cxx Search.hxx \
@@ -32,7 +33,9 @@ Atlas_SOURCES = \
 	Palette.cxx Palette.hxx \
 	misc.cxx misc.hxx \
 	Globals.cxx Globals.hxx \
-	Geographics.cxx Geographics.hxx 
+##	Geographics.cxx Geographics.hxx \
+##	MPAircraft.cxx MPAircraft.hxx
+	Geographics.cxx Geographics.hxx
 
 Atlas_LDADD = \
 	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgserial -lsgdebug \
