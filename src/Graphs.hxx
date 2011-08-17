@@ -233,7 +233,7 @@ protected:
 	// radio could receive signals from more than one transmitter.
 	enum Radio {NAV1 = 0, NAV2, _RADIO_COUNT};
 	struct _GSSection {
-	    vector <_GSValue> vals;
+	    std::vector <_GSValue> vals;
 	    Radio radio;
 	};
 

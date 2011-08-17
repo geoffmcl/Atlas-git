@@ -30,6 +30,7 @@
 #ifndef _FLIGHTTRACK_H_
 #define _FLIGHTTRACK_H_
 
+#include <vector>
 #include <deque>
 #include <plib/sg.h>
 #include <simgear/compiler.h>
@@ -69,11 +70,11 @@ class FlightData {
     float dist;			// Cumulative distance from start of
 				// flight (in metres)
 
-    const vector<NAV *>& navaids();
+    const std::vector<NAV *>& navaids();
 
   protected:
     bool _navaidsLoaded;
-    vector<NAV *> _navaids;	// In-range tuned navaids.
+    std::vector<NAV *> _navaids;	// In-range tuned navaids.
 };
 
 class FlightTrack {

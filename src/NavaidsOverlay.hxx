@@ -28,7 +28,6 @@
 
 #include <vector>
 #include <string>
-#include <map>
 
 #include <zlib.h>
 
@@ -108,8 +107,8 @@ class NavaidsOverlay: public Subscriber {
     void drawILSs();
     void drawDMEs();
 
-    const vector<Cullable *>& getNavaids(sgdVec3 p);
-    const vector<Cullable *>& getNavaids(FlightData *p);
+    const std::vector<Cullable *>& getNavaids(sgdVec3 p);
+    const std::vector<Cullable *>& getNavaids(FlightData *p);
 
     // Subscriber interface.
     bool notification(Notification::type n);
@@ -147,7 +146,7 @@ class NavaidsOverlay: public Subscriber {
     Culler::PointSearch *_point;
     double _metresPerPixel;
 
-    vector<NAV *> _navaids;
+    std::vector<NAV *> _navaids;
 
     GLuint _VORRoseDL, _VORSymbolDL, _VORTACSymbolDL, _VORDMESymbolDL;
     GLuint _NDBSymbolDL, _NDBDMESymbolDL;

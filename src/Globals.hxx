@@ -31,6 +31,8 @@
 
 // Global variables, all bundled together into a nice simple class.
 
+#include <vector>
+
 #include <plib/sg.h>
 #include <plib/fnt.h>
 #include <plib/pu.h>
@@ -54,7 +56,7 @@ class Globals {
     // empty, in which case the track will be NULL and the track
     // number will be FlightTrack::npos.
     FlightData *currentPoint();
-    const vector<FlightTrack *>& tracks() { return _tracks; }
+    const std::vector<FlightTrack *>& tracks() { return _tracks; }
     size_t currentTrackNo() { return _currentTrackNo; }
     FlightTrack *track() { return _track; }
     FlightTrack *track(size_t i);
@@ -94,7 +96,7 @@ class Globals {
     bool magnetic;
 
   protected:
-    vector<FlightTrack *> _tracks;
+    std::vector<FlightTrack *> _tracks;
     FlightTrack *_track;
     size_t _currentTrackNo;
 
