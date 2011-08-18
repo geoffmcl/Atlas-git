@@ -72,7 +72,7 @@ bool Subbucket::load(Bucket::Projection projection)
     // All points within the chunk are relative to the reference
     // point.  Therefore, to place points in absolute 3D space, we
     // need to add the reference point to all points.
-    const SGVec3<double>& gbs_p = _chunk.get_gbs_center2();
+    const SGVec3<double>& gbs_p = _chunk.get_gbs_center();
 
     // Get all the points, and use them to set our maximum elevation
     // figure.
