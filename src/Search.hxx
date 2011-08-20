@@ -3,7 +3,7 @@
 
   Written by Brian Schack, started July 2007.
 
-  Copyright (C) 2007 Brian Schack
+  Copyright (C) 2007 - 2011 Brian Schack
 
   Implements a widget used for text-based searching.
 

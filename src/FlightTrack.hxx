@@ -4,7 +4,7 @@
   Written by Per Liedman, started July 2000.
 
   Copyright (C) 2000 Per Liedman, liedman@home.se
-  Copyright (C) 2009 Brian Schack
+  Copyright (C) 2009 - 2011 Brian Schack
 
   A flight track contains the data for a FlightGear session.  It
   includes things like the aircraft's position, speed, altitude, etc.

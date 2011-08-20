@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 Brian Schack
+  Copyright (C) 2009 - 2011 Brian Schack
 
   This contains some variables that are needed in several different
   parts of Atlas.  Although we could pass them around via function

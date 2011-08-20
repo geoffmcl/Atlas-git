@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2008 Brian Schack
+  Copyright (C) 2008 - 2011 Brian Schack
 
   The airways overlay manages the loading and drawing of airways.
 

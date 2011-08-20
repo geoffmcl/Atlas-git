@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 Brian Schack
+  Copyright (C) 2009 - 2011 Brian Schack
 
   A bucket object can load and draw a bucket, which is a basic unit of
   FlightGear scenery.  Buckets are 1/8 degree high, and anywhere from

@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 Brian Schack
+  Copyright (C) 2009 - 2011 Brian Schack
 
   The notification class allows classes to send messages to interested
   parties (subscribers).  This is useful when you don't want classes
@@ -89,6 +89,8 @@ class Subscriber {
     // This must be implemented by subclasses.  It will be called
     // whenever Notification::notify() is called with something we've
     // subscribed to.
+
+    // EYE - why bool?
     virtual bool notification(Notification::type n) = 0;
 };
 

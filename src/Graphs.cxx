@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2007 - 2009 Brian Schack
+  Copyright (C) 2007 - 2011 Brian Schack
 
   This file is part of Atlas.
 
@@ -186,6 +186,7 @@ GraphsUI::GraphsUI(Graphs& g): _graphs(g)
 		fontFile.c_str());
 	exit(-1);
     }
+    // EYE - magic number
     _font.initialize(_texFont, 10.0);
     puFont legend, label;
     puGetDefaultFonts(&legend, &label);

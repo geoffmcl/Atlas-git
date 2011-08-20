@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 Brian Schack
+  Copyright (C) 2009 - 2011 Brian Schack
 
   A Searchable is anything that can be added to and used by a
   Searcher.  It is capable of representing itself as a

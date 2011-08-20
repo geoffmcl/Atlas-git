@@ -3,7 +3,7 @@
 
   Written by Brian Schack, started August 2007.
 
-  Copyright (C) 2007 Brian Schack
+  Copyright (C) 2007 - 2011 Brian Schack
 
   This file is part of Atlas.
 
@@ -360,7 +360,8 @@ Preferences::Preferences()
 
     char *env = getenv("FG_ROOT");
     if (env == NULL) {
-	// EYE - can this not be defined?
+	// EYE - can this not be defined?  Should we just get rid of
+	// FGBASE_DIR altogether?
 	fg_root.set(FGBASE_DIR);
     } else {
 	fg_root.set(env);

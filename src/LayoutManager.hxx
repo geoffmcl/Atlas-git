@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 Brian Schack
+  Copyright (C) 2009 - 2011 Brian Schack
 
   The layout manager is used for rendering text in OpenGL.  It
   provides a few (cheesy) facilities to make handling text easier.  It

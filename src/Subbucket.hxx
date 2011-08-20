@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 Brian Schack
+  Copyright (C) 2009 - 2011 Brian Schack
 
   A subbucket is a part of a bucket (which is a part of a tile, blah,
   blah, blah).  It contains the polygon information for a single

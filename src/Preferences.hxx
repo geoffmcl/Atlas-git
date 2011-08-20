@@ -3,7 +3,7 @@
 
   Written by Brian Schack, started August 2007.
 
-  Copyright (C) 2007 Brian Schack
+  Copyright (C) 2007 - 2011 Brian Schack
 
   Handles command-line options, as well as the Atlas preferences file.
 
@@ -127,6 +127,7 @@ public:
     sgVec4 lightPosition;
 
     // Factory defaults
+    // EYE - need to set values for these (and use them too)
     static const float defaultLatitude, defaultLongitude, defaultZoom;
     static const int defaultWidth = 800, defaultHeight = 600;
     static const bool defaultAutocenterMode = false;

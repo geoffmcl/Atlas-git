@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 Brian Schack
+  Copyright (C) 2009 - 2011 Brian Schack
 
   A couple of classes (TileManager, TileInfo) for keeping track of
   tiles and their basic information: names, directories, which maps

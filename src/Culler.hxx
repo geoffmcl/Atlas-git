@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 Brian Schack
+  Copyright (C) 2009 - 2011 Brian Schack
 
   A simple culling structure.  Atlas uses it to quickly look up
   navaids, airports, etc in a given area.

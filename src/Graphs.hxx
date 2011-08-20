@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2007 - 2009 Brian Schack
+  Copyright (C) 2007 - 2011 Brian Schack
 
   The graphs object draws graphs for a flight track in a window.
 
