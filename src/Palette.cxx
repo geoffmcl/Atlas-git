@@ -41,7 +41,7 @@ Palette::Palette(const char *path): _metres(true), _base(0.0), _i(1)
     // EYE - throw errors?
     ifstream in(path);
     if (in.fail()) {
-	throw std::runtime_error("failed to open file");
+	throw std::runtime_error("failed to open palette file");
 	return;
     }
 
