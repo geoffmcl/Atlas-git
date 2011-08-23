@@ -28,6 +28,7 @@
 #include <cassert>
 #include <limits>
 #include <algorithm>		// min(), max()
+#include <vector>
 
 #include <plib/pu.h>
 #include <simgear/compiler.h>
@@ -38,6 +39,8 @@
 #include "NavaidsOverlay.hxx"
 #include "Globals.hxx"
 #include "Preferences.hxx"
+
+using namespace std;
 
 // EYE - add to globals?
 extern Preferences prefs;
