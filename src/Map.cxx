@@ -124,7 +124,7 @@ static int bufferSize;	// Size of rendering buffer.
 // storing the results as image files.  It only generates maps if they
 // don't already exist.
 ////////////////////////////////////////////////////////////////////////////////
-void renderMap(TileInfo *t)
+void renderMap(Tile *t)
 {
     const bitset<TileManager::MAX_MAP_LEVEL>& maps = t->missingMaps();
     if (maps.none()) {
@@ -140,7 +140,7 @@ void renderMap(TileInfo *t)
 	mapper->set(t);
 	for (unsigned int i = 0; i < TileManager::MAX_MAP_LEVEL; i++) {
 	    if (maps[i]) {
-		mapper->draw(i + rescaleFactor);
+		mapper->render();
 		if (createJPEG) {
 		    mapper->save(i, TileMapper::JPEG, jpegQuality);
 		} else {
@@ -452,7 +452,17 @@ int main(int argc, char **argv)
     // atlas directories and catalogue what we've got.  We ask it to
     // create directories if they don't exist.
     try {
-	tileManager = new TileManager(scenery, atlas, true);
+	tileManager = new TileManager(scenery, atlas);
+	if (tileManager->mapLevels().none()) {
+	    // EYE - magic numbers
+	    bitset<TileManager::MAX_MAP_LEVEL> levels;
+	    levels[4] = true;
+	    levels[6] = true;
+	    levels[8] = true;
+	    levels[9] = true;
+	    levels[10] = true;
+	    tileManager->setMapLevels(levels);
+	}
     } catch (runtime_error &e) {
 	fprintf(stderr, "%s: Unable to create tile manager: %s\n", 
 		appName, e.what());
@@ -499,20 +509,27 @@ int main(int argc, char **argv)
 	    }
 	}
 	printf("\n");
-	printf("Scenery: %d tiles\n", (int)tileManager->tiles().size());
+	printf("Scenery: %d tiles\n", 
+	       tileManager->tileCount(TileManager::DOWNLOADED));
     }
 
     // Find out what our maximum desired map and buffer sizes are.
-    int mapSize = 0;
+    int mapSize = 0, bufferLevel;
     const bitset<TileManager::MAX_MAP_LEVEL>& mapLevels = 
 	tileManager->mapLevels();
     for (int i = TileManager::MAX_MAP_LEVEL - 1; i >= 0; i--) {
 	if (mapLevels[i]) {
-	    mapSize = 1 << i;
+	    bufferLevel = i;
 	    break;
 	}
     }
-    bufferSize = mapSize << rescaleFactor;
+    // The final maximum map size is given by mapSize; the final
+    // buffer size needed to render it (accounting for oversampling)
+    // is given by bufferSize; the logarithm base 2 of bufferSize is
+    // bufferLevel (or, in other words, 2^bufferLevel = bufferSize).
+    mapSize = 1 << bufferLevel;
+    bufferLevel += rescaleFactor;
+    bufferSize = 1 << bufferLevel;
 
     // Initialize OpenGL.
     int windowSize = bufferSize;
@@ -609,8 +626,8 @@ int main(int argc, char **argv)
 	printf("Atlas map directory:\n\t%s\n", atlas.c_str());
 	printf("Palette file:\n\t%s\n", palettePath.c_str());
 
-	const map<string, TileInfo *>& tiles = tileManager->tiles();
-	printf("Scenery:\n\t%d tiles in total\n", (int)tiles.size());
+	int downloadedTiles = tileManager->tileCount(TileManager::DOWNLOADED);
+	printf("Scenery:\n\t%d tiles in total\n", downloadedTiles);
 	printf("Map resolutions:\n");
 	const bitset<TileManager::MAX_MAP_LEVEL>& mapLevels = 
 	    tileManager->mapLevels();
@@ -622,9 +639,8 @@ int main(int argc, char **argv)
 	}
 
 	int tileCount = 0, mapCount = 0;
-	map<string, TileInfo *>::const_iterator i = tiles.begin();
-	for (; i != tiles.end(); i++) {
-	    TileInfo *t = i->second;
+	for (int i = 0; i < downloadedTiles; i++) {
+	    Tile *t = tileManager->tile(TileManager::DOWNLOADED, i);
 	    const bitset<TileManager::MAX_MAP_LEVEL>& maps = t->missingMaps();
 	    if (!maps.none()) {
 		if (tileCount == 0) {
@@ -655,13 +671,13 @@ int main(int argc, char **argv)
     // Now we know where to get the scenery data, where to put the
     // maps, the desired map sizes, the size of the buffers we can
     // use, and the palette to use.  Let's draw!
-    mapper = new TileMapper(atlasPalette, discreteContours, contourLines,
+    mapper = new TileMapper(atlasPalette, bufferLevel, 
+			    discreteContours, contourLines,
 			    azimuth, elevation, lighting, smoothShading);
 
-    const map<string, TileInfo *>& tiles = tileManager->tiles();
-    map<string, TileInfo *>::const_iterator i = tiles.begin();
-    for (; i != tiles.end(); i++) {
-	TileInfo *t = i->second;
+    int downloadedTiles = tileManager->tileCount(TileManager::DOWNLOADED);
+    for (int i = 0; i < downloadedTiles; i++) {
+	Tile *t = tileManager->tile(TileManager::DOWNLOADED, i);
 	renderMap(t);
     }
 

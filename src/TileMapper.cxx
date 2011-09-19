@@ -32,12 +32,13 @@
 
 using namespace std;
 
-TileMapper::TileMapper(Palette *p, bool discreteContours, bool contourLines,
+TileMapper::TileMapper(Palette *p, unsigned int maxLevel, 
+		       bool discreteContours, bool contourLines,
 		       float azimuth, float elevation, bool lighting, 
 		       bool smoothShading):
-    _palette(p), _discreteContours(discreteContours), 
-    _contourLines(contourLines), _lighting(lighting),
-    _smoothShading(smoothShading)
+    _palette(p), _maxLevel(maxLevel), _discreteContours(discreteContours), 
+    _contourLines(contourLines), _azimuth(azimuth), _elevation(elevation),
+    _lighting(lighting), _smoothShading(smoothShading), _fbo(0), _to(0)
 {
     // We must have a palette.
     if (!_palette) {
@@ -51,6 +52,7 @@ TileMapper::TileMapper(Palette *p, bool discreteContours, bool contourLines,
     _lightPosition[2] = sin(e);
     _lightPosition[3] = 0.0;
 
+    // EYE - make a class method?  Does C++ have those?
     Bucket::palette = _palette;
     Bucket::discreteContours = _discreteContours;
     Bucket::contourLines = _contourLines;
@@ -59,11 +61,13 @@ TileMapper::TileMapper(Palette *p, bool discreteContours, bool contourLines,
 TileMapper::~TileMapper()
 {
     _unloadBuckets();
+    glDeleteFramebuffersEXT(1, &_fbo);
 }
 
-void TileMapper::set(TileInfo *t)
+// Tells TileMapper which tile is to be rendered.
+void TileMapper::set(Tile *t)
 {
-    // Remove any old information we have;
+    // Remove any old information we have.
     _unloadBuckets();
 
     _tile = t;
@@ -82,207 +86,232 @@ void TileMapper::set(TileInfo *t)
 	    }
 	}
     }
+
+    // Silently reduce (if necessary) _maxLevel to a value we can
+    // actually handle.
+
+    // EYE - Does this really belong here?
+    GLint textureSize = 0x1 << _maxLevel;
+    while (true) {
+	GLint tmp;
+	// For this test to be accurate, we need to make the
+	// parameters (GL_RGB, ...) the same as the ones we'll use in
+	// Atlas when loading the texture.
+	glTexImage2D(GL_PROXY_TEXTURE_2D, 0, GL_RGB,
+		     textureSize, textureSize, 0, 
+		     GL_RGB, GL_UNSIGNED_BYTE, NULL);
+	glGetTexLevelParameteriv(GL_PROXY_TEXTURE_2D, 0,
+				 GL_TEXTURE_WIDTH, &tmp);
+	if ((tmp != 0) || (textureSize == 1)) {
+	    break;
+	}
+	fprintf(stderr, "Max level (%d) too big, reducing\n", _maxLevel);
+	textureSize /= 2;
+	_maxLevel--;
+    };
+
+    // Calculate the proper width and height for the given level.
+    _tile->mapSize(_maxLevel, &_width, &_height);
 }
 
-// Draws the tile at the given size.  Takes responsibility for setting
-// up the OpenGL view and drawing parameters.
-void TileMapper::draw(unsigned int size)
+// Draws the tile into a texture attached to a framebuffer.
+void TileMapper::render()
 {
+    // EYE - remove this
     assert(glGetError() == GL_NO_ERROR);
 
-    // Set up the view.  First, calculate the desired map size in
-    // pixels and set our viewport correspondingly.
+    // Set up the framebuffer object, if it hasn't been done already.
+    // We delay until now so that a TileMapper can be created without
+    // having an OpenGL context.
+    if (_fbo == 0) {
+	glGenFramebuffersEXT(1, &_fbo);
+    }
 
+    // Bind the framebuffer so that all rendering goes to it.
+    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, _fbo);
+
+    // Create a texture object.
     // EYE - we also need to see if our current buffer is big enough.
-    // This is where we could add the tiling code.  See
-    // http://www.mesa3d.org/brianp/TR.html
-    // http://www.opengl.org/resources/code/samples/sig99/advanced99/notes/node30.html
-    int width, height;
-    _tile->mapSize(size, &width, &height);
+    // This is where we could add the tiling code.
+    // EYE - necessary to enable?  We don't actually do any texturing.
+    // glEnable(GL_TEXTURE_2D);
+    glGenTextures(1, &_to);
+    glBindTexture(GL_TEXTURE_2D, _to);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, _width, _height, 0, GL_RGB, 
+		 GL_UNSIGNED_BYTE, 0);
+    glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT,
+    			      GL_COLOR_ATTACHMENT0_EXT,
+    			      GL_TEXTURE_2D,
+    			      _to,
+    			      0);
+    assert(glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT) == 
+	   GL_FRAMEBUFFER_COMPLETE_EXT);
 
-    // This is a slight hack.  For 99% of tiles, height >= width.
-    // This means that all limit checks can ignore width.  The
-    // exception, as always, are the poles - they are about 4 times
-    // wider than they are tall.  We could handle this by "tiling the
-    // tile" - doing it in chunks, but since the poles have no real
-    // data anyway, I'm punting on this by forcing them to be square.
-    if (width > height) {
-    	width = height;
-    }
-    glViewport(0, 0, width, height);
+    // The framebuffer shares its state with the current context, so
+    // we push some attributes so we don't step on current OpenGL
+    // state.
+    glPushAttrib(GL_VIEWPORT_BIT | GL_LIGHTING_BIT | GL_CURRENT_BIT); {
+	// Set up the view.
+	glViewport(0, 0, _width, _height);
 
-    // When our buckets were loaded, all points were converted to lat,
-    // lon.  We need to stretch them to fill the buffer correctly.
-    int lat = _tile->lat();
-    int lon = _tile->lon();
-    int w = _tile->width();
-    int h = _tile->height();
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    gluOrtho2D(lon, lon + w, lat, lat + h);
+	// When our buckets were loaded, all points were converted to
+	// lat, lon.  We need to stretch them to fill the buffer
+	// correctly.  Note that tiles use special latitudes (0 - 179)
+	// and longitudes (0 - 359), so we need to adjust them to
+	// "normal" values.
 
-    // No model or view transformations.
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
+	// EYE - Do we really?  And should we have special accessors
+	// in tiles?
+	int lat = _tile->lat();
+	int lon = _tile->lon();
+	int w = _tile->width();
+	int h = _tile->height();
+	glMatrixMode(GL_PROJECTION);
+	glPushMatrix();
+	glLoadIdentity();
+	gluOrtho2D(lon, lon + w, lat, lat + h);
 
-    // Set up lighting.  The values used here must be the same as used
-    // in Atlas if you want live scenery to match pre-rendered scenery
-    // (the same goes for the palette used).
-    sgVec4 lightPosition;
-    const float BRIGHTNESS = 0.8;
-    GLfloat diffuse[] = {BRIGHTNESS, BRIGHTNESS, BRIGHTNESS, 1.0f};
-    if (_lighting) {
-	// We make a copy of the light position because we may rotate
-	// it later.
-	sgCopyVec4(lightPosition, _lightPosition);
+	// No model or view transformations.
+	glMatrixMode(GL_MODELVIEW);
+	glPushMatrix();
+	glLoadIdentity();
 
-	glEnable(GL_LIGHTING);
-	glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse);
-	glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
-	glEnable(GL_LIGHT0);
-    }
+	// Set up lighting.  The values used here must be the same as used
+	// in Atlas if you want live scenery to match pre-rendered scenery
+	// (the same goes for the palette used).
+	sgVec4 lightPosition;
+	const float BRIGHTNESS = 0.8;
+	GLfloat diffuse[] = {BRIGHTNESS, BRIGHTNESS, BRIGHTNESS, 1.0f};
+	if (_lighting) {
+	    // We make a copy of the light position because we may rotate
+	    // it later.
+	    sgCopyVec4(lightPosition, _lightPosition);
 
-    // Ask for smooth or flat shading.
-    glShadeModel(_smoothShading ? GL_SMOOTH : GL_FLAT);
-
-    glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE);
-    glEnable(GL_COLOR_MATERIAL);
-
-    // Now that we've set everything up, we first draw an
-    // ocean-coloured rectangle covering the entire tile.  This
-    // ensures that every part of the tile is coloured, even where
-    // there is no bucket for it.
-    const float *c;
-    assert(_palette);
-    if ((c = _palette->colour("Ocean"))) {
-	glBegin(GL_QUADS); {
-	    glColor4fv(c);
-	    glNormal3f(0.0, 0.0, 1.0);
-
-	    glVertex2f(lon, lat);
-	    glVertex2f(lon, lat + height);
-	    glVertex2f(lon + width, lat + height);
-	    glVertex2f(lon + width, lat);
+	    glEnable(GL_LIGHTING);
+	    glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse);
+	    glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
+	    glEnable(GL_LIGHT0);
 	}
-	glEnd();
-    }
+
+	// Ask for smooth or flat shading.
+	glShadeModel(_smoothShading ? GL_SMOOTH : GL_FLAT);
+
+	glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE);
+	glEnable(GL_COLOR_MATERIAL);
+
+	// Now that we've set everything up, we first draw an
+	// ocean-coloured rectangle covering the entire tile.  This
+	// ensures that every part of the tile is coloured, even where
+	// there is no bucket for it.
+	const float *c;
+	assert(_palette);
+	if ((c = _palette->colour("Ocean"))) {
+	    glBegin(GL_QUADS); {
+		glColor4fv(c);
+		glNormal3f(0.0, 0.0, 1.0);
+
+		glVertex2f(lon, lat);
+		glVertex2f(lon, lat + h);
+		glVertex2f(lon + w, lat + h);
+		glVertex2f(lon + w, lat);
+	    }
+	    glEnd();
+	}
 
 #ifdef ROTATE_NORMALS
-    // If ROTATE_NORMALS is defined, then vertex normals will be
-    // rotated to the correct orientation in the bucket's draw()
-    // routine.
-//     printf("TileNew: rotating normals\n");
+	// If ROTATE_NORMALS is defined, then vertex normals will be
+	// rotated to the correct orientation in the bucket's draw()
+	// routine.
+	//     printf("TileNew: rotating normals\n");
 #else
-    // If ROTATE_NORMALS is not defined, then we just rotate the light
-    // source.
-    //
-    // To visualize this, consider looking in the default camera
-    // orientation (along the negative z-axis, with the positive
-    // y-axis 'up', and so the positive x-axis is right).  In our
-    // world coordinates, this means looking down from the north pole,
-    // with our head pointing to 90 degrees east (the Indian Ocean),
-    // and our butt pointing to 90 degrees west (Lake Superior).  What
-    // do we need to do to rotate to an arbitrary <lat, lon>?
-    //
-    // Consider moving to <-123, 37> (KSFO).  Our local coordinate
-    // system is initially aligned with the world's.  First, we need
-    // to rotate our local coordinate system 33 degrees clockwise
-    // around our negative z-axis (a pin through our belly button), so
-    // our butt is facing KSFO.  Rotations are specified around the
-    // positive axis, so that corresponds to rotating it -33 degrees
-    // clockwise around the positive z-axis.  This corresponds to 90.0
-    // + lon.
-    //
-    // Then, we need to rotate it 53 degrees clockwise around the
-    // positive y-axis (aligned with our right arm).  This corresponds
-    // to 90.0 - lat.
+	// If ROTATE_NORMALS is not defined, then we just rotate the light
+	// source.
+	//
+	// To visualize this, consider looking in the default camera
+	// orientation (along the negative z-axis, with the positive
+	// y-axis 'up', and so the positive x-axis is right).  In our
+	// world coordinates, this means looking down from the north pole,
+	// with our head pointing to 90 degrees east (the Indian Ocean),
+	// and our butt pointing to 90 degrees west (Lake Superior).  What
+	// do we need to do to rotate to an arbitrary <lat, lon>?
+	//
+	// Consider moving to <-123, 37> (KSFO).  Our local coordinate
+	// system is initially aligned with the world's.  First, we need
+	// to rotate our local coordinate system 33 degrees clockwise
+	// around our negative z-axis (a pin through our belly button), so
+	// our butt is facing KSFO.  Rotations are specified around the
+	// positive axis, so that corresponds to rotating it -33 degrees
+	// clockwise around the positive z-axis.  This corresponds to 90.0
+	// + lon.
+	//
+	// Then, we need to rotate it 53 degrees clockwise around the
+	// positive y-axis (aligned with our right arm).  This corresponds
+	// to 90.0 - lat.
 
-    if (_lighting) {
-	// As a compromise, we rotate the light to be correct at the
-	// centre of the tile.  This compromise gets worse as we near
-	// the poles.
-	float cLat = _tile->centreLat();
-	float cLon = _tile->centreLon();
-	sgMat4 rot;
-	sgMakeRotMat4(rot, 90.0 + cLon, 90.0 - cLat, 0.0);
-	//     printf("TileNew: Not rotating normals\n");
-	sgXformVec3(lightPosition, rot);
-	glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
-    }
+	if (_lighting) {
+	    // As a compromise, we rotate the light to be correct at the
+	    // centre of the tile.  This compromise gets worse as we near
+	    // the poles.
+	    float cLat = _tile->centreLat();
+	    float cLon = _tile->centreLon();
+	    sgMat4 rot;
+	    sgMakeRotMat4(rot, 90.0 + cLon, 90.0 - cLat, 0.0);
+	    //     printf("TileNew: Not rotating normals\n");
+	    sgXformVec3(lightPosition, rot);
+	    glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
+	}
 #endif
 
-    for (unsigned int i = 0; i < _buckets.size(); i++) {
-	// Buckets are smart enough to save a display list and used
-	// that if asked to be drawn more than once.  Therefore
-	// calling TileMapper::draw() more than once is relatively
-	// cheap, if the buckets have not been unloaded.
-	_buckets[i]->draw();
+	for (unsigned int i = 0; i < _buckets.size(); i++) {
+	    // Buckets are smart enough to save a display list and used
+	    // that if asked to be drawn more than once.  Therefore
+	    // calling Tile::draw() more than once is relatively cheap, if
+	    // the buckets have not been unloaded.
+	    _buckets[i]->draw();
+	}
+
+	glFinish();
+
+	assert(glGetError() == GL_NO_ERROR);
+
+	// Create mimaps and unbind the framebuffer.  We should now have a
+	// map of the appropriate size in the texture object _to.
+	glGenerateMipmapEXT(GL_TEXTURE_2D);
+	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+
+	// EYE - before the unbinding or after?
+	glMatrixMode(GL_PROJECTION);
+	glPopMatrix();
+	glMatrixMode(GL_MODELVIEW);
+	glPopMatrix();
     }
-
-    glFinish();
-
-    assert(glGetError() == GL_NO_ERROR);
+    glPopAttrib();
 }
 
-// Saves the currently rendered map at the given size.  Note that the
-// rendered map doesn't have to have the same size as the saved map.
-// This can be useful if, say, we want to do over-sampling.
+// Saves the currently rendered map at the given size.  We assume that
+// render() has been called.  Note that level must be <= maxLevel
+// (given in the constructor).
 void TileMapper::save(unsigned int level, ImageType t, unsigned int jpegQuality)
 {
     // First, calculate the desired map size in pixels.
-    int width, height;
-    _tile->mapSize(level, &width, &height);
-    // See comment in TileMapper::draw() for the logic behind this.
-    if (width > height) {
-    	width = height;
+    int shrinkage = _maxLevel - level;
+    int width = _width / (1 << shrinkage),
+	height = _height / (1 << shrinkage);
+
+    // With skinny tiles, the above calculation sometimes results in
+    // zero-width tiles, so we correct it manually.
+    if (width == 0) {
+	width = 1;
     }
 
-    // Now get the size of our buffer.
-    GLint viewport[4];
-    glGetIntegerv(GL_VIEWPORT, viewport);
-    GLint bufWidth = viewport[2];
-    GLint bufHeight = viewport[3];
-
-    assert(bufWidth >= width);
-    assert(bufHeight >= height);
-
-    // Grab the image and resample it if necessary.
-    GLubyte *image = new GLubyte[bufWidth * bufHeight * 3];
+    // Grab the image.
+    // EYE - should we worry about enabling textures, ...?
+    // EYE - pushAttrib - pixelstorei, texture
+    glBindTexture(GL_TEXTURE_2D, _to);
+    GLubyte *image = new GLubyte[width * height * 3];
     assert(image);
-
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
-    glReadPixels(0, 0, bufWidth, bufHeight, GL_RGB, GL_UNSIGNED_BYTE, image);
-
-    // Are we resampling?
-    if (bufWidth > width) {
-	assert(bufHeight > height);
-	assert((bufWidth % width) == 0);
-	assert((bufHeight % height) == 0);
-	assert((bufWidth / width) == (bufHeight / height));
-
-	// We do an in-place resampling.  Scary.
-	int factor = bufWidth / width;
-	int factorSquared = factor * factor;
-	unsigned int newIndex = 0;
-	for (int y = 0; y < height; y++) {
-	    for (int x = 0; x < width; x++) {
-		unsigned int rgb[3];
-		rgb[0] = rgb[1] = rgb[2] = 0;
-		for (int i = 0; i < factor; i++) {
-		    unsigned int oldIndex = 
-			((y * factor + i) * bufWidth + (x * factor)) * 3;
-		    for (int j = 0; j < factor; j++) {
-			rgb[0] += image[oldIndex++];
-			rgb[1] += image[oldIndex++];
-			rgb[2] += image[oldIndex++];
-		    }
-		}
-		image[newIndex++] = rgb[0] / factorSquared;
-		image[newIndex++] = rgb[1] / factorSquared;
-		image[newIndex++] = rgb[2] / factorSquared;
-	    }
-	}
-    }
+    glGetTexImage(GL_TEXTURE_2D, shrinkage, GL_RGB, GL_UNSIGNED_BYTE, image);
 
     // Save to a file.  We save it in _atlas/size/_name.<type> (if
     // that makes any sense).
@@ -301,8 +330,12 @@ void TileMapper::save(unsigned int level, ImageType t, unsigned int jpegQuality)
     }
     
     delete[] image;
+    glBindTexture(GL_TEXTURE_2D, 0);
 }
 
+// Cleans things up - unloads buckets, resets the maximum elevation
+// figure, and deletes our texture.  This should be called when
+// finished with a tile.
 void TileMapper::_unloadBuckets()
 {
     for (unsigned int i = 0; i < _buckets.size(); i++) {
@@ -313,5 +346,11 @@ void TileMapper::_unloadBuckets()
     // This might be overkill, but presumably if we're unloading
     // buckets, that means we can no longer trust the maximum
     // elevation figure.
-    _maximumElevation = Bucket::NanE;
+
+    // EYE - should be a constant somewhere - Tile?  Bucket::NanE?
+    _maximumElevation = -std::numeric_limits<float>::max();
+
+    // Delete the texture object.  We need to do this because
+    // different tiles may have different sizes.
+    glDeleteTextures(1, &_to);
 }

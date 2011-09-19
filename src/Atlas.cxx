@@ -2990,7 +2990,8 @@ HelpUI::HelpUI(int x, int y, Preferences& prefs, TileManager& tm)
     // EYE - this can change!
     globalString.appendf("\n");
     globalString.appendf("Maps\n");
-    globalString.appendf("    %d maps/tiles\n", tm.tiles().size());
+    globalString.appendf("    %d maps/tiles\n", 
+			 tm.tileCount(TileManager::DOWNLOADED));
     globalString.appendf("    resolutions:\n");
     const bitset<TileManager::MAX_MAP_LEVEL>& levels = tm.mapLevels();
     for (unsigned int i = 0; i < TileManager::MAX_MAP_LEVEL; i++) {
@@ -3746,9 +3747,39 @@ void keyPressed(unsigned char key, int x, int y)
 	    break;
 
 	  case 'a':
-	    // Toggle airways.
-	    mainUI->airwaysToggle->setValue(!mainUI->airwaysToggle->getValue());
-	    show_cb(mainUI->airwaysToggle);
+	    // Toggle airways.  We cycle through no airways, low
+	    // airways, then high airways.
+
+	    // EYE - super ugly!
+	    if (!mainUI->airwaysToggle->getValue()) {
+		// No airways -> low airways
+		mainUI->airwaysToggle->setValue(1);
+		show_cb(mainUI->airwaysToggle);
+		mainUI->awyLow->setValue(1);
+		show_cb(mainUI->awyLow);
+		mainUI->awyHigh->setValue(0);
+		show_cb(mainUI->awyHigh);
+	    } else {
+		if (mainUI->awyLow->getValue() && 
+		    !mainUI->awyHigh->getValue()) {
+		    // Low airways -> high airways
+		    mainUI->awyLow->setValue(0);
+		    show_cb(mainUI->awyLow);
+		    mainUI->awyHigh->setValue(1);
+		    show_cb(mainUI->awyHigh);
+		} else if (!mainUI->awyLow->getValue() && 
+			   mainUI->awyHigh->getValue()) {
+		    // High airways -> no airways
+		    mainUI->airwaysToggle->setValue(0);
+		    show_cb(mainUI->airwaysToggle);
+		    mainUI->awyLow->setValue(0);
+		    show_cb(mainUI->awyLow);
+		    mainUI->awyHigh->setValue(0);
+		    show_cb(mainUI->awyHigh);
+		} else {
+		    assert(false);
+		}
+	    }
 	    glutPostRedisplay();
 	    break;
 
@@ -4598,7 +4629,7 @@ int main(int argc, char **argv)
     // Load our preferences.  If there's a problem with any of the
     // arguments, it will print some errors to stderr, and return false.
     if (!prefs.loadPreferences(argc, argv)) {
-	exit(1);
+    	exit(1);
     }
 
     // A bit of post-preference processing.
@@ -4680,6 +4711,16 @@ int main(int argc, char **argv)
     printf("Checking scenery and maps from\n  %s\n  %s\n", 
 	   prefs.scenery_root.c_str(), prefs.path.c_str());
     tileManager = new TileManager(prefs.scenery_root, prefs.path);
+    if (tileManager->mapLevels().none()) {
+	// EYE - magic numbers
+	bitset<TileManager::MAX_MAP_LEVEL> levels;
+	levels[4] = true;
+	levels[6] = true;
+	levels[8] = true;
+	levels[9] = true;
+	levels[10] = true;
+	tileManager->setMapLevels(levels);
+    }
     printf("  ... done\n");
 
     // This does some OpenGL initialization.

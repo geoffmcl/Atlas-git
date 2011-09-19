@@ -3,11 +3,21 @@
 
   Written by Brian Schack, started March 2009.
 
-  Copyright (C) 2009 - 2011 Brian Schack
+  Copyright (C) 2009, 2011 Brian Schack
 
   This class will render maps for a tile and write them to a file.
   The rendering style is fixed for the duration of the object, so to
   change the style you have to create a new object.
+
+  To create maps for a tile, first set() the tile, render() it (once
+  only), then call save() for each file that needs to be created.
+  Note that you cannot save a file of higher resolution than maxLevel
+  (given in the constructor).
+
+  Rendering is done by creating an OpenGL framebuffer object and
+  rendering to an attached texture of a size given by maxLevel
+  (therefore your graphics card has to be able to support textures of
+  that size).
 
   This file is part of Atlas.
 
@@ -28,6 +38,8 @@
 #ifndef _TILEMAPPER_H_
 #define _TILEMAPPER_H_
 
+#include <vector>
+
 #include <plib/pu.h>
 
 #include "Palette.hxx"
@@ -36,9 +48,10 @@
 
 class TileMapper {
   public:
-    TileMapper(Palette *p, 
-	       bool discreteContours = true, 
-	       bool contourLines = false, 
+    TileMapper(Palette *p,
+	       unsigned int maxLevel = 10,
+	       bool discreteContours = true,
+	       bool contourLines = false,
 	       float azimuth = 315.0,
 	       float elevation = 55.0,
 	       bool lighting = true,
@@ -49,27 +62,41 @@ class TileMapper {
 
     // Specify the tile upon which future operations will operate.
     // This will load the scenery for the tile.
-    void set(TileInfo *t);
+    void set(Tile *t);
 
-    // Draw the current tile at the given level.  This can be called
-    // multiple times quite efficiently, as the OpenGL commands are
-    // saved in a display list.
-    void draw(unsigned int level);
-    // Save the current image to a file at the given level.  This
-    // level need not be the same as the level at which it was
-    // rendered (this can be used to do oversampling).
+    // Renders the current tile at the size given by maxLevel.
+    // Rendering is done via a frame buffer object drawing into a
+    // texture.  This only needs to be done once per tile.
+    void render();
+
+    // Save the current image to a file at the given level.  You must
+    // call render() before the first call to save() (for each tile).
+    // EYE - put in a check?
     void save(unsigned int level, ImageType t, unsigned int jpegQuality = 75);
+
+    // Accessors.
+    const Palette *palette() const { return _palette; }
+    unsigned int maxLevel() const { return _maxLevel; }
+    bool discreteContours() const { return _discreteContours; }
+    float azimuth() const { return _azimuth; }
+    float elevation() const { return _elevation; }
+    bool contourLines() const { return _contourLines; }
+    bool lighting() const { return _lighting; }
+    bool smoothShading() const { return _smoothShading; }
 
   protected:
     void _unloadBuckets();
 
     // Our palette.
     Palette *_palette;
+    // Maximum level (including any over-sampling).
+    unsigned int _maxLevel;
     // True if we should have discrete contour colours.
     bool _discreteContours;
     // True if we should draw contour lines.
     bool _contourLines;
     // Position of light (in eye coordinates).
+    float _azimuth, _elevation;
     sgVec4 _lightPosition;
     // True if we have lighting.
     bool _lighting;
@@ -77,7 +104,7 @@ class TileMapper {
     bool _smoothShading;
 
     // The tile we're working on.
-    TileInfo *_tile;
+    Tile *_tile;
 
     // Maximum elevation of tile in feet (this can only be set once
     // we've loaded the buckets).
@@ -85,6 +112,12 @@ class TileMapper {
 
     // Our scenery.
     std::vector<Bucket *> _buckets;
+
+    // The width and height of the full-sized tile.
+    int _width, _height;
+
+    // Framebuffer and texture objects.
+    GLuint _fbo, _to;
 };
 
 #endif	// _TILEMAPPER_H_

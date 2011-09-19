@@ -108,7 +108,7 @@ class MapTexture {
 
 class SceneryTile: public Cullable, public CacheObject, Subscriber {
   public:
-    SceneryTile(TileInfo *t, Scenery *s);
+    SceneryTile(Tile *t, Scenery *s);
     ~SceneryTile();
 
     // Draws a texture appropriate to the given level.
@@ -145,7 +145,7 @@ class SceneryTile: public Cullable, public CacheObject, Subscriber {
     // extra work.
     void _findBuckets();
 
-    TileInfo *_ti;
+    Tile *_ti;
     Scenery *_scenery;
     const bitset<TileManager::MAX_MAP_LEVEL> &_levels;
 
@@ -388,7 +388,7 @@ void MapTexture::draw()
 	glBindTexture(GL_TEXTURE_2D, _t.name());
 
 	glBegin(GL_QUAD_STRIP); {
-	    int width = TileManager::tileWidth(_lat);
+	    int width = Tile::width(_lat + 90);
 	    double s, n;
 	    s = _lat;
 	    n = _lat + 1;
@@ -435,7 +435,7 @@ bool MapTexture::loaded() const
     return _t.loaded();
 }
 
-SceneryTile::SceneryTile(TileInfo *ti, Scenery *s): 
+SceneryTile::SceneryTile(Tile *ti, Scenery *s): 
     _ti(ti), _scenery(s), _levels(ti->mapLevels()), _maxElevation(Bucket::NanE),
     _buckets(NULL)
 {
@@ -819,10 +819,9 @@ Scenery::Scenery(TileManager *tm, int window):
     _frustum = new Culler::FrustumSearch(*_culler);
 
     // Create scenery tiles.
-    const map<string, TileInfo *>& tiles = _tm->tiles();
-    map<string, TileInfo *>::const_iterator i = tiles.begin();
-    for (; i != tiles.end(); i++) {
-	TileInfo *ti = i->second;
+    int tileCount = _tm->tileCount(TileManager::MAPPED);
+    for (int i = 0; i < tileCount; i++) {
+	Tile *ti = _tm->tile(TileManager::MAPPED, i);
 
 	// Create a tile.
 	SceneryTile *tile = new SceneryTile(ti, this);

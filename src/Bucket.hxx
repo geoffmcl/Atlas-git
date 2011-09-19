@@ -91,7 +91,7 @@ public:
 		      SGVec3<double> *c);
 
   protected:
-    const SGPath& _p;		// Our scenery directory.
+    SGPath _p;			// Our scenery directory.
     long int _index;		// Bucket index.
 
     double _lat, _lon;		// The centre of this bucket.

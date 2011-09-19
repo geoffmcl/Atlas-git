@@ -19,7 +19,7 @@ Atlas_SOURCES = \
 	FlightTracksOverlay.hxx FlightTracksOverlay.cxx \
 	CrosshairsOverlay.hxx CrosshairsOverlay.cxx \
 	RangeRingsOverlay.hxx RangeRingsOverlay.cxx \
-	Tiles.cxx Tiles.hxx \
+	Tiles.cxx Tiles.hxx tiles.h \
 	Searcher.cxx Searcher.hxx \
 	Search.cxx Search.hxx \
 	Preferences.cxx Preferences.hxx \
