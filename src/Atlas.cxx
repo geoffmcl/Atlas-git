@@ -2937,9 +2937,13 @@ HelpUI::HelpUI(int x, int y, Preferences& prefs, TileManager& tm)
     globalString.appendf("Atlas maps\n");
     globalString.appendf("    %s\n", prefs.path.c_str());
     // EYE - this can change!  We need to track changes in the
-    // palette, or indicate that this is the default palette.
+    // palette, or indicate that this is the default palette.  Also,
+    // we really need a function to give us the palette path.
+    SGPath palette(prefs.path);
+    palette.append("Palettes");
+    palette.append(prefs.palette);
     globalString.appendf("Atlas palette\n");
-    globalString.appendf("    %s\n", prefs.palette.c_str());
+    globalString.appendf("    %s\n", palette.c_str());
 
     // EYE - this can change!
     globalString.appendf("\n");
@@ -4617,10 +4621,10 @@ int main(int argc, char **argv)
     }
 
     // Load the preferred palette.
-    globals.setPalette(palettes->setPalette(prefs.palette.c_str()));
+    globals.setPalette(palettes->setPalette(prefs.palette));
     if (!globals.palette()) {
 	printf("%s: Failed to read palette file '%s'\n", 
-	       argv[0], prefs.palette.c_str());
+	       argv[0], prefs.palette);
 	// EYE - exit?
 	exit(0);
     }

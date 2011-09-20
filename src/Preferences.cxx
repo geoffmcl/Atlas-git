@@ -381,10 +381,6 @@ Preferences::Preferences()
     }
     path.append("Atlas");
 
-    palette.set(path.str());
-    palette.append("Palettes");
-    palette.append("default.ap");
-
     textureFonts = true;
     width = defaultWidth;
     height = defaultHeight;
@@ -407,6 +403,7 @@ Preferences::Preferences()
     smoothShading = true;
     azimuth = defaultAzimuth;
     elevation = defaultElevation;
+    palette = strdup("default.ap");
 }
 
 // First loads preferences from ~/.atlasrc (if it exists), then checks
@@ -484,7 +481,6 @@ void Preferences::savePreferences()
     printf("%s\n", icao);
     printf("%s\n", path.c_str());
     printf("%s\n", fg_root.c_str());
-    printf("%s\n", palette.c_str());
     printf("%d\n", textureFonts);
     printf("%d\n", width);
     printf("%d\n", height);
@@ -508,6 +504,7 @@ void Preferences::savePreferences()
     printf("%d\n", lightingOn);
     printf("%d\n", smoothShading);
     printf("<%.1f, %.1f>", azimuth, elevation);
+    printf("%s\n", palette);
 
     for (unsigned int i = 0; i < flightFiles.size(); i++) {
 	printf("%s\n", flightFiles[i].c_str());
@@ -560,7 +557,8 @@ bool Preferences::_loadPreferences(int argc, char *argv[])
 	    fg_root.set(optarg);
 	    break;
 	  case PALETTE_OPTION:
-	    palette.set(optarg);
+	    free(palette);
+	    palette = strdup(optarg);
 	    break;
 	  case GLUTFONTS_OPTION:
 	    textureFonts = false;

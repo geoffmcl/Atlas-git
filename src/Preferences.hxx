@@ -100,7 +100,6 @@ public:
     // Paths
     SGPath path;		// Path to maps
     SGPath fg_root;		// Root of FlightGear stuff
-    SGPath palette;		// Path to palettes
     SGPath scenery_root;	// Path to FlightGear scenery
 
     // Visual stuff - fonts, window size, ...
@@ -125,6 +124,7 @@ public:
     bool discreteContours, contourLines, lightingOn, smoothShading;
     float azimuth, elevation;
     sgVec4 lightPosition;
+    char *palette;		// Palette name
 
     // Factory defaults
     // EYE - need to set values for these (and use them too)
