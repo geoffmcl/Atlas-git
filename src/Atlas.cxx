@@ -312,9 +312,9 @@ bool elevationLabels = true;
 // scenery is live).
 bool relativePalette = false;
 
-// We keep a list of all palettes.  Initially this is set to the
-// installed palettes in Atlas' Palettes directory, but it can expand
-// if the user loads custom palettes of her own.
+// We keep a vector of all palettes in Atlas' "Palettes" directory.
+// They can be chosen by index or by name (which should be the file
+// name, without the leading path).
 class Palettes {
   public:
     Palettes(const char *paletteDir);
@@ -323,16 +323,9 @@ class Palettes {
     Palette *currentPalette();
     size_t currentPaletteNo() { return _i; }
     size_t size() { return _palettes.size(); }
-    const Palette *setPalette(size_t i);
+    Palette *setPalette(size_t i);
+    Palette *setPalette(const char *name);
     const vector<Palette *>& palettes() { return _palettes; }
-
-    // Adds the given path to the list (unless it's there already),
-    // loads the given palette (unless it's loaded already), and
-    // returns a pointer to it (NULL if it couldn't be loaded, in
-    // which case the vector and current palette are unchanged).
-    Palette *load(const char *path);
-    // Unloads the current palette and replaces it with another.
-    const Palette *unload();
 
   protected:
     size_t _i;
@@ -384,7 +377,7 @@ Palette *Palettes::currentPalette()
     }
 }
 
-const Palette *Palettes::setPalette(size_t i)
+Palette *Palettes::setPalette(size_t i)
 {
     if (i < _palettes.size()) {
 	_i = i;
@@ -394,55 +387,16 @@ const Palette *Palettes::setPalette(size_t i)
     }
 }
 
-Palette *Palettes::load(const char *path)
+Palette *Palettes::setPalette(const char *name)
 {
-    // First check and see if we have it already.  We just compare the
-    // paths we're given, which are not guaranteed to be canonical, so
-    // this is not a fail-safe test - it's possible to load the same
-    // file twice.
-    unsigned int i;
-    for (i = 0; i < _palettes.size(); i++) {
-	if (strcmp(path, _palettes[i]->path()) == 0) {
+    for (size_t i = 0; i < _palettes.size(); i++) {
+	SGPath full(_palettes[i]->path());
+	if (strcmp(name, full.file().c_str()) == 0) {
 	    _i = i;
-	    break;
+	    return _palettes[i];
 	}
     }
-
-    if (i == _palettes.size()) {
-	// It's new, so try loading it.
-	try {
-	    Palette *aPalette = new Palette(path);
-	    _palettes.push_back(aPalette);
-	    _i = i;
-	} catch (runtime_error e) {
-	    fprintf(stderr,
-		    "Palettes::load: error loading palette file '%s': %s\n", 
-		    path, e.what());
-	    return NULL;
-	}
-    }
-
-    return _palettes[_i];
-}
-
-const Palette *Palettes::unload()
-{
-    if (_i < _palettes.size()) {
-	Palette *p = _palettes[_i];
-	_palettes.erase(_palettes.begin() + _i);
-	delete p;
-	if (_i < _palettes.size()) {
-	    return _palettes[_i];
-	} else if (_palettes.size() > 0) {
-	    _i = _palettes.size() - 1;
-	    return _palettes[_i];
-	} else {
-	    _i = 0;
-	    return NULL;
-	}
-    } else {
-	return NULL;
-    }
+    return NULL;
 }
 
 // ScreenLocation maintains a window x, y coordinate, and its
@@ -3303,13 +3257,23 @@ void specialGraphs(int key, int x, int y)
 // {
 //     // EYE - hard-wired for now
 //     // EYE - need to check for live internet connection
-//     SGSocket *io = new SGSocket("mpserver02.flightgear.org", "5001", "tcp");
+//     // EYE - it's unfortunate we need to build up and break down TCP
+//     //       connections on each call to this function.
+//     SGSocket *io = new SGSocket("mpserver01.flightgear.org", "5001", "tcp");
 //     // EYE - we need to be OUT, even though we're just reading
-//     // information.  Apparently we qualify as a "client".
+//     //       information.  Apparently we qualify as a "client".
+//     // EYE - if the network connection goes down, we block on this
+//     //       call for a loooong time (about a minute).  We really need
+//     //       some kind of non-blocking io.  After the first block,
+//     //       though, things respond instantly.  Why?
 //     if (!io->open(SG_IO_OUT)) {
 // 	fprintf(stderr, "Couldn't open socket!\n");
-// 	// EYE - just return
-// 	// exit(1);
+// 	// Try again later.
+// 	// EYE - need a way to be signalled of a live network rather
+// 	//       than polling.
+// 	glutTimerFunc(MPTimerInterval, MPAircraftTimer, value + 1);
+// 	io->close();
+// 	delete io;
 // 	return;
 //     }
 
@@ -3326,6 +3290,7 @@ void specialGraphs(int key, int x, int y)
 // 	noOfBytes = io->read(bytes, bufferSize);
 //     }
 //     io->close();
+//     delete io;
 
 //     istringstream stream(str);
 //     string line;
@@ -3353,6 +3318,7 @@ void specialGraphs(int key, int x, int y)
 // 		MPAircraftMap.find(id);
 // 	    MPAircraft *a;
 // 	    if (i == MPAircraftMap.end()) {
+// 		printf("'%s': new aircraft\n", id.c_str());
 // 		a = new MPAircraft(id, model);
 // 		MPAircraftMap[id] = a;
 // 	    } else {
@@ -4651,18 +4617,12 @@ int main(int argc, char **argv)
     }
 
     // Load the preferred palette.
-    globals.setPalette(palettes->load(prefs.palette.c_str()));
+    globals.setPalette(palettes->setPalette(prefs.palette.c_str()));
     if (!globals.palette()) {
-	// Try tacking the palette directory on the front and see what
-	// happens.
-	paletteDir.append(prefs.palette.str());
-	globals.setPalette(palettes->load(paletteDir.c_str()));
-	if (!globals.palette()) {
-	    printf("%s: Failed to read palette file '%s'\n", 
-		   argv[0], prefs.palette.c_str());
-	    // EYE - exit?
-	    exit(0);
-	}
+	printf("%s: Failed to read palette file '%s'\n", 
+	       argv[0], prefs.palette.c_str());
+	// EYE - exit?
+	exit(0);
     }
 
     // GLUT initialization.

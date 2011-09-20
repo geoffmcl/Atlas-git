@@ -180,19 +180,17 @@ class TileIterator;
 
 // The tile manager (generally you should only need one) keeps track
 // of FlightGear scenery.  It is given the scenery path (which can
-// consist of several directories), the Atlas map directory, and an
-// flag telling the tile manager whether it can create a map directory
-// if none exists.
+// consist of several directories) and the Atlas map directory.
 //
 // Maintainer note: The tile manager "knows" about all FlightGear
 // scenery, whether loaded or not, via the __scenery static data
 // structure (from tiles.h).  Thus you can query the tile manager (and
 // chunks and tiles) about some aspects of scenery (names, widths,
-// ...)  without having actually downloaded the scenery.  The static
-// data structure should be checked occasionally to make sure it
-// correctly represents the state of FlightGear scenery.  However, I
-// suspect this doesn't need to be done very often - land is not
-// likely to appear or disappear in the short term.
+// ...)  without having actually downloaded the scenery in question.
+// The static data structure should be checked occasionally to make
+// sure it correctly represents the state of FlightGear scenery.
+// However, I suspect this doesn't need to be done very often - land
+// is not likely to appear or disappear in the short term.
 class TileManager {
   public:
     // Initialize a tile manager, telling it where to look for scenery

@@ -185,7 +185,7 @@ static void print_help_for(int option, const char *indent)
 	printOne(indent, "--atlas=<path>", "Set path for map images", NULL);
 	break;
       case PALETTE_OPTION:
-	printOne(indent, "--palette=<path>", 
+	printOne(indent, "--palette=<palette>", 
 		 "Specify Atlas palette", NULL);
 	break;
       case LAT_OPTION:
