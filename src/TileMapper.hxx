@@ -3,7 +3,7 @@
 
   Written by Brian Schack, started March 2009.
 
-  Copyright (C) 2009, 2011 Brian Schack
+  Copyright (C) 2009 - 2011 Brian Schack
 
   This class will render maps for a tile and write them to a file.
   The rendering style is fixed for the duration of the object, so to
