@@ -23,6 +23,7 @@
 
 #include <cassert>
 #include <stdexcept>
+#include <limits>
 #include <math.h>
 
 #include <simgear/misc/sg_path.hxx>
@@ -358,7 +359,8 @@ void TileManager::scanScenery(bool scanMapLevels)
 		// Get the tile (if one exists) and tell it that it
 		// has a map at this level.
 		char loc[8];
-		strlcpy(loc, e->d_name, sizeof(loc));
+		strncpy(loc, e->d_name, sizeof(loc) - 1);
+		loc[sizeof(loc) - 1] = '\0';
 		Tile *t = tile(loc);
 		if (!t) {
 		    fprintf(stderr, "TileManager::scanScenery: unexpected map '%s' - ignoring\n", e->d_name);
