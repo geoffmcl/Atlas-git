@@ -57,10 +57,12 @@
 class TileMapper {
   public:
     // Returns the maximum map level that this computer's graphics
-    // card can handle.  A map level of n means that the card can
-    // handle textures of 2^n x 2^n.  The result should be treated
-    // with a grain of salt as it is just an estimate - in reality,
-    // the you might have to decrease the maximum level by 1.
+    // card can theoretically handle.  A map level of n means that the
+    // card can handle textures and frame buffers of 2^n x 2^n.  The
+    // result should be treated with a grain of salt as it is just an
+    // estimate and can't take into account texture memory being used
+    // by other textures - in reality, the you might have to decrease
+    // the maximum level by 1.
     static unsigned int maxPossibleLevel();
 
     // Create a tile mapper with the given rendering parameters.

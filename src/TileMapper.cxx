@@ -24,7 +24,7 @@
 #include <cassert>
 #include <stdexcept>
 
-// #include <GL/glew.h>
+#include <GL/glew.h>
 #include <plib/pu.h>
 #include <simgear/misc/sg_path.hxx>
 
@@ -33,34 +33,45 @@
 
 using namespace std;
 
+// We generate maps by rendering to a frame buffer, the generating a
+// texture from the results.  Therefore, the biggest map we can create
+// is limited to the smaller of the maximum frame buffer size and
+// maximum texture size.
 unsigned int TileMapper::maxPossibleLevel()
 {
-    unsigned int result = TileManager::MAX_MAP_LEVEL;
-    GLint textureSize = 0x1 << result;
+    // Check supported texture sizes.  First, get the maximum possible
+    // texture size (ignoring texture format).
+    GLint maxTextureSize;
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);
     
-    // Theoretically this isn't quite correct, as it's possible that
-    // *no* texture sizes are allowed (not even 1x1, which is what a
-    // result of 0 implies).  However, in reality I don't think that
-    // can ever happen.
-    while (result > 0) {
-	GLint tmp;
-	// For this test to be accurate, we need to make the
-	// parameters (GL_RGB, ...) the same as the ones we'll use in
-	// Atlas when loading the texture.
+    // Now take into account the texture format.  Note that for this
+    // test to be accurate, we need to make the parameters (GL_RGB,
+    // ...) the same as the ones we'll use in Atlas when loading the
+    // texture.
+    while (true) {
+	GLint tmp = 0;
 	glTexImage2D(GL_PROXY_TEXTURE_2D, 0, GL_RGB,
-		     textureSize, textureSize, 0, 
+		     maxTextureSize, maxTextureSize, 0, 
 		     GL_RGB, GL_UNSIGNED_BYTE, NULL);
 	glGetTexLevelParameteriv(GL_PROXY_TEXTURE_2D, 0,
 				 GL_TEXTURE_WIDTH, &tmp);
-	if ((tmp != 0) || (textureSize == 1)) {
-	    // We found an acceptable size.
+
+	if ((tmp != 0) || (maxTextureSize == 1)) {
+	    // We found an acceptable size (or we're down to 1x1
+	    // textures).
 	    break;
 	}
-	textureSize /= 2;
-	result--;
+	maxTextureSize /= 2;
     };
 
-    return result;
+    // Now check buffer sizes.
+    GLint maxBufferSize;
+    glGetIntegerv(GL_MAX_RENDERBUFFER_SIZE_EXT, &maxBufferSize);
+
+    // The result is the minimum of our maximum map size, the maximum
+    // texture size, and the maximum buffer size.
+    return log2(min(0x1 << TileManager::MAX_MAP_LEVEL,
+		    min(maxTextureSize, maxBufferSize)));
 }
 
 TileMapper::TileMapper(Palette *p, unsigned int maxDesiredLevel, 
