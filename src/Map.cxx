@@ -55,18 +55,7 @@
 #include <windows.h>
 #endif
 
-#ifndef __APPLE__
-  #define GL_GLEXT_PROTOTYPES
-  #include <GL/gl.h>
-  #if (defined(HAVE_GLEXT_H) || !defined(EXCLUDE_GLEXT_H))
-    #include <GL/glext.h>
-  #else
-    #ifdef HAVE_SGGLEXT_H
-      #include "MapEXT.hxx"
-    #endif
-  #endif
-#endif
-
+#include <GL/glew.h>
 #include <plib/pu.h>
 #include <simgear/misc/sg_path.hxx>
 
@@ -113,8 +102,7 @@ static TileManager *tileManager;
 static SGPath scenery, fg_scenery, fg_root, atlas, palette;
 static Palette *atlasPalette;
 
-// Handles to our framebuffer and renderbuffer objects.
-GLuint fbo = 0, rbo = 0;
+// Handles rendering of maps.
 static TileMapper *mapper;
 
 static int bufferSize;	// Size of rendering buffer.
@@ -138,9 +126,9 @@ void renderMap(Tile *t)
 	printf("%s: ", t->name());
 
 	mapper->set(t);
+	mapper->render();
 	for (unsigned int i = 0; i < TileManager::MAX_MAP_LEVEL; i++) {
 	    if (maps[i]) {
-		mapper->render();
 		if (createJPEG) {
 		    mapper->save(i, TileMapper::JPEG, jpegQuality);
 		} else {
@@ -266,39 +254,6 @@ bool parse_arg(char* arg)
     return true;
 }
 
-#if (defined(HAVE_GLEXT_H) || !defined(EXCLUDE_GLEXT_H))
-bool getFramebuffer(int textureSize) 
-{
-#if (defined(__GLEW_H__) || defined(__glew_h__))
-    GLenum err = glewInit();
-    if (err != GLEW_OK)
-	{
-	    // Problem: glewInit failed, something is seriously wrong.
-	    fprintf(stderr, "Error: glewInit FAILED!\n%s\n", 
-		    glewGetErrorString(err));
-	    exit(1);
-	}
-    if (verbose)
-        printf("Status: Using GLEW %s\n", glewGetString(GLEW_VERSION));
-#endif
-
-    glGenFramebuffersEXT(1, &fbo);
-    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo);
-
-    glGenRenderbuffersEXT(1, &rbo);
-    glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, rbo);
-    glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, 
-			     GL_RGB, textureSize, textureSize);
-    glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT,
-				 GL_COLOR_ATTACHMENT0_EXT,
-				 GL_RENDERBUFFER_EXT,
-				 rbo);
-
-    return (glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT) == 
-	    GL_FRAMEBUFFER_COMPLETE_EXT);
-}
-#endif
-
 // Attempts to load a palette at the given path.  Returns the palette
 // if successful, NULL otherwise.
 Palette *loadPalette(const char *path)
@@ -324,18 +279,6 @@ void cleanup(int exitCode)
     if (tileManager) {
 	delete tileManager;
     }
-#if (defined(HAVE_GLEXT_H) || !defined(EXCLUDE_GLEXT_H))
-    if (rbo != 0) {
-	glDeleteRenderbuffersEXT(1, &rbo);
-    }
-    if (fbo != 0) {
-	glDeleteFramebuffersEXT(1, &fbo);
-    }
-#else
-  #ifdef HAVE_SGGLEXT_H
-    Map_Exit_Ext( &fbo, &rbo );
-  #endif
-#endif
    if (mapper) {
 	delete mapper;
     }
@@ -471,6 +414,7 @@ int main(int argc, char **argv)
 
     // Read the Atlas palette file.  If successful, atlasPalette will
     // be set to the loaded palette.
+    // EYE - make this match the logic in Atlas
     SGPath palettePath;
     palettePath.append(palette.str());
     if ((atlasPalette = loadPalette(palettePath.c_str())) == NULL) {
@@ -542,69 +486,32 @@ int main(int argc, char **argv)
     glutInitWindowSize(windowSize, windowSize);
     glutCreateWindow("Map");
   
-#if (defined(HAVE_GLEXT_H) || !defined(EXCLUDE_GLEXT_H))
-    if (renderToFramebuffer) {
-	// Try to get a framebuffer.  First, check if the requested
-	// size is supported.
-	GLint max;
-	glGetIntegerv(GL_MAX_RENDERBUFFER_SIZE_EXT, &max);
-	if (bufferSize > max) {
-	    fprintf(stderr, 
-		    "%s: Requested buffer size (%d) > maximum supported buffer size (%d)\n", 
-		    appName, bufferSize, max);
-	    cleanup(1);
-	}
-	if (!getFramebuffer(bufferSize)) {
-	    fprintf(stderr, 
-		    "%s: Unable to initialize framebuffer.\n",
-		    appName);
-	    cleanup(1);
-	}
-	if (verbose) {
-	    printf("Framebuffer size: %dx%d\n", bufferSize, bufferSize);
-	}
+    // Check for sufficient OpenGL capabilities.
+    GLenum err = glewInit();
+    if (err != GLEW_OK) {
+	fprintf(stderr, "Failed to initialize GLEW!\n");
+	exit(0);
     }
-#else
-    // NO <GL/glext.h> available, as in native windows
-    if (renderToFramebuffer)
-    {
-  #ifdef HAVE_SGGLEXT_H
-        // Use SimGear GL extension support - really only for windows
-        if (!Map_Init_Ext(&fbo,&rbo,bufferSize))
-        {
-    	    fprintf(stderr, "%s: Unable to initialize framebuffer.\n", appName);
-            cleanup(1);
-        }
-    	if (verbose) {
-	        printf("Framebuffer size: %dx%d\n", bufferSize, bufferSize);
-	    }
-  #else
-        fprintf(stderr, "%s: GL Extended functions NOT supported!\n", appName);
-        cleanup(1);
-  #endif
+    if (!GLEW_VERSION_1_5) {
+    	printf("OpenGL version 1.5 not supported!\n");
+	exit(0);
     }
-#endif
+    if (verbose) {
+	printf("OpenGL 1.5 supported\n");
+    }
+    if (!GLEW_EXT_framebuffer_object) {
+	fprintf(stderr, "EXT_framebuffer_object not supported!\n");
+	exit(0);
+    }
+    if (verbose) {
+	printf("OpenGL framebuffer object extension supported\n");
+    }
 
     // Check if largest desired size will fit into a texture.  In some
     // ways this is immaterial to Map.  However, the user should be
     // warned if she is about to create maps that Atlas will be unable
     // to load.
-    GLint textureSize = mapSize;
-    while (true) {
-	GLint tmp;
-	// For this test to be accurate, we need to make the
-	// parameters (GL_RGB, ...) the same as the ones we'll use in
-	// Atlas when loading the texture.
-	glTexImage2D(GL_PROXY_TEXTURE_2D, 0, GL_RGB,
-		     textureSize, textureSize, 0, 
-		     GL_RGB, GL_UNSIGNED_BYTE, NULL);
-	glGetTexLevelParameteriv(GL_PROXY_TEXTURE_2D, 0,
-				 GL_TEXTURE_WIDTH, &tmp);
-	if ((tmp != 0) || (textureSize == 1)) {
-	    break;
-	}
-	textureSize /= 2;
-    };
+    GLint textureSize = min(mapSize, 0x1 << TileMapper::maxPossibleLevel());
     if (verbose) {
 	printf("Maximum supported texture size <= map size: %dx%d\n", 
 	       (int)textureSize, (int)textureSize);
@@ -671,9 +578,11 @@ int main(int argc, char **argv)
     // Now we know where to get the scenery data, where to put the
     // maps, the desired map sizes, the size of the buffers we can
     // use, and the palette to use.  Let's draw!
+
+    // EYE - move creation into renderMap() routine?
     mapper = new TileMapper(atlasPalette, bufferLevel, 
-			    discreteContours, contourLines,
-			    azimuth, elevation, lighting, smoothShading);
+    			    discreteContours, contourLines,
+    			    azimuth, elevation, lighting, smoothShading);
 
     int downloadedTiles = tileManager->tileCount(TileManager::DOWNLOADED);
     for (int i = 0; i < downloadedTiles; i++) {

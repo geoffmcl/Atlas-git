@@ -315,6 +315,10 @@ AC_CHECK_LIB(plibul, ulInit,,,)
 
 AC_LANG_POP(C++)
 
+dnl Check for GLEW
+AC_CHECK_HEADER(GL/glew.h)
+AC_CHECK_LIB(GLEW, glewInit)
+
 dnl Checks for header files.
 AC_HEADER_STDC
 AC_CHECK_HEADERS( fcntl.h unistd.h windows.h winbase.h values.h )
