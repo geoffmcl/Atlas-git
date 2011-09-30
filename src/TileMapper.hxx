@@ -7,17 +7,25 @@
 
   This class will render maps for a tile and write them to a file.
   The rendering style is fixed for the duration of the object, so to
-  change the style you have to create a new object.
+  change the style you have to create a new object.  This may seem a
+  bit of an odd approach, but the motiviation is that we tend to
+  render all maps in the same way; all that changes are the tiles
+  being mapped.  A TileMapper can be thought of as an encapsulation of
+  a certain rendering style, which is then applied to various tiles.
 
   To create maps for a tile, first set() the tile, render() it (once
   only), then call save() for each file that needs to be created.
-  Note that you cannot save a file of higher resolution than maxLevel
-  (given in the constructor).
+  Note that you cannot save a file of higher resolution than
+  maxDesiredLevel (given in the constructor).
 
   Rendering is done by creating an OpenGL framebuffer object and
-  rendering to an attached texture of a size given by maxLevel
+  rendering to an attached texture of a size given by maxDesiredLevel
   (therefore your graphics card has to be able to support textures of
-  that size).
+  that size - this can be checked with the maxPossibleLevel() class
+  method).
+
+  There must be an valid OpenGL context when a TileMapper object is
+  created and used.
 
   This file is part of Atlas.
 
@@ -48,20 +56,30 @@
 
 class TileMapper {
   public:
+    // Returns the maximum map level that this computer's graphics
+    // card can handle.  A map level of n means that the card can
+    // handle textures of 2^n x 2^n.  The result should be treated
+    // with a grain of salt as it is just an estimate - in reality,
+    // the you might have to decrease the maximum level by 1.
+    static unsigned int maxPossibleLevel();
+
+    // Create a tile mapper with the given rendering parameters.
     TileMapper(Palette *p,
-	       unsigned int maxLevel = 10,
-	       bool discreteContours = true,
-	       bool contourLines = false,
-	       float azimuth = 315.0,
-	       float elevation = 55.0,
-	       bool lighting = true,
-	       bool smoothShading = true);
+    	       unsigned int maxDesiredLevel = 10,
+    	       bool discreteContours = true,
+    	       bool contourLines = false,
+    	       float azimuth = 315.0,
+    	       float elevation = 55.0,
+    	       bool lighting = true,
+    	       bool smoothShading = true);
     ~TileMapper();
 
     enum ImageType {PNG, JPEG};
 
     // Specify the tile upon which future operations will operate.
-    // This will load the scenery for the tile.
+    // This will load the scenery for the tile.  If t is NULL, this
+    // essentially clears the current values (and calls to render() or
+    // save() are ignored).
     void set(Tile *t);
 
     // Renders the current tile at the size given by maxLevel.
@@ -69,14 +87,14 @@ class TileMapper {
     // texture.  This only needs to be done once per tile.
     void render();
 
-    // Save the current image to a file at the given level.  You must
-    // call render() before the first call to save() (for each tile).
-    // EYE - put in a check?
+    // Save the current image to a file at the given level (<=
+    // maxDesiredLevel).  You must call render() before the first call
+    // to save() (for each tile).
     void save(unsigned int level, ImageType t, unsigned int jpegQuality = 75);
 
     // Accessors.
     const Palette *palette() const { return _palette; }
-    unsigned int maxLevel() const { return _maxLevel; }
+    unsigned int maxDesiredLevel() const { return _maxLevel; }
     bool discreteContours() const { return _discreteContours; }
     float azimuth() const { return _azimuth; }
     float elevation() const { return _elevation; }

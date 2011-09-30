@@ -24,6 +24,7 @@
 #include <cassert>
 #include <stdexcept>
 
+// #include <GL/glew.h>
 #include <plib/pu.h>
 #include <simgear/misc/sg_path.hxx>
 
@@ -32,13 +33,44 @@
 
 using namespace std;
 
-TileMapper::TileMapper(Palette *p, unsigned int maxLevel, 
+unsigned int TileMapper::maxPossibleLevel()
+{
+    unsigned int result = TileManager::MAX_MAP_LEVEL;
+    GLint textureSize = 0x1 << result;
+    
+    // Theoretically this isn't quite correct, as it's possible that
+    // *no* texture sizes are allowed (not even 1x1, which is what a
+    // result of 0 implies).  However, in reality I don't think that
+    // can ever happen.
+    while (result > 0) {
+	GLint tmp;
+	// For this test to be accurate, we need to make the
+	// parameters (GL_RGB, ...) the same as the ones we'll use in
+	// Atlas when loading the texture.
+	glTexImage2D(GL_PROXY_TEXTURE_2D, 0, GL_RGB,
+		     textureSize, textureSize, 0, 
+		     GL_RGB, GL_UNSIGNED_BYTE, NULL);
+	glGetTexLevelParameteriv(GL_PROXY_TEXTURE_2D, 0,
+				 GL_TEXTURE_WIDTH, &tmp);
+	if ((tmp != 0) || (textureSize == 1)) {
+	    // We found an acceptable size.
+	    break;
+	}
+	textureSize /= 2;
+	result--;
+    };
+
+    return result;
+}
+
+TileMapper::TileMapper(Palette *p, unsigned int maxDesiredLevel, 
 		       bool discreteContours, bool contourLines,
 		       float azimuth, float elevation, bool lighting, 
 		       bool smoothShading):
-    _palette(p), _maxLevel(maxLevel), _discreteContours(discreteContours), 
-    _contourLines(contourLines), _azimuth(azimuth), _elevation(elevation),
-    _lighting(lighting), _smoothShading(smoothShading), _fbo(0), _to(0)
+    _palette(p), _maxLevel(maxDesiredLevel),
+    _discreteContours(discreteContours), _contourLines(contourLines),
+    _azimuth(azimuth), _elevation(elevation), _lighting(lighting),
+    _smoothShading(smoothShading), _tile(NULL), _fbo(0), _to(0)
 {
     // We must have a palette.
     if (!_palette) {
@@ -56,6 +88,10 @@ TileMapper::TileMapper(Palette *p, unsigned int maxLevel,
     Bucket::palette = _palette;
     Bucket::discreteContours = _discreteContours;
     Bucket::contourLines = _contourLines;
+
+    // Create the framebuffer object.
+    glGenFramebuffersEXT(1, &_fbo);
+    assert(_fbo != 0);
 }
 
 TileMapper::~TileMapper()
@@ -64,77 +100,61 @@ TileMapper::~TileMapper()
     glDeleteFramebuffersEXT(1, &_fbo);
 }
 
-// Tells TileMapper which tile is to be rendered.
+// Tells TileMapper which tile is to be rendered.  We load the tile's
+// buckets, and set _maximumElevation.
 void TileMapper::set(Tile *t)
 {
     // Remove any old information we have.
     _unloadBuckets();
 
     _tile = t;
-    if (_tile) {
-	const vector<long int>* buckets = _tile->bucketIndices();
-	for (unsigned int i = 0; i < buckets->size(); i++) {
-	    long int index = buckets->at(i);
-
-	    Bucket *b = new Bucket(_tile->sceneryDir(), index);
-	    b->load(Bucket::RECTANGULAR);
-
-	    _buckets.push_back(b);
-
-	    if (b->maximumElevation() > _maximumElevation) {
-		_maximumElevation = b->maximumElevation();
-	    }
-	}
+    if (!_tile) {
+	// EYE - throw an error, like when checking for a palette?
+	return;
     }
 
-    // Silently reduce (if necessary) _maxLevel to a value we can
-    // actually handle.
+    const vector<long int>* buckets = _tile->bucketIndices();
+    for (unsigned int i = 0; i < buckets->size(); i++) {
+	long int index = buckets->at(i);
 
-    // EYE - Does this really belong here?
-    GLint textureSize = 0x1 << _maxLevel;
-    while (true) {
-	GLint tmp;
-	// For this test to be accurate, we need to make the
-	// parameters (GL_RGB, ...) the same as the ones we'll use in
-	// Atlas when loading the texture.
-	glTexImage2D(GL_PROXY_TEXTURE_2D, 0, GL_RGB,
-		     textureSize, textureSize, 0, 
-		     GL_RGB, GL_UNSIGNED_BYTE, NULL);
-	glGetTexLevelParameteriv(GL_PROXY_TEXTURE_2D, 0,
-				 GL_TEXTURE_WIDTH, &tmp);
-	if ((tmp != 0) || (textureSize == 1)) {
-	    break;
+	Bucket *b = new Bucket(_tile->sceneryDir(), index);
+	b->load(Bucket::RECTANGULAR);
+
+	_buckets.push_back(b);
+
+	if (b->maximumElevation() > _maximumElevation) {
+	    _maximumElevation = b->maximumElevation();
 	}
-	fprintf(stderr, "Max level (%d) too big, reducing\n", _maxLevel);
-	textureSize /= 2;
-	_maxLevel--;
-    };
-
-    // Calculate the proper width and height for the given level.
-    _tile->mapSize(_maxLevel, &_width, &_height);
+    }
 }
 
 // Draws the tile into a texture attached to a framebuffer.
 void TileMapper::render()
 {
-    // EYE - remove this
+    // EYE - remove this eventually
     assert(glGetError() == GL_NO_ERROR);
 
-    // Set up the framebuffer object, if it hasn't been done already.
-    // We delay until now so that a TileMapper can be created without
-    // having an OpenGL context.
-    if (_fbo == 0) {
-	glGenFramebuffersEXT(1, &_fbo);
+    if (!_palette || !_tile) {
+	// EYE - throw an error?
+	return;
     }
 
     // Bind the framebuffer so that all rendering goes to it.
     glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, _fbo);
+
+    // EYE - assert _to is 0?
+
+    // Calculate the proper width and height for the given level.
+    // Note that we don't check if _maxLevel is reasonable - that's up
+    // to the caller.
+    _tile->mapSize(_maxLevel, &_width, &_height);
 
     // Create a texture object.
     // EYE - we also need to see if our current buffer is big enough.
     // This is where we could add the tiling code.
     // EYE - necessary to enable?  We don't actually do any texturing.
     // glEnable(GL_TEXTURE_2D);
+    // EYE - do I need to attach a depth buffer too?
     glGenTextures(1, &_to);
     glBindTexture(GL_TEXTURE_2D, _to);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, _width, _height, 0, GL_RGB, 
@@ -156,12 +176,7 @@ void TileMapper::render()
 
 	// When our buckets were loaded, all points were converted to
 	// lat, lon.  We need to stretch them to fill the buffer
-	// correctly.  Note that tiles use special latitudes (0 - 179)
-	// and longitudes (0 - 359), so we need to adjust them to
-	// "normal" values.
-
-	// EYE - Do we really?  And should we have special accessors
-	// in tiles?
+	// correctly.
 	int lat = _tile->lat();
 	int lon = _tile->lon();
 	int w = _tile->width();
@@ -272,10 +287,9 @@ void TileMapper::render()
 
 	glFinish();
 
-	assert(glGetError() == GL_NO_ERROR);
-
-	// Create mimaps and unbind the framebuffer.  We should now have a
-	// map of the appropriate size in the texture object _to.
+	// Create mipmaps and unbind the framebuffer.  We should now
+	// have a map of the appropriate size in the texture object
+	// _to.
 	glGenerateMipmapEXT(GL_TEXTURE_2D);
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
 
@@ -293,6 +307,10 @@ void TileMapper::render()
 // (given in the constructor).
 void TileMapper::save(unsigned int level, ImageType t, unsigned int jpegQuality)
 {
+    if (!_palette || !_tile) {
+	return;
+    }
+
     // First, calculate the desired map size in pixels.
     int shrinkage = _maxLevel - level;
     int width = _width / (1 << shrinkage),
@@ -342,15 +360,15 @@ void TileMapper::_unloadBuckets()
 	delete _buckets[i];
     }
     _buckets.clear();
+    _tile = NULL;
 
     // This might be overkill, but presumably if we're unloading
     // buckets, that means we can no longer trust the maximum
     // elevation figure.
-
-    // EYE - should be a constant somewhere - Tile?  Bucket::NanE?
-    _maximumElevation = -std::numeric_limits<float>::max();
+    _maximumElevation = Bucket::NanE;
 
     // Delete the texture object.  We need to do this because
     // different tiles may have different sizes.
     glDeleteTextures(1, &_to);
+    _to = 0;
 }
