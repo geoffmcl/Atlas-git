@@ -270,9 +270,9 @@ AC_TRY_RUN([
 #define STRINGIFY(X) XSTRINGIFY(X)
 #define XSTRINGIFY(X) #X
 
-#define MIN_MAJOR 1
-#define MIN_MINOR 9
-#define MIN_MICRO 1
+#define MIN_MAJOR 2
+#define MIN_MINOR 4
+#define MIN_MICRO 0
 
 int main() {
     int major, minor, micro;
@@ -316,6 +316,7 @@ AC_CHECK_LIB(plibul, ulInit,,,)
 AC_LANG_POP(C++)
 
 dnl Check for GLEW
+dnl EYE - complain if not found, check for a specific version of GLEW?
 AC_CHECK_HEADER(GL/glew.h)
 AC_CHECK_LIB(GLEW, glewInit)
 
