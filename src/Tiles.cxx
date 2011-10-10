@@ -71,16 +71,22 @@ GeoLocation::GeoLocation(const char *name)
 {
     int lat, lon;
     char ew, ns;
-    assert(sscanf(name, "%1c%3d%1c%2d", &ew, &lon, &ns, &lat) == 4);
-    if (ew == 'w') {
-	lon = 360 - lon;
-    }
-    if (ns == 's') {
-	lat = -lat;
-    }
-    lat += 90;
+    if (sscanf(name, "%1c%3d%1c%2d", &ew, &lon, &ns, &lat) == 4) {
+	// The string seems to be well-formed, so try to extract a
+	// latitude and longitude from it.
 
-    setLoc(lat, lon);
+	if (ew == 'w') {
+	    lon = 360 - lon;
+	}
+	if (ns == 's') {
+	    lat = -lat;
+	}
+	lat += 90;
+
+	setLoc(lat, lon);
+    } else {
+	invalidate();
+    }
 }
 
 GeoLocation::GeoLocation()
