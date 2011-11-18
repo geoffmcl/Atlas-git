@@ -580,6 +580,9 @@ int main(int argc, char **argv)
     // use, and the palette to use.  Let's draw!
 
     // EYE - move creation into renderMap() routine?
+    // EYE - if we always use a TileMapper (and if it always uses a
+    //       framebuffer), we should get rid of the
+    //       render-to-window/render-offscreen options.
     mapper = new TileMapper(atlasPalette, bufferLevel, 
     			    discreteContours, contourLines,
     			    azimuth, elevation, lighting, smoothShading);
