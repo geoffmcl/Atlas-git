@@ -316,8 +316,15 @@ AC_CHECK_LIB(plibul, ulInit,,,)
 AC_LANG_POP(C++)
 
 dnl Check for GLEW
-dnl EYE - complain if not found, check for a specific version of GLEW?
 AC_CHECK_HEADER(GL/glew.h)
+if test "x$ac_cv_header_GL_glew_h" != "xyes"; then
+    echo
+    echo "You *must* have the GLEW library installed on your system to build"
+    echo "Atlas!"
+    echo
+    echo "configure aborted."
+    exit
+fi
 AC_CHECK_LIB(GLEW, glewInit)
 
 dnl Checks for header files.
