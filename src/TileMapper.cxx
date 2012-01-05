@@ -140,6 +140,13 @@ void TileMapper::set(Tile *t)
 }
 
 // Draws the tile into a texture attached to a framebuffer.
+
+// EYE - should we draw instead to a renderbuffer?  I'm not sure which
+// is considered superior, but renderbuffers do have
+// glRenderbufferStorageMultisample(), which may give us nice
+// anti-aliasing.  Render buffer multisampling is supported under the
+// EXT_framebuffer_multisample extension (dating from 2005), or core
+// version 3.0.
 void TileMapper::render()
 {
     // EYE - remove this eventually
@@ -170,13 +177,20 @@ void TileMapper::render()
     glBindTexture(GL_TEXTURE_2D, _to);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, _width, _height, 0, GL_RGB, 
 		 GL_UNSIGNED_BYTE, 0);
+    // EYE - Strictly speaking, this is not necessary.  However, due
+    // to a bug in Nvidia drivers (as of January 2012), we need to add
+    // this line.  This bug is discussed in:
+    //
+    // http://www.opengl.org/wiki/Common_Mistakes#Render_To_Texture
+    //
+    glGenerateMipmapEXT(GL_TEXTURE_2D);
     glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT,
     			      GL_COLOR_ATTACHMENT0_EXT,
     			      GL_TEXTURE_2D,
     			      _to,
     			      0);
     assert(glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT) == 
-	   GL_FRAMEBUFFER_COMPLETE_EXT);
+    	   GL_FRAMEBUFFER_COMPLETE_EXT);
 
     // The framebuffer shares its state with the current context, so
     // we push some attributes so we don't step on current OpenGL
