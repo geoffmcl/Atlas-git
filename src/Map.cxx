@@ -5,7 +5,7 @@
   Based on a perl-script written by Alexei Novikov (anovikov@heron.itep.ru)
 
   Copyright (C) 2000 Per Liedman, liedman@home.se
-  Copyright (C) 2009 - 2011 Brian Schack
+  Copyright (C) 2009 - 2012 Brian Schack
 
   This file is part of Atlas.
 

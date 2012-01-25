@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2011 Brian Schack
+  Copyright (C) 2009 - 2012 Brian Schack
 
   A group of classes for keeping track of scenery information: names,
   directories, which maps exist, size, latitude, longitude, ....

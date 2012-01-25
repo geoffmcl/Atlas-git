@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2011 Brian Schack
+  Copyright (C) 2009 - 2012 Brian Schack
 
   A palette tells Atlas (and Map) how to colour maps.  It specifies
   colours for elevations and materials.  The palette object can load

@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2011 Brian Schack
+  Copyright (C) 2009 - 2012 Brian Schack
 
   A cache manages the loading and unloading of cache objects, which
   exist in 3D space.  The cache guarantees to load all the objects you
