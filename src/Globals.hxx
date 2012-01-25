@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2011 Brian Schack
+  Copyright (C) 2009 - 2012 Brian Schack
 
   This contains some variables that are needed in several different
   parts of Atlas.  Although we could pass them around via function
@@ -33,74 +33,30 @@
 
 #include <vector>
 
-#include <plib/sg.h>
-#include <plib/fnt.h>
-#include <plib/pu.h>
-
-#include "Overlays.hxx"
-#include "FlightTrack.hxx"
-#include "Searcher.hxx"
-#include "Palette.hxx"
+#include "Preferences.hxx"
 #include "misc.hxx"
 
+class AtlasWindow;
+class GraphsWindow;
 class Globals {
  public:
     Globals();
-    ~Globals();
 
-    // Overlays object.
-    Overlays *overlays;
+    // Standard colours.
+    sgVec4 trackColour, markColour;
+    sgVec4 vor1Colour, vor2Colour, adfColour;
 
-    // Flight tracks.  There will always be a valid current track and
-    // a valid current track number, except when the tracks vector is
-    // empty, in which case the track will be NULL and the track
-    // number will be FlightTrack::npos.
-    FlightData *currentPoint();
-    const std::vector<FlightTrack *>& tracks() { return _tracks; }
-    size_t currentTrackNo() { return _currentTrackNo; }
-    FlightTrack *track() { return _track; }
-    FlightTrack *track(size_t i);
-    size_t addTrack(FlightTrack *t, bool select = true);
-    FlightTrack *removeTrack() { return removeTrack(_currentTrackNo); }
-    FlightTrack *removeTrack(size_t i);
-    FlightTrack *setCurrent(size_t i);
-    FlightTrack *exists(int port, bool select = true);
-    FlightTrack *exists(const char *device, int baud, bool select = true);
-    FlightTrack *exists(const char *path, bool select = true);
+    // Our windows.
+    AtlasWindow *aw;
+    GraphsWindow *gw;
 
-    // Our view on the world.
-    sgdMat4 modelViewMatrix;
-    sgdFrustum frustum;
-    double metresPerPixel;
+    // Our preferences.
+    Preferences prefs;
 
-    // Searcher object.
-    Searcher searcher;
-
-    // Scenery lighting.
-    bool discreteContours, contourLines, lightingOn;
-
-    // Current palette.
-    Palette *palette() { return _palette; }
-    void setPalette(Palette *p);
-
-    // The fonts we use for the user interface, scenery and overlays.
-    atlasFntRenderer fontRenderer;
-    atlasFntTexFont *regularFont, *boldFont;
-    puFont uiFont;
-    // Sets the current font (which is accessed through fontRenderer)
-    // to regular or bold.
-    void regular() { fontRenderer.setFont(regularFont); }
-    void bold() { fontRenderer.setFont(boldFont); }
-
-    // Whether we're displaying true or magnetic headings.
-    bool magnetic;
-
-  protected:
-    std::vector<FlightTrack *> _tracks;
-    FlightTrack *_track;
-    size_t _currentTrackNo;
-
-    Palette *_palette;
+    // A shared global string.  It can be used for temporary string
+    // manipulation, saving the need to malloc (and possibly realloc)
+    // memory.
+    AtlasString str;
 };
 
 extern Globals globals;

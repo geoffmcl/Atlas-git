@@ -3,7 +3,7 @@
 
   Written by Brian Schack, started August 2007.
 
-  Copyright (C) 2007 - 2011 Brian Schack
+  Copyright (C) 2007 - 2012 Brian Schack
 
   This file is part of Atlas.
 
@@ -72,7 +72,7 @@ enum {FIRST_OPTION,
       BAUD_OPTION,
       MAX_TRACK_OPTION,
       UPDATE_OPTION,
-      AUTO_CENTER_MODE_OPTION,
+      AUTO_CENTRE_MODE_OPTION,
       LINE_WIDTH_OPTION,
       AIRPLANE_IMAGE_OPTION,
       AIRPLANE_SIZE_OPTION,
@@ -108,7 +108,7 @@ static struct option long_options[] = {
     {"baud", required_argument, 0, BAUD_OPTION},
     {"update", required_argument, 0, UPDATE_OPTION},
     {"max-track", required_argument, 0, MAX_TRACK_OPTION},
-    {"autocenter-mode", no_argument, 0, AUTO_CENTER_MODE_OPTION},
+    {"autocentre-mode", no_argument, 0, AUTO_CENTRE_MODE_OPTION},
     {"line-width", required_argument, 0, LINE_WIDTH_OPTION},
     {"airplane", required_argument, 0, AIRPLANE_IMAGE_OPTION},
     {"airplane-size", required_argument, 0, AIRPLANE_SIZE_OPTION},
@@ -133,7 +133,7 @@ static void print_short_help(char *name)
     printf("\t[--palette=<path>] [--lat=<x>] [--lon=<x>] [--zoom=<m/pixel>]\n");
     printf("\t[--airport=<icao>] [--glutfonts] [--geometry=<w>x<h>]\n");
     printf("\t[--softcursor] [--udp[=<port>]] [--serial=[<dev>]] [--baud=<rate>]\n");
-    printf("\t[--autocenter-mode] [--discrete-contour] [--smooth-contour]\n");
+    printf("\t[--autocentre-mode] [--discrete-contour] [--smooth-contour]\n");
     printf("\t[--contour-lines] [--no-contour-lines] [--lighting]\n");
     printf("\t[--no-lighting] [--light=azim,elev] [--smooth-shading]\n");
     printf("\t[--flat-shading] [--line-width=<w>] [--airplane=<path>]\n");
@@ -156,14 +156,15 @@ static void printOne(const char *indent, const char *option,
 		     const char *str, ...)
 {
     const int width = 20;
-    globalString.printf("%%s%%-%ds%%s\n", width);
-    printf(globalString.str(), indent, option, str);
+    AtlasString formatStr;
+    formatStr.printf("%%s%%-%ds%%s\n", width);
+    printf(formatStr.str(), indent, option, str);
 
     va_list ap;
     char *s;
     va_start(ap, str);
     while ((s = va_arg(ap, char *)) != NULL) {
-	printf(globalString.str(), indent, "", s);
+	printf(formatStr.str(), indent, "", s);
     }
     va_end(ap);
 }
@@ -254,11 +255,11 @@ static void print_help_for(int option, const char *indent)
 		 "Maximum number of points to record while tracking a",
 		 "flight (0 = unlimited)", defaultStr.str(), NULL);
 	break;
-      case AUTO_CENTER_MODE_OPTION:
-	defaultStr.printf("Default: %s", Preferences::defaultAutocenterMode ? 
+      case AUTO_CENTRE_MODE_OPTION:
+	defaultStr.printf("Default: %s", Preferences::defaultAutocentreMode ? 
 			  "true" : "false");
-	printOne(indent, "--autocenter-mode",
-		 "Automatically center map on aircraft",
+	printOne(indent, "--autocentre-mode",
+		 "Automatically centre map on aircraft",
 		 defaultStr.str(), NULL);
 	break;
       case LINE_WIDTH_OPTION:
@@ -390,7 +391,7 @@ Preferences::Preferences()
     _serial.baud = defaultBaudRate;
     update = defaultUpdate;
     max_track = defaultMaxTrack;
-    autocenter_mode = defaultAutocenterMode;
+    autocentre_mode = defaultAutocentreMode;
     lineWidth = defaultLineWidth;
     airplaneImage.set(path.str());
     airplaneImage.append("airplane_image.png");
@@ -495,7 +496,7 @@ void Preferences::savePreferences()
     printf("%.1f\n", update);
     printf("%s\n", scenery_root.c_str());
     printf("%d\n", max_track);
-    printf("%d\n", autocenter_mode);
+    printf("%d\n", autocentre_mode);
     printf("%f\n", lineWidth);
     printf("%s\n", airplaneImage.c_str());
 
@@ -646,8 +647,8 @@ bool Preferences::_loadPreferences(int argc, char *argv[])
 		elevation = 90.0;
 	    }
 	    break;
-	  case AUTO_CENTER_MODE_OPTION:
-	    autocenter_mode = true;
+	  case AUTO_CENTRE_MODE_OPTION:
+	    autocentre_mode = true;
 	    break;
  	  case LINE_WIDTH_OPTION:
  	    OPTION_CHECK(sscanf(optarg, "%f", &lineWidth), 1, 

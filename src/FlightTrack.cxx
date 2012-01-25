@@ -4,7 +4,7 @@
   Written by Per Liedman, started July 2000.
 
   Copyright (C) 2000 Per Liedman, liedman@home.se
-  Copyright (C) 2009 - 2011 Brian Schack
+  Copyright (C) 2009 - 2012 Brian Schack
 
   This file is part of Atlas.
 
@@ -39,11 +39,12 @@
 
 #include "FlightTrack.hxx"
 #include "Overlays.hxx"
-#include "Globals.hxx"
+#include "NavData.hxx"
 
 using namespace std;
 
-FlightData::FlightData(): _navaidsLoaded(false)
+FlightData::FlightData(NavData *navData):
+    _navData(navData), _navaidsLoaded(false)
 {
 }
 
@@ -60,8 +61,7 @@ const vector<NAV *>& FlightData::navaids()
     if (!_navaidsLoaded) {
 	// Look up the navaids we're tuned into.  Note that we must
 	// have a valid cartesian location for the call to getNavaids.
-	const vector<Cullable *>& results = 
-	    globals.overlays->navaidsOverlay()->getNavaids(this);
+	const vector<Cullable *>& results = _navData->getNavaids(this);
 	for (unsigned int i = 0; i < results.size(); i++) {
 	    NAV *n = dynamic_cast<NAV *>(results[i]);
 	    assert(n);
@@ -77,8 +77,9 @@ const vector<NAV *>& FlightData::navaids()
 const size_t FlightTrack::npos = numeric_limits<size_t>::max();
 
 // EYE - create a common initializer?
-FlightTrack::FlightTrack(const char *filePath) : 
-    _max_buffer(0), _mark(npos), _live(false), _input_channel(NULL)
+FlightTrack::FlightTrack(NavData *navData, const char *filePath): 
+    _navData(navData), _max_buffer(0), _mark(npos), _live(false), 
+    _input_channel(NULL)
 {
     if (!_readFlightFile(filePath)) {
 	throw runtime_error("flight file open failure");
@@ -95,8 +96,8 @@ FlightTrack::FlightTrack(const char *filePath) :
     _versionAtLastSave = _version = 0;
 }
 
-FlightTrack::FlightTrack(int port, unsigned int max_buffer) : 
-    _max_buffer(max_buffer), _mark(npos), _live(true)
+FlightTrack::FlightTrack(NavData *navData, int port, unsigned int max_buffer): 
+    _navData(navData), _max_buffer(max_buffer), _mark(npos), _live(true)
 {
     AtlasString portStr;
 
@@ -116,8 +117,9 @@ FlightTrack::FlightTrack(int port, unsigned int max_buffer) :
     _versionAtLastSave = _version = 0;
 }
 
-FlightTrack::FlightTrack(const char *device, int baud, unsigned int max_buffer) : 
-    _max_buffer(max_buffer), _mark(npos), _live(true)
+FlightTrack::FlightTrack(NavData *navData, const char *device, int baud, 
+			 unsigned int max_buffer): 
+    _navData(navData), _max_buffer(max_buffer), _mark(npos), _live(true)
 {
     AtlasString baudStr;
 
@@ -266,16 +268,18 @@ bool FlightTrack::checkForInput()
     while ((noOfBytes = _input_channel->read(buffer, bufferSize)) > 0) {
 	// If we managed to read data, then we'll assume we need to
 	// add some flight data.
-	FlightData tmp;
+	FlightData *d = new FlightData(_navData);
 	buffer[noOfBytes] = '\0';
-	if (_parse_message(buffer, &tmp)) {
+	if (_parse_message(buffer, d)) {
 	    // Record point.
-	    FlightData *d = new FlightData;
-	    *d = tmp;
 
 	    // EYE - I add the point unconditionally (before it was only
 	    // added if the change was more than 1 arc second).
 	    result = _addPoint(d, -1.0);
+
+	    d = new FlightData(_navData);
+	} else {
+	    delete d;
 	}
     }
 
@@ -616,14 +620,13 @@ bool FlightTrack::_readFlightFile(const char *path)
 	// If we've read 3 lines, send them off to _parse_message.
 	if (count == 3) {
 	    lines[totalLength - 1] = '\0';
-	    FlightData tmp;
-	    if (!_parse_message(lines, &tmp)) {
+
+	    FlightData *d = new FlightData(_navData);
+	    if (!_parse_message(lines, d)) {
 		// EYE - should we delete all the points we've added?
+		delete d;
 		return false;
 	    }
-
-	    FlightData *d = new FlightData;
-	    *d = tmp;
 
 	    // Add point unconditionally (ie, no tolerance
 	    // specification).
@@ -707,7 +710,7 @@ bool FlightTrack::_parse_message(char *buf, FlightData *d)
 	    if (tokenCount == 13) {
 		// The nmea protocol forces all year values to be less
 		// than 100, which is wrong (2009, for example, should
-		// be 109, not 09).  This hack will correctly for for
+		// be 109, not 09).  This hack will work correctly for
 		// dates from 1990 to 2089.
 		if (year < 90) {
 		    year += 100;
@@ -826,6 +829,12 @@ bool FlightTrack::_addPoint(FlightData *data, float tolerance)
 	(fabs(data->spd) < 0.001) &&
 	(fabs(data->hdg) < 0.001) &&
 	(fabs(data->alt) < 0.001)) {
+	delete data;
+	return false;
+    }
+    // Sometimes it starts with an altitude of -9999.  Don't ask me
+    // why.
+    if (data->alt < -9990) {
 	delete data;
 	return false;
     }

@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2011 Brian Schack
+  Copyright (C) 2009 - 2012 Brian Schack
 
   This file is part of Atlas.
 
@@ -28,13 +28,17 @@
 #include <cassert>
 #include <sstream>
 
+#include "Overlays.hxx"
+#include "AirportsOverlay.hxx"
+#include "NavaidsOverlay.hxx"
+#include "AirwaysOverlay.hxx"
+#include "FixesOverlay.hxx"
+#include "FlightTracksOverlay.hxx"
+#include "CrosshairsOverlay.hxx"
+#include "RangeRingsOverlay.hxx"
 #include "Globals.hxx"
 
-#include "Overlays.hxx"
-
 using namespace std;
-
-multimap<string, NAVPOINT> navPoints;
 
 // Colours from VFR_Chart_Symbols.pdf:
 //
@@ -53,17 +57,14 @@ multimap<string, NAVPOINT> navPoints;
 // const float heli_colour1[4] = {0.271, 0.439, 0.420, 0.7}; 
 // const float heli_colour2[4] = {0.863, 0.824, 0.824, 0.7};
 
-Overlays::Overlays(const string& fgDir)
+#include "AtlasWindow.hxx"
+Overlays::Overlays(AtlasWindow *aw): _aw(aw)
 {
     // Load data.
     _airports = new AirportsOverlay(*this);
-    _airports->load(fgDir);
     _navaids = new NavaidsOverlay(*this);
-    _navaids->load(fgDir);
     _fixes = new FixesOverlay(*this);
-    _fixes->load(fgDir);
     _airways = new AirwaysOverlay(*this);
-    _airways->load(fgDir);
     _tracks = new FlightTracksOverlay(*this);
     _crosshairs = new CrosshairsOverlay(*this);
     _rangeRings = new RangeRingsOverlay(*this);
@@ -80,8 +81,28 @@ Overlays::~Overlays()
     delete _rangeRings;
 }
 
+atlasFntTexFont *Overlays::regularFont() 
+{ 
+    return _aw->regularFont(); 
+}
+
+atlasFntTexFont *Overlays::boldFont() 
+{ 
+    return _aw->boldFont(); 
+}
+
+AtlasWindow *Overlays::aw() 
+{ 
+    return _aw; 
+}
+
+AtlasController *Overlays::ac()
+{
+    return _aw->ac();
+}
+
 // Draws all the overlays.
-void Overlays::draw()
+void Overlays::draw(NavData *navData)
 {
     // We assume that when called, the depth test is on, and lighting
     // is off.
@@ -93,32 +114,33 @@ void Overlays::draw()
 	glDisable(GL_DEPTH_TEST);
 
 	if (_overlays[AIRPORTS]) {
-	    _airports->drawBackgrounds();
+	    _airports->drawBackgrounds(navData);
 	}
 	// We sandwich ILSs between runway backgrounds and the runways.
 	if (_overlays[NAVAIDS] && _overlays[ILS]) {
-	    _navaids->drawILSs();
+	    _navaids->drawILSs(navData);
 	}
 	if (_overlays[AIRPORTS]) {
-	    _airports->drawForegrounds();
+	    _airports->drawForegrounds(navData);
 	    if (_overlays[LABELS]) {
-		_airports->drawLabels();
+		_airports->drawLabels(navData);
 	    }
 	}
 	if (_overlays[AIRWAYS]) {
-	    _airways->draw(_overlays[HIGH], _overlays[LOW], _overlays[LABELS]);
+	    _airways->draw(_overlays[HIGH], _overlays[LOW], _overlays[LABELS],
+			   navData);
 	}
 	if (_overlays[NAVAIDS] && _overlays[FIXES]) {
-	    _fixes->draw();
+	    _fixes->draw(navData);
 	}
 	if (_overlays[NAVAIDS] && _overlays[NDB]) {
-	    _navaids->drawNDBs();
+	    _navaids->drawNDBs(navData);
 	}
 	if (_overlays[NAVAIDS] && _overlays[VOR]) {
-	    _navaids->drawVORs();
+	    _navaids->drawVORs(navData);
 	}
 	if (_overlays[NAVAIDS] && _overlays[DME]) {
-	    _navaids->drawDMEs();
+	    _navaids->drawDMEs(navData);
 	}
 	if (_overlays[CROSSHAIRS]) {
 	    _crosshairs->draw();

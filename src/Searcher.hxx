@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2011 Brian Schack
+  Copyright (C) 2009 - 2012 Brian Schack
 
   A Searchable is anything that can be added to and used by a
   Searcher.  It is capable of representing itself as a
@@ -101,9 +101,10 @@ class Searcher {
     Searcher();
     ~Searcher();
 
-    // Adds the given searchable to our data structures.
+    // Adds and removes the given searchable to/from our data
+    // structures.
     void add(Searchable *s);
-    // EYE - we should also create a remove() method.
+    void remove(Searchable *s);
 
     // Finds matches for the given string, returning true if any
     // (more) are found.  If maxMatches is not -1, it will limit
@@ -124,9 +125,6 @@ class Searcher {
     bool _match(Searchable *s, 
 		const std::vector<std::string>& completeSearchTokens,
 		const std::string& partialSearchToken);
-
-    // All our searchable objects.
-    std::vector<Searchable *> _searchables;
 
     // All tokens from all searchables, paired with the searchables
     // they come from.  These are sorted alphabetically, disregarding

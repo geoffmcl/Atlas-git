@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2011 Brian Schack
+  Copyright (C) 2009 - 2012 Brian Schack
 
   This file is part of Atlas.
 
@@ -34,6 +34,7 @@
 #include "FixesOverlay.hxx"
 #include "Globals.hxx"
 #include "Geographics.hxx"
+#include "AtlasWindow.hxx"
 
 using namespace std;
 
@@ -53,40 +54,6 @@ const float terminal_fix_colour[4] = {1.0, 0.0, 1.0, 0.7};
 
 const float fix_label_colour[4] = {0.2, 0.2, 0.2, 0.7};
 
-//////////////////////////////////////////////////////////////////////
-// Searchable interface.
-//////////////////////////////////////////////////////////////////////
-double FIX::distanceSquared(const sgdVec3 from) const
-{
-    return sgdDistanceSquaredVec3(bounds.center, from);
-}
-
-// Returns our tokens, generating them if they haven't been already.
-const std::vector<std::string>& FIX::tokens()
-{
-    if (_tokens.empty()) {
-	// The name/id is a token.
-	_tokens.push_back(name);
-
-	// Add a "FIX:" token.
-	_tokens.push_back("FIX:");
-    }
-
-    return _tokens;
-}
-
-// Returns our pretty string, generating it if it hasn't been already.
-const std::string& FIX::asString()
-{
-    if (_str.empty()) {
-	// Initialize our pretty string.
-	globalString.printf("FIX: %s", name);
-	_str = globalString.str();
-    }
-
-    return _str;
-}
-
 // Note: there are many types of fixes and waypoints, but our database
 // doesn't differentiate.  So we just draw them as points (rather than
 // triangles, or circles, or any of the other common renderings).
@@ -97,10 +64,6 @@ const std::string& FIX::asString()
 FixesOverlay::FixesOverlay(Overlays& overlays):
     _overlays(overlays), _DL(0), _isDirty(false)
 {
-    // Create a culler and a frustum searcher for it.
-    _culler = new Culler();
-    _frustum = new Culler::FrustumSearch(*_culler);
-
     // Subscribe to moved and zoomed notifications.
     subscribe(Notification::Moved);
     subscribe(Notification::Zoomed);
@@ -109,107 +72,6 @@ FixesOverlay::FixesOverlay(Overlays& overlays):
 FixesOverlay::~FixesOverlay()
 {
     glDeleteLists(_DL, 1);
-
-    delete _frustum;
-    delete _culler;
-}
-
-bool FixesOverlay::load(const string& fgDir)
-{
-    bool result = false;
-
-    SGPath f(fgDir);
-    f.append("Navaids/fix.dat.gz");
-
-    gzFile arp;
-    char *line;
-
-    printf("Loading fixes from\n  %s\n", f.c_str());
-    arp = gzopen(f.c_str(), "rb");
-    if (arp == NULL) {
-	// EYE - we might want to throw an error instead.
-	fprintf(stderr, "_loadFixes: Couldn't open \"%s\".\n", f.c_str());
-	return false;
-    } 
-
-    // Check the file version.  We can handle version 600 files.
-    int version = -1;
-    gzGetLine(arp, &line);	// Windows/Mac header
-    gzGetLine(arp, &line);	// Version
-    sscanf(line, "%d", &version);
-    if (version == 600) {
-	// It looks like we have a valid file.
-	result = _load600(arp);
-    } else {
-	// EYE - throw an error?
-	fprintf(stderr, "_loadFixes: \"%s\": unknown version %d.\n", 
-		f.c_str(), version);
-	result = false;
-    }
-
-    gzclose(arp);
-    printf("  ... done\n");
-
-    return result;
-}
-
-bool FixesOverlay::_load600(const gzFile& arp)
-{
-    char *line;
-
-    FIX *f;
-
-    while (gzGetLine(arp, &line)) {
-	if (strcmp(line, "") == 0) {
-	    // Blank line.
-	    continue;
-	} 
-
-	if (strcmp(line, "99") == 0) {
-	    // Last line.
-	    break;
-	}
-
-	// Create a record and fill it in.
-	f = new FIX;
-
-	// A line looks like this:
-	//
-	// <lat> <lon> <name>
-	//
-	if (sscanf(line, "%lf %lf %s", &f->lat, &f->lon, f->name) != 3) {
-	    fprintf(stderr, "FixesOverlay::_load600(): bad line in file:\n");
-	    fprintf(stderr, "\t'%s'\n", line);
-	    continue;
-	}
-
-	// Add to the culler.
-	sgdVec3 point;
-	atlasGeodToCart(f->lat, f->lon, 0.0, point);
-
-	// We arbitrarily say fixes have a radius of 1000m.
-	f->bounds.radius = 1000.0;
-	f->bounds.setCenter(point);
-
-	// Until determined otherwise, fixes are not assumed to be
-	// part of any low or high altitude airways.
-	f->low = f->high = false;
-
-	// Add to our culler.
-	_frustum->culler().addObject(f);
-
-	// Create search tokens for it.
-	globals.searcher.add(f);
-
-	// Add to the navPoints map.
-	NAVPOINT foo;
-	foo.isNavaid = false;
-	foo.n = (void *)f;
-	navPoints.insert(pair<string, NAVPOINT>(f->name, foo));
-    }
-
-    // EYE - will there ever be a false return?
-    return true;
 }
 
 void FixesOverlay::setDirty()
@@ -217,7 +79,7 @@ void FixesOverlay::setDirty()
     _isDirty = true;
 }
 
-void FixesOverlay::draw()
+void FixesOverlay::draw(NavData *navData)
 {
     // Size of point used to represent the fix.
     const float fixSize = 4.0;
@@ -239,7 +101,8 @@ void FixesOverlay::draw()
 	}
 
 	glNewList(_DL, GL_COMPILE); {
-	    vector<Cullable *> intersections = _frustum->intersections();
+	    const vector<Cullable *>& intersections = 
+		navData->hits(NavData::FIXES);
 	    // Fixes (points)
 	    glPushAttrib(GL_POINT_BIT); {
 		// We use a non-standard point size, so we need to
@@ -267,7 +130,7 @@ void FixesOverlay::draw()
 	    // Fix labels
 	    LayoutManager lm;
 	    float pointSize = _metresPerPixel * 10.0;
-	    lm.setFont(globals.regularFont, pointSize);
+	    lm.setFont(_overlays.regularFont(), pointSize);
 
 	    if (_overlays.isVisible(Overlays::LABELS)) {
 		for (unsigned int i = 0; i < intersections.size(); i++) {
@@ -321,27 +184,14 @@ void FixesOverlay::_label(const FIX *f, LayoutManager& lm)
 }
 
 // Called when somebody posts a notification that we've subscribed to.
-bool FixesOverlay::notification(Notification::type n)
+void FixesOverlay::notification(Notification::type n)
 {
     if (n == Notification::Moved) {
-	// Update our frustum from globals and record ourselves as
-	// dirty.
-	_frustum->move(globals.modelViewMatrix);
 	setDirty();
     } else if (n == Notification::Zoomed) {
-	// Update our frustum and scale from globals and record
-	// ourselves as dirty.
-	_frustum->zoom(globals.frustum.getLeft(),
-		       globals.frustum.getRight(),
-		       globals.frustum.getBot(),
-		       globals.frustum.getTop(),
-		       globals.frustum.getNear(),
-		       globals.frustum.getFar());
-	_metresPerPixel = globals.metresPerPixel;
+	_metresPerPixel = _overlays.aw()->scale();
 	setDirty();
     } else {
 	assert(false);
     }
-
-    return true;
 }

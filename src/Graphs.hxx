@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2007 - 2011 Brian Schack
+  Copyright (C) 2007 - 2012 Brian Schack
 
   The graphs object draws graphs for a flight track in a window.
 
@@ -29,17 +29,24 @@
 #include <vector>
 #include <bitset>
 
+#include "AtlasWindow.hxx"
 #include "FlightTrack.hxx"
 #include "Notifications.hxx"
 
 class GraphsUI;
-class Graphs: public Subscriber {
-public:
-    Graphs(int window);
-    ~Graphs();
+class GraphsWindow: public AtlasBaseWindow, Subscriber {
+  public:
+    GraphsWindow(const char *name,
+		 const char *regularFontFile,
+		 const char *boldFontFile,
+		 AtlasController *ac);
+    ~GraphsWindow();
 
-    void draw();
-    void reshape(int w, int h);
+    // Public window callback.  The main window needs to pass on
+    // special characters to us, so we expose it (making sure to set
+    // our window to be current).
+    void special(int key, int x, int y);
+
     void setAircraftColour(const float *colour);
     void setMarkColour(const float *colour);
 
@@ -65,12 +72,9 @@ public:
     void setScale(XAxisType t, float f);
     void setScale(YAxisType t, float f);
 
-    size_t mouseClick(int button, int state, int x, int y);
-    size_t mouseMotion(int x, int y);
+    void notification(Notification::type n);
 
-    bool notification(Notification::type n);
-
-protected:
+  protected:
     // The Values class contains a set of data points, which could be
     // along the x-axis (time, distance), or the y-axis (altitude,
     // speed, or climb rate).  It also contains some bookkeeping
@@ -188,7 +192,7 @@ protected:
     // Derived classes.  Most derived classes are very simple - the
     // at() function merely accesses the appropriate field in the
     // flight data point.  There are two exceptions: Altitudes (which
-    // much deal with glideslopes), and RatesOfClimb (which needs to
+    // must deal with glideslopes), and RatesOfClimb (which needs to
     // deal with smoothing).
     class Times: public Values {
       public:
@@ -267,8 +271,8 @@ protected:
 	float _timeAt(size_t i);
     };
 
-    int _window;
     int _w, _h;
+    AtlasController *_ac;
 
     FlightTrack *_track;	// The current track.
     std::bitset<_GRAPH_TYPES_COUNT> _graphTypes;
@@ -308,6 +312,15 @@ protected:
     bool _dragging;
     GraphsUI *_ui;
 
+    // Window callbacks.
+    void _display();
+    void _reshape(int w, int h);
+    void _mouse(int button, int state, int x, int y);
+    void _motion(int x, int y);
+    void _keyboard(unsigned char key, int x, int y);
+    void _special(int key, int x, int y);
+    void _visibility(int state);
+
     // Draws the entire graph, including labels and such.
     void _drawGraph(Values &xVals, Values& yVals, int viewport[4]);
     // Draws one labelled axis.
@@ -340,20 +353,17 @@ protected:
 //////////////////////////////////////////////////////////////////////
 class GraphsUI {
   public:
-    GraphsUI(Graphs& g);
+    GraphsUI(GraphsWindow *gw);
     ~GraphsUI();
 
-    // void reveal() { _gui->reveal(); }
-    // void hide() { _gui->hide(); }
-    // bool isVisible() const { return _gui->isVisible(); }
-
+    // EYE - make part of GLUTWindow?
     int width() const { return _w; }
     int height() const { return _h; }
 
     void setSize(int x, int h);
 
-    void setXAxisType(Graphs::XAxisType t);
-    void setYAxisType(Graphs::YAxisType t, bool b);
+    void setXAxisType(GraphsWindow::XAxisType t);
+    void setYAxisType(GraphsWindow::YAxisType t, bool b);
     void setSmoothing(unsigned int s);
 
   protected:
@@ -393,14 +403,14 @@ class GraphsUI {
     void _autoscale(_AxisUI *axis);
     void _setScale(_AxisUI *axis);
 
-    Graphs& _graphs;
+    GraphsWindow *_gw;
     atlasFntTexFont *_texFont;
     puFont _font;
 
     puGroup *_mainGroup, *_xGroup, *_yGroup;
     puFrame *_mainFrame, *_xFrame, *_yFrame;
-    _AxisUI *_yAxes[Graphs::_GRAPH_TYPES_COUNT];
-    _AxisUI *_xAxes[Graphs::_XAXIS_COUNT];
+    _AxisUI *_yAxes[GraphsWindow::_GRAPH_TYPES_COUNT];
+    _AxisUI *_xAxes[GraphsWindow::_XAXIS_COUNT];
     puSlider *_smoother;
 
     int _w, _h;

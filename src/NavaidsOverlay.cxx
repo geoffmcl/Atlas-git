@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2011 Brian Schack
+  Copyright (C) 2009 - 2012 Brian Schack
 
   This file is part of Atlas.
 
@@ -33,21 +33,15 @@
 #include <simgear/misc/sg_path.hxx>
 #include <simgear/math/sg_geodesy.hxx>
 #include <simgear/magvar/magvar.hxx>
-#include <simgear/timing/sg_time.hxx>
 
 #include "Globals.hxx"
 #include "misc.hxx"
 #include "Geographics.hxx"
-
+#include "AtlasWindow.hxx"
 #include "NavaidsOverlay.hxx"
 
 using namespace std;
 
-// From Atlas.cxx, used for colouring tuned-in navaids.
-// EYE - make part of preferences
-extern float vor1Colour[];
-extern float vor2Colour[];
-extern float adfColour[];
 float clearColour[4] = {1.0, 1.0, 1.0, 0.0};
 
 // EYE - change to sgVec4?
@@ -104,121 +98,6 @@ const float markerRadii[3] =
 // doesn't give a range for markers.
 const int markerRange = 1;
 
-//////////////////////////////////////////////////////////////////////
-// Searchable interface.
-//////////////////////////////////////////////////////////////////////
-double NAV::distanceSquared(const sgdVec3 from) const
-{
-    return sgdDistanceSquaredVec3(bounds.center, from);
-}
-
-// Returns our tokens, generating them if they haven't been already.
-const std::vector<std::string>& NAV::tokens()
-{
-    if (_tokens.empty()) {
-	bool isNDB = (navtype == NAV_NDB);
-	bool isMarker = ((navtype == NAV_OM) ||
-			 (navtype == NAV_MM) ||
-			 (navtype == NAV_IM));
-    
-	// The id, if it has one, is a token.
-	if (!isMarker) {
-	    _tokens.push_back(id);
-	}
-
-	// Tokenize the name.
-	Searchable::tokenize(name, _tokens);
-
-	// Add a frequency too, if it has one.
-	if (!isMarker) {
-	    if (isNDB) {
-		globalString.printf("%d", freq);
-	    } else {
-		globalString.printf("%.2f", freq / 1000.0);
-	    }
-	    _tokens.push_back(globalString.str());
-	}
-
-	// Add a navaid type token.
-	switch (navtype) {
-	  case NAV_VOR:
-	    _tokens.push_back("VOR:");
-	    break;
-	  case NAV_DME:
-	    _tokens.push_back("DME:");
-	    break;
-	  case NAV_NDB:
-	    _tokens.push_back("NDB:");
-	    break;
-	  case NAV_ILS:
-	  case NAV_GS:
-	    _tokens.push_back("ILS:");
-	    break;
-	  case NAV_OM:
-	    _tokens.push_back("MKR:");
-	    _tokens.push_back("OM:");
-	    break;
-	  case NAV_MM:
-	    _tokens.push_back("MKR:");
-	    _tokens.push_back("MM:");
-	    break;
-	  case NAV_IM:
-	    _tokens.push_back("MKR:");
-	    _tokens.push_back("IM:");
-	    break;
-	  default:
-	    assert(false);
-	    break;
-	}
-    }
-
-    return _tokens;
-}
-
-// Returns our pretty string, generating it if it hasn't been already.
-const std::string& NAV::asString()
-{
-    if (_str.empty()) {
-	// Initialize our pretty string.
-	switch (navtype) {
-	  case NAV_VOR:
-	    // EYE - cleanString?
-	    globalString.printf("VOR: %s %s (%.2f)", 
-				id.c_str(), name.c_str(), freq / 1000.0);
-	    break;
-	  case NAV_DME:
-	    globalString.printf("DME: %s %s (%.2f)", 
-				id.c_str(), name.c_str(), freq / 1000.0);
-	    break;
-	  case NAV_NDB:
-	    globalString.printf("NDB: %s %s (%d)", 
-				id.c_str(), name.c_str(), freq);
-	    break;
-	  case NAV_ILS:
-	  case NAV_GS:
-	    globalString.printf("ILS: %s %s (%.2f)", 
-				id.c_str(), name.c_str(), freq / 1000.0);
-	    break;
-	  case NAV_OM:
-	    globalString.printf("MKR: OM: %s", name.c_str());
-	    break;
-	  case NAV_MM:
-	    globalString.printf("MKR: MM: %s", name.c_str());
-	    break;
-	  case NAV_IM:
-	    globalString.printf("MKR: IM: %s", name.c_str());
-	    break;
-	  default:
-	    assert(false);
-	    break;
-	}
-
-	_str = globalString.str();
-    }
-
-    return _str;
-}
-
 NavaidsOverlay::NavaidsOverlay(Overlays& overlays):
     _overlays(overlays),
     _VORDirty(false), _NDBDirty(false), _ILSDirty(false), _DMEDirty(false),
@@ -255,11 +134,6 @@ NavaidsOverlay::NavaidsOverlay(Overlays& overlays):
     _createILSSymbols();
     _createMarkerSymbols();
 
-    // Create a culler and searchers for it.
-    _culler = new Culler();
-    _frustum = new Culler::FrustumSearch(*_culler);
-    _point = new Culler::PointSearch(*_culler);
-
     // Subscribe to moved, zoomed, flight track and magnetic/true
     // display notifications.
     subscribe(Notification::Moved);
@@ -274,14 +148,6 @@ NavaidsOverlay::NavaidsOverlay(Overlays& overlays):
 
 NavaidsOverlay::~NavaidsOverlay()
 {
-    for (unsigned int i = 0; i < _navaids.size(); i++) {
-	NAV *n = _navaids[i];
-
-	delete n;
-    }
-
-    _navaids.clear();
-
     glDeleteLists(_VORDisplayList, 1);
     glDeleteLists(_NDBDisplayList, 1);
     glDeleteLists(_ILSDisplayList, 1);
@@ -300,66 +166,6 @@ NavaidsOverlay::~NavaidsOverlay()
     glDeleteLists(_ILSMarkerDLs[0], 1);
     glDeleteLists(_ILSMarkerDLs[1], 1);
     glDeleteLists(_ILSMarkerDLs[2], 1);
-
-    delete _point;
-    delete _frustum;
-    delete _culler;
-}
-
-bool NavaidsOverlay::load(const string& fgDir)
-{
-    bool result = false;
-
-    SGPath f(fgDir);
-    // EYE - magic name
-    f.append("Navaids/nav.dat.gz");
-
-    gzFile arp;
-    char *line;
-
-    printf("Loading navaids from\n  %s\n", f.c_str());
-    arp = gzopen(f.c_str(), "rb");
-    if (arp == NULL) {
-	// EYE - we might want to throw an error instead.
-	fprintf(stderr, "_loadNavaids: Couldn't open \"%s\".\n", f.c_str());
-	return false;
-    } 
-
-    // Check the file version.  We can handle version 810 files.  Note
-    // that there was a mysterious (and stupid, in my opinion) change
-    // in how DMEs were formatted some time after data cycle 2007.09.
-    // So we need to check the data cycle as well.  Unfortunately, the
-    // file version line doesn't have a constant format.  We could
-    // have the following two:
-    //
-    // 810 Version - data cycle 2008.05
-    //
-    // 810 Version - DAFIF data cycle 2007.09
-    int version = -1;
-    int index;
-    float cycle = 0.0;
-    gzGetLine(arp, &line);	// Windows/Mac header
-    gzGetLine(arp, &line);	// Version
-//     sscanf(line, "%d", &version);
-    sscanf(line, "%d Version - %n", &version, &index);
-    if (strncmp(line + index, "DAFIF ", 6) == 0) {
-	index += 6;
-    }
-    sscanf(line + index, "data cycle %f", &cycle);
-    if (version == 810) {
-	// It looks like we have a valid file.
-	result = _load810(cycle, arp);
-    } else {
-	// EYE - throw an error?
-	fprintf(stderr, "_loadNavaids: \"%s\": unknown version %d.\n", 
-		f.c_str(), version);
-	result = false;
-    }
-
-    gzclose(arp);
-    printf("  ... done\n");
-
-    return result;
 }
 
 // Creates a standard VOR rose of radius 1.0.  This is a circle with
@@ -453,7 +259,7 @@ void NavaidsOverlay::_createVORRose()
 		AtlasString label;
 		label.printf("%d", i / 10);
 
-		LayoutManager lm(label.str(), globals.regularFont, pointSize);
+		LayoutManager lm(label.str(), _overlays.regularFont(), pointSize);
 		lm.setAnchor(LayoutManager::LC);
 		lm.drawText();
 	    }
@@ -945,317 +751,6 @@ static void _createTriangle(float width,
     glEnd();
 }
 
-bool NavaidsOverlay::_load810(float cycle, const gzFile& arp)
-{
-    char *line;
-
-    NAV *n;
-
-    while (gzGetLine(arp, &line)) {
-	NavType navtype;
-	NavSubType navsubtype;
-	int lineCode, offset;
-	double lat, lon;
-	int elev, freq, range;
-	float magvar;
-	char id[5];
-
-	if (strcmp(line, "") == 0) {
-	    // Blank line.
-	    continue;
-	} 
-
-	if (strcmp(line, "99") == 0) {
-	    // Last line.
-	    break;
-	}
-
-	// A line looks like this:
-	//
-	// <code> <lat> <lon> <elev> <freq> <range> <magvar> <id> <name>
-	//
-	// Where name is a string ending with a "type" (eg, a VOR,
-	// type code 3, can either be a VOR, VOR-DME, or VORTAC).
-	// This type embedded at the end of the name isn't officially
-	// in the navaid data file specification, so we can't
-	// absolutely count on it.  On the other hand, every file I've
-	// checked consistently has it, and it's useful, so we'll use
-	// it.
-	if (sscanf(line, "%d %lf %lf %d %d %d %f %s %n", &lineCode, 
-		   &lat, &lon, &elev, &freq, &range, &magvar, id, &offset)
-	    != 8) {
-	    continue;
-	}
-	line += offset;
-	assert(lineCode != 99);
-
-	// Find the "type", which is the last space-delimited string.
-	char *subType = lastToken(line);
-	assert(subType != NULL);
-
-	// We slightly alter the representation of frequencies.  In
-	// the navaid database, NDB frequencies are given in kHz,
-	// whereas VOR/ILS/DME/... frequencies are given in 10s of
-	// kHz.  We adjust the latter so that they are kHz as well.
-	if (lineCode != 2) {
-	    freq *= 10;
-	}
-
-	// EYE - is having navtype and navsubtype a good idea, or
-	// should we just stick to one or the other (presumably the
-	// latter would be better)?
-	switch (lineCode) {
-	  case 2: 
-	    navtype = NAV_NDB;
-	    if (strcmp(subType, "NDB") == 0) {
-		navsubtype = NDB;
-	    } else if (strcmp(subType, "NDB-DME") == 0) {
-		navsubtype = NDB_DME;
-	    } else if (strcmp(subType, "LOM") == 0) {
-		navsubtype = LOM;
-	    } else {
-		navsubtype = UNKNOWN;
-	    }
-	    break; 
-	  case 3: 
-	    navtype = NAV_VOR; 
-	    if (strcmp(subType, "VOR") == 0) {
-		navsubtype = VOR;
-	    } else if (strcmp(subType, "VOR-DME") == 0) {
-		navsubtype = VOR_DME;
-	    } else if (strcmp(subType, "VORTAC") == 0) {
-		navsubtype = VORTAC;
-	    } else {
-		navsubtype = UNKNOWN;
-	    }
-	    break; 
-	  case 4: 
-	    if (strcmp(subType, "IGS") == 0) {
-		navsubtype = IGS;
-	    } else if (strcmp(subType, "ILS-cat-I") == 0) {
-		navsubtype = ILS_cat_I;
-	    } else if (strcmp(subType, "ILS-cat-II") == 0) {
-		navsubtype = ILS_cat_II;
-	    } else if (strcmp(subType, "ILS-cat-III") == 0) {
-		navsubtype = ILS_cat_III;
-	    } else if (strcmp(subType, "LDA-GS") == 0) {
-		navsubtype = LDA_GS;
-	    } else {
-		navsubtype = UNKNOWN;
-	    }
-	    // EYE - have a NAV_ILS and NAV_LOC?
-	    navtype = NAV_ILS; 
-	    break; 
-	  case 5: 
-	    if (strcmp(subType, "LDA") == 0) {
-		navsubtype = LDA;
-	    } else if (strcmp(subType, "LOC") == 0) {
-		navsubtype = LOC;
-	    } else if (strcmp(subType, "SDF") == 0) {
-		navsubtype = SDF;
-	    } else {
-		navsubtype = UNKNOWN;
-	    }
-	    navtype = NAV_ILS; 
-	    break; 
-	  case 6: 
-	    // EYE - if we only have one subtype, forget the whole
-	    // subtype business?
-	    if (strcmp(subType, "GS") == 0) {
-		navsubtype = GS;
-	    } else {
-		navsubtype = UNKNOWN;
-	    }
-	    navtype = NAV_GS; 
-	    break;  
-	  case 7: 
-	    if (strcmp(subType, "OM") == 0) {
-		// Since the navaid database specifies no range for
-		// markers, we set our own, such that it is bigger
-		// than the marker's rendered size.
-		range = markerRange;
-		navsubtype = OM;
-	    } else {
-		navsubtype = UNKNOWN;
-	    }
-	    navtype = NAV_OM; 
-	    break;  
-	  case 8: 
-	    if (strcmp(subType, "MM") == 0) {
-		range = markerRange;
-		navsubtype = MM;
-	    } else {
-		navsubtype = UNKNOWN;
-	    }
-	    navtype = NAV_MM; 
-	    break;  
-	  case 9: 
-	    if (strcmp(subType, "IM") == 0) {
-		range = markerRange;
-		navsubtype = IM;
-	    } else {
-		navsubtype = UNKNOWN;
-	    }
-	    navtype = NAV_IM; 
-	    break;  
-	  case 12: 
-	  case 13: 
-	    // Due to the "great DME shift" of 2007.09, we need to do
-	    // extra processing to handle DMEs.  Here's the picture:
-	    //
-	    // Before:			After:
-	    // Foo Bar DME-ILS		Foo Bar DME-ILS
-	    // Foo Bar DME		Foo Bar DME
-	    // Foo Bar NDB-DME		Foo Bar NDB-DME DME
-	    // Foo Bar TACAN		Foo Bar TACAN DME
-	    // Foo Bar VORTAC		Foo Bar VORTAC DME
-	    // Foo Bar VOR-DME		Foo Bar VOR-DME DME
-	    //
-	    // The subType is now less useful, only telling us about
-	    // DME-ILSs.  To find out the real subtype, we need to
-	    // back one more token and look at that.  However, that
-	    // doesn't work for "pure" DMEs (ie, "Foo Bar DME").  So,
-	    // if the next token isn't NDB-DME, TACAN, VORTAC, or
-	    // VOR-DME, then we must be looking at a pure DME.
-
-	    if ((cycle > 2007.09) && (strcmp(subType, "DME-ILS") != 0)) {
-		// New format.  Yuck.  We need to find the "real"
-		// subType by looking back one token.
-		char *subSubType = lastToken(line, subType);
-		if ((strncmp(subSubType, "NDB-DME", 7) == 0) ||
-		    (strncmp(subSubType, "TACAN", 5) == 0) ||
-		    (strncmp(subSubType, "VORTAC", 6) == 0) ||
-		    (strncmp(subSubType, "VOR-DME", 7) == 0)) {
-		    // The sub-subtype is the real subtype (getting
-		    // confused?).  Terminate the string, and make
-		    // subType point to subSubType.
-		    subType--;
-		    *subType = '\0';
-		    subType = subSubType;
-		}
-	    }
-
-	    // Because DMEs are often paired with another navaid, we
-	    // tend to ignore them, assuming that we've already
-	    // created a navaid for them already.  The ones ignored
-	    // are: VOR-DME, VORTAC, and NDB-DME.  We don't ignore
-	    // DME-ILSs because, although paired with an ILS, their
-	    // location is usually different.
-	    if (strcmp(subType, "DME-ILS") == 0) {
-		navsubtype = DME_ILS;
-	    } else if (strcmp(subType, "TACAN") == 0) {
-		// TACANs are drawn like VOR-DMEs, but with the lobes
-		// not filled in.  They can provide directional
-		// guidance, so they should have a compass rose.
-		// Unfortunately, the nav.dat file doesn't tell us the
-		// magnetic variation for the TACAN, so it can't be
-		// used.
-		navsubtype = TACAN;
-	    } else if (strcmp(subType, "VOR-DME") == 0) {
-		navsubtype = VOR_DME;
-		continue;
-	    } else if (strcmp(subType, "VORTAC") == 0) {
-		navsubtype = VORTAC;
-		continue;
-	    } else if (strcmp(subType, "DME") == 0) {
-		// EYE - For a real stand-alone DME, check lo1.pdf,
-		// Bonnyville Y3, 109.8 (N54.31, W110.74, near Cold
-		// Lake, east of Edmonton).  It is drawn as a simple
-		// DME square (grey, as is standard on Canadian maps
-		// it seems, although lo1.pdf is not a VFR map).
-		navsubtype = DME;
-	    } else if (strcmp(subType, "NDB-DME") == 0) {
-		// We ignore NDB-DMEs, in the sense that we don't
-		// create a navaid entry for them.  However, we do add
-		// their frequency to the corresponding NDB.
-		navsubtype = NDB_DME;
-		// EYE - very crude
-		unsigned int i;
-		for (i = 0; i < _navaids.size(); i++) {
-		    NAV *o = _navaids[i];
-		    // EYE - look at name too
-		    if ((o->navtype == NAV_NDB) && 
-			(o->navsubtype == NDB_DME) && 
-			(o->id == id)) {
-			o->freq2 = freq;
-			break;
-		    }
-		}
-		if (i == _navaids.size()) {
-		    printf("No matching NDB for NDB-DME %s (%s)\n", id, line);
-		}
-		continue;
-	    } else {
-		navsubtype = UNKNOWN;
-	    }
-	    navtype = NAV_DME; 
-	    // For DMEs, magvar represents the DME bias, in nautical
-	    // miles (which we convert to metres).
-	    magvar *= SG_NM_TO_METER;
-	    break;
-	  default:
-	    assert(false);
-	    break;
-	}
-	if (navsubtype == UNKNOWN) {
-	    printf("UNKNOWN: %s\n", line);
-	}
-
-	if (navtype == NAV_ILS) {
-	    // For ILS elements, the name is <airport> <runway>.  I
-	    // don't care about the airport, so skip it.
-	    // EYE - check return?
-	    sscanf(line, "%*s %n", &offset);
-	    line += offset;
-	}
-
-	// Create a record and fill it in.
-	n = new NAV;
-	n->navtype = navtype;
-	n->navsubtype = navsubtype;
-
-	n->lat = lat;
-	n->lon = lon;
-	// EYE - in flight tracks, we save elevations (altitudes?) in
-	// feet, but here we use metres.  Should we change one?
-	n->elev = elev * SG_FEET_TO_METER;
-	n->freq = freq;
-	n->range = range * SG_NM_TO_METER;
-	n->magvar = magvar;
-
-	n->id = id;
-	n->name = line;
-	// EYE - this seems rather hacky and unreliable.
-	n->name.erase(subType - line - 1);
-
-	// Add to the culler.  The navaid bounds are given by its
-	// center and range.
-	sgdVec3 center;
-	atlasGeodToCart(lat, lon, elev * SG_FEET_TO_METER, center);
-
-	n->bounds.setCenter(center);
-	n->bounds.setRadius(n->range);
-
-	// Add to our culler.
-	_frustum->culler().addObject(n);
-
-	// Add to the navaids vector.
-	_navaids.push_back(n);
-
-	// Create search tokens for it.
-	globals.searcher.add(n);
-
-	// Add to the navPoints map.
-	NAVPOINT foo;
-	foo.isNavaid = true;
-	foo.n = (void *)n;
-	navPoints.insert(pair<string, NAVPOINT>(n->id, foo));
-    }
-
-    // EYE - will there ever be a false return?
-    return true;
-}
-
 void NavaidsOverlay::setDirty()
 {
     _VORDirty = true;
@@ -1264,14 +759,15 @@ void NavaidsOverlay::setDirty()
     _DMEDirty = true;
 }
 
-void NavaidsOverlay::drawVORs()
+void NavaidsOverlay::drawVORs(NavData *navData)
 {
     if (_VORDirty) {
 	// Something's changed, so we need to regenerate the VOR
 	// display list.
 	assert(_VORDisplayList != 0);
 	glNewList(_VORDisplayList, GL_COMPILE); {
-	    const vector<Cullable *>& intersections = _frustum->intersections();
+	    const vector<Cullable *>& intersections = 
+		navData->hits(NavData::NAVAIDS);
 	    for (unsigned int i = 0; i < intersections.size(); i++) {
 		NAV *n = dynamic_cast<NAV *>(intersections[i]);
 		if (!n || (n->navtype != NAV_VOR)) {
@@ -1290,14 +786,15 @@ void NavaidsOverlay::drawVORs()
     glCallList(_VORDisplayList);
 }
 
-void NavaidsOverlay::drawNDBs()
+void NavaidsOverlay::drawNDBs(NavData *navData)
 {
     if (_NDBDirty) {
 	// Something's changed, so we need to regenerate the NDB
 	// display list.
 	assert(_NDBDisplayList != 0);
 	glNewList(_NDBDisplayList, GL_COMPILE); {
-	    const vector<Cullable *>& intersections = _frustum->intersections();
+	    const vector<Cullable *>& intersections = 
+		navData->hits(NavData::NAVAIDS);
 	    for (unsigned int i = 0; i < intersections.size(); i++) {
 		NAV *n = dynamic_cast<NAV *>(intersections[i]);
 		if (!n || (n->navtype != NAV_NDB)) {
@@ -1316,17 +813,17 @@ void NavaidsOverlay::drawNDBs()
     glCallList(_NDBDisplayList);
 }
 
-void NavaidsOverlay::drawILSs()
+void NavaidsOverlay::drawILSs(NavData *navData)
 {
     if (_ILSDirty) {
 	// Something's changed, so we need to regenerate the ILS
 	// display list.
-	const vector<Cullable *>& intersections = _frustum->intersections();
-
 	assert(_ILSDisplayList != 0);
 	glNewList(_ILSDisplayList, GL_COMPILE); {
 	    // We do all markers first, then all the ILS systems.
 	    // This ensures that markers don't obscure the localizers.
+	    const vector<Cullable *>& intersections = 
+		navData->hits(NavData::NAVAIDS);
 	    for (unsigned int i = 0; i < intersections.size(); i++) {
 		NAV *n = dynamic_cast<NAV *>(intersections[i]);
 		assert(n);
@@ -1360,14 +857,15 @@ void NavaidsOverlay::drawILSs()
     glCallList(_ILSDisplayList);
 }
 
-void NavaidsOverlay::drawDMEs()
+void NavaidsOverlay::drawDMEs(NavData *navData)
 {
     if (_DMEDirty) {
 	// Something's changed, so we need to regenerate the DME
 	// display list.
 	assert(_DMEDisplayList != 0);
 	glNewList(_DMEDisplayList, GL_COMPILE); {
-	    const vector<Cullable *>& intersections = _frustum->intersections();
+	    const vector<Cullable *>& intersections = 
+		navData->hits(NavData::NAVAIDS);
 	    for (unsigned int i = 0; i < intersections.size(); i++) {
 		NAV *n = dynamic_cast<NAV *>(intersections[i]);
 		if (!n || (n->navtype != NAV_DME)) {
@@ -1397,59 +895,6 @@ void NavaidsOverlay::drawDMEs()
     }
 
     glCallList(_DMEDisplayList);
-}
-
-// Returns navaids within range.
-const vector<Cullable *>& NavaidsOverlay::getNavaids(sgdVec3 p)
-{
-    static vector<Cullable *> results;
-
-    results.clear();
-
-    // EYE - should we do this?
-    _point->move(p);
-    results = _point->intersections();
-
-    return results;
-}
-
-// Returns navaids within range and which are tuned in (as given by
-// 'p').
-const vector<Cullable *>& NavaidsOverlay::getNavaids(FlightData *p)
-{
-    static vector<Cullable *> results;
-
-    results.clear();
-
-    if (p == NULL) {
-	return results;
-    }
-
-    // We don't do anything if this is from an NMEA track.
-    // Unfortunately, there's no explicit marker in a FlightData
-    // structure that tells us what kind of track it is.  However,
-    // NMEA tracks have their frequencies and radials set to 0, so we
-    // just check for that (and in any case, if frequencies are 0, we
-    // won't match any navaids anyway).
-    if ((p->nav1_freq == 0) && (p->nav2_freq == 0) && (p->adf_freq == 0)) {
-	return results;
-    }
-
-    const vector<Cullable *>& navaids = getNavaids(p->cart);
-	
-    for (unsigned int i = 0; i < navaids.size(); i++) {
-	NAV *n = dynamic_cast<NAV *>(navaids[i]);
-	assert(n);
-	if (p->nav1_freq == n->freq) {
-	    results.push_back(n);
-	} else if (p->nav2_freq == n->freq) {
-	    results.push_back(n);
-	} else if (p->adf_freq == n->freq) {
-	    results.push_back(n);
-	}
-    }
-
-    return results;
 }
 
 // Drawing strategy:
@@ -1578,7 +1023,8 @@ void NavaidsOverlay::_renderVOR(const NAV *n)
 		glPushMatrix(); {
 		    glRotatef(-rad, 0.0, 0.0, 1.0);
 		    glScalef(n->range, n->range, n->range);
-		    _createTriangle(angularWidth, clearColour, vor1Colour);
+		    _createTriangle(angularWidth, clearColour, 
+				    globals.vor1Colour);
 		}
 		glPopMatrix();
 	    }
@@ -1587,7 +1033,8 @@ void NavaidsOverlay::_renderVOR(const NAV *n)
 		glPushMatrix(); {
 		    glRotatef(-rad, 0.0, 0.0, 1.0);
 		    glScalef(n->range, n->range, n->range);
-		    _createTriangle(angularWidth, clearColour, vor2Colour);
+		    _createTriangle(angularWidth, clearColour, 
+				    globals.vor2Colour);
 		}
 		glPopMatrix();
 	    }
@@ -1744,7 +1191,8 @@ void NavaidsOverlay::_renderNDB(const NAV *n)
 				   &rad, &end, &l);
 		glRotatef(180.0 - rad, 0.0, 0.0, 1.0);
 		glScalef(n->range, n->range, n->range);
-		_createTriangle(angularWidth, adfColour, adfColour, false);
+		_createTriangle(angularWidth, globals.adfColour, 
+				globals.adfColour, false);
 	    }
 	    glPopMatrix();
 	}
@@ -1821,11 +1269,11 @@ void NavaidsOverlay::_renderILS(const NAV *n)
 	    // drawn to its true length, and we use the radio colour
 	    // to colour it.
 	    ilsLength = n->range;
-	    ilsColour = vor1Colour;
+	    ilsColour = globals.vor1Colour;
 	    live = true;
 	} else if (n->freq == _p->nav2_freq) {
 	    ilsLength = n->range;
-	    ilsColour = vor2Colour;
+	    ilsColour = globals.vor2Colour;
 	    live = true;
 	}
     }
@@ -1885,9 +1333,6 @@ void NavaidsOverlay::_renderILS(const NAV *n)
 	// Label the ILS.
 	if (_overlays.isVisible(Overlays::LABELS) &&
 	    (ilsLength / _metresPerPixel > minimumScale)) {
-	    fntRenderer& f = globals.fontRenderer;
-	    f.setPointSize(labelPointSize * _metresPerPixel);
-
 	    // EYE - shrink this as we zoom out?
 	    glPushMatrix(); {
 		if (n->magvar < 180.0) {
@@ -1913,7 +1358,7 @@ void NavaidsOverlay::_renderILS(const NAV *n)
 		    offset = 0.5 * ilsLength;
 		}
 
-		float pointSize = f.getPointSize();
+		float pointSize = labelPointSize * _metresPerPixel;
 		// We draw the ILS in a single style, but it might be
 		// better to alter it depending on the scale.
 		_drawLabel("RWY %N\n%F %I %M", n, pointSize, offset, 0.0);
@@ -1923,12 +1368,12 @@ void NavaidsOverlay::_renderILS(const NAV *n)
 		offset *= 1.75;
 		LayoutManager lm;
 		// EYE - magic number
-		lm.setFont(globals.regularFont, pointSize * 1.25);
+		lm.setFont(_overlays.regularFont(), pointSize * 1.25);
 		lm.begin(offset, 0.0);
 		// EYE - just record this once, when the navaid is loaded?
 		double magvar = 0.0;
 		const char *magTrue = "T";
-		if (globals.magnetic) {
+		if (_overlays.ac()->magTrue()) {
 		    magvar = magneticVariation(n->lat, n->lon, n->elev);
 		    magTrue = "";
 		}
@@ -1937,8 +1382,8 @@ void NavaidsOverlay::_renderILS(const NAV *n)
 		// EYE - we should add the glideslope too, if it has
 		// one (eg, "284@3.00")
 
-		globalString.printf("%03d%c%s", heading, degreeSymbol, magTrue);
-		lm.addText(globalString.str());
+		globals.str.printf("%03d%c%s", heading, degreeSymbol, magTrue);
+		lm.addText(globals.str.str());
 		lm.end();
 
 		glColor4fv(ils_label_colour);
@@ -2217,7 +1662,7 @@ Label *NavaidsOverlay::_makeLabel(const char *fmt, const NAV *n,
 
     // Set our font and find out what our ascent is (_morseWidth and
     // _renderMorse need it).
-    l->lm.setFont(globals.regularFont, labelPointSize);
+    l->lm.setFont(_overlays.regularFont(), labelPointSize);
     float ascent = l->lm.font()->ascent() * labelPointSize;
 
     // Go through the format string once, using the layout manager to
@@ -2350,27 +1795,16 @@ void NavaidsOverlay::_drawLabel(Label *l)
     l->lm.drawText();
 }
 
-bool NavaidsOverlay::notification(Notification::type n)
+void NavaidsOverlay::notification(Notification::type n)
 {
     if (n == Notification::Moved) {
-	// Update our frustum from globals and record ourselves as
-	// dirty.
-	_frustum->move(globals.modelViewMatrix);
 	setDirty();
     } else if (n == Notification::Zoomed) {
-	// Update our frustum and scale from globals and record
-	// ourselves as dirty.
-	_frustum->zoom(globals.frustum.getLeft(),
-		       globals.frustum.getRight(),
-		       globals.frustum.getBot(),
-		       globals.frustum.getTop(),
-		       globals.frustum.getNear(),
-		       globals.frustum.getFar());
-	_metresPerPixel = globals.metresPerPixel;
+	_metresPerPixel = _overlays.aw()->scale();
 	setDirty();
     } else if ((n == Notification::AircraftMoved) ||
 	       (n == Notification::NewFlightTrack)) {
-	_p = globals.currentPoint();
+	_p = _overlays.ac()->currentPoint();
 
 	// The aircraft moved, or we loaded a new flight track.  We
 	// may have to update how "live" radios are drawn.
@@ -2378,7 +1812,7 @@ bool NavaidsOverlay::notification(Notification::type n)
 	    // No flight data, so no flight track.  We'll probably need to
 	    // redraw any radio "beams".
 	    setDirty();
-	    return true;
+	    return;
 	}
 
 	// Check if the radios have changed.  If so, set the
@@ -2416,6 +1850,4 @@ bool NavaidsOverlay::notification(Notification::type n)
     } else {
 	assert(false);
     }
-
-    return true;
 }

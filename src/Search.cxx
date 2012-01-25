@@ -3,7 +3,7 @@
 
   Written by Brian Schack, started July 2007.
 
-  Copyright (C) 2007 - 2011 Brian Schack
+  Copyright (C) 2007 - 2012 Brian Schack
 
   This file is part of Atlas.
 
@@ -31,18 +31,12 @@
 void _list_cb(puObject *cb);
 void _down_cb(puObject *cb);
 
-Search::Search(int minx, int miny, int maxx, int maxy) :
+Search::Search(int minx, int miny, int maxx, int maxy):
     puGroup(minx, miny)
 {
     // Initialize variables to reasonable default values.
     _lines = NULL;
     _numOfLines = 0;
-
-    _cb = NULL;
-    _select_cb = NULL;
-    _input_cb = NULL;
-    _size_cb = NULL;
-    _data_cb = NULL;
 
     _top = _bottom = _above = _below = 0;
     _selected = -1;
@@ -54,12 +48,6 @@ Search::Search(int minx, int miny, int maxx, int maxy) :
     _input->setUserData(this);
     _input->setStyle(PUSTYLE_SMALL_SHADED);
     
-    // EYE - What does this really do?
-//     /* Share 'string' value with input box */
-//     char *stringval ;
-//     input->getValue(&stringval);
-//     setValuator(stringval);
-
     _list = new puListBox(0, 0, maxx - minx, maxy - miny - 10);
     _list->setStyle(PUSTYLE_PLAIN);
     _list->setUserData(this);
@@ -93,43 +81,15 @@ void Search::reloadData()
     _setSelected(-1, true);
 }
 
-// Called when the user hits return.
-void Search::setCallback(void(*cb)(Search *, int))
-{
-    _cb = cb;
-}
-
-// Called whenever the selection changes.
-void Search::setSelectCallback(void(*cb)(Search *, int))
-{
-    _select_cb = cb;
-}
-
-// Called whenever the search string changes.
-void Search::setInputCallback(void(*cb)(Search *, const char *))
-{
-    _input_cb = cb;
-}
-
-// Called when we need to find out the size of the data array.
-void Search::setSizeCallback(int(*cb)(Search *))
-{
-    _size_cb = cb;
-}
-
-// Called when we need to get an entry in the data array.
-void Search::setDataCallback(char *(*cb)(Search *, int))
-{
-    _data_cb = cb;
-}
-
 // Sets the font, readjusts the input field, recalculates _numOfLines
 // and redisplays the current data.
 void Search::setFont(puFont font)
 {
     _input->setLegendFont(font);
     _list->setLegendFont(font);
+    // _setSizes();
     _setSizes();
+    reloadData();
 }
 
 void Search::draw(int dx, int dy)
@@ -137,9 +97,6 @@ void Search::draw(int dx, int dy)
     if (!visible || (window != puGetWindow())) {
 	return;
     }
-
-    // EYE - why?
-//     draw_label(dx, dy);
 
     puGroup::draw(dx, dy);
 }
@@ -176,9 +133,7 @@ int Search::checkKey(int key, int updown)
 	_setSelected(0);
 	break;
       case PU_KEY_END:
-	if (_size_cb != NULL) {
-	    _setSelected(_size_cb(this) - 1);
-	}
+	_setSelected(noOfMatches() - 1);
 	break;
       case PU_KEY_UP:
 	_setSelected(_selected - 1);
@@ -202,24 +157,20 @@ int Search::checkKey(int key, int updown)
 	break;
       case 13:
 	// Return.  We notify the user, then hide ourselves.
-	if (_cb != NULL) {
-	    if ((_selected == -1) && (_realLines() > 0)) {
-		// Special case.  If nothing is selected, then we
-		// interpret a return to mean "I want the first one",
-		// regardless of whether it's selected or not.
-		_cb(this, _top);
-	    } else {
-		_cb(this, _selected);
-	    }
+	if ((_selected == -1) && (_realLines() > 0)) {
+	    // Special case.  If nothing is selected, then we
+	    // interpret a return to mean "I want the first one",
+	    // regardless of whether it's selected or not.
+	    searchFinished(_top);
+	} else {
+	    searchFinished(_selected);
 	}
 	hide();
 	break;
       case 27:
 	// Escape.  We tell the user there's no selection, then hide
 	// ourselves.
-	if (_cb != NULL) {
-	    _cb(this, -1);
-	}
+	searchFinished(-1);
 	hide();
 	break;
       default:
@@ -234,9 +185,7 @@ int Search::checkKey(int key, int updown)
 	if (result) {
 	    if (strcmp(before, searchString()) != 0) {
 		// The string has changed.  Tell the user.
-		if (_input_cb != NULL) {
-		    _input_cb(this, searchString());
-		}
+		searchStringChanged(searchString());
 	    }
 	}
 	free(before);
@@ -278,9 +227,7 @@ void Search::__list_cb()
 	// user.
 	if ((selectedLine + _above - _top) != _selected) {
 	    _selected = selectedLine + _above - _top;
-	    if (_select_cb != NULL) {
-		_select_cb(this, _selected);
-	    }
+	    searchItemSelected(_selected);
 	}
     }
 }
@@ -322,9 +269,6 @@ void Search::_setSizes()
     for (int i = 0; i <= _numOfLines; i++) {
 	_lines[i] = NULL;
     }
-
-    // Fill it in.
-    reloadData();
 }
 
 // Sets _selected to the given value, updating the list value (the
@@ -337,11 +281,7 @@ void Search::_setSelected(int s, bool reset)
 {
     int size;
 
-    if ((_size_cb == NULL) || (_data_cb == NULL)) {
-	return;
-    }
-
-    size = _size_cb(this);
+    size = noOfMatches();
     if (reset) {
 	s = -1;
     } else {
@@ -411,7 +351,8 @@ void Search::_setSelected(int s, bool reset)
 	    // Strings.  We don't copy the string data, but we are
 	    // owners of it, and free it when we're finished.
 	    free(_lines[i]);
-	    _lines[i] = _data_cb(this, i + _above - _top);
+	    // _lines[i] = _data_cb(this, i + _above - _top);
+	    _lines[i] = matchAtIndex(i + _above - _top);
 	}
 	for (; i < _numOfLines - 1; i++) {
 	    // Blank lines.
@@ -436,9 +377,7 @@ void Search::_setSelected(int s, bool reset)
     }
 
     // Tell the user the selection has changed.
-    if (_select_cb != NULL) {
-	_select_cb(this, _selected);
-    }
+    searchItemSelected(_selected);
 }
 
 // Returns true if the value (representing an index into the data
@@ -447,11 +386,7 @@ bool Search::_inRange(int s)
 {
     int size;
 
-    if (_size_cb == NULL) {
-	return false;
-    }
-
-    size = _size_cb(this);
+    size = noOfMatches();
     if (s < _above) {
 	return false;
     }

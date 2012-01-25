@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2011 Brian Schack
+  Copyright (C) 2009 - 2012 Brian Schack
 
   The flight tracks overlay manages the display of flight tracks.
 
@@ -33,11 +33,11 @@
 #include "Notifications.hxx"
 #include "Scenery.hxx"
 
-struct TRACK_INFO {
-    sgVec4 trackColour;
-    sgVec4 planeColour;
-    GLuint DL;
-};
+// struct TRACK_INFO {
+//     sgVec4 trackColour;
+//     sgVec4 planeColour;
+//     GLuint DL;
+// };
 
 class Overlays;
 class FlightTracksOverlay: public Subscriber {
@@ -45,25 +45,26 @@ class FlightTracksOverlay: public Subscriber {
     FlightTracksOverlay(Overlays& overlays);
     ~FlightTracksOverlay();
 
-    // Adds the given track, which it will display with trackColour,
-    // and the plane with planeColour.
-    void addTrack(FlightTrack *t, sgVec4 trackColour, sgVec4 planeColour);
-    // Removes the given track.  If t is NULL, it removes all tracks.
-    void removeTrack(FlightTrack *t = NULL);
+    // // Adds the given track, which it will display with trackColour,
+    // // and the plane with planeColour.
+    // void addTrack(FlightTrack *t, sgVec4 trackColour, sgVec4 planeColour);
+    // // Removes the given track.  If t is NULL, it removes all tracks.
+    // void removeTrack(FlightTrack *t = NULL);
 
     void setDirty();
 
     void draw();
 
     // Subscriber interface.
-    bool notification(Notification::type n);
+    void notification(Notification::type n);
 
   protected:
     Overlays& _overlays;
 
-    std::map<FlightTrack*, TRACK_INFO> _tracks;
+    // std::map<FlightTrack*, TRACK_INFO> _tracks;
 
     bool _isDirty;
+    GLuint _dl;
 
     // Aircraft icon.
     void _drawAirplane(FlightData *d, const sgVec4 colour);

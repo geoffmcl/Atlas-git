@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2008 - 2011 Brian Schack
+  Copyright (C) 2008 - 2012 Brian Schack
 
   The scenery object is responsible for loading and displaying
   scenery, whether that scenery comes in the form of pre-rendered maps
@@ -39,6 +39,7 @@
 #include "Notifications.hxx"
 #include "Tiles.hxx"
 #include "Cache.hxx"
+#include "AtlasBaseWindow.hxx"
 
 // Handles loading and unloading of a single texture (ie, map).  The
 // texture doesn't know how to draw itself.
@@ -71,22 +72,25 @@ class Texture {
 };
 
 class SceneryTile;
-class Scenery: public Subscriber {
+class Scenery {
   public:
     // A Scenery object needs a TileManager to get tile information,
     // and needs to know what window to display everything into (this
     // is mostly because textures are loaded asynchronously, and we
     // need to make sure that the textures are being created in the
     // right OpenGL context).
-    Scenery(TileManager *tm, int window);
+    Scenery(TileManager *tm, AtlasBaseWindow *win);
     ~Scenery();
+
+    AtlasBaseWindow *win() { return _win; }
 
     void setBackgroundImage(const SGPath& f);
 
-    void move(const sgdMat4 modelViewMatrix);
+    void move(const sgdMat4 modelViewMatrix, const sgdVec3 eye);
     void zoom(const sgdFrustum& frustum, double metresPerPixel);
+    void setMEFs(bool elevationLabels) { _MEFs = elevationLabels; }
 
-    void draw(bool elevationLabels);
+    void draw(bool lightingOn);
 
     bool live() const { return _live; }
     unsigned int level() const { return _level; }
@@ -109,17 +113,17 @@ class Scenery: public Subscriber {
     bool intersection(double x, double y, SGVec3<double> *c, 
 		      bool *validElevation = NULL);
 
-    // This will get called when we receive a notification.
-    bool notification(Notification::type n);
-
   protected:
     void _createWorlds(bool force = false);
 
     void _label(bool live);
 
+    AtlasBaseWindow *_win;	// Our owning window.
     bool _dirty;		// True if the eyepoint has moved or
 				// we've zoomed.
+    bool _MEFs;			// True if we need to draw MEFs.
 
+    sgdVec3 _eye;		// Our eye point (used by the cache).
     double _metresPerPixel;	// Current zoom level.
     unsigned int _level;	// Current texture level to display.
     bool _live;			// True if we need to display live scenery.

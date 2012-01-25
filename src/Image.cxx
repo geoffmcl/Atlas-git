@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2011 Brian Schack
+  Copyright (C) 2009 - 2012 Brian Schack
 
   This file is part of Atlas.
 
@@ -274,14 +274,15 @@ void saveJPEG(const char *file, int quality,
     // We want to pass the maximum elevation along with the image, so
     // we insert it as the marker "Map Maximum Elevation <elev>",
     // where <elev> is in feet, rounded to the nearest foot.
-    globalString.printf("Map Maximum Elevation %.0f", maxElev);
+    AtlasString str;
+    str.printf("Map Maximum Elevation %.0f", maxElev);
     // We use the marker type APP1 (APP0, APP8, and APP14 are commonly
     // used by other applications, and the COM marker should be used
     // for user comments, not program-supplied data).  Note: a JOCTET
     // is 8 bits wide.
     jpeg_write_marker(&cinfo, JPEG_APP0 + 1, 
-		      (const JOCTET *)globalString.str(), 
-		      strlen(globalString.str()) + 1);
+		      (const JOCTET *)str.str(), 
+		      strlen(str.str()) + 1);
 
     while (cinfo.next_scanline < cinfo.image_height) {
 	// A little bit of hackiness.  The jpeg library expects an
@@ -336,11 +337,12 @@ void savePNG(const char *file,
     // we place it in a text comment structure.  The keyword is "Map
     // Maximum Elevation", and the text is the elevation (in feet,
     // rounded to the nearest foot).
-    globalString.printf("%.0f", maxElev);
+    AtlasString str;
+    str.printf("%.0f", maxElev);
 
     png_text text_ptr[1];
     text_ptr[0].key = (char *)"Map Maximum Elevation";
-    text_ptr[0].text = (char *)globalString.str();
+    text_ptr[0].text = (char *)str.str();
     text_ptr[0].compression = PNG_TEXT_COMPRESSION_NONE;
     png_set_text(png_ptr, info_ptr, text_ptr, 1);
 

@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2011 Brian Schack
+  Copyright (C) 2009 - 2012 Brian Schack
 
   This file is part of Atlas.
 
@@ -544,8 +544,6 @@ const char *AtlasString::_appendf(const char *fmt, va_list ap)
     return _buf;
 }
 
-AtlasString globalString;
-
 // // next-largest power of 2 (nlpo2)
 // //
 // // From 
@@ -632,4 +630,91 @@ void atlasCartToGeod(double *cart, double *lat, double *lon, double *alt)
     sgCartToGeod(cart, lat, lon, alt);
     *lat *= SGD_RADIANS_TO_DEGREES;
     *lon *= SGD_RADIANS_TO_DEGREES;
+}
+
+//////////////////////////////////////////////////////////////////////
+// AtlasDialog
+//////////////////////////////////////////////////////////////////////
+
+// Create a generic dialog box, with the given buttons.  The dialog
+// will have the given text, and call 'cb' when done.  The left
+// button's default integer value is set to LEFT, the middle's to
+// MIDDLE, and the right's to RIGHT.  An empty or null string will
+// have no button.  The button which was pressed will be passed to the
+// callback, so you can check its default integer value to find out
+// which one was pressed.  The callback must delete the dialog (using
+// puDeleteObject) and set it to NULL.  All of the buttons will be
+// assigned the given user data.
+
+// EYE - use a vararg instead?
+AtlasDialog::AtlasDialog(const char *msg, const char *leftLabel, 
+			 const char *middleLabel, const char *rightLabel, 
+			 puCallback cb, void *data):
+    puDialogBox(0, 0), _cb(cb)
+{
+    // EYE - magic numbers (and many others later).
+    const int dialogWidth = 300;
+    const int dialogHeight = 100;
+
+    // _x is used to place buttons.  When a new button is created, we
+    // expect it to be at the left edge of the previously placed
+    // button.
+    _x = dialogWidth;
+
+    // Place the dialog box in the centre of the window.
+    GLint viewport[4];
+    glGetIntegerv(GL_VIEWPORT, viewport);
+    GLint windowWidth = viewport[2];
+    GLint windowHeight = viewport[3];
+    setPosition(windowWidth / 2 - dialogWidth / 2,
+		windowHeight / 2 + dialogHeight / 2);
+
+    // Create a frame with the message.
+    new puFrame(0, 0, dialogWidth, dialogHeight); {
+	_label = new puText(10, dialogHeight - 30);
+
+	// I copy the string so that the caller is free to do whatever
+	// he/she wants with the string passed in.  We free this copy
+	// in our destructor.
+	_label->setLabel(strdup(msg));
+
+	// Create the buttons from right to left.  Note that I don't
+	// check if the strings are NULL - strcmp() seems to be smart
+	// enough to handle that.
+	if (strcmp(rightLabel, "") != 0) {
+	    puOneShot *right = _makeButton(rightLabel, RIGHT, data);
+	}
+	if (strcmp(middleLabel, "") != 0) {
+	    puOneShot *middle = _makeButton(middleLabel, MIDDLE, data);
+	}
+	if (strcmp(leftLabel, "") != 0) {
+	    puOneShot *left = _makeButton(leftLabel, LEFT, data);
+	}
+    }
+    close();
+    reveal();
+}
+
+AtlasDialog::~AtlasDialog()
+{
+    free((void *)_label->getLabel());
+}
+
+puOneShot *AtlasDialog::_makeButton(const char *label, CallbackButton pos,
+				    void *data)
+{
+    // We'll adjust its position later.
+    puOneShot *button = new puOneShot(0, 0, label);
+    button->setCallback(_cb);
+    button->setUserData(data);
+    button->setDefaultValue(pos);
+
+    // EYE - magic number
+    const int spacing = 10;
+    int width, height;
+    button->getSize(&width, &height);
+    _x -= spacing + width;
+    button->setPosition(_x, spacing);
+
+    return button;
 }

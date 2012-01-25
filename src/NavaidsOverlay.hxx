@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2011 Brian Schack
+  Copyright (C) 2009 - 2012 Brian Schack
 
   Loads and draws navaids (VORs, NDBs, ILS systems, and DMEs).
 
@@ -39,49 +39,7 @@
 #include "FlightTrack.hxx"
 #include "Searcher.hxx"
 #include "Notifications.hxx"
-
-// EYE - change to VOR, DME, NDB, ...?
-enum NavType {NAV_VOR, NAV_DME, NAV_NDB, NAV_ILS, NAV_GS, 
-	      NAV_OM, NAV_MM, NAV_IM};
-enum NavSubType {DME, DME_ILS, GS, IGS, ILS_cat_I, ILS_cat_II, ILS_cat_III, 
-		 IM, LDA, LDA_GS, LOC, LOM, MM, NDB, NDB_DME, OM, SDF, TACAN, 
-		 VOR, VOR_DME, VORTAC, UNKNOWN};
-
-struct NAV: public Searchable, Cullable {
-  public:
-    // Searchable interface.
-    const double *location() const { return bounds.center; }
-    virtual double distanceSquared(const sgdVec3 from) const;
-    virtual const std::vector<std::string>& tokens();
-    virtual const std::string& asString();
-
-    // Cullable interface.
-    const atlasSphere& Bounds() { return bounds; }
-    double latitude() { return lat; }
-    double longitude() { return lon; }
-
-    std::string name, id;
-    NavType navtype;
-    NavSubType navsubtype;
-    // lat, lon - location (degrees)
-    double lat, lon;
-    // elev - elevation (metres)
-    // freq - frequency (kHz)
-    // range - range (metres)
-    int elev, freq, range, freq2;
-    // magvar means different things for different navaids:
-    //   NDB - magnetic variation from true north (degrees)
-    //   VOR/VORTAC - slaved variation from true north (degrees)
-    //   ILS - true heading (degrees)
-    //   GS - ssshhh.hhh - slope * 100,000 and true heading (degrees)
-    //   DME - bias (metres)
-    float magvar;
-    atlasSphere bounds;
-
-  protected:
-    std::vector<std::string> _tokens;
-    std::string _str;
-};
+#include "NavData.hxx"
 
 // Used for drawing labels on navaids.
 // EYE - make Label a class?
@@ -98,20 +56,15 @@ class NavaidsOverlay: public Subscriber {
     NavaidsOverlay(Overlays& overlays);
     ~NavaidsOverlay();
 
-    bool load(const std::string& fgDir);
-
     void setDirty();
 
-    void drawVORs();
-    void drawNDBs();
-    void drawILSs();
-    void drawDMEs();
-
-    const std::vector<Cullable *>& getNavaids(sgdVec3 p);
-    const std::vector<Cullable *>& getNavaids(FlightData *p);
+    void drawVORs(NavData *navData);
+    void drawNDBs(NavData *navData);
+    void drawILSs(NavData *navData);
+    void drawDMEs(NavData *navData);
 
     // Subscriber interface.
-    bool notification(Notification::type n);
+    void notification(Notification::type n);
 
   protected:
     void _createVORRose();
@@ -121,7 +74,6 @@ class NavaidsOverlay: public Subscriber {
     void _createDMESymbols();
     void _createILSSymbols();
     void _createILSSymbol(GLuint dl, const float *colour);
-    bool _load810(float cycle, const gzFile& arp);
 
     void _renderVOR(const NAV *n);
     void _renderNDB(const NAV *n);
@@ -141,12 +93,7 @@ class NavaidsOverlay: public Subscriber {
     void _drawLabel(Label *l);
 
     Overlays& _overlays;
-    Culler *_culler;
-    Culler::FrustumSearch *_frustum;
-    Culler::PointSearch *_point;
     double _metresPerPixel;
-
-    std::vector<NAV *> _navaids;
 
     GLuint _VORRoseDL, _VORSymbolDL, _VORTACSymbolDL, _VORDMESymbolDL;
     GLuint _NDBSymbolDL, _NDBDMESymbolDL;

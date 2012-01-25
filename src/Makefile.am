@@ -9,8 +9,13 @@ endif
 Atlas_SOURCES = \
 	Notifications.cxx Notifications.hxx \
 	Atlas.cxx \
+	GLUTWindow.cxx GLUTWindow.hxx \
+	AtlasBaseWindow.cxx AtlasBaseWindow.hxx \
+	AtlasWindow.cxx AtlasWindow.hxx \
+	AtlasController.cxx AtlasController.hxx \
 	FlightTrack.hxx FlightTrack.cxx \
 	Image.cxx Image.hxx \
+	NavData.cxx NavData.hxx \
 	Overlays.cxx Overlays.hxx \
 	AirportsOverlay.hxx AirportsOverlay.cxx \
 	AirwaysOverlay.hxx AirwaysOverlay.cxx \
@@ -20,6 +25,7 @@ Atlas_SOURCES = \
 	CrosshairsOverlay.hxx CrosshairsOverlay.cxx \
 	RangeRingsOverlay.hxx RangeRingsOverlay.cxx \
 	Tiles.cxx Tiles.hxx tiles.h \
+	TileMapper.cxx TileMapper.hxx \
 	Searcher.cxx Searcher.hxx \
 	Search.cxx Search.hxx \
 	Preferences.cxx Preferences.hxx \
@@ -33,9 +39,9 @@ Atlas_SOURCES = \
 	Palette.cxx Palette.hxx \
 	misc.cxx misc.hxx \
 	Globals.cxx Globals.hxx \
-##	Geographics.cxx Geographics.hxx \
-##	MPAircraft.cxx MPAircraft.hxx
 	Geographics.cxx Geographics.hxx
+##	PreferencesWindow.cxx PreferencesWindow.hxx
+##	MPAircraft.cxx MPAircraft.hxx
 
 Atlas_LDADD = \
 	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgserial -lsgdebug \
@@ -57,7 +63,7 @@ Map_SOURCES = \
 Map_LDADD = \
 	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgdebug \
 	-lsgbucket -lsgstructure -lsgmath \
-	-lplibfnt -lplibsg \
+	-lplibfnt -lplibsg -lplibpu \
 	$(opengl_LIBS) \
 	-lpng -lz -ljpeg \
 	-lGLEW

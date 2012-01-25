@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2008 - 2011 Brian Schack
+  Copyright (C) 2008 - 2012 Brian Schack
 
   This file is part of Atlas.
 
@@ -40,7 +40,6 @@
 
 #include "Scenery.hxx"
 #include "Bucket.hxx"
-#include "Globals.hxx"
 #include "Image.hxx"
 #include "LayoutManager.hxx"
 #include "Geographics.hxx"
@@ -77,9 +76,6 @@ using namespace std;
 // (c) Tell the tiles to draw themselves.  The tiles will draw
 //     themselves using the best possible existing texture, and live
 //     scenery if we are live.
-
-// EYE - put this in a class?
-extern sgdVec3 eye;
 
 // A cache object containing a texture.
 class MapTexture {
@@ -137,7 +133,7 @@ class SceneryTile: public Cullable, public CacheObject, Subscriber {
     unsigned int size() { return _size; }
 
     // This will get called when we receive a notification.
-    bool notification(Notification::type n);
+    void notification(Notification::type n);
 
   protected:
     // Allocates and initializes the _buckets array, but doesn't load
@@ -283,7 +279,7 @@ void Texture::unload()
 GLuint Texture::name() const
 {
     if (loaded()) {
-	return _name;
+    	return _name;
     } else {
 	// Has our default texture been initialized?
 	if (__defaultTexture == 0) {
@@ -293,14 +289,20 @@ GLuint Texture::name() const
 		    bool c = ((((i & 0x1) == 0) ^ ((j & 0x1)) == 0));
 		    if (c) {
 			// Red square
-			__defaultImage[i][j][0] = 255;
-			__defaultImage[i][j][1] = 0;
+			// __defaultImage[i][j][0] = 255;
+			// __defaultImage[i][j][1] = 0;
+			// __defaultImage[i][j][2] = 0;
+			__defaultImage[i][j][0] = 0;
+			__defaultImage[i][j][1] = 255;
 			__defaultImage[i][j][2] = 0;
 		    } else {
 			// White square
-			__defaultImage[i][j][0] = 255;
+			// __defaultImage[i][j][0] = 255;
+			// __defaultImage[i][j][1] = 255;
+			// __defaultImage[i][j][2] = 255;
+			__defaultImage[i][j][0] = 0;
 			__defaultImage[i][j][1] = 255;
-			__defaultImage[i][j][2] = 255;
+			__defaultImage[i][j][2] = 0;
 		    }
 		}
 	    }
@@ -337,33 +339,11 @@ MapTexture::~MapTexture()
     unload();
 }
 
-// This website:
-//
-// http://mysite.du.edu/~jcalvert/math/ellipse.htm
-//
-// has a good explanation of ellipses, including the statement "The
-// ellipse is just this auxiliary circle with its ordinates shrunk in the
-// ratio b/a", where a is the major axis (equatorial plane), and b is
-// the minor axis (axis of rotation).
-
-// EYE - put this in misc.cxx?
-
-// Draw a vertex at the given lat/lon, given in degrees.
-void geodVertex3f(float lat, float lon)
-{
-    sgdVec3 cart;
-
-    atlasGeodToCart(lat, lon, 0.0, cart);
-    // Since we don't use lighting for displaying textures, we don't
-    // need to calculate a normal.
-    glVertex3f(cart[0], cart[1], cart[2]);
-}
-
 void MapTexture::draw()
 {
     // Don't draw ourselves if the texture hasn't been loaded yet.
     if (!_t.loaded()) {
-	return;
+    	return;
     }
 
     if (_dlist == 0) {
@@ -378,12 +358,7 @@ void MapTexture::draw()
 	// 'push'.
 	glColor3f(1.0, 1.0, 1.0);
 	glEnable(GL_TEXTURE_2D);
-	// EYE - toss this?
-// #ifndef LIGHTING
-// 	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL);
-// #else
 	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-// #endif
 
 	glBindTexture(GL_TEXTURE_2D, _t.name());
 
@@ -460,7 +435,7 @@ SceneryTile::SceneryTile(Tile *ti, Scenery *s):
     // change notifications.  When we get either, we'll tell our
     // buckets.
     subscribe(Notification::DiscreteContours);
-    subscribe(Notification::NewPalette);
+    subscribe(Notification::Palette);
 }
 
 SceneryTile::~SceneryTile()
@@ -639,7 +614,7 @@ void SceneryTile::drawBuckets(Culler::FrustumSearch& frustum)
 }
 
 // Called when the lighting changes.
-bool SceneryTile::notification(Notification::type n)
+void SceneryTile::notification(Notification::type n)
 {
     if (n == Notification::DiscreteContours) {
 	// Switched between smooth and discrete contours.
@@ -648,7 +623,7 @@ bool SceneryTile::notification(Notification::type n)
 		_buckets->at(i)->discreteContoursChanged();
 	    }
 	}
-    } else if (n == Notification::NewPalette) {
+    } else if (n == Notification::Palette) {
 	// Got a new palette.
 	if (_buckets) {
 	    for (unsigned int i = 0; i < _buckets->size(); i++) {
@@ -658,13 +633,12 @@ bool SceneryTile::notification(Notification::type n)
     } else {
 	assert(false);
     }
-
-    return true;
 }
 
 // Draw the maximum elevation figure (MEF) at the given location and
 // scale.
-static void _label(int mef, double lat, double lon, double metresPerPixel)
+static void _label(int mef, double lat, double lon, double metresPerPixel,
+		   atlasFntTexFont *fnt)
 {
     // EYE - magic numbers
     const float thousandsSize = 36.0 * metresPerPixel;
@@ -677,15 +651,16 @@ static void _label(int mef, double lat, double lon, double metresPerPixel)
     // Create the label.
     LayoutManager lm;
     lm.begin(); {
-	globalString.printf("%d", thousands);
-	lm.setFont(globals.regularFont, thousandsSize);
-	lm.addText(globalString.str());
+	static AtlasString str;
+	str.printf("%d", thousands);
+	lm.setFont(fnt, thousandsSize);
+	lm.addText(str.str());
 
-	globalString.printf(" %d", hundreds);
+	str.printf(" %d", hundreds);
 	// This is how we fake a superscript - we use a smaller font,
 	// then draw it a bit closer (-1/3) and higher (1/2).
 	lm.setPointSize(hundredsSize);
-	lm.addText(globalString.str(), -hundredsSize / 3.0, hundredsSize / 2.0);
+	lm.addText(str.str(), -hundredsSize / 3.0, hundredsSize / 2.0);
     }
     lm.end();
     
@@ -723,7 +698,8 @@ void SceneryTile::label(Culler::FrustumSearch& frustum, double metresPerPixel,
 		(b->loaded()) && 
 		frustum.intersects(b->bounds())) {
 		int mef = MEF(b->maximumElevation());
-		_label(mef, b->centreLat(), b->centreLon(), metresPerPixel);
+		_label(mef, b->centreLat(), b->centreLon(), metresPerPixel,
+		       _scenery->win()->regularFont());
 	    }
 	}
     } else {
@@ -732,7 +708,8 @@ void SceneryTile::label(Culler::FrustumSearch& frustum, double metresPerPixel,
 	    int mef = MEF(_maxElevation);
 	    double lat = _ti->lat() + 0.5;
 	    double lon = _ti->lon() + _ti->width() / 2.0;
-	    _label(mef,  lat, lon, metresPerPixel);
+	    _label(mef,  lat, lon, metresPerPixel, 
+		   _scenery->win()->regularFont());
 	}
     }
 }
@@ -786,9 +763,9 @@ unsigned int SceneryTile::_calcBest(unsigned int level, bool loaded)
 {
     // First look at this level or above (higher resolutions).
     for (unsigned int l = level; l < _levels.size(); l++) {
-	if (_textures[l] && (!loaded || _textures[l]->loaded())) {
-	    return l;
-	}
+    	if (_textures[l] && (!loaded || _textures[l]->loaded())) {
+    	    return l;
+    	}
     }
 
     // If we found none above this level, then look below (lower
@@ -798,9 +775,9 @@ unsigned int SceneryTile::_calcBest(unsigned int level, bool loaded)
     // subtract 1, it will become very large.  Thus the test.  Tricky
     // (and scary).
     for (unsigned int l = level; l < _levels.size(); l--) {
-	if (_textures[l] && (!loaded || _textures[l]->loaded())) {
-	    return l;
-	}
+    	if (_textures[l] && (!loaded || _textures[l]->loaded())) {
+    	    return l;
+    	}
     }
     
     // None found at all.  Return TileManager::MAX_MAP_LEVEL.
@@ -810,9 +787,9 @@ unsigned int SceneryTile::_calcBest(unsigned int level, bool loaded)
 // Creates a Scenery object.  The given TileManager will supply tile
 // information, and we assume that all scenery will be displayed in
 // the given window.
-Scenery::Scenery(TileManager *tm, int window): 
-    _dirty(true), _level(TileManager::MAX_MAP_LEVEL), _live(false), 
-    _levels(tm->mapLevels()), _tm(tm), _backgroundWorld(0), _cache(window)
+Scenery::Scenery(TileManager *tm, AtlasBaseWindow *win): 
+    _win(win), _dirty(true), _level(TileManager::MAX_MAP_LEVEL), _live(false), 
+    _levels(tm->mapLevels()), _tm(tm), _backgroundWorld(0), _cache(_win->id())
 {
     // Create a culler and a frustum searcher for it.
     _culler = new Culler();
@@ -848,10 +825,6 @@ Scenery::Scenery(TileManager *tm, int window):
 	_tiles.push_back(tile);
 	_culler->addObject(tile);
     }
-
-    // Subscribe to notifications of moves and zooms.
-    subscribe(Notification::Moved);
-    subscribe(Notification::Zoomed);
 }
 
 Scenery::~Scenery()
@@ -900,10 +873,7 @@ void Scenery::setBackgroundImage(const SGPath& f)
 	    double s, n;
 	    s = lat - 90;
 	    n = lat - 90 + 1;
-	    // "Pin" the texture at 1 degree intervals (for most,
-	    // this just means the 4 corners, but at extreme
-	    // latitudes, it means points along the upper and
-	    // lower edges as well).
+	    // "Pin" the texture at 1 degree intervals.
 	    for (int lon = 0; lon <= 360; lon++) {
 		double w = lon - 180.0;
 
@@ -923,9 +893,10 @@ void Scenery::setBackgroundImage(const SGPath& f)
     glEndList();
 }
 
-void Scenery::move(const sgdMat4 modelViewMatrix)
+void Scenery::move(const sgdMat4 modelViewMatrix, const sgdVec3 eye)
 {
     _frustum->move(modelViewMatrix);
+    sgdCopyVec3(_eye, eye);
     _dirty = true;
 }
 
@@ -986,7 +957,7 @@ void Scenery::zoom(const sgdFrustum& frustum, double metresPerPixel)
     }
 }
 
-void Scenery::draw(bool elevationLabels)
+void Scenery::draw(bool lightingOn)
 {
     // We assume that when called, the depth test is on and lighting
     // is off.
@@ -996,7 +967,7 @@ void Scenery::draw(bool elevationLabels)
     if (_dirty) {
 	// Yes.  Update our idea of what to display, ask the culler
 	// for visible tiles, and tell the cache.
-	_cache.reset(eye);
+	_cache.reset(_eye);
 
 	// Now ask the culler for all visible tiles, and add them to
 	// the cache for loading.
@@ -1049,7 +1020,7 @@ void Scenery::draw(bool elevationLabels)
 
     // Render "live" scenery too if we're zoomed in close enough.
     if (_live) {
-	if (globals.lightingOn) {
+	if (lightingOn) {
 	    glEnable(GL_LIGHTING);
 	}
 
@@ -1073,7 +1044,7 @@ void Scenery::draw(bool elevationLabels)
 	glDisable(GL_LIGHTING);
     }
 
-    if (elevationLabels) {
+    if (_MEFs) {
 	_label(_live);
     }
 }
@@ -1145,6 +1116,9 @@ void Scenery::_label(bool live)
 bool Scenery::intersection(double x, double y, 
 			   SGVec3<double> *c, bool *validElevation)
 {
+    // EYE - we should set the window ourselves (which means saving it
+    // in the constructor).  Then this method could be called safely
+    // from anywhere.
     GLint viewport[4];
     GLdouble mvmatrix[16], projmatrix[16];
     GLdouble wx, wy, wz;	// World x, y, z coords.
@@ -1189,9 +1163,6 @@ bool Scenery::intersection(double x, double y,
 	    gluPickMatrix(x, y, 1.0, 1.0, viewport);
 	    glMultMatrixd(projmatrix);
 
-	    if (globals.lightingOn) {
-		glEnable(GL_LIGHTING);
-	    }
 	    // Now that we have our viewing ray (although, technically
 	    // speaking, it should actually be a very narrow viewing
 	    // frustum, but a ray is good enough), get the
@@ -1213,7 +1184,6 @@ bool Scenery::intersection(double x, double y,
 		    break;
 		}
 	    }
-	    glDisable(GL_LIGHTING);
 	    glMatrixMode(GL_PROJECTION);
 	}
 	glPopMatrix();
@@ -1234,6 +1204,15 @@ bool Scenery::intersection(double x, double y,
     // earth is a sphere.  This code assumes that the earth is centred
     // at the origin, and that the earth's axis is aligned with the z
     // axis, north positive.
+    //
+    // This website:
+    //
+    // http://mysite.du.edu/~jcalvert/math/ellipse.htm
+    //
+    // has a good explanation of ellipses, including the statement "The
+    // ellipse is just this auxiliary circle with its ordinates shrunk in the
+    // ratio b/a", where a is the major axis (equatorial plane), and b is
+    // the minor axis (axis of rotation).
     assert((validElevation == NULL) || (*validElevation == false));
     SGVec3<double> centre(0.0, 0.0, 0.0);
     double mu1, mu2;
@@ -1260,20 +1239,4 @@ bool Scenery::intersection(double x, double y,
     } else {
 	return false;
     }
-}
-
-// Called when somebody issues a Moved or Zoomed notification.  We
-// examine the current OpenGL model-view (Moved) or projection
-// (zoomed) matrices to update our view of the world.
-bool Scenery::notification(Notification::type n)
-{
-    if (n == Notification::Moved) {
-	move(globals.modelViewMatrix);
-    } else if (n == Notification::Zoomed) {
-	zoom(globals.frustum, globals.metresPerPixel);
-    } else {
-	assert(false);
-    }
-
-    return true;
 }

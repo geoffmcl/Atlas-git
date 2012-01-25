@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2011 Brian Schack
+  Copyright (C) 2011 - 2012 Brian Schack
 
   This file is part of Atlas.
 
@@ -35,7 +35,9 @@
 // #endif
 
 #include "RangeRingsOverlay.hxx"
+#include "LayoutManager.hxx"
 #include "Globals.hxx"
+#include "AtlasWindow.hxx"
 
 using namespace std;
 
@@ -104,7 +106,8 @@ void RangeRingsOverlay::draw()
 		float size = sqrt(w * w + h * h);
 
 		// Convert size from pixels to nautical miles.
-		size *= globals.metresPerPixel / SG_NM_TO_METER;
+		double metresPerPixel = _overlays.aw()->scale();
+		size *= metresPerPixel / SG_NM_TO_METER;
 
 		// Break it down into an exponent (base-10) and mantissa
 		// (1.0 <= mantissa < 10.0).
@@ -131,16 +134,17 @@ void RangeRingsOverlay::draw()
 		    tiny = 0.5 * base;
 		}
 		// Convert back from nautical miles to pixels.
-		big *= SG_NM_TO_METER / globals.metresPerPixel;
-		medium *= SG_NM_TO_METER / globals.metresPerPixel;
-		small *= SG_NM_TO_METER / globals.metresPerPixel;
-		tiny *= SG_NM_TO_METER / globals.metresPerPixel;
+		big *= SG_NM_TO_METER / metresPerPixel;
+		medium *= SG_NM_TO_METER / metresPerPixel;
+		small *= SG_NM_TO_METER / metresPerPixel;
+		tiny *= SG_NM_TO_METER / metresPerPixel;
 
 		_drawCircle(x, y, big);
 		_drawCircle(x, y, medium);
 		_drawCircle(x, y, small);
 		_drawCircle(x, y, tiny);
 
+		// // Draw a compass rose aligned with magnetic north.
 		// float smallest = w > h ? h : w;
 		// glPushMatrix(); {
 		// 	glTranslatef(x, y, 0.0);
@@ -164,7 +168,7 @@ void RangeRingsOverlay::draw()
     glCallList(_rangeRingsDL);
 }
 
-bool RangeRingsOverlay::notification(Notification::type n)
+void RangeRingsOverlay::notification(Notification::type n)
 {
     if (n == Notification::Zoomed) {
 	// Record ourselves as dirty.
@@ -172,21 +176,11 @@ bool RangeRingsOverlay::notification(Notification::type n)
     } else {
 	assert(false);
     }
-
-    return true;
 }
 
 // Draws a circle of the given radius (given in pixels).
 void RangeRingsOverlay::_drawCircle(float x, float y, float radius)
 {
-    float nm = radius * globals.metresPerPixel / SG_NM_TO_METER;
-    if (nm > 3500) {
-	// This is a bit hard-coded, but it ensures that we don't draw
-	// a range ring larger than the earth (which has a radius of
-	// about 3500nm), which looks silly.
-	return;
-    }
-
     glPushMatrix(); {
     	glTranslatef(x, y, 0.0);
     	glScalef(radius, radius, radius);
@@ -195,6 +189,7 @@ void RangeRingsOverlay::_drawCircle(float x, float y, float radius)
     glPopMatrix();
     
     // Label the top of the segment.
+    float nm = radius * _overlays.aw()->scale() / SG_NM_TO_METER;
     AtlasString str;
     if (nm >= 1) {
     	str.printf("%.0f nm\n", nm);
@@ -202,7 +197,7 @@ void RangeRingsOverlay::_drawCircle(float x, float y, float radius)
     	str.printf("%.0g nm\n", nm);
     }
     // EYE - magic number
-    LayoutManager lm(str.str(), globals.regularFont, __pointSize);
+    LayoutManager lm(str.str(), _overlays.regularFont(), __pointSize);
     lm.setBoxed(true);
     lm.moveTo(x, y + radius);
     lm.drawText();
@@ -303,7 +298,8 @@ void RangeRingsOverlay::_createRose()
 		AtlasString label;
 		label.printf("%d", i);
 
-		LayoutManager lm(label.str(), globals.regularFont, pointSize);
+		LayoutManager lm(label.str(), _overlays.regularFont(), 
+				 pointSize);
 		lm.setAnchor(LayoutManager::LC);
 		lm.drawText();
 	    }

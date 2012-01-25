@@ -3,7 +3,7 @@
 
   Written by Brian Schack, started August 2007.
 
-  Copyright (C) 2007 - 2011 Brian Schack
+  Copyright (C) 2007 - 2012 Brian Schack
 
   Handles command-line options, as well as the Atlas preferences file.
 
@@ -109,7 +109,7 @@ public:
 
     // Flight paths
     std::vector<SGPath> flightFiles;
-    bool autocenter_mode;
+    bool autocentre_mode;
     float lineWidth;
     SGPath airplaneImage;
     float airplaneImageSize;
@@ -130,7 +130,7 @@ public:
     // EYE - need to set values for these (and use them too)
     static const float defaultLatitude, defaultLongitude, defaultZoom;
     static const int defaultWidth = 800, defaultHeight = 600;
-    static const bool defaultAutocenterMode = false;
+    static const bool defaultAutocentreMode = false;
     static const float defaultLineWidth;
     static const float defaultAirplaneSize;
     static const int defaultMaxTrack = 0;

@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2007 - 2011 Brian Schack
+  Copyright (C) 2007 - 2012 Brian Schack
 
   This file is part of Atlas.
 
@@ -39,15 +39,9 @@
 #include "NavaidsOverlay.hxx"
 #include "Globals.hxx"
 #include "Preferences.hxx"
+#include "AtlasWindow.hxx"
 
 using namespace std;
-
-// EYE - add to globals?
-extern Preferences prefs;
-
-// EYE - eventually these should be placed in preferences
-extern float vor1Colour[];
-extern float vor2Colour[];
 
 static float axisColour[4] = {0.0, 0.0, 0.0, 1.0};
 static float labelColour[4] = {0.0, 0.0, 0.0, 1.0};
@@ -158,29 +152,21 @@ void GraphsUI::_AxisUI::_callback(puObject *cb)
     } else {
 	assert(0);
     }
-
-    glutPostRedisplay();
 }
 
 static void _smoother_cb(puObject *cb)
 {
-    static AtlasString buf;
-    buf.printf("%d", cb->getIntegerValue());
-    cb->setLegend(buf.str());
-
     GraphsUI *me = (GraphsUI *)cb->getUserData();
     me->setSmoothing(cb->getIntegerValue());
-
-    glutPostRedisplay();
 }
 
-GraphsUI::GraphsUI(Graphs& g): _graphs(g)
+GraphsUI::GraphsUI(GraphsWindow *gw): _gw(gw)
 {
     // PUI texture-based fonts must be loaded per-window - they are
     // textures, and are local to a single OpenGL context.
     // EYE - copied from Atlas.cxx - just pass it in instead?
     SGPath fontFile;
-    fontFile = prefs.path;
+    fontFile = globals.prefs.path;
     fontFile.append("Fonts");
     fontFile.append("Helvetica.100.txf");
     _texFont = new atlasFntTexFont;
@@ -206,17 +192,17 @@ GraphsUI::GraphsUI(Graphs& g): _graphs(g)
 	    _xFrame = new puFrame(0, 0, 0, 0);
 
 	    // X-axis controllers.
-	    _xAxes[Graphs::TIME] = 
+	    _xAxes[GraphsWindow::TIME] = 
 		new GraphsUI::_AxisUI("Time", "s", 
-				      g.scale(Graphs::TIME), 
+				      gw->scale(GraphsWindow::TIME), 
 				      *this);
-	    _xAxes[Graphs::DISTANCE] = 
+	    _xAxes[GraphsWindow::DISTANCE] = 
 		new GraphsUI::_AxisUI("Distance", "nm", 
-				      g.scale(Graphs::DISTANCE), 
+				      gw->scale(GraphsWindow::DISTANCE), 
 				      *this);
 
-	    width = std::max(_xAxes[Graphs::TIME]->width(), width);
-	    width = std::max(_xAxes[Graphs::DISTANCE]->width(), width);
+	    width = std::max(_xAxes[GraphsWindow::TIME]->width(), width);
+	    width = std::max(_xAxes[GraphsWindow::DISTANCE]->width(), width);
 	}
 	_xGroup->close();
 	_xGroup->reveal();	// EYE - necessary?
@@ -225,22 +211,22 @@ GraphsUI::GraphsUI(Graphs& g): _graphs(g)
 	    _yFrame = new puFrame(0, 0, 0, 0);
 
 	    // Y-axis controllers.
-	    _yAxes[Graphs::ALTITUDE] = 
+	    _yAxes[GraphsWindow::ALTITUDE] = 
 		new GraphsUI::_AxisUI("Altitude", "ft", 
-				      g.scale(Graphs::ALTITUDE), 
+				      gw->scale(GraphsWindow::ALTITUDE), 
 				      *this);
-	    _yAxes[Graphs::SPEED] = 
+	    _yAxes[GraphsWindow::SPEED] = 
 		new GraphsUI::_AxisUI("Speed", "kt", 
-				      g.scale(Graphs::SPEED), 
+				      gw->scale(GraphsWindow::SPEED), 
 				      *this);
-	    _yAxes[Graphs::CLIMB_RATE] = 
+	    _yAxes[GraphsWindow::CLIMB_RATE] = 
 		new GraphsUI::_AxisUI("Climb rate", "ft/min", 
-				      g.scale(Graphs::CLIMB_RATE), 
+				      gw->scale(GraphsWindow::CLIMB_RATE), 
 				      *this);
 
-	    width = std::max(_yAxes[Graphs::ALTITUDE]->width(), width);
-	    width = std::max(_yAxes[Graphs::SPEED]->width(), width);
-	    width = std::max(_yAxes[Graphs::CLIMB_RATE]->width(), width);
+	    width = std::max(_yAxes[GraphsWindow::ALTITUDE]->width(), width);
+	    width = std::max(_yAxes[GraphsWindow::SPEED]->width(), width);
+	    width = std::max(_yAxes[GraphsWindow::CLIMB_RATE]->width(), width);
 
 	    // Smoothing slider.
 	    _smoother = new puSlider(0, 0, width - 2 * hSpace, FALSE, 
@@ -261,10 +247,10 @@ GraphsUI::GraphsUI(Graphs& g): _graphs(g)
 	_yGroup->reveal();	// EYE - necessary?
 
 	// EYE - assume all heights are the same.
-	int height = _xAxes[Graphs::DISTANCE]->height(), y = vSpace;
-	_xAxes[Graphs::DISTANCE]->setSize(y, width);
+	int height = _xAxes[GraphsWindow::DISTANCE]->height(), y = vSpace;
+	_xAxes[GraphsWindow::DISTANCE]->setSize(y, width);
 	y += height + vSpace;
-	_xAxes[Graphs::TIME]->setSize(y, width);
+	_xAxes[GraphsWindow::TIME]->setSize(y, width);
 	y += height + vSpace;
 	_xFrame->setSize(width, y);
 	_xGroup->setSize(width, y);
@@ -273,11 +259,11 @@ GraphsUI::GraphsUI(Graphs& g): _graphs(g)
 	y = vSpace;
 	_smoother->setPosition(hSpace, y);
 	y += (bbox->max[1] - bbox->min[1]) + vSpace;
-	_yAxes[Graphs::CLIMB_RATE]->setSize(y, width);
+	_yAxes[GraphsWindow::CLIMB_RATE]->setSize(y, width);
 	y += height + vSpace;
-	_yAxes[Graphs::SPEED]->setSize(y, width);
+	_yAxes[GraphsWindow::SPEED]->setSize(y, width);
 	y += height + vSpace;
-	_yAxes[Graphs::ALTITUDE]->setSize(y, width);
+	_yAxes[GraphsWindow::ALTITUDE]->setSize(y, width);
 	y += height + vSpace;
 	_yFrame->setSize(width, y);
 	_yGroup->setSize(width, y);
@@ -335,75 +321,79 @@ void GraphsUI::setSize(int x, int h)
     _yGroup->setPosition(0, y);
 }
 
-void GraphsUI::setXAxisType(Graphs::XAxisType t)
+void GraphsUI::setXAxisType(GraphsWindow::XAxisType t)
 {
-    if (t == Graphs::TIME) {
-	_xAxes[Graphs::TIME]->setSelected(true);
-	_xAxes[Graphs::DISTANCE]->setSelected(false);
+    if (t == GraphsWindow::TIME) {
+	_xAxes[GraphsWindow::TIME]->setSelected(true);
+	_xAxes[GraphsWindow::DISTANCE]->setSelected(false);
     } else {
-	_xAxes[Graphs::TIME]->setSelected(false);
-	_xAxes[Graphs::DISTANCE]->setSelected(true);
+	_xAxes[GraphsWindow::TIME]->setSelected(false);
+	_xAxes[GraphsWindow::DISTANCE]->setSelected(true);
     }
 }
 
-void GraphsUI::setYAxisType(Graphs::YAxisType t, bool b)
+void GraphsUI::setYAxisType(GraphsWindow::YAxisType t, bool b)
 {
-    if (t == Graphs::ALTITUDE) {
-	_yAxes[Graphs::ALTITUDE]->setSelected(b);
-    } else if (t == Graphs::SPEED) {
-	_yAxes[Graphs::SPEED]->setSelected(b);
+    if (t == GraphsWindow::ALTITUDE) {
+	_yAxes[GraphsWindow::ALTITUDE]->setSelected(b);
+    } else if (t == GraphsWindow::SPEED) {
+	_yAxes[GraphsWindow::SPEED]->setSelected(b);
     } else {
-	_yAxes[Graphs::CLIMB_RATE]->setSelected(b);
+	_yAxes[GraphsWindow::CLIMB_RATE]->setSelected(b);
     }
 }
 
 void GraphsUI::setSmoothing(unsigned int s)
 {
-    _graphs.setSmoothing(s);
+    static AtlasString buf;
+    buf.printf("%d", _smoother->getIntegerValue());
+    _smoother->setLegend(buf.str());
+
+    _gw->setSmoothing(s);
 }
 
 void GraphsUI::_axisSelect(_AxisUI *axis) 
 {
-    if (axis == _xAxes[Graphs::TIME]) {
-	_graphs.setXAxisType(Graphs::TIME);
-    } else if (axis == _xAxes[Graphs::DISTANCE]) {
-	_graphs.setXAxisType(Graphs::DISTANCE);
-    } else if (axis == _yAxes[Graphs::ALTITUDE]) {
-	_graphs.setYAxisType(Graphs::ALTITUDE, axis->selected());
-    } else if (axis == _yAxes[Graphs::SPEED]) {
-	_graphs.setYAxisType(Graphs::SPEED, axis->selected());
-    } else if (axis == _yAxes[Graphs::CLIMB_RATE]) {
-	_graphs.setYAxisType(Graphs::CLIMB_RATE, axis->selected());
+    if (axis == _xAxes[GraphsWindow::TIME]) {
+	_gw->setXAxisType(GraphsWindow::TIME);
+    } else if (axis == _xAxes[GraphsWindow::DISTANCE]) {
+	_gw->setXAxisType(GraphsWindow::DISTANCE);
+    } else if (axis == _yAxes[GraphsWindow::ALTITUDE]) {
+	_gw->setYAxisType(GraphsWindow::ALTITUDE, axis->selected());
+    } else if (axis == _yAxes[GraphsWindow::SPEED]) {
+	_gw->setYAxisType(GraphsWindow::SPEED, axis->selected());
+    } else if (axis == _yAxes[GraphsWindow::CLIMB_RATE]) {
+	_gw->setYAxisType(GraphsWindow::CLIMB_RATE, axis->selected());
     }
 }
 
 void GraphsUI::_autoscale(_AxisUI *axis) 
 {
-    if (axis == _xAxes[Graphs::TIME]) {
-	_graphs.setAutoscale(Graphs::TIME, axis->autoscaling());
-    } else if (axis == _xAxes[Graphs::DISTANCE]) {
-	_graphs.setAutoscale(Graphs::DISTANCE, axis->autoscaling());
-    } else if (axis == _yAxes[Graphs::ALTITUDE]) {
-	_graphs.setAutoscale(Graphs::ALTITUDE, axis->autoscaling());
-    } else if (axis == _yAxes[Graphs::SPEED]) {
-	_graphs.setAutoscale(Graphs::SPEED, axis->autoscaling());
-    } else if (axis == _yAxes[Graphs::CLIMB_RATE]) {
-	_graphs.setAutoscale(Graphs::CLIMB_RATE, axis->autoscaling());
+    if (axis == _xAxes[GraphsWindow::TIME]) {
+	_gw->setAutoscale(GraphsWindow::TIME, axis->autoscaling());
+    } else if (axis == _xAxes[GraphsWindow::DISTANCE]) {
+	_gw->setAutoscale(GraphsWindow::DISTANCE, axis->autoscaling());
+    } else if (axis == _yAxes[GraphsWindow::ALTITUDE]) {
+	_gw->setAutoscale(GraphsWindow::ALTITUDE, axis->autoscaling());
+    } else if (axis == _yAxes[GraphsWindow::SPEED]) {
+	_gw->setAutoscale(GraphsWindow::SPEED, axis->autoscaling());
+    } else if (axis == _yAxes[GraphsWindow::CLIMB_RATE]) {
+	_gw->setAutoscale(GraphsWindow::CLIMB_RATE, axis->autoscaling());
     }
 }
 
 void GraphsUI::_setScale(_AxisUI *axis) 
 {
-    if (axis == _xAxes[Graphs::TIME]) {
-	_graphs.setScale(Graphs::TIME, axis->scale());
-    } else if (axis == _xAxes[Graphs::DISTANCE]) {
-	_graphs.setScale(Graphs::DISTANCE, axis->scale());
-    } else if (axis == _yAxes[Graphs::ALTITUDE]) {
-	_graphs.setScale(Graphs::ALTITUDE, axis->scale());
-    } else if (axis == _yAxes[Graphs::SPEED]) {
-	_graphs.setScale(Graphs::SPEED, axis->scale());
-    } else if (axis == _yAxes[Graphs::CLIMB_RATE]) {
-	_graphs.setScale(Graphs::CLIMB_RATE, axis->scale());
+    if (axis == _xAxes[GraphsWindow::TIME]) {
+	_gw->setScale(GraphsWindow::TIME, axis->scale());
+    } else if (axis == _xAxes[GraphsWindow::DISTANCE]) {
+	_gw->setScale(GraphsWindow::DISTANCE, axis->scale());
+    } else if (axis == _yAxes[GraphsWindow::ALTITUDE]) {
+	_gw->setScale(GraphsWindow::ALTITUDE, axis->scale());
+    } else if (axis == _yAxes[GraphsWindow::SPEED]) {
+	_gw->setScale(GraphsWindow::SPEED, axis->scale());
+    } else if (axis == _yAxes[GraphsWindow::CLIMB_RATE]) {
+	_gw->setScale(GraphsWindow::CLIMB_RATE, axis->scale());
     }
 }
 
@@ -415,7 +405,7 @@ void GraphsUI::_setScale(_AxisUI *axis)
 // allowed to do that.
 void _slider_cb(puObject *cb)
 {
-    Graphs *me = (Graphs *)cb->getUserData();
+    GraphsWindow *me = (GraphsWindow *)cb->getUserData();
     me->_setSlider(cb, cb->getFloatValue());
 }
 
@@ -430,12 +420,20 @@ static void _drawString(const char *str, float x, float y)
     }
 }
 
-Graphs::Graphs(int window): 
-    _window(window), _track(NULL), _graphTypes(0), _smoothing(0),
+GraphsWindow::GraphsWindow(const char *name, const char *regularFontFile, 
+			   const char *boldFontFile, AtlasController *ac):
+    AtlasBaseWindow(name, regularFontFile, boldFontFile), _ac(ac),
+    _track(NULL), _graphTypes(0), _smoothing(0),
     _xAxisType(_XAXIS_COUNT), _time("time (s)"), 
     _dist("distance (nm)"), _shouldRerender(false),
     _shouldReload(false), _graphDL(0), _dragging(false)
 {
+    // Standard OpenGL attributes.
+    glEnable(GL_LINE_SMOOTH);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glLineWidth(1.0);
+
     // EYE - allocate _time and _dist too?  Add to _values?  Have
     // _xValues and _yValues?  Make strings part of
     // preferences/internationalization stuff?
@@ -452,7 +450,7 @@ Graphs::Graphs(int window):
     _values[CLIMB_RATE]->setScale(10.0); // 10.0 ft/s/pixel
 
     // Default mark and live aircraft colours are black.
-    // EYE - set these from outside?
+    // EYE - set these from outside?  Get them directly from globals?
     GLfloat black[4] = {0.0, 0.0, 0.0, 1.0};
     setAircraftColour(black);
     setMarkColour(black);
@@ -472,19 +470,21 @@ Graphs::Graphs(int window):
 	_values[i]->setSlider(_ySliders[i]);
     }
 
-    // This ensures that all PUI widgets end up in the graphs window.
-    glutSetWindow(_window);
-
     // Create the UI.
-    _ui = new GraphsUI(*this);
+    _ui = new GraphsUI(this);
+
+    // Set some defaults.
+    setFlightTrack(_ac->currentTrack());
+    setSmoothing(10);
 
     // Subscribe to things that interest us.
     subscribe(Notification::AircraftMoved);
     subscribe(Notification::FlightTrackModified);
     subscribe(Notification::NewFlightTrack);
+    subscribe(Notification::ShowTrackInfo);
 }
 
-Graphs::~Graphs()
+GraphsWindow::~GraphsWindow()
 {
     for (int t = ALTITUDE; t < _GRAPH_TYPES_COUNT; t++) {
 	delete _values[t];
@@ -494,6 +494,202 @@ Graphs::~Graphs()
     for (int i = 0; i < _GRAPH_TYPES_COUNT; i++) {
     	delete _ySliders[i];
     }
+}
+
+void GraphsWindow::special(int key, int x, int y)
+{
+    int win = set();
+    _special(key, x, y);
+    set(win);
+}
+
+void GraphsWindow::setAircraftColour(const float *colour)
+{
+    memcpy(_aircraftColour, colour, sizeof(float) * 4);
+}
+
+void GraphsWindow::setMarkColour(const float *colour)
+{
+    memcpy(_markColour, colour, sizeof(float) * 4);
+}
+
+void GraphsWindow::setFlightTrack(FlightTrack *t)
+{
+    if (t && _ac->showTrackInfo()) {
+	reveal();
+    } else {
+	hide();
+    }
+
+    if (_track == t) {
+	// If the new flight track is the same as the old, don't do
+	// anything.
+	return;
+    }
+
+    _track = t;
+
+    _shouldRerender = _shouldReload = true;
+}
+
+// EYE - make smoothing a float?
+void GraphsWindow::setSmoothing(unsigned int s)
+{
+    if (s == _smoothing) {
+	return;
+    }
+
+    _smoothing = s;
+    RatesOfClimb *roc = dynamic_cast<RatesOfClimb *>(_values[CLIMB_RATE]);
+    assert(roc);
+    roc->setSmoothing(s);
+
+    // We need to reload the data because the rate of climb graph data
+    // depends on the smoothing interval.
+    // EYE - make reloading Values-specific?  In other words, just
+    // mark _values[CLIMB_RATE]?
+    _shouldRerender = _shouldReload = true;
+    postRedisplay();
+}
+
+void GraphsWindow::setYAxisType(YAxisType t, bool b)
+{
+    if (_graphTypes[t] == b) {
+	return;
+    }
+    _graphTypes[t] = b;
+    _ui->setYAxisType(t, b);
+
+    _shouldRerender = true;
+    postRedisplay();
+}
+
+void GraphsWindow::setXAxisType(XAxisType t)
+{
+    if (t == _xAxisType) {
+	return;
+    }
+
+    _xAxisType = t;
+    _ui->setXAxisType(t);
+
+    _shouldRerender = true;
+    postRedisplay();
+}
+
+void GraphsWindow::toggleXAxisType()
+{
+    if (_xAxisType == TIME) {
+	setXAxisType(DISTANCE);
+    } else {
+	setXAxisType(TIME);
+    }
+}
+
+bool GraphsWindow::autoscale(XAxisType t) const 
+{
+    if (t == TIME) {
+	return _time.autoscale();
+    } else {
+	return _dist.autoscale();
+    }
+}
+
+bool GraphsWindow::autoscale(YAxisType t) const 
+{
+    return _values[t]->autoscale();
+}
+
+float GraphsWindow::scale(XAxisType t) const 
+{
+    if (t == TIME) {
+	return _time.requestedScale();
+    } else {
+	return _dist.requestedScale();
+    }
+}
+
+float GraphsWindow::scale(YAxisType t) const 
+{
+    return _values[t]->requestedScale();
+}
+
+void GraphsWindow::setAutoscale(XAxisType t, bool b)
+{
+    if (t == TIME) {
+	_time.setAutoscale(b);
+    } else {
+	_dist.setAutoscale(b);
+    }
+
+    _shouldRerender = true;
+    postRedisplay();
+}
+
+void GraphsWindow::setAutoscale(YAxisType t, bool b)
+{
+    _values[t]->setAutoscale(b);
+
+    _shouldRerender = true;
+    postRedisplay();
+}
+
+void GraphsWindow::setScale(XAxisType t, float f)
+{
+    if (t == TIME) {
+	_time.setScale(f);
+    } else {
+	_dist.setScale(f);
+    }
+
+    _shouldRerender = true;
+    postRedisplay();
+}
+
+void GraphsWindow::setScale(YAxisType t, float f)
+{
+    _values[t]->setScale(f);
+
+    _shouldRerender = true;
+    postRedisplay();
+}
+
+void GraphsWindow::_setSlider(puObject *slider, float val)
+{
+    slider->setValue(val);
+
+    _shouldRerender = true;
+    postRedisplay();
+}
+
+// This routine receives notifications of events that we've subscribed
+// to.  Basically it translates from some outside event, like the
+// flight track being modified, to some internal action or future
+// action (eg, setting _shouldRerender to true).
+//
+// In general, we try to postpone as much work as possible, merely
+// recording the fact that work needs to be done.  Later, in the
+// draw() routine, we actually do some real work (which means that
+// someone, somewhere has to call draw(), because we never do it
+// ourselves).  The reason for this strategy is that we can
+// potentially receive many notifications per drawing request.
+void GraphsWindow::notification(Notification::type n)
+{
+    if (n == Notification::AircraftMoved) {
+	// At the moment we don't do anything when informed of
+	// aircraft movement, since we unconditionally draw the
+	// aircraft mark.
+    } else if (n == Notification::FlightTrackModified) {
+	_shouldRerender = true;
+	_shouldReload = true;
+    } else if ((n == Notification::NewFlightTrack) || 
+	       (n == Notification::ShowTrackInfo)) {
+	setFlightTrack(_ac->currentTrack());
+    } else {
+	assert(false);
+    }
+
+    postRedisplay();
 }
 
 // Draws all of our graphs (as given by graphTypes) into our window.
@@ -515,16 +711,20 @@ Graphs::~Graphs()
 //     really changed.  Maybe it should be responsible for deleting
 //     the outdated display list?
 //
-// (3) Move the graphs UI (graph type, smoothing interval, x axis) to
-//     the graphs window.  Add autoscale button, scaling values.  Add
-//     graphs window toggle to data UI.
-// 
-// (4) Add sliders to y axes.
-//
-// (5) Have left and right margins, header and footer?
-void Graphs::draw()
+// (3) Have left and right margins, header and footer?
+void GraphsWindow::_display()
 {
-    assert(glutGetWindow() == _window);
+    assert(glutGetWindow() == id());
+
+    // Check errors before...
+    GLenum error = glGetError();
+    if (error != GL_NO_ERROR) {
+    	printf("GraphsWindow::display (before): %s\n", gluErrorString(error));
+    }
+
+    if (!_track) {
+	return;
+    }
 
     Values& xVals = _xValues();
     if (_shouldRerender) {
@@ -532,7 +732,7 @@ void Graphs::draw()
 	_loadData();
 
 	// Set our title.
-	glutSetWindowTitle(_track->niceName());
+	setTitle(_track->niceName());
 
 	// Create a new display list.
 	glDeleteLists(_graphDL, 1);
@@ -629,20 +829,20 @@ void Graphs::draw()
     glPopAttrib();
 
     puDisplay();
+
+    glutSwapBuffers();
+
+    // ... and check errors at the end.
+    error = glGetError();
+    if (error != GL_NO_ERROR) {
+	printf("GraphsWindow::display (after): %s\n", gluErrorString(error));
+    }
 }
 
-void Graphs::setAircraftColour(const float *colour)
+void GraphsWindow::_reshape(int w, int h)
 {
-    memcpy(_aircraftColour, colour, sizeof(float) * 4);
-}
+    assert(glutGetWindow() == id());
 
-void Graphs::setMarkColour(const float *colour)
-{
-    memcpy(_markColour, colour, sizeof(float) * 4);
-}
-
-void Graphs::reshape(int w, int h)
-{
     // EYE - refuse to resize below a minimum size?
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
@@ -658,224 +858,124 @@ void Graphs::reshape(int w, int h)
     _shouldRerender = true;
 }
 
-void Graphs::setFlightTrack(FlightTrack *t)
+// Called after a mouse click.
+void GraphsWindow::_mouse(int button, int state, int x, int y)
 {
-    if (_track == t) {
-	// If the new flight track is the same as the old, don't do
-	// anything.
-	return;
-    }
+    assert(glutGetWindow() == id());
 
-    _track = t;
-
-    _shouldRerender = _shouldReload = true;
-}
-
-// EYE - make smoothing a float?
-void Graphs::setSmoothing(unsigned int s)
-{
-    if (s == _smoothing) {
-	return;
-    }
-
-    _smoothing = s;
-    RatesOfClimb *roc = dynamic_cast<RatesOfClimb *>(_values[CLIMB_RATE]);
-    assert(roc);
-    roc->setSmoothing(s);
-
-    // We need to reload the data because the rate of climb graph data
-    // depends on the smoothing interval.
-    // EYE - make reloading Values-specific?  In other words, just
-    // mark _values[CLIMB_RATE]?
-    _shouldRerender = _shouldReload = true;
-}
-
-void Graphs::setYAxisType(YAxisType t, bool b)
-{
-    if (_graphTypes[t] == b) {
-	return;
-    }
-    _graphTypes[t] = b;
-    _ui->setYAxisType(t, b);
-
-    _shouldRerender = true;
-    glutPostWindowRedisplay(_window);
-}
-
-void Graphs::setXAxisType(XAxisType t)
-{
-    if (t == _xAxisType) {
-	return;
-    }
-
-    _xAxisType = t;
-    _ui->setXAxisType(t);
-
-    _shouldRerender = true;
-    glutPostWindowRedisplay(_window);
-}
-
-void Graphs::toggleXAxisType()
-{
-    if (_xAxisType == TIME) {
-	setXAxisType(DISTANCE);
-    } else {
-	setXAxisType(TIME);
-    }
-}
-
-bool Graphs::autoscale(XAxisType t) const 
-{
-    if (t == TIME) {
-	return _time.autoscale();
-    } else {
-	return _dist.autoscale();
-    }
-}
-
-bool Graphs::autoscale(YAxisType t) const 
-{
-    return _values[t]->autoscale();
-}
-
-float Graphs::scale(XAxisType t) const 
-{
-    if (t == TIME) {
-	return _time.requestedScale();
-    } else {
-	return _dist.requestedScale();
-    }
-}
-
-float Graphs::scale(YAxisType t) const 
-{
-    return _values[t]->requestedScale();
-}
-
-void Graphs::setAutoscale(XAxisType t, bool b)
-{
-    if (t == TIME) {
-	_time.setAutoscale(b);
-    } else {
-	_dist.setAutoscale(b);
-    }
-
-    // EYE - should we take care of calling glutPostRedisplay()?
-    _shouldRerender = true;
-}
-
-void Graphs::setAutoscale(YAxisType t, bool b)
-{
-    _values[t]->setAutoscale(b);
-
-    // EYE - should we take care of calling glutPostRedisplay()?
-    _shouldRerender = true;
-}
-
-void Graphs::setScale(XAxisType t, float f)
-{
-    if (t == TIME) {
-	_time.setScale(f);
-    } else {
-	_dist.setScale(f);
-    }
-
-    // EYE - should we take care of calling glutPostRedisplay()?
-    _shouldRerender = true;
-}
-
-void Graphs::setScale(YAxisType t, float f)
-{
-    _values[t]->setScale(f);
-
-    // EYE - should we take care of calling glutPostRedisplay()?
-    _shouldRerender = true;
-}
-
-// Called when the mouse is clicked in the graphs window.
-size_t Graphs::mouseClick(int button, int state, int x, int y)
-{
     // If we're dragging, we only respond to one mouse event: a mouse
     // up of button 1.
     if (_dragging) {
 	if ((button == GLUT_LEFT_BUTTON) && (state == GLUT_UP)) {
 	    _dragging = false;
 	}
-	return globals.track()->mark();
+	return;
     }
 
     // If PUI eats the event, then return right away.
     if (puMouse(button, state, x, y)) {
-	return globals.track()->mark();
+	return;
     }
 
     // At this point, we only respond to one event: a mouse down of
     // button 1.
     if ((button != GLUT_LEFT_BUTTON) || (state != GLUT_DOWN)) {
-	return globals.track()->mark();
+	return;
     }
 
     // At this point, we know we're starting a drag.
     _dragging = true;
 
-    return mouseMotion(x, y);
+    // Tell the Atlas controller where the aircraft should move to.
+    _ac->setMark(_pixelToPoint(x));
 }
 
-// Called when the mouse is moved in the graphs window.
-size_t Graphs::mouseMotion(int x, int y)
+// Called during a drag.
+void GraphsWindow::_motion(int x, int y)
 {
-    // Dragging takes precedence over everything, so test it first.
+    assert(glutGetWindow() == id());
+
     if (_dragging) {
-	return _pixelToPoint(x);
-    }
-
-    // No dragging, so give it to PUI, just in case it's interested.
-    puMouse(x, y);
-
-    return globals.track()->mark();
-}
-
-void Graphs::_setSlider(puObject *slider, float val)
-{
-    slider->setValue(val);
-
-    _shouldRerender = true;
-    glutPostRedisplay();
-}
-
-// This routine receives notifications of events that we've subscribed
-// to.  Basically it translates from some outside event, like the
-// flight track being modified, to some internal action or future
-// action (eg, setting _shouldRerender to true).
-//
-// In general, we try to postpone as much work as possible, merely
-// recording the fact that work needs to be done.  Later, in the
-// draw() routine, we actually do some real work (which means that
-// someone, somewhere has to call draw(), because we never do it
-// ourselves).  The reason for this strategy is that we can
-// potentially receive many notifications per drawing request.
-bool Graphs::notification(Notification::type n)
-{
-    if (n == Notification::AircraftMoved) {
-	// At the moment we don't do anything when informed of
-	// aircraft movement, since we unconditionally draw the
-	// aircraft mark.
-    } else if (n == Notification::FlightTrackModified) {
-	_shouldRerender = true;
-	_shouldReload = true;
-    } else if (n == Notification::NewFlightTrack) {
-	setFlightTrack(globals.track());
+	_ac->setMark(_pixelToPoint(x));
     } else {
-	assert(false);
+	// No dragging, so give it to PUI, just in case it's interested.
+	puMouse(x, y);
+    }
+}
+
+// Called when the user presses a key in the graphs window.  We just
+// pass the key on to the handler for the main window.
+void GraphsWindow::_keyboard(unsigned char key, int x, int y)
+{
+    assert(glutGetWindow() == id());
+
+    if (puKeyboard(key, PU_DOWN)) {
+	// EYE - or puDisplay()?
+	postRedisplay();
+    } else {
+	// EYE - keyboard does a call to puKeyboard.  Is this okay
+	// (especially if we do the same in the future)?
+	globals.aw->keyboard(key, x, y);
+    }
+}
+
+// Called when the user presses a "special" key in the graphs window,
+// where "special" includes directional keys.
+void GraphsWindow::_special(int key, int x, int y)
+{
+    assert(glutGetWindow() == id());
+
+    size_t offset = 1;
+    if (glutGetModifiers() & GLUT_ACTIVE_SHIFT) {
+	// If the user presses the shift key, right and left arrow
+	// clicks move 10 times as far.
+	offset *= 10;
     }
 
-    return true;
+    FlightTrack *t = _ac->currentTrack();
+    switch (key + PU_KEY_GLUT_SPECIAL_OFFSET) {
+      case PU_KEY_LEFT:
+	if (t->mark() >= offset) {
+	    _ac->setMark(t->mark() - offset);
+	} else {
+	    _ac->setMark(0);
+	}
+	break;
+      case PU_KEY_RIGHT:
+	// Note that since we're using unsigned integers, we have to
+	// be very careful with comparisons (in fact, this comparison
+	// will still fail if the track length is close to the maximum
+	// unsigned int).
+	if ((t->mark() + offset) < t->size()) {
+	    _ac->setMark(t->mark() + offset);
+	} else {
+	    _ac->setMark(t->size() - 1);
+	}
+	break;
+      case PU_KEY_HOME:
+	_ac->setMark(0);
+	break;
+      case PU_KEY_END:
+	_ac->setMark(t->size() - 1);
+	break;
+      default:
+	return;
+    }
+}
+
+void GraphsWindow::_visibility(int state)
+{
+    assert(glutGetWindow() == id());
+
+    if (state == GLUT_VISIBLE) {
+	postRedisplay();
+    }
 }
 
 // Draws a graph as x vs y, in the given viewport (which should
 // specify the space for the graph, ignoring labels).  It takes into
 // account the position of the x slider.
-void Graphs::_drawGraph(Values &xVals, Values& yVals, int viewport[4])
+void GraphsWindow::_drawGraph(Values &xVals, Values& yVals, int viewport[4])
 {
     // EYE - should yVals do this itself?
     if (yVals.showSlider()) {
@@ -931,7 +1031,7 @@ void Graphs::_drawGraph(Values &xVals, Values& yVals, int viewport[4])
 // Draws the axis for the given Values object.  This does not draw the
 // graph itself, but does draw the axis line, the ticks along the
 // line, the labels of the ticks, and the "tick extensions".
-void Graphs::_drawGraphAxis(Values &vals, int viewport[4], float world[4],
+void GraphsWindow::_drawGraphAxis(Values &vals, int viewport[4], float world[4],
 			    bool vertical)
 {
     // This complicated fiddling business is done here so that the
@@ -986,7 +1086,7 @@ void Graphs::_drawGraphAxis(Values &vals, int viewport[4], float world[4],
     glPopMatrix();
 }
 
-Graphs::Values& Graphs::_xValues()
+GraphsWindow::Values& GraphsWindow::_xValues()
 {
     if (_xAxisType == TIME) {
 	return _time;
@@ -995,7 +1095,7 @@ Graphs::Values& Graphs::_xValues()
     }
 }
 
-float Graphs::_offset(Values& v)
+float GraphsWindow::_offset(Values& v)
 {
     if (!v.showSlider()) {
 	return 0.0;
@@ -1005,7 +1105,7 @@ float Graphs::_offset(Values& v)
     }
 }
 
-bool Graphs::Values::showSlider()
+bool GraphsWindow::Values::showSlider()
 {
     return (!_autoscale && (pixels() > _requestedPixels));
 }
@@ -1016,9 +1116,9 @@ bool Graphs::Values::showSlider()
 // not constant), finding the corresponding point in the flight track
 // requires a search.  We're stupid and just do a linear search from
 // the beginning - we really should be a bit smarter about it.
-size_t Graphs::_pixelToPoint(int x)
+size_t GraphsWindow::_pixelToPoint(int x)
 {
-    assert(glutGetWindow() == _window);
+    assert(glutGetWindow() == id());
 
     // Reload our data (if necessary).
     _loadData();
@@ -1100,7 +1200,7 @@ size_t Graphs::_pixelToPoint(int x)
 // Sets the Values variables, based on the values in _track.  In
 // general, this should be called whenever we detect that _track has
 // changed.
-void Graphs::_loadData()
+void GraphsWindow::_loadData()
 {
     if (_shouldReload) {
 	_time.setFlightTrack(_track);
@@ -1117,7 +1217,7 @@ void Graphs::_loadData()
 // Values
 //////////////////////////////////////////////////////////////////////
 
-Graphs::Values::Values(const char *label): 
+GraphsWindow::Values::Values(const char *label): 
     _ft(NULL), _min(0.0), _max(0.0), _autoscale(true), _pixels(0), _scale(0.0), 
     _first(0.0), _last(0.0), _d(0.0), _D(0.0), _decimals(0), _dirty(false),
     _slider(NULL)
@@ -1125,25 +1225,25 @@ Graphs::Values::Values(const char *label):
     _label = strdup(label);
 }
 
-Graphs::Values::~Values()
+GraphsWindow::Values::~Values()
 {
     free(_label);
     puDeleteObject(_slider);
 }
 
-void Graphs::Values::setFlightTrack(FlightTrack *ft)
+void GraphsWindow::Values::setFlightTrack(FlightTrack *ft)
 {
     _ft = ft;
     load();
 }
 
-size_t Graphs::Values::size()
+size_t GraphsWindow::Values::size()
 {
     return _ft->size();
 }
 
 // EYE - make private?
-void Graphs::Values::load()
+void GraphsWindow::Values::load()
 {
     if (_ft == NULL) {
 	return;
@@ -1157,7 +1257,7 @@ void Graphs::Values::load()
 }
 
 // Return the *calculated* size of the graph, in pixels.
-int Graphs::Values::pixels()
+int GraphsWindow::Values::pixels()
 {
     _update();
 
@@ -1165,56 +1265,56 @@ int Graphs::Values::pixels()
 }
 
 // Return the *calculated* scale of the graph, in units/pixel.
-float Graphs::Values::scale()
+float GraphsWindow::Values::scale()
 {
     _update();
 
     return _scale;
 }
 
-float Graphs::Values::first()
+float GraphsWindow::Values::first()
 {
     _update();
 
     return _first;
 }
 
-float Graphs::Values::last()
+float GraphsWindow::Values::last()
 {
     _update();
 
     return _last;
 }
 
-float Graphs::Values::range()
+float GraphsWindow::Values::range()
 {
     _update();
 
     return _last - _first;
 }
 
-float Graphs::Values::d()
+float GraphsWindow::Values::d()
 {
     _update();
 
     return _d;
 }
 
-float Graphs::Values::D()
+float GraphsWindow::Values::D()
 {
     _update();
 
     return _D;
 }
 
-int Graphs::Values::decimals()
+int GraphsWindow::Values::decimals()
 {
     _update();
 
     return _decimals;
 }
 
-void Graphs::Values::setAutoscale(bool b)
+void GraphsWindow::Values::setAutoscale(bool b)
 {
     if (_autoscale == b) {
 	// Nothing has changed.
@@ -1224,7 +1324,7 @@ void Graphs::Values::setAutoscale(bool b)
     _dirty = true;
 }
 
-void Graphs::Values::setPixels(int pixels)
+void GraphsWindow::Values::setPixels(int pixels)
 {
     if (_requestedPixels == pixels) {
 	// Nothing has changed.
@@ -1236,7 +1336,7 @@ void Graphs::Values::setPixels(int pixels)
     }
 }
 
-void Graphs::Values::setScale(float scale)
+void GraphsWindow::Values::setScale(float scale)
 {
     if (_requestedScale == scale) {
 	// Nothing has changed.
@@ -1248,7 +1348,7 @@ void Graphs::Values::setScale(float scale)
     }
 }
 
-void Graphs::Values::drawAxis(float from, float to, int height, int margin)
+void GraphsWindow::Values::drawAxis(float from, float to, int height, int margin)
 {
     // numeric_limits::epsilon() is the difference between 1.0 and the
     // smallest number greater than 1.0.  We multiply it by 'to',
@@ -1336,7 +1436,7 @@ void Graphs::Values::drawAxis(float from, float to, int height, int margin)
     glPopAttrib();
 }
 
-void Graphs::Values::draw(Values& xVals)
+void GraphsWindow::Values::draw(Values& xVals)
 {
     glColor4fv(graphColour);
     glBegin(GL_LINE_STRIP); {
@@ -1352,7 +1452,7 @@ void Graphs::Values::draw(Values& xVals)
 // A convenience routine to set _min and _max.  It makes sure that
 // _dirty is updated if necessary.  If you want to force _min and _max
 // to be set to the given values, set force to true (default = false).
-void Graphs::Values::_setMinMax(float val, bool force)
+void GraphsWindow::Values::_setMinMax(float val, bool force)
 {
     if (force) {
 	_dirty = ((_min != val) || (_max != val));
@@ -1374,7 +1474,7 @@ void Graphs::Values::_setMinMax(float val, bool force)
 // calculates all derived parameters: _pixels, _scale, _first, _last,
 // _d, _D, and _decimals.  Sets _dirty to false.  If _dirty is true on
 // entry, does nothing.
-void Graphs::Values::_update()
+void GraphsWindow::Values::_update()
 {
     const int minimum = 10;	// Minimum small interval, in pixels.
     float actual;		// Actual interval, if min is placed
@@ -1465,11 +1565,11 @@ void Graphs::Values::_update()
 // Times
 //////////////////////////////////////////////////////////////////////
 
-Graphs::Times::Times(const char *label): Values(label)
+GraphsWindow::Times::Times(const char *label): Values(label)
 {
 }
 
-float Graphs::Times::at(size_t i)
+float GraphsWindow::Times::at(size_t i)
 {
     return _ft->at(i)->est_t_offset;
 }
@@ -1478,11 +1578,11 @@ float Graphs::Times::at(size_t i)
 // Distances
 //////////////////////////////////////////////////////////////////////
 
-Graphs::Distances::Distances(const char *label): Values(label)
+GraphsWindow::Distances::Distances(const char *label): Values(label)
 {
 }
 
-float Graphs::Distances::at(size_t i)
+float GraphsWindow::Distances::at(size_t i)
 {
     return _ft->at(i)->dist * SG_METER_TO_NM;
 }
@@ -1491,11 +1591,11 @@ float Graphs::Distances::at(size_t i)
 // Speeds
 //////////////////////////////////////////////////////////////////////
 
-Graphs::Speeds::Speeds(const char *label): Values(label)
+GraphsWindow::Speeds::Speeds(const char *label): Values(label)
 {
 }
 
-float Graphs::Speeds::at(size_t i)
+float GraphsWindow::Speeds::at(size_t i)
 {
     return _ft->at(i)->spd;
 }
@@ -1504,18 +1604,18 @@ float Graphs::Speeds::at(size_t i)
 // Altitudes (including glideslopes)
 //////////////////////////////////////////////////////////////////////
 
-Graphs::Altitudes::Altitudes(const char *label): Values(label)
+GraphsWindow::Altitudes::Altitudes(const char *label): Values(label)
 {
 }
 
-Graphs::Altitudes::~Altitudes()
+GraphsWindow::Altitudes::~Altitudes()
 {
     for (size_t i = 0; i < _GSs.size(); i++) {
 	delete _GSs[i];
     }
 }
 
-float Graphs::Altitudes::at(size_t i)
+float GraphsWindow::Altitudes::at(size_t i)
 {
     return _ft->at(i)->alt;
 }
@@ -1535,7 +1635,7 @@ float Graphs::Altitudes::at(size_t i)
 // some derived data for glideslopes).  On the other hand, this is
 // only an issue for live tracks - file-based tracks will call
 // _loadData once only.
-void Graphs::Altitudes::load()
+void GraphsWindow::Altitudes::load()
 {
     if (_ft == NULL) {
 	return;
@@ -1698,7 +1798,7 @@ void Graphs::Altitudes::load()
     }
 }
 
-void Graphs::Altitudes::draw(Values& xVals)
+void GraphsWindow::Altitudes::draw(Values& xVals)
 {
     // Draw the glideslopes behind.
     _drawGSs(xVals);
@@ -1707,7 +1807,7 @@ void Graphs::Altitudes::draw(Values& xVals)
     Values::draw(xVals);
 }
 
-void Graphs::Altitudes::_drawGSs(Values& xVals)
+void GraphsWindow::Altitudes::_drawGSs(Values& xVals)
 {
     if (_GSs.size() == 0) {
 	// No glideslope chunks to draw.
@@ -1719,10 +1819,10 @@ void Graphs::Altitudes::_drawGSs(Values& xVals)
 
 	float *c;
 	if (s->radio == NAV1) {
-	    c = vor1Colour;
+	    c = globals.vor1Colour;
 	} else {
 	    assert(s->radio == NAV2);
-	    c = vor2Colour;
+	    c = globals.vor2Colour;
 	}
 
 	glBegin(GL_QUAD_STRIP); {
@@ -1768,7 +1868,7 @@ void Graphs::Altitudes::_drawGSs(Values& xVals)
 }
 
 // Extracts the heading and slope from a glideslope.
-void Graphs::Altitudes::_extractHeadingSlope(NAV *n, double *heading, 
+void GraphsWindow::Altitudes::_extractHeadingSlope(NAV *n, double *heading, 
 					     double *slope)
 {
     // The glideslope's heading is given by the lower 3 digits of the
@@ -1779,7 +1879,7 @@ void Graphs::Altitudes::_extractHeadingSlope(NAV *n, double *heading,
 }
 
 // Calculates the planes for the given glideslope.
-void Graphs::Altitudes::_createPlanes(NAV *n, _Planes *planes)
+void GraphsWindow::Altitudes::_createPlanes(NAV *n, _Planes *planes)
 {
     // Glideslopes have a vertical angular width of 0.7 degrees above
     // and below the centre of the glideslope (FAA AIM).
@@ -1844,17 +1944,17 @@ void Graphs::Altitudes::_createPlanes(NAV *n, _Planes *planes)
 // Rates of Climb
 //////////////////////////////////////////////////////////////////////
 
-Graphs::RatesOfClimb::RatesOfClimb(const char *label): Values(label)
+GraphsWindow::RatesOfClimb::RatesOfClimb(const char *label): Values(label)
 {
 }
 
-float Graphs::RatesOfClimb::at(size_t i)
+float GraphsWindow::RatesOfClimb::at(size_t i)
 {
     // EYE - check bounds?  (Also for all other at() methods)
     return _data[i];
 }
 
-void Graphs::RatesOfClimb::load()
+void GraphsWindow::RatesOfClimb::load()
 {
     if (_ft == NULL) {
 	return;
@@ -1934,12 +2034,12 @@ void Graphs::RatesOfClimb::load()
     }
 }
 
-float Graphs::RatesOfClimb::_altAt(size_t i)
+float GraphsWindow::RatesOfClimb::_altAt(size_t i)
 {
     return _ft->at(i)->alt;
 }
 
-float Graphs::RatesOfClimb::_timeAt(size_t i)
+float GraphsWindow::RatesOfClimb::_timeAt(size_t i)
 {
     return _ft->at(i)->est_t_offset;
 }

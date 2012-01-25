@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2008 - 2011 Brian Schack
+  Copyright (C) 2008 - 2012 Brian Schack
 
   This file is part of Atlas.
 
@@ -35,6 +35,7 @@
 #include "Globals.hxx"
 #include "misc.hxx"
 #include "Geographics.hxx"
+#include "AtlasWindow.hxx"
 
 #ifdef _MSC_VER
 #include <simgear/math/SGMisc.hxx>
@@ -57,43 +58,6 @@ const float arp_controlled_colour[4] = {0.000, 0.420, 0.624, 1.0};
 // Runway (light grey)
 const float arp_runway_colour[4] = {0.824, 0.863, 0.824, 1.0};
 
-//////////////////////////////////////////////////////////////////////
-// Searchable interface.
-//////////////////////////////////////////////////////////////////////
-double ARP::distanceSquared(const sgdVec3 from) const
-{
-    return sgdDistanceSquaredVec3(bounds.center, from);
-}
-
-// Returns our tokens, generating them if they haven't been already.
-const std::vector<std::string>& ARP::tokens()
-{
-    if (_tokens.empty()) {
-	// The id is a token.
-	_tokens.push_back(id);
-
-	// Tokenize the name.
-	Searchable::tokenize(name, _tokens);
-
-	// Add an "AIR:" token.
-	_tokens.push_back("AIR:");
-    }
-
-    return _tokens;
-}
-
-// Returns our pretty string, generating it if it hasn't been already.
-const std::string& ARP::asString()
-{
-    if (_str.empty()) {
-	// Initialize our pretty string.
-	globalString.printf("AIR: %s %s", id.c_str(), name.c_str());
-	_str = globalString.str();
-    }
-
-    return _str;
-}
-
 AirportsOverlay::AirportsOverlay(Overlays& overlays):
     _overlays(overlays),
     _backgroundsDisplayList(0), _runwaysDisplayList(0), _labelsDisplayList(0),
@@ -113,34 +77,6 @@ AirportsOverlay::AirportsOverlay(Overlays& overlays):
     _createBeacon();
     _createAirportIcon();
 
-//     GLubyte *data;
-//     int width, height, depth;
-//     data = (GLubyte *)loadPng("FreqIcons.png", &width, &height, &depth);
-//     assert(data != NULL);
-//     glGenTextures(1, &_icons);
-//     assert(_icons > 0);
-
-//     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-//     glBindTexture(GL_TEXTURE_2D, _icons);
-
-//     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-//     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-//     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-// //     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-//     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-
-//     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height,
-// 		 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-
-//     gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGBA, width, height,
-// 		      GL_RGBA, GL_UNSIGNED_BYTE, data);
-
-//     delete []data;
-
-    // Create a culler and a frustum searcher for it.
-    _culler = new Culler();
-    _frustum = new Culler::FrustumSearch(*_culler);
-
     // Subscribe to moved and zoomed notifications.
     subscribe(Notification::Moved);
     subscribe(Notification::Zoomed);
@@ -148,30 +84,12 @@ AirportsOverlay::AirportsOverlay(Overlays& overlays):
 
 AirportsOverlay::~AirportsOverlay()
 {
-    for (unsigned int i = 0; i < _airports.size(); i++) {
-	ARP *ap = _airports[i];
-
-	for (unsigned int j = 0; j < ap->rwys.size(); j++) {
-	    delete ap->rwys[j];
-	}
-	ap->rwys.clear();
-
-	ap->freqs.clear();
-
-	delete ap;
-    }
-
-    _airports.clear();
-
     glDeleteLists(_backgroundsDisplayList, 1);
     glDeleteLists(_runwaysDisplayList, 1);
     glDeleteLists(_labelsDisplayList, 1);
 
     glDeleteLists(_beaconDL, 1);
     glDeleteLists(_airportIconDL, 1);
-
-    delete _frustum;
-    delete _culler;
 }
 
 void AirportsOverlay::setPolicy(const AirportPolicy& p)
@@ -184,46 +102,6 @@ void AirportsOverlay::setPolicy(const AirportPolicy& p)
 AirportPolicy AirportsOverlay::policy()
 {
     return _policy;
-}
-
-bool AirportsOverlay::load(const string& fgDir)
-{
-    bool result = false;
-
-    SGPath f(fgDir);
-    f.append("Airports/apt.dat.gz");
-
-    gzFile arp;
-    char *line;
-
-    printf("Loading airports from\n  %s\n", f.c_str());
-    arp = gzopen(f.c_str(), "rb");
-    if (arp == NULL) {
-	// EYE - we might want to throw an error instead.
-	fprintf(stderr, "AirportsOverlay::load: Couldn't open \"%s\".\n", 
-		f.c_str());
-	return false;
-    } 
-
-    // Check the file version.  We can handle version 810 files.
-    int version = -1;
-    gzGetLine(arp, &line);	// Windows/Mac header
-    gzGetLine(arp, &line);	// Version
-    sscanf(line, "%d", &version);
-    if (version == 810) {
-	// It looks like we have a valid file.
-	result = _load810(arp);
-    } else {
-	// EYE - throw an error?
-	fprintf(stderr, "AirportsOverlay::load: \"%s\": unknown version %d.\n", 
-		f.c_str(), version);
-	result = false;
-    }
-
-    gzclose(arp);
-    printf("  ... done\n");
-
-    return result;
 }
 
 // Creates a single predefined beacon and saves it in _beaconDL.
@@ -317,286 +195,6 @@ void AirportsOverlay::_createAirportIcon()
     glEndList();
 }
 
-bool AirportsOverlay::_load810(const gzFile& arp)
-{
-    char *line;
-
-    ARP *ap = NULL;
-
-    while (gzGetLine(arp, &line)) {
-	int lineCode, offset;
-
-	if (strcmp(line, "") == 0) {
-	    // Blank line.
-	    continue;
-	} 
-
-	if (strcmp(line, "99") == 0) {
-	    // Last line.
-	    break;
-	}
-
-	sscanf(line, "%d%n", &lineCode, &offset);
-	line += offset;
-	switch (lineCode) {
-	  case 1:
-	  case 16:
-	  case 17:
-	    {
-		// The presence of a 1/16/17 means that we're starting a
-		// new airport/seaport/heliport, and therefore ending an
-		// old one.  Deal with the old airport first.
-		if (ap != NULL) {
-		    // Calculate the airport's center in lat, lon.
-		    airportLatLon(ap);
-		    _airports.push_back(ap);
-		    // Add our airport text to the searcher object.
-		    globals.searcher.add(ap);
-		    // Add to our culler.
-		    _frustum->culler().addObject(ap);
-
-		    ap = NULL;
-		}
-
-		// EYE - add seaports and heliports!  (Note: the
-		// classification of seaports is iffy - Pearl Harbor
-		// is called an airport, even though it's in the
-		// ocean, and Courchevel is called a seaport, even
-		// though it's on top of a mountain).
-		if (lineCode != 1) {
-		    // We only handle airports (16 = seaport, 17 = heliport)
-		    break;
-		}
-
-		// Create a new airport record.
-		ap = new ARP;
-
-		float elevation;
-		int controlled;
-		char code[5];	// EYE - safe?
-
-		sscanf(line, "%f %d %*d %s %n", 
-		       &elevation, &controlled, code, &offset);
-		line += offset;
-
-		ap->elev = elevation * SG_FEET_TO_METER;
-		ap->controlled = (controlled == 1);
-		ap->id = code;
-		ap->name = line;
-		// This will be set to true if we find a runway with
-		// any kind of runway lighting.
-		ap->lighting = false;
-		// If set to true, then beaconLat and beaconLon
-		// contain the location of the beacon.
-		ap->beacon = false;
-	    }
-
-	    break;
-	  case 10:
-	    {
-		if (ap == NULL) {
-		    // If we're not working on an airport (ie, if this is
-		    // a heliport), just continue.
-		    break;
-		}
-
-		double lat, lon;
-		char rwyid[4];	// EYE - safe?
-
-		sscanf(line, "%lf %lf %s %n", &lat, &lon, rwyid, &offset);
-		line += offset;
-
-		// We ignore taxiways and helipads.
-		if (strcmp(rwyid, "xxx") == 0) {
-		    break;
-		}
-		if (strncmp(rwyid, "H", 1) == 0) {
-		    break;
-		}
-
-		// Strip off trailing x's.
-		int firstX = strcspn(rwyid, "x");
-		if (firstX > 0) {
-		    rwyid[firstX] = '\0';
-		}
-		assert(strlen(rwyid) <= 3);
-
-		// Runway!
-		RWY *rwy = new RWY;
-
-		float heading, length, width;
-		char *lighting;
-
-		sscanf(line, "%f %f %*f %*f %f %n", 
-		       &heading, &length, &width, &offset);
-		lighting = line + offset;
-
-		rwy->lat = lat;
-		rwy->lon = lon;
-		rwy->hdg = heading;
-		rwy->length = length * SG_FEET_TO_METER;
-		rwy->width  = width * SG_FEET_TO_METER;
-		rwy->id = rwyid;
-		ap->rwys.push_back(rwy);
-
-		runwayExtents(rwy, ap->elev);
-		ap->bounds.extend(&(rwy->bounds));
-
-		// According to the FAA's "VFR Aeronautical Chart
-		// Symbols", lighting codes on VFR maps refer to
-		// runway lights (not approach lights).
-		//
-		// In apt.dat, visual approach, runway, and approach
-		// lighting is given by a six-digit "number" (which we
-		// treat as a string).  We're concerned with digits 2
-		// and 5, which concern the runway itself.  If the
-		// value is '1', there is no runway lighting.
-		//
-		// Note that the apt.dat database does not tell us
-		// about lighting limitations, nor whether the
-		// lighting is pilot-controlled.
-		if ((lighting[1] != '1') || (lighting[4] != '1')) {
-		    ap->lighting = true;
-		}
-	    }
-
-	    break;
-	  case 18: 
-	    if (ap != NULL) {
-		// Beacon
-		double lat, lon;
-		int beaconType;
-
-		sscanf(line, "%lf %lf %d", &lat, &lon, &beaconType);
-		if (beaconType != 0) {
-		    ap->beacon = true;
-		    ap->beaconLat = lat;
-		    ap->beaconLon = lon;
-		}
-	    }
-	    break;
-	  case WEATHER:		// AWOS, ASOS, ATIS
-	  case UNICOM:		// Unicom/CTAF (US), radio (UK)
-	  case DEL:		// Clearance delivery
-	  case GND:		// Ground
-	  case TWR:		// Tower
-	  case APP:		// Approach
-	  case DEP:		// Departure
-	      {
-		  // ATC frequencies.
-		  //
-		  // Here's a sample, from LFPG (Paris Charles De
-		  // Gaulle), which is a rather extreme case:
-		  //
-		  // 50 12712 DE GAULLE ATIS
-		  // 53 11810 DE GAULLE TRAFFIC
-		  // 53 11955 DE GAULLE TRAFFIC
-		  // 53 12160 DE GAULLE GND
-		  // 53 12167 DE GAULLE TRAFFIC
-		  // 53 12177 DE GAULLE GND
-		  // 53 12177 DE GAULLE GND
-		  // 53 12180 DE GAULLE GND
-		  // 53 12192 DE GAULLE TRAFFIC
-		  // 53 12192 DE GAULLE TRAFFIC
-		  // 53 12197 DE GAULLE GND
-		  // 53 12197 DE GAULLE GND
-		  // 54 11865 DE GAULLE TWR
-		  // 54 11925 DE GAULLE TWR
-		  // 54 12090 DE GAULLE TWR
-		  // 54 12360 DE GAULLE TWR
-		  // 54 12532 DE GAULLE TWR
-		  //
-		  // [...]
-		  //
-		  // There are several important things to note:
-		  //
-		  // (1) There many be several entries for a given
-		  //     type.  For example, there is only one WEATHER
-		  //     entry (type code 50), but 10 GND entries
-		  //     (type code 53).
-		  //
-		  // (2) There may be several frequencies with the
-		  //     same name in a given type.  For example,
-		  //     there are 4 GND entries labelled "DE GAULLE
-		  //     TRAFFIC", and 6 labelled "DE GAULLE GND".
-		  //     They are not guaranteed to be grouped
-		  //     together.  
-		  //
-		  //     When rendering these, we only print the label
-		  //     once, and all frequencies with that label are
-		  //     printed after the label.  This makes for a
-		  //     less cluttered display:
-		  //
-		  //     DE GAULLE TRAFFIC 118.1 119.55 121.675 121.925
-		  //
-		  // (3) There may be duplicates.  For example, '53
-		  //     12192 DE GAULLE TRAFFIC' is given twice.  The
-		  //     duplicates should presumably be ignored.
-		  //
-		  // (4) Frequencies are given as integers, and should
-		  //     be divided by 100.0 to give the true
-		  //     frequency in MHz.  That is, 11810 is 118.1
-		  //     MHz.  In addition, they are missing a
-		  //     significant digit: 12192 really means 121.925
-		  //     MHz, not 121.92 MHz (communications
-		  //     frequencies have a 25 kHz spacing).  So, we
-		  //     need to correct frequencies with end in the
-		  //     digits '2' and '7'.
-		  //
-		  //     Internally, we also store the frequencies as
-		  //     integers, but multiplied by 1000.0, not
-		  //     100.0.  And we add a final '5' when
-		  //     necessary.  So, we store 12192 as 121925, and
-		  //     11810 as 118100.
-
-	          // EYE - what should I do about multiple frequencies
-	          // of one type?  A: Check San Jose (KSJC) - it has 2
-	          // CT frequencies, and just lists them.  However,
-	          // the VFR_Chart_Symbols.pdf file says that it lists
-	          // the "primary frequency."
-
-	          // Note: Unicom frequencies are written in bold
-	          // italics, others in bold.  CT seems to be written
-	          // slightly larger than the others.
-
-	          // Note: Some airports, like Reid-Hillview, have
-	          // CTAF and UNICOM.  CTAF is written with a circled
-	          // C in front, the frequency bold and slightly
-	          // enlarged (like CT), UNICOM in bold italics.
-
-		  if (ap != NULL) {
-		      int freq;
-
-		      sscanf(line, "%d %n", &freq, &offset);
-		      line += offset;
-
-		      FrequencyMap& f = ap->freqs[(ATCCodeType)lineCode];
-		      set<int>& freqs = f[line];
-		      if ((freq % 10 == 2) || (freq % 10 == 7)) {
-			  freqs.insert(freq * 10 + 5);
-		      } else {
-			  freqs.insert(freq * 10);
-		      }
-		  }
-	      }
-	    break;
-	}
-    }
-
-    if (ap != NULL) {
-	// Calculate the airport's center in lat, lon.
-	airportLatLon(ap);
-	_airports.push_back(ap);
-	// Add our airport text to the searcher object.
-	globals.searcher.add(ap);
-	// Add to our culler.
-	_frustum->culler().addObject(ap);
-    }
-
-    // EYE - will there ever be a false return?
-    return true;
-}
-
 void AirportsOverlay::setDirty()
 {
     _FGDirty = true;
@@ -657,7 +255,7 @@ void AirportsOverlay::setDirty()
 //
 //     glDisable(GL_STENCIL_TEST);
 
-void AirportsOverlay::drawBackgrounds()
+void AirportsOverlay::drawBackgrounds(NavData *navData)
 {
     if (_BGDirty) {
 	const int rO = _policy.rO;
@@ -670,7 +268,8 @@ void AirportsOverlay::drawBackgrounds()
 	// Airport radius (pixels)
 	int rA;
 
-	const vector<Cullable *>& intersections = _frustum->intersections();
+	const vector<Cullable *>& intersections = 
+	    navData->hits(NavData::AIRPORTS);
 
 	if (_backgroundsDisplayList == 0) {
 	    _backgroundsDisplayList = glGenLists(1);
@@ -727,7 +326,7 @@ void AirportsOverlay::drawBackgrounds()
 }
 
 // Draws the runways and the airport beacon.
-void AirportsOverlay::drawForegrounds()
+void AirportsOverlay::drawForegrounds(NavData *navData)
 {
     if (_FGDirty) {
 	const int rI = _policy.rI;
@@ -736,7 +335,8 @@ void AirportsOverlay::drawForegrounds()
 	// Airport radius (pixels)
 	int rA;
 
-	const vector<Cullable *>& intersections = _frustum->intersections();
+	const vector<Cullable *>& intersections = 
+	    navData->hits(NavData::AIRPORTS);
 
 	if (_runwaysDisplayList == 0) {
 	    _runwaysDisplayList = glGenLists(1);
@@ -817,7 +417,7 @@ void AirportsOverlay::drawForegrounds()
     glCallList(_runwaysDisplayList);
 }
 
-void AirportsOverlay::drawLabels()
+void AirportsOverlay::drawLabels(NavData *navData)
 {
     if (_labelsDirty) {
 	const int rI = _policy.rI;
@@ -826,7 +426,8 @@ void AirportsOverlay::drawLabels()
 	// Airport radius (pixels)
 	int rA;
 
-	const vector<Cullable *>& intersections = _frustum->intersections();
+	const vector<Cullable *>& intersections = 
+	    navData->hits(NavData::AIRPORTS);
 
 	if (_labelsDisplayList == 0) {
 	    _labelsDisplayList = glGenLists(1);
@@ -840,7 +441,8 @@ void AirportsOverlay::drawLabels()
 
 	// Label the runways.
 	glColor4f(0.0, 0.0, 0.0, 1.0);
-	globals.fontRenderer.begin();
+	// EYE - does removing the begin()/end() pair affect things?
+	// globals.fontRenderer.begin();
 	for (unsigned int i = 0; i < intersections.size(); i++) {
 	    ARP *ap = dynamic_cast<ARP *>(intersections[i]);
 	    if (!ap) {
@@ -856,7 +458,7 @@ void AirportsOverlay::drawLabels()
 		}
 	    }
 	}
-	globals.fontRenderer.end();
+	// globals.fontRenderer.end();
 
 	// Label the airports.
 	for (unsigned int i = 0; i < intersections.size(); i++) {
@@ -878,99 +480,6 @@ void AirportsOverlay::drawLabels()
     }
 
     glCallList(_labelsDisplayList);
-}
-
-// Calculates the airport's center in lat, lon from its bounds.
-void airportLatLon(ARP *ap)
-{
-    double lat, lon, alt;
-    sgdVec3 c;
-    sgdSetVec3(c,
-	       ap->bounds.center[0], 
-	       ap->bounds.center[1], 
-	       ap->bounds.center[2]);
-    sgCartToGeod(c, &lat, &lon, &alt);
-    ap->lat = lat * SGD_RADIANS_TO_DEGREES;
-    ap->lon = lon * SGD_RADIANS_TO_DEGREES;
-}
-
-// Given a runway with a valid lat, lon, and heading (in degrees), and
-// a valid length and width (in metres), sets its bounds, "ahead"
-// vector (a normalized vector pointing along the runway in the given
-// heading), "aside" vector (a normalized vector pointing across the
-// runway, 90 degrees clockwise from the ahead vector), and its
-// "above" vector (its normal vector).
-void runwayExtents(RWY *rwy, float elev)
-{
-    // In PLIB, "up" (the direction of our normal) is along the
-    // positive y-axis.  What we call "ahead" (looking along our
-    // heading, where the runway points), is along the positive
-    // z-axis), and what we call "aside" (looking across the runway,
-    // 90 degrees from our heading), is along the negative x-axis.
-
-    // EYE - am I thinking about this right?  Is it what PLIB
-    // "thinks", or what I think?
-    sgdSetVec3(rwy->ahead, 0.0, 0.0, 1.0);
-    sgdSetVec3(rwy->aside, -1.0, 0.0, 0.0);
-    sgdSetVec3(rwy->above, 0.0, 1.0, 0.0);
-
-    sgdMat4 rot;
-    double heading = rwy->lon - 90.0;
-    double pitch = rwy->lat;
-    double roll = -rwy->hdg;
-
-    // This version has us in our standard orientation, which means 0
-    // lat, 0 lon, and a heading of 0 (north).
-    // EYE - untested
-//     sgdSetVec3(rwy->ahead, 0.0, 0.0, 1.0);
-//     sgdSetVec3(rwy->aside, 0.0, 1.0, 0.0);
-//     sgdSetVec3(rwy->above, 1.0, 0.0, 0.0);
-
-//     sgdMat4 rot;
-//     double heading = rwy->lon;
-//     double pitch = -rwy->hdg;
-//     double roll = -rwy->lat;
-
-    // This version is in the standard PLIB orientation, facing out
-    // along the y axis, the x axis right, and the z axis up.
-    // EYE - untested
-//     sgdSetVec3(rwy->ahead, 0.0, 0.0, 1.0);
-//     sgdSetVec3(rwy->aside, 1.0, 0.0, 0.0);
-//     sgdSetVec3(rwy->above, 0.0, 1.0, 0.0);
-
-//     sgdMat4 rot;
-//     double heading = 90.0 - rwy->lon;
-//     double pitch = rwy->lat;
-//     double roll = rwy->hdg;
-
-    sgdMakeRotMat4(rot, heading, pitch, roll);
-
-    sgdXformVec3(rwy->ahead, rot);
-    sgdXformVec3(rwy->aside, rot);
-    sgdXformVec3(rwy->above, rot);
-
-    // Calculate our bounding sphere.
-    sgdVec3 center;
-    atlasGeodToCart(rwy->lat, rwy->lon, elev, center);
-    sgdCopyVec3(rwy->bounds.center, center);
-
-    sgdMat4 mat;
-    sgdMakeTransMat4(mat, rwy->bounds.center);
-    sgdPreMultMat4(mat, rot);
-
-    sgdVec3 ll = {rwy->width / 2,  0.0, -rwy->length / 2};
-    sgdVec3 lr = {-rwy->width / 2, 0.0, -rwy->length / 2};
-    sgdVec3 ul = {rwy->width / 2, 0.0, rwy->length / 2};
-    sgdVec3 ur = {-rwy->width / 2, 0.0, rwy->length / 2};
-
-    sgdXformPnt3(ul, mat);
-    sgdXformPnt3(lr, mat);
-    sgdXformPnt3(ll, mat);
-    sgdXformPnt3(ur, mat);
-    rwy->bounds.extend(ul);
-    rwy->bounds.extend(ll);
-    rwy->bounds.extend(ll);
-    rwy->bounds.extend(ur);
 }
 
 // EYE - makes no allowance for the curvature of the earth; assumes
@@ -1085,10 +594,10 @@ void AirportsOverlay::_labelAirport(ARP *ap, int rA)
     // Generate label.
     LayoutManager lm;
     lm.begin();
-    lm.setFont(globals.regularFont, pointSize);
+    lm.setFont(_overlays.regularFont(), pointSize);
 
-    globalString.printf("%s (%s)", ap->name.c_str(), ap->id.c_str());
-    lm.addText(globalString.str());
+    globals.str.printf("%s (%s)", ap->name.c_str(), ap->id.c_str());
+    lm.addText(globals.str.str());
 
     // Frequencies
     lm.newline();
@@ -1114,17 +623,17 @@ void AirportsOverlay::_labelAirport(ARP *ap, int rA)
 		}
 
 		// First, the frequency name.
-		lm.setFont(globals.regularFont, tinyFontSize);
+		lm.setFont(_overlays.regularFont(), tinyFontSize);
 		lm.addText(freq->first);
 
 		// Now, the frequencies themselves.
-		globalString.clear();
-		lm.setFont(globals.boldFont, smallFontSize);
+		globals.str.clear();
+		lm.setFont(_overlays.boldFont(), smallFontSize);
 		set<int>::iterator j;
 		for (j = freqs.begin(); j != freqs.end(); j++) {
-		    globalString.appendf(" %s", formatFrequency(*j));
+		    globals.str.appendf(" %s", formatFrequency(*j));
 		}
-		lm.addText(globalString.str());
+		lm.addText(globals.str.str());
 	    }
 
 	    lm.newline();
@@ -1135,11 +644,11 @@ void AirportsOverlay::_labelAirport(ARP *ap, int rA)
 	lm.newline();
 
 	// Airport elevation - set in regular italics.
-	lm.setFont(globals.regularFont, mediumFontSize, 0.25);
+	lm.setFont(_overlays.regularFont(), mediumFontSize, 0.25);
 	// We need to ensure that the number is at least 2 digits
 	// long (ie, '6' must be written '06').
-	globalString.printf("%02.0f  ", ap->elev * SG_METER_TO_FEET);
-	lm.addText(globalString.str());
+	globals.str.printf("%02.0f  ", ap->elev * SG_METER_TO_FEET);
+	lm.addText(globals.str.str());
 	lm.setItalics(0.0);
 
 	// Runway lighting.
@@ -1162,9 +671,9 @@ void AirportsOverlay::_labelAirport(ARP *ap, int rA)
 	// point.  It's probably different in different countries, and
 	// it may be different on VFR charts.  For now, though, we'll
 	// use the '70 rule'.
-	globalString.printf("%.0f",
+	globals.str.printf("%.0f",
 			    ROUND((maxRwy * SG_METER_TO_FEET - 20) / 100));
-	lm.addText(globalString.str());
+	lm.addText(globals.str.str());
     }
 
     lm.end();
@@ -1235,8 +744,6 @@ void AirportsOverlay::_labelRunway(RWY *rwy)
 //     static const float multiple = 10.0;
     static const float multiple = 4.0;
 
-    atlasFntRenderer& f = globals.fontRenderer;
-
     // Calculate size (in metres) of text.
     float pointSize;
     if ((rwy->width * multiple) < (maxHeight * _metresPerPixel)) {
@@ -1251,7 +758,6 @@ void AirportsOverlay::_labelRunway(RWY *rwy)
     if (pointSize / _metresPerPixel < 10.0) {
 	return;
     }
-    f.setPointSize(pointSize);
 
     // Label "main" end.
     _labelRunwayEnd(rwy->id.c_str(), pointSize, 0.0, rwy);
@@ -1283,10 +789,10 @@ void AirportsOverlay::_labelRunway(RWY *rwy)
     }
 
     // Create the label.
-    globalString.printf("%.0f' x %.0f'", 
+    globals.str.printf("%.0f' x %.0f'", 
 			rwy->length * SG_METER_TO_FEET,
 			rwy->width * SG_METER_TO_FEET);
-    LayoutManager lm(globalString.str(), globals.regularFont, pointSize);
+    LayoutManager lm(globals.str.str(), _overlays.regularFont(), pointSize);
 
     // Now draw it.
     geodDrawText(lm, rwy->lat, rwy->lon, rwy->hdg - 90.0);
@@ -1298,7 +804,7 @@ void AirportsOverlay::_labelRunway(RWY *rwy)
 void AirportsOverlay::_labelRunwayEnd(const char *str, float pointSize,
 				      float hdg, RWY *rwy)
 {
-    LayoutManager lm(str, globals.regularFont, pointSize);
+    LayoutManager lm(str, _overlays.regularFont(), pointSize);
     lm.moveTo(0.0, -rwy->length / 2.0, LayoutManager::UC);
 
     geodPushMatrix(rwy->lat, rwy->lon, rwy->hdg + hdg); {
@@ -1310,27 +816,14 @@ void AirportsOverlay::_labelRunwayEnd(const char *str, float pointSize,
 }
 
 // Called when somebody posts a notification that we've subscribed to.
-bool AirportsOverlay::notification(Notification::type n)
+void AirportsOverlay::notification(Notification::type n)
 {
     if (n == Notification::Moved) {
-	// Update our frustum from globals and record ourselves as
-	// dirty.
-	_frustum->move(globals.modelViewMatrix);
 	setDirty();
     } else if (n == Notification::Zoomed) {
-	// Update our frustum and scale from globals and record
-	// ourselves as dirty.
-	_frustum->zoom(globals.frustum.getLeft(),
-		       globals.frustum.getRight(),
-		       globals.frustum.getBot(),
-		       globals.frustum.getTop(),
-		       globals.frustum.getNear(),
-		       globals.frustum.getFar());
-	_metresPerPixel = globals.metresPerPixel;
+	_metresPerPixel = _overlays.aw()->scale();
 	setDirty();
     } else {
 	assert(false);
     }
-
-    return true;
 }

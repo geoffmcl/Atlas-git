@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2011 Brian Schack
+  Copyright (C) 2009 - 2012 Brian Schack
 
   The overlays object manages a bunch of other overlays.  It creates
   them, and knows which ones should be displayed.
@@ -31,24 +31,11 @@
 #include <bitset>
 
 #include "Culler.hxx"
-#include "AirportsOverlay.hxx"
-#include "NavaidsOverlay.hxx"
-#include "AirwaysOverlay.hxx"
-#include "FixesOverlay.hxx"
-#include "FlightTracksOverlay.hxx"
-#include "CrosshairsOverlay.hxx"
-#include "RangeRingsOverlay.hxx"
+#include "NavData.hxx"
 
-struct NAVPOINT {
-    bool isNavaid;		// True if navaid, false if fix.
-    void *n;			// Pointer to the navaid or fix.
-};
-
-// The navPoints map is used when generating airways - we want to
-// match the id given in the airways file with the actual navaid or
-// fix it refers to.
-extern std::multimap<std::string, NAVPOINT> navPoints;
-
+// Because of our contorted interdependencies, it's not possible to
+// include most files here, so we just forward declare most of what we
+// need, and place all method definitions in the cxx file.
 class AirportsOverlay;
 class NavaidsOverlay;
 class AirwaysOverlay;
@@ -56,13 +43,22 @@ class FixesOverlay;
 class FlightTracksOverlay;
 class CrosshairsOverlay;
 class RangeRingsOverlay;
+class AtlasWindow;
+class AtlasController;
 
 class Overlays {
   public:
-    Overlays(const std::string& fgDir);
+    Overlays(AtlasWindow *aw);
     ~Overlays();
 
-    void draw();
+    // These are shortcuts to some useful classes that our various
+    // overlays need.
+    atlasFntTexFont *regularFont();
+    atlasFntTexFont *boldFont();
+    AtlasWindow *aw();
+    AtlasController *ac();
+
+    void draw(NavData *navData);
 
     enum OverlayType {NAVAIDS = 0, VOR, NDB, ILS, DME, FIXES, AIRPORTS, 
 		      AIRWAYS, HIGH, LOW, LABELS, TRACKS, CROSSHAIRS, 
@@ -80,6 +76,7 @@ class Overlays {
     RangeRingsOverlay* rangeRingsOverlay() { return _rangeRings; }
 
   protected:
+    AtlasWindow *_aw;
     std::bitset<_LAST> _overlays;
 
     AirportsOverlay *_airports;

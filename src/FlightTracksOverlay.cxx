@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2011 Brian Schack
+  Copyright (C) 2009 - 2012 Brian Schack
 
   This file is part of Atlas.
 
@@ -31,24 +31,23 @@
 #include "Globals.hxx"
 #include "Preferences.hxx"
 #include "Geographics.hxx"
+#include "AtlasController.hxx"
+#include "AtlasWindow.hxx"
 
 using namespace std;
 
-// User preferences (including command-line arguments).
-extern Preferences prefs;
-
 FlightTracksOverlay::FlightTracksOverlay(Overlays& overlays):
-    _overlays(overlays), _isDirty(false)
+    _overlays(overlays), _isDirty(false), _dl(0)
 {
     // Load image for airplane display if requested.
-    if (prefs.airplaneImage.str().empty()) {
+    if (globals.prefs.airplaneImage.str().empty()) {
 	_haveImage = false;
-    } else if (prefs.airplaneImage.exists()) {
-	_airplaneTexture.load(prefs.airplaneImage);
+    } else if (globals.prefs.airplaneImage.exists()) {
+	_airplaneTexture.load(globals.prefs.airplaneImage);
 	if (!_airplaneTexture.loaded()) {
 	    fprintf(stderr, "Airplane image file %s could not be read.\n"
 		    "Falling back to line drawing\n",
-		    prefs.airplaneImage.c_str());
+		    globals.prefs.airplaneImage.c_str());
 	    _haveImage = false;
 	} else {
 	    _haveImage = true;
@@ -56,7 +55,7 @@ FlightTracksOverlay::FlightTracksOverlay(Overlays& overlays):
     } else {
 	fprintf(stderr, "Airplane image file %s was not found.\n"
 		"Falling back to line drawing\n",
-		prefs.airplaneImage.c_str());
+		globals.prefs.airplaneImage.c_str());
 	_haveImage = false;
     }
 
@@ -69,99 +68,151 @@ FlightTracksOverlay::FlightTracksOverlay(Overlays& overlays):
 
 FlightTracksOverlay::~FlightTracksOverlay()
 {
-    for (map<FlightTrack*, TRACK_INFO>::const_iterator i = _tracks.begin(); 
-	 i != _tracks.end(); i++) {
-	glDeleteLists(i->second.DL, 1);
-    }
+    // for (map<FlightTrack*, TRACK_INFO>::const_iterator i = _tracks.begin(); 
+    // 	 i != _tracks.end(); i++) {
+    // 	glDeleteLists(i->second.DL, 1);
+    // }
+    glDeleteLists(_dl, 1);
 }
 
-void FlightTracksOverlay::addTrack(FlightTrack *t, 
-				   sgVec4 trackColour, 
-				   sgVec4 planeColour)
-{
-    TRACK_INFO info;
+// void FlightTracksOverlay::addTrack(FlightTrack *t, 
+// 				   sgVec4 trackColour, 
+// 				   sgVec4 planeColour)
+// {
+//     TRACK_INFO info;
 
-    if (t) {
-	sgCopyVec4(info.trackColour, trackColour);
-	sgCopyVec4(info.planeColour, planeColour);
-	info.DL = 0;
+//     if (t) {
+// 	sgCopyVec4(info.trackColour, trackColour);
+// 	sgCopyVec4(info.planeColour, planeColour);
+// 	info.DL = 0;
 
-	_tracks[t] = info;
-    }
-}
+// 	_tracks[t] = info;
+//     }
+// }
 
-void FlightTracksOverlay::removeTrack(FlightTrack *t)
-{
-    if (t) {
-	_tracks.erase(t);
-    } else {
-	_tracks.clear();
-    }
-}
+// void FlightTracksOverlay::removeTrack(FlightTrack *t)
+// {
+//     if (t) {
+// 	_tracks.erase(t);
+//     } else {
+// 	_tracks.clear();
+//     }
+// }
 
 void FlightTracksOverlay::setDirty()
 {
     _isDirty = true;
 }
 
+// void FlightTracksOverlay::draw()
+// {
+//     // We save tracks in display lists, as they rarely change, and are
+//     // rendered the same regardless of zooms and moves.  The airplane,
+//     // however, is drawn anew each time - it's cheap to do, it changes
+//     // more often, and it has to be drawn differently when we zoom.
+//     if (_isDirty) {
+// 	for (map<FlightTrack*, TRACK_INFO>::const_iterator i = _tracks.begin(); 
+// 	     i != _tracks.end(); i++) {
+// 	    FlightTrack *t = i->first;
+// 	    TRACK_INFO info = i->second;
+
+// 	    if (info.DL == 0) {
+// 		info.DL = glGenLists(1);
+// 		assert(info.DL != 0);
+// 	    }
+
+// 	    glNewList(info.DL, GL_COMPILE);
+// 	    glPushAttrib(GL_LINE_BIT); {
+// 		// Draw the track.
+// 		glColor4fv(info.trackColour);
+//                 glLineWidth(prefs.lineWidth);
+
+// 		glBegin(GL_LINE_STRIP); {
+// 		    for (size_t i = 0; i < t->size(); i++) {
+// 			FlightData *d = t->at(i);
+// 			glVertex3dv(d->cart);
+// 		    }
+// 		}
+// 		glEnd();
+// 	    }
+// 	    glPopAttrib();
+// 	    glEndList();
+
+// 	    _tracks[t] = info;
+// 	}
+	
+// 	_isDirty = false;
+//     }
+
+//     for (map<FlightTrack*, TRACK_INFO>::const_iterator i = _tracks.begin(); 
+// 	 i != _tracks.end(); i++) {
+// 	// Draw the track.
+// 	glCallList(i->second.DL);
+
+// 	// Draw the airplane.  If the track is live, we draw an
+// 	// airplane at the end, in the track colour.  We also draw an
+// 	// airplane at the mark, in the plane colour.
+// 	FlightTrack *t = i->first;
+// 	if (t->live()) {
+// 	    _drawAirplane(t->last(), i->second.trackColour);
+// 	}
+// 	_drawAirplane(t->current(), i->second.planeColour);
+//     }
+// }
+
+// EYE - instead of just drawing the current track, we should
+// eventually have the option of drawing all tracks.
 void FlightTracksOverlay::draw()
 {
+    FlightTrack *t = _overlays.ac()->currentTrack();
+    if (!t) {
+	return;
+    }
+
     // We save tracks in display lists, as they rarely change, and are
     // rendered the same regardless of zooms and moves.  The airplane,
     // however, is drawn anew each time - it's cheap to do, it changes
     // more often, and it has to be drawn differently when we zoom.
     if (_isDirty) {
-	for (map<FlightTrack*, TRACK_INFO>::const_iterator i = _tracks.begin(); 
-	     i != _tracks.end(); i++) {
-	    FlightTrack *t = i->first;
-	    TRACK_INFO info = i->second;
-
-	    if (info.DL == 0) {
-		info.DL = glGenLists(1);
-		assert(info.DL != 0);
-	    }
-
-	    glNewList(info.DL, GL_COMPILE);
-	    glPushAttrib(GL_LINE_BIT); {
-		// Draw the track.
-		glColor4fv(info.trackColour);
-                glLineWidth(prefs.lineWidth);
-
-		glBegin(GL_LINE_STRIP); {
-		    for (size_t i = 0; i < t->size(); i++) {
-			FlightData *d = t->at(i);
-			glVertex3dv(d->cart);
-		    }
-		}
-		glEnd();
-	    }
-	    glPopAttrib();
-	    glEndList();
-
-	    _tracks[t] = info;
+	if (_dl == 0) {
+	    _dl = glGenLists(1);
+	    assert(_dl != 0);
 	}
+
+	glNewList(_dl, GL_COMPILE);
+	glPushAttrib(GL_LINE_BIT); {
+	    // Draw the track.
+	    glColor4fv(globals.trackColour);
+	    glLineWidth(globals.prefs.lineWidth);
+
+	    glBegin(GL_LINE_STRIP); {
+		for (size_t i = 0; i < t->size(); i++) {
+		    FlightData *d = t->at(i);
+		    glVertex3dv(d->cart);
+		}
+	    }
+	    glEnd();
+	}
+	glPopAttrib();
+	glEndList();
 	
 	_isDirty = false;
     }
 
-    for (map<FlightTrack*, TRACK_INFO>::const_iterator i = _tracks.begin(); 
-	 i != _tracks.end(); i++) {
-	// Draw the track.
-	glCallList(i->second.DL);
+    // Draw the track.
+    glCallList(_dl);
 
-	// Draw the airplane.  If the track is live, we draw an
-	// airplane at the end, in the track colour.  We also draw an
-	// airplane at the mark, in the plane colour.
-	FlightTrack *t = i->first;
-	if (t->live()) {
-	    _drawAirplane(t->last(), i->second.trackColour);
-	}
-	_drawAirplane(t->current(), i->second.planeColour);
+    // Draw the airplane.  If the track is live, we draw an
+    // airplane at the end, in the track colour.  We also draw an
+    // airplane at the mark, in the plane colour.
+    if (t->live()) {
+	_drawAirplane(t->last(), globals.trackColour);
     }
+    _drawAirplane(t->current(), globals.markColour);
 }
 
 // Called when somebody posts a notification that we've subscribed to.
-bool FlightTracksOverlay::notification(Notification::type n)
+void FlightTracksOverlay::notification(Notification::type n)
 {
     if (n == Notification::NewFlightTrack) {
 	setDirty();
@@ -170,8 +221,6 @@ bool FlightTracksOverlay::notification(Notification::type n)
     } else {
 	assert(false);
     }
-
-    return true;
 }
 
 // Draw the airplane at the given point in the given track in the
@@ -189,7 +238,7 @@ void FlightTracksOverlay::_drawAirplane(FlightData *d, const sgVec4 colour)
     // EYE - draw a trail (eg, 10s) as well?
     glColor4fv(colour);
     geodPushMatrix(d->cart, d->lat, d->lon, d->hdg); {
-	double scale = globals.metresPerPixel;
+	double scale = _overlays.aw()->scale();
 	glScaled(scale, scale, scale);
 
 	// EYE - why does the aircraft not draw itself exactly on the
@@ -197,7 +246,7 @@ void FlightTracksOverlay::_drawAirplane(FlightData *d, const sgVec4 colour)
 	// doubles.
 	if (_haveImage) {
 	    // Draw texture.
-	    float b = prefs.airplaneImageSize / 2.0;
+	    float b = globals.prefs.airplaneImageSize / 2.0;
 	    glEnable(GL_TEXTURE_2D);
 	    glBindTexture(GL_TEXTURE_2D, _airplaneTexture.name());
 	    glBegin(GL_QUADS); {

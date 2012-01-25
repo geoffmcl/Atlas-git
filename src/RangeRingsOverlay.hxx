@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2011 Brian Schack
+  Copyright (C) 2011 - 2012 Brian Schack
 
   Draws range rings.
 
@@ -37,7 +37,7 @@ class RangeRingsOverlay: public Subscriber {
     void draw();
 
     // Subscriber interface.
-    bool notification(Notification::type n);
+    void notification(Notification::type n);
 
   protected:
     void _createCrosshairs();

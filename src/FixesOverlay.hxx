@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2011 Brian Schack
+  Copyright (C) 2009 - 2012 Brian Schack
 
   The fixes overlay manages the loading and display of navigational
   fixes.
@@ -32,29 +32,7 @@
 #include "Searcher.hxx"
 #include "Notifications.hxx"
 #include "LayoutManager.hxx"
-
-struct FIX: public Searchable, Cullable {
-  public:
-    // Searchable interface.
-    const double *location() const { return bounds.center; }
-    virtual double distanceSquared(const sgdVec3 from) const;
-    virtual const std::vector<std::string>& tokens();
-    virtual const std::string& asString();
-
-    // Cullable interface.
-    const atlasSphere& Bounds() { return bounds; }
-    double latitude() { return lat; }
-    double longitude() { return lon; }
-
-    char name[6];		// Fixes are always 5 characters or less.
-    double lat, lon;
-    bool low, high;
-    atlasSphere bounds;
-
-  protected:
-    std::vector<std::string> _tokens;
-    std::string _str;
-};
+#include "NavData.hxx"
 
 class Overlays;
 class FixesOverlay: public Subscriber {
@@ -62,21 +40,17 @@ class FixesOverlay: public Subscriber {
     FixesOverlay(Overlays& overlays);
     ~FixesOverlay();
 
-    bool load(const std::string& fgDir);
-
     void setDirty();
 
-    void draw();
+    void draw(NavData *navData);
 
     // Subscriber interface.
-    bool notification(Notification::type n);
+    void notification(Notification::type n);
 
   protected:
-    Culler *_culler;
-    Culler::FrustumSearch *_frustum;
     double _metresPerPixel;
 
-    bool _load600(const gzFile& arp);
+    // bool _load600(const gzFile& arp);
 
     void _render(const FIX *f);
     void _label(const FIX *f, LayoutManager& lm);

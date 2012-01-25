@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2008 - 2011 Brian Schack
+  Copyright (C) 2008 - 2012 Brian Schack
 
   This file is part of Atlas.
 
@@ -34,6 +34,7 @@
 #include "Globals.hxx"
 #include "misc.hxx"
 #include "Geographics.hxx"
+#include "AtlasWindow.hxx"
 
 #include "AirwaysOverlay.hxx"
 
@@ -113,226 +114,14 @@ sgVec4 distanceColour = {0.0, 0.0, 1.0, 1.0};
 AirwaysOverlay::AirwaysOverlay(Overlays& overlays):
     _overlays(overlays), _highDL(0), _lowDL(0)
 {
-    // Create a culler and a frustum searcher for it.
-    _culler = new Culler();
-    _frustum = new Culler::FrustumSearch(*_culler);
-
-    // Subscribe to moved and zoomed notifications.
-    subscribe(Notification::Moved);
+    // Subscribe to zoomed notifications.
     subscribe(Notification::Zoomed);
 }
 
 AirwaysOverlay::~AirwaysOverlay()
 {
-    for (unsigned int i = 0; i < _segments.size(); i++) {
-	AWY *n = _segments[i];
-
-	delete n;
-    }
-    _segments.clear();
-
     glDeleteLists(_highDL, 1);
     glDeleteLists(_lowDL, 1);
-
-    delete _frustum;
-    delete _culler;
-}
-
-bool AirwaysOverlay::load(const string& fgDir)
-{
-    bool result = false;
-
-    SGPath f(fgDir);
-    f.append("Navaids/awy.dat.gz");
-
-    gzFile arp;
-    char *line;
-
-    printf("Loading airways from\n  %s\n", f.c_str());
-    arp = gzopen(f.c_str(), "rb");
-    if (arp == NULL) {
-	// EYE - we might want to throw an error instead.
-	fprintf(stderr, "_loadAirways: Couldn't open \"%s\".\n", f.c_str());
-	return false;
-    } 
-
-    // Check the file version.  We can handle version 640 files.
-    int version = -1;
-    gzGetLine(arp, &line);	// Windows/Mac header
-    gzGetLine(arp, &line);	// Version
-    sscanf(line, "%d", &version);
-    if (version == 640) {
-	// It looks like we have a valid file.
-	result = _load640(arp);
-    } else {
-	// EYE - throw an error?
-	fprintf(stderr, "_loadAirways: \"%s\": unknown version %d.\n", 
-		f.c_str(), version);
-	result = false;
-    }
-
-    gzclose(arp);
-    printf("  ... done\n");
-
-    return result;
-}
-
-bool AirwaysOverlay::_load640(const gzFile& arp)
-{
-    char *line;
-
-    AWY *a;
-
-    while (gzGetLine(arp, &line)) {
-	if (strcmp(line, "") == 0) {
-	    // Blank line.
-	    continue;
-	} 
-
-	if (strcmp(line, "99") == 0) {
-	    // Last line.
-	    break;
-	}
-
-	// Create a record and fill it in.
-	a = new AWY;
-	istringstream str(line);
-
-	// A line looks like this:
-	//
-	// <id> <lat> <lon> <id> <lat> <lon> <high/low> <base> <top> <name>
-	//
-	// 
-	int lowHigh;
-	str >> a->start.id >> a->start.lat >> a->start.lon
-	    >> a->end.id >> a->end.lat >> a->end.lon
-	    >> lowHigh >> a->base >> a->top >> a->name;
-	// EYE - check for errors
-	if (lowHigh == 1) {
-	    a->isLow = true;
-	} else if (lowHigh == 2) {
-	    a->isLow = false;
-	} else {
-	    assert(false);
-	}
-
-	// Add to the culler.  The airway bounds are given by its two
-	// endpoints.
-	// EYE - save these two points
-	sgdVec3 point;
-	atlasGeodToCart(a->start.lat, a->start.lon, 0.0, point);
-	a->bounds.extend(point);
-	atlasGeodToCart(a->end.lat, a->end.lon, 0.0, point);
-	a->bounds.extend(point);
-	double az1, az2, s;
-	geo_inverse_wgs_84(0.0, a->start.lat, a->start.lon, 
-			   a->end.lat, a->end.lon,
-			   &az1, &az2, &s);
-	a->length = s;				       
-
-	// Add to our culler.
-	_frustum->culler().addObject(a);
-
-	// Add to the segments vector.
-	_segments.push_back(a);
-	
-	// Look for the two endpoints in the navPoints map.  For those
-	// that are fixes, update their high/low status.
-	_checkEnd(a->start, a->isLow);
-	_checkEnd(a->end, a->isLow);
-    }
-
-    // EYE - will there ever be a false return?
-    return true;
-}
-
-// Each airway segment has two endpoints, which should be fixes and/or
-// navaids.  If an endpoint is a fix, we use the airway type as a
-// heuristic to decide whether that fix is a high or low fix.  Note
-// that the navaid, fix, and airways databases are not perfect, so we
-// need to handle cases where no or partial matches are made.
-void AirwaysOverlay::_checkEnd(AwyLabel &end, bool isLow)
-{
-    // EYE - clear as mud!
-    multimap<string, NAVPOINT>::iterator it;
-    pair<multimap<string, NAVPOINT>::iterator, 
-	multimap<string, NAVPOINT>::iterator> ret;
-    
-    // Search for a navaid or fix with the same name and same location
-    // as 'end'.
-    ret = navPoints.equal_range(end.id);
-    for (it = ret.first; it != ret.second; it++) {
-	NAVPOINT p = (*it).second;
-	double lat, lon;
-	if (p.isNavaid) {
-	    NAV *n = (NAV *)p.n;
-	    lat = n->lat;
-	    lon = n->lon;
-	} else {
-	    FIX *f = (FIX *)p.n;
-	    lat = f->lat;
-	    lon = f->lon;
-	}
-
-	if ((lat == end.lat) && (lon == end.lon)) {
-	    // Bingo!
-	    if (!p.isNavaid) {
-		// If the end is a fix, make sure we tag it as high/low.
-		FIX *f = (FIX *)p.n;
-		if (isLow) {
-		    f->low = true;
-		} else {
-		    f->high = true;
-		}
-	    }
-
-	    // EYE - put a NAVPOINT structure in AwyLabel?
-	    end.isNavaid = p.isNavaid;
-	    end.n = p.n;
-
-	    // We've found an exact match, so bail out early.
-	    return;
-	}
-    }
-
-    // Couldn't find an exact match.  Find the closest navaid or fix
-    // with the same name.
-    double distance = 1e12;
-    double latitude, longitude;
-    for (it = ret.first; it != ret.second; it++) {
-	NAVPOINT p = (*it).second;
-	FIX *f;
-	NAV *n;
-	double lat, lon;
-	if (p.isNavaid) {
-	    n = (NAV *)p.n;
-	    lat = n->lat;
-	    lon = n->lon;
-	} else {
-	    f = (FIX *)p.n;
-	    lat = f->lat;
-	    lon = f->lon;
-	}
-
-	double d, junk;
-	geo_inverse_wgs_84(lat, lon, end.lat, end.lon, &junk, &junk, &d);
-	if (d < distance) {
-	    distance = d;
-	    latitude = lat;
-	    longitude = lon;
-	}
-    }
-
-    // EYE - we need some kind of logging facility.
-//     if (distance == 1e12) {
-// 	fprintf(stderr, "_findEnd: can't find any match for '%s' <%lf, %lf>\n",
-// 		end.id.c_str(), end.lat, end.lon);
-//     } else {
-// 	fprintf(stderr, "_findEnd: closest match for '%s' <%lf, %lf> is\n",
-// 		end.id.c_str(), end.lat, end.lon);
-// 	fprintf(stderr, "\t%.0f metres away <%lf, %lf>\n",
-// 		distance, latitude, longitude);
-//     }
 }
 
 // EYE - we need to be very careful about OpenGL state changes.  Here,
@@ -340,7 +129,8 @@ void AirwaysOverlay::_checkEnd(AwyLabel &end, bool isLow)
 // Therefore, we need to do all the low-altitude airways first
 // (they'll all have the same line width), and all the high-alitude
 // airways last.
-void AirwaysOverlay::draw(bool drawHigh, bool drawLow, bool label)
+void AirwaysOverlay::draw(bool drawHigh, bool drawLow, bool label, 
+			  NavData *navData)
 {
     // I used to add individual airway segments to the culler and draw
     // them based on whether they were visible.  This turned out to be
@@ -349,6 +139,7 @@ void AirwaysOverlay::draw(bool drawHigh, bool drawLow, bool label)
     // turn them on and off as required.  If, for some reasons, we
     // wanted to render airways differently depending on our zoom, for
     // example, then we couldn't do this.
+    const vector<AWY *>& segments = navData->segments();
     if (drawLow) {
 	if (_lowDL == 0) {
 	    _lowDL = glGenLists(1);
@@ -357,8 +148,8 @@ void AirwaysOverlay::draw(bool drawHigh, bool drawLow, bool label)
 		glColor4fv(awy_low_colour);
 		glPushAttrib(GL_LINE_BIT); {
 		    glLineWidth(2.0);
-		    for (unsigned int i = 0; i < _segments.size(); i++) {
-			AWY *a = _segments[i];
+		    for (unsigned int i = 0; i < segments.size(); i++) {
+			AWY *a = segments[i];
 			if (a->isLow) {
 			    _render(a);
 			}
@@ -378,8 +169,8 @@ void AirwaysOverlay::draw(bool drawHigh, bool drawLow, bool label)
 	    assert(_highDL != 0);
 	    glNewList(_highDL, GL_COMPILE); {
 		glColor4fv(awy_high_colour);
-		for (unsigned int i = 0; i < _segments.size(); i++) {
-		    AWY *a = _segments[i];
+		for (unsigned int i = 0; i < segments.size(); i++) {
+		    AWY *a = segments[i];
 		    if (!a->isLow) {
 			_render(a);
 		    }
@@ -395,7 +186,8 @@ void AirwaysOverlay::draw(bool drawHigh, bool drawLow, bool label)
     // EYE - we should create a display list, combine this with the
     // previous bit, blah blah blah
     if (label) {
-	vector<Cullable *> intersections = _frustum->intersections();
+	const vector<Cullable *>& intersections = 
+	    navData->hits(NavData::AIRWAYS);
 	for (unsigned int i = 0; i < intersections.size(); i++) {
 	    AWY *a = dynamic_cast<AWY *>(intersections[i]);
 	    assert(a);
@@ -511,7 +303,7 @@ bool AirwaysOverlay::_label(const AWY *a) const
     pointSize *= _metresPerPixel;
 
     // Airway name label
-    LayoutManager lmName(a->name, globals.regularFont, pointSize);
+    LayoutManager lmName(a->name, _overlays.regularFont(), pointSize);
     lmName.setBoxed(true);
     if (lmName.width() + (space * 2.0) > a->length) {
 	return false;
@@ -525,21 +317,21 @@ bool AirwaysOverlay::_label(const AWY *a) const
     // room?
     LayoutManager lmElev;
     lmElev.setBoxed(true);
-    lmElev.setFont(globals.regularFont, pointSize * 0.75);
+    lmElev.setFont(_overlays.regularFont(), pointSize * 0.75);
 
     lmElev.begin(); {
-	globalString.printf("%d", a->isLow ? a->top * 100 : a->top);
-	lmElev.addText(globalString.str());
+	globals.str.printf("%d", a->isLow ? a->top * 100 : a->top);
+	lmElev.addText(globals.str.str());
 	lmElev.newline();
-	globalString.printf("%d", a->isLow ? a->base * 100 : a->base);
-	lmElev.addText(globalString.str());
+	globals.str.printf("%d", a->isLow ? a->base * 100 : a->base);
+	lmElev.addText(globals.str.str());
     }
     lmElev.end();
 
     // Airway length label
-    globalString.printf("%.0f", a->length * SG_METER_TO_NM);
+    globals.str.printf("%.0f", a->length * SG_METER_TO_NM);
     // EYE - magic number
-    LayoutManager lmDist(globalString.str(), globals.regularFont, 
+    LayoutManager lmDist(globals.str.str(), _overlays.regularFont(), 
 			 pointSize * 0.75);
     lmDist.setBoxed(true);
 
@@ -636,23 +428,11 @@ bool AirwaysOverlay::_label(const AWY *a) const
 }
 
 // Called when somebody posts a notification that we've subscribed to.
-bool AirwaysOverlay::notification(Notification::type n)
+void AirwaysOverlay::notification(Notification::type n)
 {
-    if (n == Notification::Moved) {
-	// Update our frustum from globals.
-	_frustum->move(globals.modelViewMatrix);
-    } else if (n == Notification::Zoomed) {
-	// Update our frustum and scale from globals.
-	_frustum->zoom(globals.frustum.getLeft(),
-		       globals.frustum.getRight(),
-		       globals.frustum.getBot(),
-		       globals.frustum.getTop(),
-		       globals.frustum.getNear(),
-		       globals.frustum.getFar());
-	_metresPerPixel = globals.metresPerPixel;
+    if (n == Notification::Zoomed) {
+	_metresPerPixel = _overlays.aw()->scale();
     } else {
 	assert(false);
     }
-
-    return true;
 }

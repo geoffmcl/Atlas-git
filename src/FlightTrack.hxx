@@ -4,7 +4,7 @@
   Written by Per Liedman, started July 2000.
 
   Copyright (C) 2000 Per Liedman, liedman@home.se
-  Copyright (C) 2009 - 2011 Brian Schack
+  Copyright (C) 2009 - 2012 Brian Schack
 
   A flight track contains the data for a FlightGear session.  It
   includes things like the aircraft's position, speed, altitude, etc.
@@ -42,12 +42,13 @@
 
 // EYE - why do I need to do this?
 struct NAV;
+class NavData;
 
 // EYE - it's wasteful to have the radio stuff in a FlightData struct,
 // since they change so infrequently.
 class FlightData {
   public:
-    FlightData();
+    FlightData(NavData *navData);
     ~FlightData();
 
     time_t time;		// Time of record (in integral seconds)
@@ -73,6 +74,7 @@ class FlightData {
     const std::vector<NAV *>& navaids();
 
   protected:
+    NavData *_navData;
     bool _navaidsLoaded;
     std::vector<NAV *> _navaids;	// In-range tuned navaids.
 };
@@ -84,9 +86,10 @@ class FlightTrack {
     // Flight tracks can be loaded from files, by listening on a
     // socket, or by reading a serial device (I think - I've never
     // tested the latter).
-    FlightTrack(const char *filePath);
-    FlightTrack(int port, unsigned int max_buffer = 2000);
-    FlightTrack(const char *device, int baud, unsigned int max_buffer = 2000);
+    FlightTrack(NavData *navData, const char *filePath);
+    FlightTrack(NavData *navData, int port, unsigned int max_buffer = 2000);
+    FlightTrack(NavData *navData, const char *device, int baud, 
+		unsigned int max_buffer = 2000);
     ~FlightTrack();
 
     bool isAtlasProtocol();	// Returns true if this track has
@@ -145,6 +148,9 @@ class FlightTrack {
     bool modified();
 
   protected:
+    // Flight data points need this to look up in-range navaids.
+    NavData *_navData;
+
     size_t _max_buffer;	// Maximum size of a buffer.
     std::deque<FlightData*> _track; // Our data.
     size_t _mark;

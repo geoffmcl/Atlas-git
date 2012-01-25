@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2011 Brian Schack
+  Copyright (C) 2009 - 2012 Brian Schack
 
   The notification class allows classes to send messages to interested
   parties (subscribers).  This is useful when you don't want classes
@@ -49,17 +49,54 @@ class Subscriber;
 class Notification {
   public:
     enum type {Moved = 0, 	 // Eyepoint moved
+	       MouseMoved,	 // Mouse moved (in mouse mode)
+	       CentreType,	 // Centre type changed
 	       Zoomed, 		 // Zoomed in/out
 	       Rotated,		 // View rotated about centre
+	       // EYE - does this overlap with SceneryChanged?
 	       NewScenery,	 // New live scenery loaded
-	       AircraftMoved,
-	       FlightTrackModified,
-	       NewFlightTrack,
-	       MagTrue,		 // Switched between true/magnetic headings
-	       DiscreteContours, // Switched between smooth/discrete contours
-	       NewPalette,	 // Loaded new palette
-	       All};		 // This must not be removed
+	       AircraftMoved,	 // Mark changed
+	       FlightTrackModified, // Point added/deleted/modified,
+				    // name changed
+	       // EYE - change to just "FlightTrack"?  We really need
+	       // to be consistent about naming here - use past tense
+	       // verbs (FlightTrackSelected, DidSelectFlightTrack),
+	       // the object that changed (FlightTrack), the new
+	       // situation (NewFlightTrack), or something else?
+	       NewFlightTrack,	 // A new flight track has been chosen.
+	       FlightTrackList,	 // List of flight tracks has changed.
+	       ShowTrackInfo,	 // Toggled display of flight track
+				 // info (including the graph window)
 
+	       DegMinSec,        // Switched between DMS/decimal degrees
+	       MagTrue,		 // Switched between true/magnetic headings
+	       MEFs,		 // Toggle MEFs
+	       OverlayToggled,	 // Overlay turned on or off
+	       AutocentreMode,	 // Autocentre mode toggled
+
+	       DiscreteContours, // Switched between smooth/discrete contours
+	       ContourLines,     // Toggled contour lines
+	       LightingOn,       // Toggled lights
+	       SmoothShading,    // Switched between smooth/flat polygon shading
+	       Azimuth,	         // Changed light azimuth
+	       Elevation,        // Changed light elevation
+
+	       Oversampling,     // Changed oversampling level
+	       ImageType,        // Changed image type (JPEG, PNG)
+	       JPEGQuality,      // Changed JPEG quality
+
+	       // EYE - does this overlap with NewScenery?
+	       SceneryChanged,	 // Scenery or maps added or deleted
+
+	       Palette,		 // Current palette changed
+	       PaletteList,	 // Palette list changed
+
+	       All};		 // This must not be removed and must
+				 // be at the end.
+
+    // EYE - it would be nice if we could pass some user data along
+    // with it, or make a notification class that has the type and
+    // some data packaged together.
     static void notify(type n);
 
   protected:
@@ -89,9 +126,7 @@ class Subscriber {
     // This must be implemented by subclasses.  It will be called
     // whenever Notification::notify() is called with something we've
     // subscribed to.
-
-    // EYE - why bool?
-    virtual bool notification(Notification::type n) = 0;
+    virtual void notification(Notification::type n) = 0;
 };
 
 #endif

@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2011 Brian Schack
+  Copyright (C) 2009 - 2012 Brian Schack
 
   As the name suggests, miscellaneous classes an functions that don't
   really belong anywhere else.
@@ -31,8 +31,16 @@
 
 #include <plib/sg.h>
 #include <plib/fnt.h>
+#include <plib/pu.h>
 #include <simgear/math/sg_geodesy.hxx>
 #include <simgear/misc/sg_path.hxx>
+
+// EYE - it's not clear that all these functions and classes belong
+// here.  Some are only used in one place, and probably should be
+// moved there; others might be more appropriate in other files; ones
+// that have library dependencies should be moved out (otherwise
+// programs that include this file but don't use the function/class
+// will still need to link to the library)
 
 // atlasSphere - a small extension to PLIB's sgdSphere
 //
@@ -177,10 +185,10 @@ bool RaySphere(SGVec3<double> p1, SGVec3<double> p2,
 // 0, rather than 360.  Casting first means that we pass 0.0, which
 // results in a return value of 360.0, the result we want.
 //
-// If max is set, then the range becomes [360 - max - 0, max) (or (360
-// - max - 0, max] if lowerInclusive is false).  Probably the only
-// useful value for max (other than 360.0) is 180.0.  This can be used
-// for, say, checking the difference between two headings:
+// If max is set, then the range becomes [-360 + max, max) (or (-360 +
+// max, max] if lowerInclusive is false).  Probably the only useful
+// value for max (other than 360.0) is 180.0.  This can be used for,
+// say, checking the difference between two headings:
 //
 //   diff = fabs(normalizeHeading(h1 - h2, true, 180.0));
 //
@@ -229,10 +237,6 @@ class AtlasString {
     const char *_appendf(const char *fmt, va_list ap);
 };
 
-// I've declared a single global AtlasString, which can be used for
-// temporary work.  Save any results you want to keep!
-extern AtlasString globalString;
-
 // I use this for printing frequencies.  VHF frequencies on charts are
 // printed without trailing zeroes, except when that would mean
 // printing nothing after the decimal, in which case a zero is added
@@ -275,10 +279,30 @@ const char *formatAngle(double degrees, bool dms);
 // So, if the highest elevation is 14,112 feet, the MEF is 14,500.
 int MEF(double elevation);
 
+// EYE - move to geographics?
 // A wrapper for sgGeodToCart that takes latitude and longitude in
 // degrees (alt is in metres, as with sgGeodToCart).
 void atlasGeodToCart(double lat, double lon, double alt, double *cart);
 // Ditto, but for sgCartToGeod.
 void atlasCartToGeod(double *cart, double *lat, double *lon, double *alt);
+
+// AtlasDialog - A dialog box that displays a single string, with up
+// to three buttons.  Note PUI dialogs appear *within* the current
+// window as a widget, not on top as a separate window.
+class AtlasDialog: public puDialogBox {
+  public:
+    AtlasDialog(const char *msg, const char *leftLabel, 
+		const char *middleLabel, const char *right, puCallback cb,
+		void *data);
+    ~AtlasDialog();
+
+    enum CallbackButton {LEFT, MIDDLE, RIGHT};
+
+  protected:
+    puText *_label;
+    puCallback _cb;
+    int _x;
+    puOneShot *_makeButton(const char *label, CallbackButton pos, void *data);
+};
 
 #endif

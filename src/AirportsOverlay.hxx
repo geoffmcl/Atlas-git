@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2008 - 2011 Brian Schack
+  Copyright (C) 2008 - 2012 Brian Schack
 
   The airports overlay manages the loading and drawing of airports.
 
@@ -40,55 +40,7 @@
 #include "Culler.hxx"
 #include "Searcher.hxx"
 #include "Notifications.hxx"
-
-struct RWY {
-    std::string id;
-    double lat, lon;		// centre of runway
-    float hdg;			// true heading, in degrees
-    float length, width;	// metres
-
-    atlasSphere bounds;
-    sgdVec3 ahead, aside, above;
-};
-
-enum ATCCodeType {WEATHER = 50, UNICOM, DEL, GND, TWR, APP, DEP};
-
-// A mapping from strings (like "ATLANTA APP") to a set of frequencies
-// associated with them.
-typedef std::map<std::string, std::set<int> > FrequencyMap;
-
-struct ARP: public Searchable, Cullable {
-  public:
-    // Searchable interface.
-    const double *location() const { return bounds.center; }
-    virtual double distanceSquared(const sgdVec3 from) const;
-    virtual const std::vector<std::string>& tokens();
-    virtual const std::string& asString();
-
-    // Cullable interface.
-    // EYE - change Bounds() to something better
-    const atlasSphere& Bounds() { return bounds; }
-    double latitude() { return lat; }
-    double longitude() { return lon; }
-
-    std::string name, id;
-    double lat, lon;
-    float elev;
-    bool controlled;
-    bool lighting;		// True if any runway has any kind of
-				// runway lighting.
-    bool beacon;
-    // EYE - change this lat, lon stuff to a structure.  Use SGGeod?
-    double beaconLat, beaconLon;
-    std::vector<RWY *> rwys;
-    std::map<ATCCodeType, FrequencyMap> freqs;
-
-    atlasSphere bounds;
-
-  protected:
-    std::vector<std::string> _tokens;
-    std::string _str;
-};
+#include "NavData.hxx"
 
 // Determines how airports are drawn.
 // EYE - add colours, runway label stuff, fonts?
@@ -134,30 +86,24 @@ class AirportsOverlay: public Subscriber {
     AirportsOverlay(Overlays& overlays);
     ~AirportsOverlay();
 
-    bool load(const std::string& fgDir);
-
     void setDirty();
 
-    void drawBackgrounds();
-    void drawForegrounds();
-    void drawLabels();		// Runways and airports
+    void drawBackgrounds(NavData *navData);
+    void drawForegrounds(NavData *navData);
+    void drawLabels(NavData *navData); // Runways and airports
 
     // EYE - Airports::Policy instead?
     void setPolicy(const AirportPolicy& p);
     AirportPolicy policy();
 
     // Subscriber interface.
-    bool notification(Notification::type n);
+    void notification(Notification::type n);
 
   protected:
-    Culler *_culler;
-    Culler::FrustumSearch *_frustum;
     double _metresPerPixel;
 
     void _createBeacon();
     void _createAirportIcon();
-
-    bool _load810(const gzFile& arp);
 
     void _drawIcon(ARP *ap, float radius);
 
@@ -166,8 +112,6 @@ class AirportsOverlay: public Subscriber {
     void _labelRunwayEnd(const char *str, float pointSize, float hdg, RWY *rwy);
 
     Overlays& _overlays;
-
-    std::vector<ARP *> _airports;
 
     GLuint _backgroundsDisplayList, _runwaysDisplayList, _labelsDisplayList;
     GLuint _beaconDL, _airportIconDL;

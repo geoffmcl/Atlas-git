@@ -3,7 +3,7 @@
 
   Written by Brian Schack, started July 2007.
 
-  Copyright (C) 2007 - 2011 Brian Schack
+  Copyright (C) 2007 - 2012 Brian Schack
 
   Implements a widget used for text-based searching.
 
@@ -29,8 +29,9 @@
 #include <plib/pu.h>
 
 class Search : public puGroup {
-public:
+  public:
     Search(int minx, int miny, int maxx, int maxy);
+    // virtual ~Search();
 
     // Returns the contents of the input field.
     char *searchString();
@@ -39,21 +40,21 @@ public:
     void reloadData();
 
     // Called when the user makes their final selection (by hitting
-    // return or escape).  Passes the index (in the user's array) of
+    // return or escape).  Passes the index (in the data array) of
     // that selection.  -1 means there was no selection.
-    void setCallback(void(*cb)(Search *, int));
+    virtual void searchFinished(int i) = 0;
     // Called whenever the selection changes.
-    void setSelectCallback(void(*cb)(Search *, int));
-    // Called whenever the search string changes.  The user should
+    virtual void searchItemSelected(int i) = 0;
+    // Called whenever the search string changes.  The receiver should
     // make a copy of the string if they want to use it.
-    void setInputCallback(void(*cb)(Search *, const char *));
-    // Called whenever we need to know the size of the user's data
-    // array.
-    void setSizeCallback(int(*cb)(Search *));
-    // Called when we need an element of the array.  We are
-    // responsible for the string returned, and will free it when
-    // we're done with it.
-    void setDataCallback(char *(*cb)(Search *, int));
+    virtual void searchStringChanged(const char *str) = 0;
+    // Called whenever the search interface needs to know the size of
+    // the data array.
+    virtual int noOfMatches() = 0;
+    // Called when the search interface needs an element of the array.
+    // It is responsible for the string returned, and will free it
+    // when done with it.
+    virtual char *matchAtIndex(int i) = 0;
 
     void setFont(puFont font);
 
@@ -66,18 +67,12 @@ public:
     // Not to be called by the user.
     void __list_cb();
     void __rejectInput();
-protected:
+  protected:
     char **_lines;
     int _numOfLines;
 
     puInput *_input;
     puListBox *_list;
-
-    void(*_cb)(Search *, int);
-    void(*_select_cb)(Search *, int);
-    void(*_input_cb)(Search *, const char *);
-    int(*_size_cb)(Search *);
-    char *(*_data_cb)(Search *, int);
 
     // _top is the index of the top line of "real" text IN _LIST (not
     // in the data array).  It will be either 0 or 1.  _bottom is the

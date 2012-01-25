@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2011 Brian Schack
+  Copyright (C) 2009 - 2012 Brian Schack
 
   This file is part of Atlas.
 
@@ -59,25 +59,33 @@ Searcher::~Searcher()
     delete _matches;
 }
 
-// Adds a searchable to our _searchable vector and its tokens to our
-// _tokens vector.
+// Adds a searchable and its tokens to our _tokens vector.
+// EYE - what effect does this have on an active search?
 void Searcher::add(Searchable *s)
 {
-    _searchables.push_back(s);
-
     const vector<string>& tokens = s->tokens();
     for (unsigned int i = 0; i < tokens.size(); i++) {
 	_tokens.insert(make_pair(tokens[i], s));
     }
 }
 
+// Removes a searchable from our _tokens vector.
+// EYE - what effect does this have on an active search?
+void Searcher::remove(Searchable *s)
+{
+    const vector<string>& tokens = s->tokens();
+    for (unsigned int i = 0; i < tokens.size(); i++) {
+	_tokens.erase(tokens[i]);
+    }
+}
+
 // Starts (if str is new) or continues (if str is the same as the
-// previous call) a search in the _searchables vector (which is
-// assumed to be sorted) for str.  The results are placed in the
-// _matches vector, sorted by their distance from the given centre of
-// interest.  Returns true if the _matches vector changed (including
-// because the centre of interest changed).  Finds at most maxMatches
-// results (this was added so that a GUI-based application can get a
+// previous call) a search in the _tokesn vector (which is assumed to
+// be sorted) for str.  The results are placed in the _matches vector,
+// sorted by their distance from the given centre of interest.
+// Returns true if the _matches vector changed (including because the
+// centre of interest changed).  Finds at most maxMatches results
+// (this was added so that a GUI-based application can get a
 // reasonable response for a potentially large search).  If maxMatches
 // < 0, then there is no limit, and all matches are found in a single
 // call.
@@ -210,7 +218,8 @@ bool Searcher::findMatches(const string& str, const sgdVec3 centre,
     multimap<string, Searchable *, CaseFreeLessThan>::const_iterator i;
     int noOfMatches;
 
-    // EYE - what happens if new tokens are added during a search?
+    // EYE - what happens if tokens are added or removed during a
+    // search?
 
     // If end is _tokens.end(), that means we're beginning a new search.
     if (_end == _tokens.end()) {
@@ -286,7 +295,7 @@ Searchable *Searcher::getMatch(unsigned int i)
     set<Searchable *, SearchableLessThan>::const_iterator iter = 
 	_matches->begin();
     for (unsigned int j = 0; j < i; j++) {
-	iter++;
+    	iter++;
     }
 
     return *iter;

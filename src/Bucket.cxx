@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2011 Brian Schack
+  Copyright (C) 2009 - 2012 Brian Schack
 
   This file is part of Atlas.
 
@@ -104,8 +104,9 @@ void Bucket::load(Projection projection)
     // Models directory.  We care about OBJECT_BASE and OBJECT types.
 
     SGPath stg(_p);
-    globalString.printf("%d.stg", _index);
-    stg.append(globalString.str());
+    AtlasString str;
+    str.printf("%d.stg", _index);
+    stg.append(str.str());
     assert(_size == 0);
 
     ifstream in(stg.c_str());
