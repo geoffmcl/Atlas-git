@@ -21,8 +21,14 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
-#include <GL/glew.h>
-#include <GLUT/glut.h>
+#if defined( __APPLE__)
+#  include <GLUT/glut.h>
+#else
+#  ifdef WIN32
+#    include <windows.h>
+#  endif
+#  include <GL/glut.h>
+#endif
 
 #include <assert.h>
 
