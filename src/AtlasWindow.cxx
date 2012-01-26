@@ -27,9 +27,6 @@
 
 #include <stdexcept>
 
-#include <GL/glew.h>
-#include <GLUT/glut.h>
-
 #include <plib/pu.h>
 #include <plib/puAux.h>
 #include <simgear/math/sg_geodesy.hxx>
