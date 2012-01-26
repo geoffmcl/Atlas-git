@@ -109,8 +109,8 @@ class SceneryTile: public Cullable, public CacheObject, Subscriber {
 
     // Draws a texture appropriate to the given level.
     void drawTexture(unsigned int level);
-    // Draws bucket(s) within the culler's frustum.
-    void drawBuckets(Culler::FrustumSearch& frustum);
+    // Draws bucket(s).
+    void drawBuckets();
     // Labels the scenery tile or its buckets with MEFs (minimum
     // elevation figures).
     void label(Culler::FrustumSearch& frustum, double metresPerPixel, 
@@ -143,7 +143,6 @@ class SceneryTile: public Cullable, public CacheObject, Subscriber {
 
     Tile *_ti;
     Scenery *_scenery;
-    const bitset<TileManager::MAX_MAP_LEVEL> &_levels;
 
     double _maxElevation;
     atlasSphere _bounds;
@@ -151,7 +150,7 @@ class SceneryTile: public Cullable, public CacheObject, Subscriber {
     // Maps at various resolutions.  Will be set to non-null at level
     // l in the constructor if the TileManager indicates there is a
     // map at that level.
-    MapTexture* _textures[TileManager::MAX_MAP_LEVEL];
+    MapTexture *_textures[TileManager::MAX_MAP_LEVEL];
     vector<Bucket *> *_buckets;    // Buckets in this tile.
 
     // Returns the level of the best available texture nearest
@@ -411,14 +410,13 @@ bool MapTexture::loaded() const
 }
 
 SceneryTile::SceneryTile(Tile *ti, Scenery *s): 
-    _ti(ti), _scenery(s), _levels(ti->mapLevels()), _maxElevation(Bucket::NanE),
-    _buckets(NULL)
+    _ti(ti), _scenery(s), _maxElevation(Bucket::NanE), _buckets(NULL)
 {
     // Create a texture object for each level at which we have maps.
     // EYE - since we only do this at creation, we won't notice new maps
     const bitset<TileManager::MAX_MAP_LEVEL>& missing = _ti->missingMaps();
-    for (unsigned int i = 0; i < _levels.size(); i++) {
-	if (_levels[i] && !missing[i]) {
+    for (unsigned int i = 0; i < _ti->mapLevels().size(); i++) {
+	if (_ti->mapLevels()[i] && !missing[i]) {
 	    char str[3];
 	    sprintf(str, "%d", i);
 
@@ -595,8 +593,9 @@ void SceneryTile::drawTexture(unsigned int level)
     }
 }
 
-// Draw the buckets in the tile that are within the culler's frustum.
-void SceneryTile::drawBuckets(Culler::FrustumSearch& frustum)
+// Draw the buckets in the tile that are within the scenery culler's
+// frustum.
+void SceneryTile::drawBuckets()
 {
     if (_buckets == NULL) {
 	// If we haven't loaded our buckets yet, just return.
@@ -607,7 +606,7 @@ void SceneryTile::drawBuckets(Culler::FrustumSearch& frustum)
 	Bucket *b = (*_buckets)[i];
 	if ((b != NULL) && 
 	    (b->loaded()) && 
-	    frustum.intersects(b->bounds())) {
+	    _scenery->frustum()->intersects(b->bounds())) {
 	    b->draw();
 	}
     }
@@ -762,7 +761,7 @@ void SceneryTile::_findBuckets()
 unsigned int SceneryTile::_calcBest(unsigned int level, bool loaded) 
 {
     // First look at this level or above (higher resolutions).
-    for (unsigned int l = level; l < _levels.size(); l++) {
+    for (unsigned int l = level; l < _ti->mapLevels().size(); l++) {
     	if (_textures[l] && (!loaded || _textures[l]->loaded())) {
     	    return l;
     	}
@@ -774,7 +773,7 @@ unsigned int SceneryTile::_calcBest(unsigned int level, bool loaded)
     // test it for all values down to 0.  However, if it's 0 and we
     // subtract 1, it will become very large.  Thus the test.  Tricky
     // (and scary).
-    for (unsigned int l = level; l < _levels.size(); l--) {
+    for (unsigned int l = level; l < _ti->mapLevels().size(); l--) {
     	if (_textures[l] && (!loaded || _textures[l]->loaded())) {
     	    return l;
     	}
@@ -1038,7 +1037,7 @@ void Scenery::draw(bool lightingOn)
 	    if (!t) {
 		continue;
 	    }
-	    t->drawBuckets(*_frustum);
+	    t->drawBuckets();
 	}
 
 	glDisable(GL_LIGHTING);
