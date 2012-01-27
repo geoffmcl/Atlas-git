@@ -370,7 +370,7 @@ Preferences::Preferences()
 
     env = getenv("FG_SCENERY");
     if (env == NULL) {
-	scenery_root.set(fg_root.str());
+	scenery_root.set(fg_root.str() + "/Scenery");
     } else {
 	scenery_root.set(env);
     }
