@@ -21,6 +21,8 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
+#include <algorithm>
+
 #include "AtlasController.hxx"
 #include "NavData.hxx"
 #include "Notifications.hxx"
