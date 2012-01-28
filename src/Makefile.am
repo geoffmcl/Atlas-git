@@ -61,7 +61,7 @@ Map_SOURCES = \
 
 Map_LDADD = \
 	$(simgear_LIBS) \
-	-lplibfnt -lplibsg -lplibpu \
+	-lplibpu -lplibfnt -lplibsg \
 	$(opengl_LIBS) \
 	-lpng -lz -ljpeg \
 	-lGLEW
