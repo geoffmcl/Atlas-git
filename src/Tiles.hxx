@@ -135,9 +135,9 @@
 // scenery.  It guarantees that, for valid GeoLocations, all latitudes
 // will be between 0 and 179 degrees inclusive, and all longitudes
 // between 0 and 359 degrees inclusive.  It can be initialized with a
-// latitude and longitude, a string in the form [ew]ddd[ns]dd (used to
-// name tiles and chunks in FlightGear scenery), or nothing (in which
-// case it is invalid).
+// latitude (0 <= lat <= 179) and longitude (0 <= lon <= 359), a
+// string in the form [ew]ddd[ns]dd (used to name tiles and chunks in
+// FlightGear scenery), or nothing (in which case it is invalid).
 //
 // If given an invalid latitude and/or longitude, either in the
 // constructor or in setLat()/setLon(), it will silently invalidate
