@@ -31,6 +31,7 @@
 #include <plib/puAux.h>
 #include <simgear/math/sg_geodesy.hxx>
 #include <simgear/sg_inlines.h>	       // SG_MAX2
+#include <simgear/bucket/newbucket.hxx>
 
 #include "AtlasWindow.hxx"
 #include "Globals.hxx"
