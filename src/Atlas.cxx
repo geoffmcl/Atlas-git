@@ -75,40 +75,40 @@ int main(int argc, char **argv)
 
     // Read in files.
     for (unsigned int i = 0; i < globals.prefs.flightFiles.size(); i++) {
-	// First check if we've loaded that file already.
-	const char *file = globals.prefs.flightFiles[i].c_str();
-	if (_ac->find(file) == FlightTracks::NaFT) {
-	    // Nope - open it.
-	    try {
-		FlightTrack *t =new FlightTrack(_ac->navData(), file);
-		// Set the mark aircraft to the beginning of the track.
-		t->setMark(0);
-		_ac->addTrack(t);
-	    } catch (runtime_error e) {
-		printf("Failed to read flight file '%s'\n", file);
-	    }
-	}
+    	// First check if we've loaded that file already.
+    	const char *file = globals.prefs.flightFiles[i].c_str();
+    	if (_ac->find(file) == FlightTracks::NaFT) {
+    	    // Nope - open it.
+    	    try {
+    		FlightTrack *t =new FlightTrack(_ac->navData(), file);
+    		// Set the mark aircraft to the beginning of the track.
+    		t->setMark(0);
+    		_ac->addTrack(t);
+    	    } catch (runtime_error e) {
+    		printf("Failed to read flight file '%s'\n", file);
+    	    }
+    	}
     }
     // Make network connections.
     for (unsigned int i = 0; i < globals.prefs.networkConnections.size(); i++) {
-	// Already loaded?.
-	int port = globals.prefs.networkConnections[i];
-	if (_ac->find(port) == FlightTracks::NaFT) {
-	    FlightTrack *f = 
-		new FlightTrack(_ac->navData(), port, globals.prefs.max_track);
-	    _ac->addTrack(f);
-	}
+    	// Already loaded?.
+    	int port = globals.prefs.networkConnections[i];
+    	if (_ac->find(port) == FlightTracks::NaFT) {
+    	    FlightTrack *f = 
+    		new FlightTrack(_ac->navData(), port, globals.prefs.max_track);
+    	    _ac->addTrack(f);
+    	}
     }
     // Make serial connections.
     for (unsigned int i = 0; i < globals.prefs.serialConnections.size(); i++) {
-	// Already loaded?.
-	const char *device = globals.prefs.serialConnections[i].device;
-	int baud = globals.prefs.serialConnections[i].baud;
-	if (_ac->find(device, baud) == FlightTracks::NaFT) {
-	    FlightTrack *f = new FlightTrack(_ac->navData(), device, baud, 
-					     globals.prefs.max_track);
-	    _ac->addTrack(f);
-	}
+    	// Already loaded?.
+    	const char *device = globals.prefs.serialConnections[i].device;
+    	int baud = globals.prefs.serialConnections[i].baud;
+    	if (_ac->find(device, baud) == FlightTracks::NaFT) {
+    	    FlightTrack *f = new FlightTrack(_ac->navData(), device, baud, 
+    					     globals.prefs.max_track);
+    	    _ac->addTrack(f);
+    	}
     }
 
     // GLUT initialization.
