@@ -113,11 +113,9 @@ class SceneryTile: public Cullable, public CacheObject, Subscriber {
     void drawBuckets();
     // Labels the scenery tile or its buckets with MEFs (minimum
     // elevation figures).
-    void label(Culler::FrustumSearch& frustum, double metresPerPixel, 
-	       bool live);
+    void label(double metresPerPixel, bool live);
 
-    bool intersection(SGVec3<double> a, SGVec3<double> b,
-		      SGVec3<double> *c);
+    bool intersection(SGVec3<double> a, SGVec3<double> b, SGVec3<double> *c);
 	
     // Cullable interface.
     void setBounds(atlasSphere& bounds) { _bounds = bounds; }
@@ -680,8 +678,7 @@ static void _label(int mef, double lat, double lon, double metresPerPixel,
 // sub-buckets, when we zoom out we should go to tile clusters.
 // Because of this, the label() facility doesn't really belong
 // (exclusively) at the Tile level.
-void SceneryTile::label(Culler::FrustumSearch& frustum, double metresPerPixel,
-			bool live)
+void SceneryTile::label(double metresPerPixel, bool live)
 {
     if (live) {
 	// If we're live, we label each bucket individually.
@@ -695,7 +692,7 @@ void SceneryTile::label(Culler::FrustumSearch& frustum, double metresPerPixel,
 	    // Label this bucket if it's loaded and visible.
 	    if ((b != NULL) && 
 		(b->loaded()) && 
-		frustum.intersects(b->bounds())) {
+		_scenery->frustum()->intersects(b->bounds())) {
 		int mef = MEF(b->maximumElevation());
 		_label(mef, b->centreLat(), b->centreLon(), metresPerPixel,
 		       _scenery->win()->regularFont());
@@ -1081,7 +1078,7 @@ void Scenery::_label(bool live)
 	    if (!t) {
 		continue;
 	    }
-	    t->label(*_frustum, _metresPerPixel, live);
+	    t->label(_metresPerPixel, live);
 	}
     }
     glPopAttrib();
