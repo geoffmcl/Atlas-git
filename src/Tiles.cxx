@@ -210,16 +210,6 @@ TileManager::TileManager(const SGPath& scenery, const SGPath& maps): _maps(maps)
 
     ////////// Maps //////////
 
-    // SGPath has a weird idea about paths - it figures that the last
-    // thing in a path like "/Foo/Bar" is a file.  However, we want to
-    // be certain it treats _maps as a directory.  So, if SGPath
-    // thinks _maps has a file at the end, we add an empty item, thus
-    // changing the path to "/Foo/Bar/", which will convince it that
-    // the last thing is in fact a directory.
-    if (!_maps.file().empty()) {
-	_maps.append("");
-    }
-
     // Find out what map levels/directories we have.
     _scanMapLevels();
 
@@ -388,8 +378,7 @@ const SGPath& TileManager::mapPath(unsigned int level)
 
     char str[3];
     snprintf(str, 3, "%d", level);
-    result.concat(str);
-    result.append("");
+    result.append(str);
 
     return result;
 }
@@ -409,12 +398,12 @@ static void __rmdir(const char *str)
 	    if (strcmp(entity->d_name, ".") && 
 		strcmp(entity->d_name, "..")) {
 		SGPath dir(str);
-		dir.concat(entity->d_name);
+		dir.append(entity->d_name);
 		__rmdir(dir.str().c_str());
 	    }
     	} else {
 	    SGPath file(str);
-	    file.concat(entity->d_name);
+	    file.append(entity->d_name);
     	    unlink(file.str().c_str());
     	}
     }
@@ -424,12 +413,24 @@ static void __rmdir(const char *str)
 // Sets our map levels to the given bitset.  In addition to changing
 // our local variable _mapLevels, it may create the maps directory and
 // individual map directories in that directory.  It may also delete
-// existing map directories (and whatever was in those directories).
+// existing map directories (and whatever was in those directories, so
+// be very careful when using this!).
 void TileManager::setMapLevels(std::bitset<MAX_MAP_LEVEL>& levels)
 {
     // If the maps directory doesn't exist, create it.
     if (!_maps.exists()) {
-	if (_maps.create_dir(0755) < 0) {
+	// SGPath has a weird idea about paths - it figures that the
+	// last thing in a path like "/Foo/Bar" is *always* a file.
+	// Do, if you ask it to create directory with that path, it
+	// won't create the directory "/Foo/Bar" as you might expect -
+	// it will create the directory "/Foo".  And you can't fake it
+	// by creating the path "/Foo/Bar/", because it doesn't allow
+	// paths that end with a path separator.  So, to satisfy its
+	// strange desires, we add a junk name at the end to act as a
+	// token file.
+	SGPath dir(_maps);
+	dir.append("junk");
+	if (dir.create_dir(0755) < 0) {
 	    // If we can't create it, throw an error.
 	    throw runtime_error("couldn't create maps directory");
 	}
@@ -439,6 +440,7 @@ void TileManager::setMapLevels(std::bitset<MAX_MAP_LEVEL>& levels)
 	if (levels[level] && !_mapLevels[level]) {
 	    // Create a new directory.
 	    SGPath mapDir = mapPath(level);
+	    mapDir.append("junk"); // See comment above.
 	    if (mapDir.create_dir(0755) < 0) {
 	    	// If we can't create it, throw an error.
 	    	throw runtime_error("couldn't create map subdirectory");

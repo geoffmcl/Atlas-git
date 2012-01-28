@@ -361,7 +361,7 @@ void TileMapper::save(unsigned int level, ImageType t, unsigned int jpegQuality)
     SGPath file = _tile->mapsDir();
     char str[3];
     snprintf(str, 3, "%d", level);
-    file.concat(str);
+    file.append(str);
     file.append(_tile->name());
     if (t == PNG) {
 	file.concat(".png");
