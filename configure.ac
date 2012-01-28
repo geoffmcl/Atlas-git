@@ -145,6 +145,18 @@ dnl includes, compile alternative source files, etc.
 dnl Enable serial support on Unix type systems
 AM_CONDITIONAL(ENABLE_UNIX_SERIAL, true)
 
+AC_ARG_ENABLE(simgear-shared, [  --enable-simgear-shared    Use a shared SimGear library instead of many static libraries.],
+ENABLE_SIMGEAR_SHARED=yes,ENABLE_SIMGEAR_SHARED=no)
+
+if test "x$ENABLE_SIMGEAR_SHARED" != "xno"; then
+    dnl Use shared library libSimGearCore. libSimGearScene is not required.
+    simgear_LIBS="-lSimGearCore"
+else
+    dnl Use many static simgear libraries.
+    simgear_LIBS="-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgserial -lsgdebug -lsgbucket -lsgstructure -lsgmath -lsgthreads"
+fi
+AC_SUBST(simgear_LIBS)
+
 dnl X11 might be installed on Mac OS X or cygwin/mingwin, we don't want
 dnl to use it if it is.
 case "${host}" in

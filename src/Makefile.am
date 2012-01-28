@@ -44,8 +44,7 @@ Atlas_SOURCES = \
 ##	MPAircraft.cxx MPAircraft.hxx
 
 Atlas_LDADD = \
-	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgserial -lsgdebug \
-	-lsgbucket -lsgstructure -lsgmath \
+	$(simgear_LIBS) \
 	 -lplibsg -lplibpuaux -lplibpu -lplibul -lplibfnt -lplibnet \
 	$(opengl_LIBS) \
 	-lpng -lz -ljpeg
@@ -61,8 +60,7 @@ Map_SOURCES = \
 	misc.cxx misc.hxx
 
 Map_LDADD = \
-	-lsgmagvar -lsgtiming -lsgmisc -lsgio -lsgdebug \
-	-lsgbucket -lsgstructure -lsgmath \
+	$(simgear_LIBS) \
 	-lplibfnt -lplibsg -lplibpu \
 	$(opengl_LIBS) \
 	-lpng -lz -ljpeg \
