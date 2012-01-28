@@ -1,3 +1,6 @@
 SUBDIRS = Fonts Palettes
 
-EXTRA_DIST = background.jpg
+imagedir = $(datadir)/Atlas
+image_DATA = background.jpg airplane_image.png
+
+EXTRA_DIST = $(image_DATA)
