@@ -3,7 +3,7 @@ dnl working configure script.
 dnl
 dnl $Id$
 
-AC_INIT([Atlas], [0.4.8])
+AC_INIT([Atlas], [0.4.9])
 AC_CONFIG_SRCDIR([src/Atlas.cxx])
 
 dnl Initialize the automake stuff
