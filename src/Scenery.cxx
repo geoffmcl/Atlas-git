@@ -240,23 +240,29 @@ void Texture::load(SGPath f, float *maximumElevation)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-//     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    // Note that because we specify a mipmap version of this filter,
+    // we *must* do mipmapping.
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 
     if (depth == 3) {
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height,
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, width, height,
 		     0, GL_RGB, GL_UNSIGNED_BYTE, data);
-	// EYE - replace with glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_TRUE);
-	// This looks nicer, although it slows things down a bit.
-	gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGB, width, height,
-			  GL_RGB, GL_UNSIGNED_BYTE, data);
     } else {
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height,
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height,
 		     0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-	// This looks nicer, although it slows things down a bit.
-	gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGBA, width, height,
-			  GL_RGBA, GL_UNSIGNED_BYTE, data);
     }
+    // EYE - glGenerateMipmapEXT() should exist if the
+    // GL_EXT_framebuffer_object extension exists.  As of OpenGL 3.0,
+    // we can also use glGenerateMipmap().  Note that we may need to
+    // add a call to glEnable(GL_TEXTURE_2D) to compensate for a bug
+    // in ATI cards (although I didn't experience any problems on
+    // mine).  See:
+    //
+    // www.opengl.org/wiki/Common_Mistakes#Automatic_mipmap_generation
+    //
+    // For more.
+    glGenerateMipmapEXT(GL_TEXTURE_2D);
 
     delete []data;
 }
@@ -314,9 +320,10 @@ GLuint Texture::name() const
 	    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 	    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 
+	    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, 
 			 __defaultSize, __defaultSize, 0, 
 			 GL_RGB, GL_UNSIGNED_BYTE, __defaultImage);
+	    // EYE - generate a mipmap?
 	}
 
 	return __defaultTexture;
