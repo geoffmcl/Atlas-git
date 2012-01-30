@@ -421,13 +421,13 @@ void TileManager::setMapLevels(std::bitset<MAX_MAP_LEVEL>& levels)
     if (!_maps.exists()) {
 	// SGPath has a weird idea about paths - it figures that the
 	// last thing in a path like "/Foo/Bar" is *always* a file.
-	// Do, if you ask it to create directory with that path, it
+	// So, if you ask it to create directory with that path, it
 	// won't create the directory "/Foo/Bar" as you might expect -
 	// it will create the directory "/Foo".  And you can't fake it
-	// by creating the path "/Foo/Bar/", because it doesn't allow
-	// paths that end with a path separator.  So, to satisfy its
-	// strange desires, we add a junk name at the end to act as a
-	// token file.
+	// out by creating the path "/Foo/Bar/", because it doesn't
+	// allow paths that end with a path separator.  So, to satisfy
+	// its strange desires, we add a junk name at the end to act
+	// as a pseudo file name.
 	SGPath dir(_maps);
 	dir.append("junk");
 	if (dir.create_dir(0755) < 0) {
