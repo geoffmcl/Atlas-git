@@ -306,7 +306,7 @@ int main(int argc, char **argv)
 
     env = getenv("FG_SCENERY");
     if (env == NULL) {
-	fg_scenery.set(fg_root.str());
+	fg_scenery.set(fg_root.str() + "/Scenery");
     } else {
 	fg_scenery.set(env);
     }
