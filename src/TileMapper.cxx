@@ -175,7 +175,7 @@ void TileMapper::render()
     // EYE - do I need to attach a depth buffer too?
     glGenTextures(1, &_to);
     glBindTexture(GL_TEXTURE_2D, _to);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, _width, _height, 0, GL_RGB8, 
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, _width, _height, 0, GL_RGB, 
 		 GL_UNSIGNED_BYTE, 0);
     // EYE - Strictly speaking, this is not necessary.  However, due
     // to a bug in Nvidia drivers (as of January 2012), we need to add
