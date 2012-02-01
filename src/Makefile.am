@@ -45,7 +45,7 @@ Atlas_SOURCES = \
 
 Atlas_LDADD = \
 	$(simgear_LIBS) \
-	 -lplibsg -lplibpuaux -lplibpu -lplibul -lplibfnt -lplibnet \
+	 -lplibsg -lplibpuaux -lplibpu -lplibfnt -lplibnet \
 	$(opengl_LIBS) \
 	-lpng -lz -ljpeg
 
@@ -63,8 +63,7 @@ Map_LDADD = \
 	$(simgear_LIBS) \
 	-lplibpu -lplibfnt -lplibsg \
 	$(opengl_LIBS) \
-	-lpng -lz -ljpeg \
-	-lGLEW
+	-lpng -lz -ljpeg
 
 GetMap_SOURCES = \
 	GetMap.cxx

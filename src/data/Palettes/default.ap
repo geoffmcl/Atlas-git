@@ -28,9 +28,8 @@
 # used.  Note that the units given only apply to *subsequent*
 # elevations in the file.
 
-# This isn't necessary, since metres are the default - it's just for
-# illustration purposes.  
-Units m
+# Use feet.
+Units ft
 
 #============================================================
 # Elevation colours
@@ -38,32 +37,32 @@ Units m
 
 # Colour names can be arbitrary, but it's best to use descriptive
 # ones.
-Colour E_-100 	0.647 0.729 0.647 1.0 
+Colour E_-250 	0.647 0.729 0.647 1.0 
 Colour E_0	0.859 0.906 0.804 1.0 
-Colour E_100	0.753 0.831 0.682 1.0
-Colour E_200	0.949 0.933 0.757 1.0 
-Colour E_500	0.941 0.871 0.608 1.0 
-Colour E_1000	0.878 0.725 0.486 1.0 
-Colour E_1500	0.816 0.616 0.443 1.0 
-Colour E_2000	0.776 0.529 0.341 1.0 
-#Colour E_3000	0.750 0.725 0.600 1.0 
-#Colour E_5000	0.824 0.863 0.824 1.0 
-Colour E_3000	0.824 0.863 0.824 1.0 
+Colour E_250	0.753 0.831 0.682 1.0
+Colour E_500	0.949 0.933 0.757 1.0 
+Colour E_1000	0.941 0.871 0.608 1.0 
+Colour E_2500	0.878 0.725 0.486 1.0 
+Colour E_5000	0.816 0.616 0.443 1.0 
+Colour E_7500	0.776 0.529 0.341 1.0 
+Colour E_10000	0.750 0.725 0.600 1.0 
+Colour E_20000	0.824 0.863 0.824 1.0 
+#Colour E_10000	0.824 0.863 0.824 1.0 
 
 #============================================================
 # Elevations
 #============================================================
-Material Elevation_-100		E_-100
+Material Elevation_-250		E_-250
 Material Elevation_0		E_0
-Material Elevation_100		E_100
-Material Elevation_200		E_200
+Material Elevation_250		E_250
 Material Elevation_500		E_500
 Material Elevation_1000		E_1000
-Material Elevation_1500		E_1500
-Material Elevation_2000		E_2000
-#Material Elevation_3000		E_3000
-#Material Elevation_5000		E_5000
-Material Elevation_3000		E_3000
+Material Elevation_2500		E_2500
+Material Elevation_5000		E_5000
+Material Elevation_7500		E_7500
+Material Elevation_10000	E_10000
+Material Elevation_20000	E_20000
+#Material Elevation_10000	E_10000
 
 #============================================================
 # Physical feature colours

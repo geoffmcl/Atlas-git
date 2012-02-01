@@ -1,62 +1,64 @@
 # ATLAS PALETTE
 #
-# Contour colours based on wiki-1 03
+# Contour colours based on GMT globe, converted to feet
 #
 # http://soliton.vm.bytemark.co.uk/pub/cpt-city/gmt/tn/GMT_globe.png.index.html
 #
-# Negative elevations below -1000 were removed.
+# Negative elevations below -1000m were removed.
 
-Colour E_-1000	0.737 0.902 1.000 1.0
-Colour E_-500	0.843 0.945 1.000 1.0
-Colour E_-200	0.945 0.988 1.000 1.0
+Units ft
+
+Colour E_-3000	0.737 0.902 1.000 1.0
+Colour E_-1500	0.843 0.945 1.000 1.0
+Colour E_-500	0.945 0.988 1.000 1.0
 Colour E_0	0.200 0.400 0.000 1.0
-Colour E_100	0.200 0.800 0.400 1.0
-Colour E_200	0.733 0.894 0.573 1.0
-Colour E_500	1.000 0.863 0.725 1.0
-Colour E_1000	0.953 0.792 0.537 1.0
-Colour E_1500	0.902 0.722 0.345 1.0
-Colour E_2000	0.851 0.651 0.153 1.0
-Colour E_2500	0.659 0.604 0.122 1.0
-Colour E_3000	0.643 0.565 0.098 1.0
-Colour E_3500	0.635 0.525 0.075 1.0
-Colour E_4000	0.624 0.482 0.051 1.0
-Colour E_4500	0.612 0.443 0.027 1.0
-Colour E_5000	0.600 0.400 0.000 1.0
-Colour E_5500	0.635 0.349 0.349 1.0
-Colour E_6000	0.698 0.463 0.463 1.0
-Colour E_6500	0.718 0.576 0.576 1.0
-Colour E_7000	0.761 0.690 0.690 1.0
-Colour E_7500	0.800 0.800 0.800 1.0
-Colour E_8000	0.898 0.898 0.898 1.0
-Colour E_8500	0.949 0.949 0.949 1.0
-Colour E_9000	1.000 1.000 1.000 1.0
-Colour E_9500	1.000 1.000 1.000 1.0
+Colour E_250	0.200 0.800 0.400 1.0
+Colour E_500	0.733 0.894 0.573 1.0
+Colour E_1500	1.000 0.863 0.725 1.0
+Colour E_3000	0.953 0.792 0.537 1.0
+Colour E_4500	0.902 0.722 0.345 1.0
+Colour E_6000	0.851 0.651 0.153 1.0
+Colour E_7500	0.659 0.604 0.122 1.0
+Colour E_9000	0.643 0.565 0.098 1.0
+Colour E_10500	0.635 0.525 0.075 1.0
+Colour E_12000	0.624 0.482 0.051 1.0
+Colour E_13500	0.612 0.443 0.027 1.0
+Colour E_15000	0.600 0.400 0.000 1.0
+Colour E_16500	0.635 0.349 0.349 1.0
+Colour E_18000	0.698 0.463 0.463 1.0
+Colour E_19500	0.718 0.576 0.576 1.0
+Colour E_21000	0.761 0.690 0.690 1.0
+Colour E_22500	0.800 0.800 0.800 1.0
+Colour E_24000	0.898 0.898 0.898 1.0
+Colour E_25500	0.949 0.949 0.949 1.0
+Colour E_27000	1.000 1.000 1.000 1.0
+Colour E_28500	1.000 1.000 1.000 1.0
 
-Material Elevation_-1000	E_-1000
+Material Elevation_-3000	E_-3000
+Material Elevation_-1500	E_-1500
 Material Elevation_-500		E_-500
-Material Elevation_-200		E_-200
 Material Elevation_0		E_0
-Material Elevation_100		E_100
-Material Elevation_200		E_200
+Material Elevation_250		E_250
 Material Elevation_500		E_500
-Material Elevation_1000		E_1000
 Material Elevation_1500		E_1500
-Material Elevation_2000		E_2000
-Material Elevation_2500		E_2500
 Material Elevation_3000		E_3000
-Material Elevation_3500		E_3500
-Material Elevation_4000		E_4000
 Material Elevation_4500		E_4500
-Material Elevation_5000		E_5000
-Material Elevation_5500		E_5500
 Material Elevation_6000		E_6000
-Material Elevation_6500		E_6500
-Material Elevation_7000		E_7000
 Material Elevation_7500		E_7500
-Material Elevation_8000		E_8000
-Material Elevation_8500		E_8500
 Material Elevation_9000		E_9000
-Material Elevation_9500		E_9500
+Material Elevation_10500	E_10500
+Material Elevation_12000	E_12000
+Material Elevation_13500	E_13500
+Material Elevation_15000	E_15000
+Material Elevation_16500	E_16500
+Material Elevation_18000	E_18000
+Material Elevation_19500	E_19500
+Material Elevation_21000	E_21000
+Material Elevation_22500	E_22500
+Material Elevation_24000	E_24000
+Material Elevation_25500	E_25500
+Material Elevation_27000	E_27000
+Material Elevation_28500	E_28500
 
 Colour water		0.671 0.737 0.745 1.0
 Colour city		1.000 0.973 0.459 1.0
