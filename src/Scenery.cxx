@@ -357,14 +357,26 @@ void MapTexture::draw()
 
 	glNewList(_dlist, GL_COMPILE);
 
-	// EYE - I added this glColor() to get rid of some strange
-	// shading that appeared after I added TACANs.  This needs to
-	// be checked.  Perhaps all this should be wrapped in state
-	// 'push'.
-	glColor3f(1.0, 1.0, 1.0);
 	glEnable(GL_TEXTURE_2D);
-	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL);
 
+	// A few note on textures for my benefit: 
+	//
+	// Textures have state.  Texture state for the *current*
+	// texture is set by glTexParameter().  Texture units also
+	// have state.  The state for the *current* texture unit is
+	// set by glTexEnv().
+	//
+	// The current texture is set with glBindTexture().  The
+	// current texture unit is set with glActiveTexture() (by
+	// default, it is texture unit 0).
+	//
+	// glEnable(GL_TEXTURE_2D) works on the current texture
+	// *unit*, and just tells OpenGL to grab texels, and that they
+	// should be from the 2D texture attached to the current unit
+	// (a texture unit can have up to 4 textures attached to it -
+	// 1D, 2D, 3D, and 4D.  There is really no good reason for
+	// this; it's just part of the spec).
 	glBindTexture(GL_TEXTURE_2D, _t.name());
 
 	glBegin(GL_QUAD_STRIP); {
@@ -799,10 +811,12 @@ Scenery::Scenery(TileManager *tm, AtlasBaseWindow *win):
     _culler = new Culler();
     _frustum = new Culler::FrustumSearch(*_culler);
 
-    // Create scenery tiles.
-    int tileCount = _tm->tileCount(TileManager::MAPPED);
+    // Create scenery tiles.  We only care about tiles that have been
+    // downloaded, regardless of whether any maps have been generated
+    // for them or not.
+    int tileCount = _tm->tileCount(TileManager::DOWNLOADED);
     for (int i = 0; i < tileCount; i++) {
-	Tile *ti = _tm->tile(TileManager::MAPPED, i);
+	Tile *ti = _tm->tile(TileManager::DOWNLOADED, i);
 
 	// Create a tile.
 	SceneryTile *tile = new SceneryTile(ti, this);
@@ -861,14 +875,14 @@ void Scenery::setBackgroundImage(const SGPath& f)
     glPolygonOffset(1.0, 1.0);
 
     // Now stretch the texture over a world.
-    glColor3f(1.0, 1.0, 1.0);
-
     glEnable(GL_TEXTURE_2D);
-// #ifndef LIGHTING
-//     glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL);
-// #else
-    glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-// #endif
+    // This texture sits underneath everything, so we'll use
+    // GL_REPLACE mode.  Since the texture is just an RGB texture (no
+    // alpha), we need to explicitly set alpha to 1.0 to ensure that
+    // nothing from behind shows through (the R, G, and B values will
+    // be ignored).
+    glColor4f(1.0, 0.5, 0.0, 1.0);
+    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
     glBindTexture(GL_TEXTURE_2D, _world.name());
 
     // Stitch the texture to the globe in a series of EW strips.

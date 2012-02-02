@@ -122,6 +122,8 @@ void atlasFntTexFont::getBBox(const char *s, float pointsize, float italic,
 void atlasFntTexFont::begin()
 {
     fntTexFont::begin();
+    // EYE - pushAttrib?
+    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
     _bound = true;
 }
 

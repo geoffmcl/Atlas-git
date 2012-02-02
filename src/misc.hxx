@@ -69,6 +69,11 @@ class atlasSphere: public sgdSphere {
 // renders the string.  But, it *doesn't* disable textures, which one
 // would expect.
 //
+// Also, fntTexFont sets the texture unit texturing function when the
+// texture is created, rather than when it is rendered, as would be
+// correct.  So atlasFntTexFont's begin() also sets the texture unit
+// texturing function.
+//
 // This class disables textures when end() is called, or when a single
 // puts() is called.
 //
