@@ -21,17 +21,16 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
-#include <cassert>
-#include <stdexcept>
-#include <limits>
-#include <math.h>
-
-#include <simgear/misc/sg_path.hxx>
-#include <plib/ul.h>
-#include <plib/sg.h>
-
+// Our include file(s)
 #include "Tiles.hxx"
 #include "tiles.h"		// Contains the __scenery array.
+
+// C++ system files
+#include <stdexcept>
+
+// Our libraries' include files
+#include <plib/ul.h>
+#include <simgear/constants.h>
 
 using namespace std;
 

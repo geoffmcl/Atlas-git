@@ -21,13 +21,18 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
+// Our include file
+#include "NavData.hxx"
+
+// C++ system files
 #include <stdexcept>
 #include <sstream>
-#include <map>
 
+// Our libraries' include files
 #include <simgear/misc/sg_path.hxx>
 
-#include "NavData.hxx"
+// Our project's include files
+#include "FlightTrack.hxx"
 #include "Globals.hxx"
 
 using namespace std;

@@ -32,13 +32,11 @@
 #ifndef _BUCKET_H_
 #define _BUCKET_H_
 
-#include <plib/sg.h>
-#include <simgear/misc/sg_path.hxx>
-#include <simgear/io/sg_binobj.hxx>
+#include <simgear/misc/sg_path.hxx> // SGPath
+#include "misc.hxx"		    // atlasSphere
 
-#include "misc.hxx"
-#include "Palette.hxx"
-
+// Forward class declarations
+class Palette;
 class Subbucket;
 
 class Bucket {

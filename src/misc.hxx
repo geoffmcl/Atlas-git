@@ -29,11 +29,9 @@
 
 #include <zlib.h>
 
-#include <plib/sg.h>
 #include <plib/fnt.h>
 #include <plib/pu.h>
 #include <simgear/math/sg_geodesy.hxx>
-#include <simgear/misc/sg_path.hxx>
 
 // EYE - it's not clear that all these functions and classes belong
 // here.  Some are only used in one place, and probably should be

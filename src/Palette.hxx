@@ -29,11 +29,11 @@
 #ifndef _PALETTE_H_
 #define _PALETTE_H_
 
-#include <plib/sg.h>
-
 #include <deque>
 #include <map>
 #include <string>
+
+#include <plib/sg.h>		// sgVec4
 
 class Palette {
   public:

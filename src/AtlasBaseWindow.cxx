@@ -21,7 +21,16 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
+// Our include file
 #include "AtlasBaseWindow.hxx"
+
+// C++ system files
+#include <stdexcept>
+
+// Our project's include files
+#include "misc.hxx"
+
+using namespace std;
 
 AtlasBaseWindow::AtlasBaseWindow(const char *name,
 				 const char *regularFontFile,

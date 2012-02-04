@@ -30,17 +30,18 @@
 #ifndef _ATLAS_CONTROLLER_H
 #define _ATLAS_CONTROLLER_H
 
-#include "TileMapper.hxx"
-#include "Searcher.hxx"
-#include "Tiles.hxx"
-#include "Globals.hxx"
-#include "Geographics.hxx"
-#include "Notifications.hxx"
-#include "FlightTrack.hxx"
+#include <vector>
 
-using namespace std;
+#include "TileMapper.hxx"	// TileMapper::ImageType
+#include "Tiles.hxx"		// TileManager::MAX_MAP_LEVEL
 
-#include <stdexcept>
+// Forward class declarations
+class FlightData;
+class FlightTrack;
+class GreatCircle;
+class NavData;
+class Palette;
+class Searcher;
 
 // This is a convenience class used by the AtlasController that
 // consolidates the management of palettes.  It keeps a vector of all
@@ -78,11 +79,11 @@ class Palettes {
     size_t find(const char *name);
 
     // Vector of all palettes.
-    const vector<Palette *>& palettes() { return _palettes; }
+    const std::vector<Palette *>& palettes() { return _palettes; }
 
   protected:
     size_t _i;
-    vector<Palette *> _palettes;
+    std::vector<Palette *> _palettes;
 };
 
 // Similar to the Palettes class, but for flight tracks.
@@ -127,11 +128,11 @@ class FlightTracks {
     void removeCurrent() { remove(currentNo()); }
 
     // Vector of all flight tracks.
-    const vector<FlightTrack *>& tracks() { return _flightTracks; }
+    const std::vector<FlightTrack *>& tracks() { return _flightTracks; }
 
   protected:
     size_t _i;
-    vector<FlightTrack *> _flightTracks;
+    std::vector<FlightTrack *> _flightTracks;
 };
 
 class AtlasController
@@ -174,7 +175,7 @@ class AtlasController
     int currentPaletteNo() { return _palettes->currentNo(); }
     // Sets the current palette (does nothing if i is out of bounds).
     void setCurrentPalette(size_t i);
-    const vector<Palette *>& palettes() { return _palettes->palettes(); }
+    const std::vector<Palette *>& palettes() { return _palettes->palettes(); }
 
     // Sets the base of the current palette to the given elevation.
     void setPaletteBase(double elev);

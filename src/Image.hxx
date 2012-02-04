@@ -27,6 +27,13 @@
 #ifndef _IMAGE_H_
 #define _IMAGE_H_
 
+#include <stdlib.h>		// For NULL
+#if defined( __APPLE__)		// For GLubyte
+#  include <OpenGL/gl.h>
+#else
+#  include <GL/gl.h>
+#endif
+
 enum ImageType {PNG, JPEG};
 
 char *loadJPEG(const char *filename, int *width, int *height, int *depth,

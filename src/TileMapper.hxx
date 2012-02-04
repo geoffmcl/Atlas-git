@@ -48,11 +48,12 @@
 
 #include <vector>
 
-#include <plib/pu.h>
+#include <plib/pu.h>		// sgVec4
 
-#include "Palette.hxx"
-#include "Tiles.hxx"
-#include "Bucket.hxx"
+// Forward class declarations
+class Palette;
+class Tile;
+class Bucket;
 
 class TileMapper {
   public:

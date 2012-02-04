@@ -26,9 +26,9 @@
 #ifndef _CROSSHAIRS_OVERLAY_H
 #define _CROSSHAIRS_OVERLAY_H
 
-#include "Overlays.hxx"
-
+// Forward class declarations
 class Overlays;
+
 class CrosshairsOverlay {
   public:
     CrosshairsOverlay(Overlays& overlays);

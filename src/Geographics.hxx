@@ -26,9 +26,17 @@
 #ifndef _GEOGRAPHICS_H
 #define _GEOGRAPHICS_H
 
-// EYE - why include the layout manager?  Geographics should be more
-// basic than that.  Perhaps geodDrawText should be moved elsewhere.
-#include "LayoutManager.hxx"
+#include <vector>
+
+// EYE - I would like to make these forward class declarations, but
+// can't figure out how.
+#include <plib/sg.h>		   // sgdVec3, ...
+#include <simgear/math/SGMath.hxx> // SGVec3, ...
+#include "misc.hxx"		   // atlasSphere
+
+// Forward class declarations
+class LayoutManager;
+class SGGeod;
 
 // Draws the given laid-out text flat on the earth's surface at the
 // given lat, lon and heading (all in degrees).  A heading of 0.0
@@ -52,6 +60,10 @@
 // The first version is a bit faster, because it can use the
 // precomputed coordinates.  The second and third versions must derive
 // the missing values.
+
+// EYE - Perhaps geodDrawText should be moved elsewhere -
+// LayoutManager is a pretty high-level class that perhaps doesn't
+// belong here.
 enum GeodTextFiddling {NO_FIDDLING, FIDDLE_TEXT, FIDDLE_ALL};
 void geodDrawText(LayoutManager& lm, 
 		  const sgdVec3 cart, double lat, double lon, double hdg = 0.0,

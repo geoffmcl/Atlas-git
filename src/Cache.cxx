@@ -21,6 +21,14 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
 ---------------------------------------------------------------------------*/
 
+// Our include file
+#include "Cache.hxx"
+
+// C++ include files
+#include <cassert>
+#include <algorithm>
+
+// Other libraries' include files
 #if defined( __APPLE__)
 #  include <GLUT/glut.h>	// Needed for glutTimerFunc().
 #else
@@ -29,13 +37,7 @@
 #  endif
 #  include <GL/glut.h>
 #endif
-
-#include <cassert>
-#include <algorithm>
-
 #include <simgear/timing/timestamp.hxx>
-
-#include "Cache.hxx"
 
 using namespace std;
 

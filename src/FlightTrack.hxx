@@ -30,19 +30,17 @@
 #ifndef _FLIGHTTRACK_H_
 #define _FLIGHTTRACK_H_
 
+#include <string>
 #include <vector>
 #include <deque>
-#include <plib/sg.h>
-#include <simgear/compiler.h>
-#include <simgear/io/sg_socket.hxx>
-#include <simgear/io/sg_serial.hxx>
-#include <simgear/misc/sg_path.hxx>
+#include <simgear/misc/sg_path.hxx> // SGPath
 
-#include "misc.hxx"
+#include "misc.hxx"		// AtlasString, ...
 
-// EYE - why do I need to do this?
-struct NAV;
+// Forward class declarations
 class NavData;
+class NAV;
+class SGIOChannel;
 
 // EYE - it's wasteful to have the radio stuff in a FlightData struct,
 // since they change so infrequently.
@@ -175,7 +173,7 @@ class FlightTrack {
     // For both socket- and serial-based tracks.
     SGIOChannel *_input_channel; 
     int _port;			// For socket-based tracks.
-    string _device;		// For serial-based tracks.
+    std::string _device;	// For serial-based tracks.
     int _baud;
 
     bool _isNetwork, _isSerial;

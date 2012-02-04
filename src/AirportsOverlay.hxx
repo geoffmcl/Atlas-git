@@ -26,21 +26,19 @@
 #ifndef _AIRPORTS_OVERLAY_H
 #define _AIRPORTS_OVERLAY_H
 
-#include <list>
-#include <vector>
-#include <string>
-#include <map>
-#include <set>
+#if defined( __APPLE__)		// For GLuint
+#  include <OpenGL/gl.h>
+#else
+#  include <GL/gl.h>
+#endif
 
-#include <zlib.h>
+#include "Notifications.hxx"	// Subscriber
 
-#include <plib/sg.h>
-
-#include "Overlays.hxx"
-#include "Culler.hxx"
-#include "Searcher.hxx"
-#include "Notifications.hxx"
-#include "NavData.hxx"
+// Forward class declarations
+class Overlays;
+class NavData;
+class ARP;
+class RWY;
 
 // Determines how airports are drawn.
 // EYE - add colours, runway label stuff, fonts?
@@ -80,7 +78,6 @@ struct AirportPolicy {
     unsigned int maxLabelDist;
 };
 
-class Overlays;
 class AirportsOverlay: public Subscriber {
   public:
     AirportsOverlay(Overlays& overlays);

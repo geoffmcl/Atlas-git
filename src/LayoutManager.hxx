@@ -49,11 +49,9 @@
 
 #include <vector>
 #include <string>
-#include <map>
 
-#include <plib/fnt.h>
-
-#include "misc.hxx"
+#include <plib/sg.h>		// sgVec4, ...
+#include "misc.hxx"		// atlasFntRenderer
 
 // Callback for drawing "boxes".  A box is a bit of reserved space on
 // line that can contain anything.  When drawing text, the layout

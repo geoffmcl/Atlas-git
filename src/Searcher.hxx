@@ -39,12 +39,12 @@
 #ifndef _SEARCHER_H_
 #define _SEARCHER_H_
 
+#include <map>
+#include <set>
 #include <string>
 #include <vector>
-#include <set>
-#include <map>
 
-#include <plib/sg.h>
+#include <plib/sg.h>		// sgdVec3
 
 // A Searchable can return its tokens (used for searching), and a
 // nicely formatted string (for use in a user interface), its

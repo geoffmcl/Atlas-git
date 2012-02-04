@@ -29,9 +29,15 @@
 #include <vector>
 #include <bitset>
 
-#include "AtlasWindow.hxx"
-#include "FlightTrack.hxx"
-#include "Notifications.hxx"
+#include <plib/pu.h>
+
+#include "AtlasBaseWindow.hxx"
+#include "Notifications.hxx"	// Subscriber
+
+// Forward class declarations
+class AtlasController;
+class FlightTrack;
+class NAV;
 
 class GraphsUI;
 class GraphsWindow: public AtlasBaseWindow, Subscriber {

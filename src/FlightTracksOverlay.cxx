@@ -21,18 +21,14 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
-
-#include <cassert>
-
+// Our include files
 #include "FlightTracksOverlay.hxx"
-#include "Globals.hxx"
-#include "Preferences.hxx"
-#include "Geographics.hxx"
+
+// Our project's include files
 #include "AtlasController.hxx"
 #include "AtlasWindow.hxx"
+#include "FlightTrack.hxx"
+#include "Globals.hxx"
 
 using namespace std;
 

@@ -27,14 +27,20 @@
 #ifndef _FIXES_OVERLAY_H
 #define _FIXES_OVERLAY_H
 
-#include "Overlays.hxx"
-#include "Culler.hxx"
-#include "Searcher.hxx"
-#include "Notifications.hxx"
-#include "LayoutManager.hxx"
-#include "NavData.hxx"
+#if defined( __APPLE__)		// For GLuint
+#  include <OpenGL/gl.h>
+#else
+#  include <GL/gl.h>
+#endif
 
+#include "Notifications.hxx"	// Subscriber
+
+// Forward class declarations
 class Overlays;
+class NavData;
+class FIX;
+class LayoutManager;
+
 class FixesOverlay: public Subscriber {
   public:
     FixesOverlay(Overlays& overlays);
@@ -49,8 +55,6 @@ class FixesOverlay: public Subscriber {
 
   protected:
     double _metresPerPixel;
-
-    // bool _load600(const gzFile& arp);
 
     void _render(const FIX *f);
     void _label(const FIX *f, LayoutManager& lm);

@@ -125,7 +125,7 @@
 #include <map>
 #include <bitset>
 
-#include <simgear/misc/sg_path.hxx>
+#include <simgear/misc/sg_path.hxx> // SGPath
 
 // EYE - put this in Geographics?
 // EYE - rename it to make it clear it's just used for tile and chunk

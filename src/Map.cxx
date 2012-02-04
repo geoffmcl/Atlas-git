@@ -38,33 +38,23 @@
                     Move fg_set_scenery to a specific file.
 ---------------------------------------------------------------------------*/
 
-#ifdef HAVE_CONFIG_H
-  #include "config.h"    // For version, and lots more ;=))
-#endif
-
-#include <stdlib.h>
-#include <stdio.h>
-#include <sys/stat.h>
-#ifndef _MSC_VER
-  #include <unistd.h>
-#endif
-
-#include <stdexcept>
-
+// C system files
 #ifdef _MSC_VER
 #include <windows.h>
 #endif
 
+// C++ system files
+#include <stdexcept>
+
+// Other libraries' include files
 #include <GL/glew.h>
-#include <plib/pu.h>
-#include <simgear/misc/sg_path.hxx>
 
-#include <simgear/bucket/newbucket.hxx>
-
+// Our project's include files
+#include "config.h"		// For VERSION
+#include "misc.hxx"
+#include "Palette.hxx"
 #include "Tiles.hxx"
 #include "TileMapper.hxx"
-#include "Palette.hxx"
-#include "misc.hxx"
 
 using namespace std;
 
@@ -493,7 +483,7 @@ int main(int argc, char **argv)
 	exit(0);
     }
     if (!GLEW_VERSION_1_5) {
-    	printf("OpenGL version 1.5 not supported!\n");
+    	fprintf(stderr, "OpenGL version 1.5 not supported!\n");
 	exit(0);
     }
     if (verbose) {

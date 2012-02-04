@@ -26,12 +26,16 @@
 #ifndef _FLIGHTTRACKS_OVERLAY_H
 #define _FLIGHTTRACKS_OVERLAY_H
 
-#include <map>
+#if defined( __APPLE__)		// For GLuint
+#  include <OpenGL/gl.h>
+#else
+#  include <GL/gl.h>
+#endif
 
-#include "FlightTrack.hxx"
-#include "Overlays.hxx"
-#include "Notifications.hxx"
-#include "Scenery.hxx"
+// #include <map>
+
+#include "Notifications.hxx"	// Subscriber
+#include "Scenery.hxx"		// Texture
 
 // struct TRACK_INFO {
 //     sgVec4 trackColour;
@@ -39,7 +43,10 @@
 //     GLuint DL;
 // };
 
+// Forward class declarations
 class Overlays;
+class FlightData;
+
 class FlightTracksOverlay: public Subscriber {
   public:
     FlightTracksOverlay(Overlays& overlays);

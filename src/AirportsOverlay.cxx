@@ -21,28 +21,27 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
+// Our include file
+#include "AirportsOverlay.hxx"
 
+// C++ system include files
 #include <cassert>
 
+// Other libraries' include files
 #include <simgear/misc/sg_path.hxx>
 #include <simgear/math/sg_geodesy.hxx>
-
-#include "AirportsOverlay.hxx"
-#include "LayoutManager.hxx"
-#include "Globals.hxx"
-#include "misc.hxx"
-#include "Geographics.hxx"
-#include "AtlasWindow.hxx"
-
 #ifdef _MSC_VER
 #include <simgear/math/SGMisc.hxx>
 #define ROUND(a) SGMisc<double>::round(a)
 #else
 #define ROUND(d)    round(d)
 #endif
+
+// Our project's include files
+#include "AtlasWindow.hxx"
+#include "Globals.hxx"
+#include "LayoutManager.hxx"
+#include "NavData.hxx"
 
 using namespace std;
 

@@ -27,24 +27,21 @@
 #ifndef _OVERLAYS_H
 #define _OVERLAYS_H
 
-#include <map>
 #include <bitset>
 
-#include "Culler.hxx"
-#include "NavData.hxx"
-
-// Because of our contorted interdependencies, it's not possible to
-// include most files here, so we just forward declare most of what we
-// need, and place all method definitions in the cxx file.
+// Forward class declarations.
 class AirportsOverlay;
-class NavaidsOverlay;
 class AirwaysOverlay;
+class CrosshairsOverlay;
 class FixesOverlay;
 class FlightTracksOverlay;
-class CrosshairsOverlay;
+class NavaidsOverlay;
 class RangeRingsOverlay;
-class AtlasWindow;
+
 class AtlasController;
+class atlasFntTexFont;
+class AtlasWindow;
+class NavData;
 
 class Overlays {
   public:

@@ -26,12 +26,19 @@
 #ifndef _AIRWAYS_OVERLAY_H
 #define _AIRWAYS_OVERLAY_H
 
-#include <set>
+#if defined( __APPLE__)		// For GLuint
+#  include <OpenGL/gl.h>
+#else
+#  include <GL/gl.h>
+#endif
 
-#include "Overlays.hxx"
-#include "Culler.hxx"
-#include "Notifications.hxx"
-#include "NavData.hxx"
+#include "Notifications.hxx"	// Subscriber
+
+// Forward class declarations
+class Overlays;
+class NavData;
+class AWY;
+class LayoutManager;
 
 class Overlays;
 class AirwaysOverlay: public Subscriber {

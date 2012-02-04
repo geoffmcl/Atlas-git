@@ -26,20 +26,14 @@
 #ifndef _NAVAIDS_OVERLAY_H
 #define _NAVAIDS_OVERLAY_H
 
-#include <vector>
-#include <string>
-
-#include <zlib.h>
-
-#include <plib/sg.h>
-
-#include "Overlays.hxx"
-#include "Culler.hxx"
 #include "LayoutManager.hxx"
-#include "FlightTrack.hxx"
-#include "Searcher.hxx"
 #include "Notifications.hxx"
-#include "NavData.hxx"
+
+// Forward class declarations
+class Overlays;
+class NavData;
+class NAV;
+class FlightData;
 
 // Used for drawing labels on navaids.
 // EYE - make Label a class?
@@ -50,7 +44,6 @@ struct Label {
     float metresPerPixel;
 };
 
-class Overlays;
 class NavaidsOverlay: public Subscriber {
   public:
     NavaidsOverlay(Overlays& overlays);

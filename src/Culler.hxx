@@ -32,7 +32,8 @@
 
 #include <plib/sg.h>
 
-#include "misc.hxx"
+// Forward class declarations
+class atlasSphere;
 
 // A nice set of articles about culling can be found at:
 //

@@ -21,25 +21,18 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
-
-#include <cassert>
-#include <limits>
-#include <algorithm>		// min(), max()
-#include <vector>
-
-#include <plib/pu.h>
-#include <simgear/compiler.h>
-#include <simgear/sg_inlines.h>
-
+// Our include file
 #include "Graphs.hxx"
-#include "misc.hxx"
-#include "NavaidsOverlay.hxx"
-#include "Globals.hxx"
-#include "Preferences.hxx"
+
+// C++ system files
+#include <algorithm>		// min(), max()
+
+// Our project's includes
+#include "AtlasController.hxx"
 #include "AtlasWindow.hxx"
+#include "FlightTrack.hxx"
+#include "Globals.hxx"
+#include "NavData.hxx"
 
 using namespace std;
 

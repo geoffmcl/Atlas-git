@@ -21,14 +21,12 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
 ---------------------------------------------------------------------------*/
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
-
+// Our include file
 #include "RangeRingsOverlay.hxx"
-#include "LayoutManager.hxx"
-#include "Globals.hxx"
+
+// Our project's include files
 #include "AtlasWindow.hxx"
+#include "LayoutManager.hxx"
 
 using namespace std;
 

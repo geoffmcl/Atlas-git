@@ -21,18 +21,17 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
+// Our include file
+#include "Image.hxx"
 
+// C++ system include files
 #include <cassert>
 
+// Other libraries' include files
 #include <png.h>
 #include <jpeglib.h>
 
-#include <plib/pu.h>		// For OpenGL stuff
-
-#include "Image.hxx"
+// Our project's include files
 #include "misc.hxx"
 
 // This is a constant representing "Not an Elevation" - it is

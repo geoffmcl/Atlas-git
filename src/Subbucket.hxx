@@ -35,8 +35,9 @@
 #ifndef _SUBBUCKET_H_
 #define _SUBBUCKET_H_
 
-#include <vector>
 #include <deque>
+#include <map>
+#include <vector>
 #if (defined(_MSC_VER) && !defined(HAVE_TRI_UNORDERED))
     #include <boost/tr1/unordered_set.hpp>
     #include <boost/tr1/unordered_map.hpp>
@@ -45,11 +46,10 @@
     #include <tr1/unordered_map>
 #endif
 
-#include <simgear/misc/sg_path.hxx>
-#include <simgear/io/sg_binobj.hxx>
+#include <simgear/misc/sg_path.hxx> // SGPath
+#include <simgear/io/sg_binobj.hxx> // SGBinObject
 
-#include "Bucket.hxx"
-#include "Palette.hxx"
+#include "Bucket.hxx"		// Bucket::Projection, ...
 
 // Create a hash function for pairs of integers.  This will be used in
 // the _edgeMap unordered_map.

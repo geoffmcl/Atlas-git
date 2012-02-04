@@ -34,8 +34,11 @@
 #include <map>
 
 #include "Culler.hxx"
+#include "misc.hxx"
 #include "Searcher.hxx"
-#include "FlightTrack.hxx"
+
+// Forward class declarations
+class FlightData;
 
 // EYE - change to VOR, DME, NDB, ...?
 enum NavType {NAV_VOR, NAV_DME, NAV_NDB, NAV_ILS, NAV_GS, 
@@ -237,7 +240,7 @@ class NavData {
 	bool isNavaid;		// True if navaid, false if fix.
 	void *n;		// Pointer to the navaid or fix.
     };
-    std::multimap<string, _NAVPOINT> _navPoints;
+    std::multimap<std::string, _NAVPOINT> _navPoints;
 };
 
 #endif

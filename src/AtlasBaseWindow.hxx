@@ -28,8 +28,10 @@
 #ifndef _ATLAS_BASE_WINDOW_H_
 #define _ATLAS_BASE_WINDOW_H_
 
-#include "GLUTWindow.hxx"
-#include "misc.hxx"
+#include "GLUTWindow.hxx"	// GLUTWindow
+
+// Forward class declarations
+class atlasFntTexFont;
 
 class AtlasBaseWindow: public GLUTWindow {
   public:

@@ -21,26 +21,24 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
+// Our include file
+#include "AtlasWindow.hxx"
 
-#include <stdexcept>
-
-#include <plib/pu.h>
-#include <plib/puAux.h>
-#include <simgear/math/sg_geodesy.hxx>
-#include <simgear/sg_inlines.h>	       // SG_MAX2
+// Our libraries' include files
+#include <simgear/sg_inlines.h>	// SG_MAX2
 #include <simgear/bucket/newbucket.hxx>
 
-#include "AtlasWindow.hxx"
-#include "Globals.hxx"
-#include "Search.hxx"
+// Our project's include files
+#include "AtlasController.hxx"
 #include "Bucket.hxx"
-#include "Preferences.hxx"
+#include "config.h"		// For VERSION
+#include "FlightTrack.hxx"
+#include "Globals.hxx"
 #include "Graphs.hxx"
-#include "Scenery.hxx"
+#include "LayoutManager.hxx"
 #include "NavData.hxx"
+#include "Palette.hxx"
+#include "Scenery.hxx"
 
 using namespace std;
 

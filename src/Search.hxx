@@ -26,7 +26,7 @@
 #ifndef _SEARCH_H_
 #define _SEARCH_H_
 
-#include <plib/pu.h>
+#include <plib/pu.h>		// puGroup
 
 class Search : public puGroup {
   public:

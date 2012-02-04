@@ -21,24 +21,15 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
-
-#include <stdarg.h>
-
-#include <cassert>
-#include <sstream>
-
-#include <simgear/misc/sg_path.hxx>
-#include <simgear/math/sg_geodesy.hxx>
-#include <simgear/magvar/magvar.hxx>
-
-#include "Globals.hxx"
-#include "misc.hxx"
-#include "Geographics.hxx"
-#include "AtlasWindow.hxx"
+// Our include file
 #include "NavaidsOverlay.hxx"
+
+// Our project's include files
+#include "AtlasController.hxx"
+#include "AtlasWindow.hxx"
+#include "FlightTrack.hxx"
+#include "Globals.hxx"
+#include "NavData.hxx"
 
 using namespace std;
 

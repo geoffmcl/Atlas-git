@@ -22,21 +22,28 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
 ---------------------------------------------------------------------------*/
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
-
+// C system files
 #include <stdio.h>
-
-#include "NavData.hxx"
-#include "Graphs.hxx"
-
 #ifdef _MSC_VER
   #include <io.h>     // For access()
   #ifndef F_OK
     #define F_OK 0
   #endif
 #endif
+
+// C++ system files
+#include <stdexcept>
+
+// Our libraries' include files
+#include <GL/glew.h>
+
+// Our project's include files
+#include "AtlasController.hxx"
+#include "AtlasWindow.hxx"
+#include "FlightTrack.hxx"
+#include "Globals.hxx"
+#include "Graphs.hxx"
+#include "NavData.hxx"
 
 // Our main controller.  It acts as the mediator between our "model"
 // (all the data) and our views (AtlasWindow, GraphsWindow).
@@ -84,7 +91,7 @@ int main(int argc, char **argv)
     		// Set the mark aircraft to the beginning of the track.
     		t->setMark(0);
     		_ac->addTrack(t);
-    	    } catch (runtime_error e) {
+    	    } catch (std::runtime_error e) {
     		printf("Failed to read flight file '%s'\n", file);
     	    }
     	}
@@ -130,14 +137,18 @@ int main(int argc, char **argv)
     boldFontFile = fontDir;
     boldFontFile.append("Helvetica-Bold.100.txf");
 
-    // Create our Atlas window.
-    globals.aw = new AtlasWindow("Atlas", 
-				 regularFontFile.c_str(),
-				 boldFontFile.c_str(),
-				 _ac);
-    globals.aw->reshape(globals.prefs.width, globals.prefs.height);
-
-    // Create the graphs window.
+    // Create the graphs window.  Why create the graphs window first?
+    // Two reasons: (1) It is hidden by default.  The second window -
+    // the main Atlas window - is in front, so by creating it second
+    // it automatically appears in front.  (2) More importantly, it
+    // allows us to initialize GLEW with a minimum of fuss.  GLEW can
+    // only be initialized after a OpenGL context (ie, window) exists.
+    // Moreover, we can't do anything that depends on GLEW before
+    // glewInit() is called.  The graphs window constructor doesn't do
+    // anything that requires GLEW, but the main Atlas window
+    // constructor does, so it's safe to call glewInit() if the graphs
+    // window is created first, but *not* if the main Atlas window is.
+    // Simple!
     globals.gw = new GraphsWindow("-- graphs --", 
 				  regularFontFile.c_str(),
 				  boldFontFile.c_str(),
@@ -155,8 +166,30 @@ int main(int argc, char **argv)
     globals.gw->setYAxisType(GraphsWindow::SPEED, true);
     globals.gw->setYAxisType(GraphsWindow::CLIMB_RATE, true);
       
-    // Make the AtlasWindow the active window.
-    globals.aw->set();
+    // Now that we have a valid OpenGL context, initialize GLEW.
+    // Because of the features we use, we need at least OpenGL 1.5,
+    // along with the FBO extension.  One of these years we'll advance
+    // into the 21st century, OpenGL-wise.
+    GLenum err = glewInit();
+    if (err != GLEW_OK) {
+	fprintf(stderr, "Failed to initialize GLEW!\n");
+	exit(0);
+    }
+    if (!GLEW_VERSION_1_5) {
+    	fprintf(stderr, "OpenGL version 1.5 not supported!\n");
+	exit(0);
+    }
+    if (!GLEW_EXT_framebuffer_object) {
+	fprintf(stderr, "EXT_framebuffer_object not supported!\n");
+	exit(0);
+    }
+
+    // Create our Atlas window.
+    globals.aw = new AtlasWindow("Atlas", 
+				 regularFontFile.c_str(),
+				 boldFontFile.c_str(),
+				 _ac);
+    globals.aw->reshape(globals.prefs.width, globals.prefs.height);
 
     // Initial position (this may be changed by the --airport option,
     // or by loading flight tracks).

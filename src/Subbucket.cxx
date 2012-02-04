@@ -21,13 +21,11 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
 ---------------------------------------------------------------------------*/
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
-
-#include <cassert>
-
+// Our include file
 #include "Subbucket.hxx"
+
+// Our project's include files
+#include "Palette.hxx"
 
 using namespace std;
 

@@ -22,23 +22,19 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
+// Our include file
+#include "FlightTrack.hxx"
 
-#include <math.h>
-
-#include <cassert>
-#include <string>
+// C++ system files
 #include <fstream>
 #include <stdexcept>
-#include <limits>
 
+// Other libraries' include files
+#include <simgear/io/sg_socket.hxx>
+#include <simgear/io/sg_serial.hxx>
 #include <simgear/timing/sg_time.hxx>
-#include <simgear/math/sg_geodesy.hxx>
 
-#include "FlightTrack.hxx"
-#include "Overlays.hxx"
+// Our project's include files
 #include "NavData.hxx"
 
 using namespace std;

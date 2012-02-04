@@ -21,12 +21,20 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
-#include <algorithm>
-
+// Our include file
 #include "AtlasController.hxx"
+
+// C++ system files
+#include <algorithm>
+#include <stdexcept>
+
+// Our project's include files
+#include "Bucket.hxx"
+#include "FlightTrack.hxx"
+#include "Globals.hxx"
 #include "NavData.hxx"
 #include "Notifications.hxx"
-#include "Preferences.hxx"
+#include "Palette.hxx"
 
 using namespace std;
 

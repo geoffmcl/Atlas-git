@@ -21,15 +21,25 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
-#include <cassert>
+// This is a special exception to the usual rule of including our
+// include file first.  In TileMapper.hxx, pu.h includes gl.h.
+// However, glew insists on being loaded first.
+#include <GL/glew.h>
+
+// Our include file
+#include "TileMapper.hxx"
+
+// C++ system files
 #include <stdexcept>
 
-#include <GL/glew.h>
-#include <plib/pu.h>
+// Other libraries' include files
 #include <simgear/misc/sg_path.hxx>
 
-#include "TileMapper.hxx"
+// Our project's include files
+#include "Bucket.hxx"
 #include "Image.hxx"
+#include "Palette.hxx"
+#include "Tiles.hxx"
 
 using namespace std;
 

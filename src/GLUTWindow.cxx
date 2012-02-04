@@ -21,6 +21,13 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
+// Our include file
+#include "GLUTWindow.hxx"
+
+// C++ system files
+#include <assert.h>
+
+// Other libraries' include files
 #if defined( __APPLE__)
 #  include <GLUT/glut.h>
 #else
@@ -29,10 +36,6 @@
 #  endif
 #  include <GL/glut.h>
 #endif
-
-#include <assert.h>
-
-#include "GLUTWindow.hxx"
 
 using namespace std;
 

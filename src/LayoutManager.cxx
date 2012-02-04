@@ -21,10 +21,11 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
-#include <cassert>
-#include <typeinfo>
-
+// Our include file
 #include "LayoutManager.hxx"
+
+// C++ system files
+#include <typeinfo>
 
 using namespace std;
 

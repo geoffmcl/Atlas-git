@@ -21,25 +21,18 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
 ---------------------------------------------------------------------------*/
 
+// Our include file
 #include "Bucket.hxx"
 
-#if defined( __APPLE__)
-#  include <GLUT/glut.h>	// Needed for gluPickMatrix().
-#else
-#  ifdef WIN32
-#    include <windows.h>
-#  endif
-#  include <GL/glut.h>
-#endif
-
-#include <cassert>
-#include <iostream>
+// C++ system files
 #include <sstream>
 #include <fstream>
 
+// Other libraries' include files
 #include <simgear/bucket/newbucket.hxx>
-#include <simgear/math/sg_geodesy.hxx>
 
+// Our project's include files
+#include "Palette.hxx"
 #include "Subbucket.hxx"
 
 using namespace std;

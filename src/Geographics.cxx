@@ -21,9 +21,14 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
+// C++ system files
 #include <stdexcept>
 
+// Our include file
 #include "Geographics.hxx"
+
+// Our project's include files
+#include "LayoutManager.hxx"
 
 // Draw text at the given latitude and longitude, with hdg pointing
 // up.

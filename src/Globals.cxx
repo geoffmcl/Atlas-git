@@ -21,14 +21,14 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
+// Our include file
+#include "Globals.hxx"
 
+// C++ system include files
 #include <algorithm>
 #include <limits>
 
-#include "Globals.hxx"
+// Our project's include files
 #include "Bucket.hxx"
 
 Globals globals;

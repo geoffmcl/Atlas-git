@@ -35,13 +35,13 @@
 #include <plib/puAux.h>
 
 #include "AtlasBaseWindow.hxx"
-#include "AtlasController.hxx"
+#include "Geographics.hxx"	// AtlasCoord
 #include "Notifications.hxx"
-#include "Overlays.hxx"
-#include "Scenery.hxx"
+#include "Overlays.hxx"		// Overlays::OverlayType
 #include "Search.hxx"
-#include "Tiles.hxx"
-#include "misc.hxx"
+
+// Forward class declarations.
+class Scenery;
 
 //////////////////////////////////////////////////////////////////////
 // 

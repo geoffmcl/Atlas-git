@@ -21,19 +21,21 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
+// Our include file
+#include "Preferences.hxx"
 
-#include <stdlib.h>
+// C system files
 #include <getopt.h>
 #ifndef _MSC_VER
 #include "libgen.h"
 #endif
-#include <stdarg.h>
 
-#include <cassert>
+// C++ system files
 #include <fstream>
+
+// Our project's include files
+#include "config.h"		// For VERSION
+#include "misc.hxx"
 
 using namespace std;
 
@@ -44,9 +46,6 @@ using namespace std;
 	print_help_for(t, "   ");					\
 	return false;	  \
     }
-
-#include "Preferences.hxx"
-#include "misc.hxx"
 
 // Preferences file.
 const char *atlasrc = ".atlasrc";

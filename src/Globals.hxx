@@ -7,8 +7,7 @@
 
   This contains some variables that are needed in several different
   parts of Atlas.  Although we could pass them around via function
-  parameters, this is clearer (I think).  It also adds a few access
-  methods for convenience (and to prevent data corruption).
+  parameters, this is clearer (I think).
 
   This file is part of Atlas.
 
@@ -29,15 +28,14 @@
 #ifndef _GLOBALS_H
 #define _GLOBALS_H
 
-// Global variables, all bundled together into a nice simple class.
-
-#include <vector>
-
+#include <plib/sg.h>
 #include "Preferences.hxx"
 #include "misc.hxx"
 
+// Forward class declarations
 class AtlasWindow;
 class GraphsWindow;
+
 class Globals {
  public:
     Globals();

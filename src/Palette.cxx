@@ -21,17 +21,15 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
-
+// Our include file
 #include "Palette.hxx"
 
-#include <stdexcept>
-#include <iostream>
-#include <sstream>
+// C++ system files
 #include <fstream>
+#include <sstream>
+#include <stdexcept>
 
+// Our libraries' include files
 #include <simgear/constants.h>
 
 using namespace std;

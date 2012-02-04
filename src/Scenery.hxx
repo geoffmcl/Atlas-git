@@ -33,13 +33,21 @@
 #include <bitset>
 #include <map>
 
+#if defined( __APPLE__)		// For GLubyte and GLuint
+#  include <OpenGL/gl.h>
+#else
+#  include <GL/gl.h>
+#endif
+#include <simgear/math/SGMath.hxx> // SGVec3
 #include <simgear/misc/sg_path.hxx>
 
-#include "Culler.hxx"
+#include "Cache.hxx"		// Cache
+#include "Culler.hxx"		// Culler::FrustumSearch
 #include "Notifications.hxx"
-#include "Tiles.hxx"
-#include "Cache.hxx"
-#include "AtlasBaseWindow.hxx"
+#include "Tiles.hxx"		// TileManager::MAX_MAP_LEVEL
+
+// Forward class declarations
+class AtlasBaseWindow;
 
 // Handles loading and unloading of a single texture (ie, map).  The
 // texture doesn't know how to draw itself.

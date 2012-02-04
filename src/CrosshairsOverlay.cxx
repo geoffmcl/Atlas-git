@@ -21,20 +21,18 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
 ---------------------------------------------------------------------------*/
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
+// Our include file
+#include "CrosshairsOverlay.hxx"
 
+// Other libraries' include files
 #if defined( __APPLE__)
-#  include <GLUT/glut.h>	// Needed for gluOrtho2D().
+#  include <GL/glu.h>		// Needed for gluOrtho2D(), ...
 #else
 #  ifdef WIN32
 #    include <windows.h>
 #  endif
-#  include <GL/glut.h>
+#  include <GL/glu.h>
 #endif
-
-#include "CrosshairsOverlay.hxx"
 
 using namespace std;
 

@@ -21,22 +21,17 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
-
-#include <cassert>
-#include <sstream>
-
+// Our include file
 #include "Overlays.hxx"
+
+// Our project's include files
 #include "AirportsOverlay.hxx"
-#include "NavaidsOverlay.hxx"
 #include "AirwaysOverlay.hxx"
+#include "CrosshairsOverlay.hxx"
 #include "FixesOverlay.hxx"
 #include "FlightTracksOverlay.hxx"
-#include "CrosshairsOverlay.hxx"
+#include "NavaidsOverlay.hxx"
 #include "RangeRingsOverlay.hxx"
-#include "Globals.hxx"
 
 using namespace std;
 

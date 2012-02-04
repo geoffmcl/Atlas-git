@@ -21,25 +21,23 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
+// Our include file
+#include "misc.hxx"
 
+// C++ system files
 #include <cassert>
 #include <limits>
 
-#include "misc.hxx"
-
-#include <simgear/math/SGMath.hxx>
-#include <simgear/math/sg_geodesy.hxx>
+// Other libraries' include files
 #include <simgear/magvar/magvar.hxx>
+#include <simgear/math/SGMath.hxx>
+#include <simgear/misc/sg_path.hxx>
 #include <simgear/timing/sg_time.hxx>
-
 #ifdef _MSC_VER
-#include <simgear/math/SGMisc.hxx>
-#define LROUND(a) SGMisc<double>::round(a)
+#  include <simgear/math/SGMisc.hxx>
+#  define LROUND(a) SGMisc<double>::round(a)
 #else
-#define LROUND(d) lround(d)
+#  define LROUND(d) lround(d)
 #endif
 
 //////////////////////////////////////////////////////////////////////

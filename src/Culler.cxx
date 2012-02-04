@@ -21,17 +21,18 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
 ---------------------------------------------------------------------------*/
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
-
+// Our include file
 #include "Culler.hxx"
-#include "Globals.hxx"
 
+// C++ system include files
 #include <cassert>
 #include <vector>
 
+// Other libraries' include files
 #include <simgear/math/sg_geodesy.hxx>
+
+// Our project's include files
+#include "misc.hxx"
 
 using namespace std;
 

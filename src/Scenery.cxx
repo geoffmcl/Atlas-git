@@ -21,32 +21,27 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
 ---------------------------------------------------------------------------*/
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
+// This is a special exception to the usual rule of including our
+// include file first.  We include gl.h in Scenery.hxx.  However, glew
+// insists on being loaded before gl.h.
+#include <GL/glew.h>
 
+// Our include file
+#include "Scenery.hxx"
+
+// C++ system files
 #include <cassert>
 
-#include <simgear/math/sg_geodesy.hxx>
-#include <simgear/math/SGMisc.hxx>
-#if defined( __APPLE__)
-#  include <GLUT/glut.h>	// Needed for gluPickMatrix().
-#else
-#  ifdef WIN32
-#    include <windows.h>
-#  endif
-#  include <GL/glew.h>
-#  include <GL/glut.h>
-#endif
-
-#include "Scenery.hxx"
+// Our project's include files
+#include "AtlasBaseWindow.hxx"
 #include "Bucket.hxx"
+#include "Geographics.hxx"
 #include "Image.hxx"
 #include "LayoutManager.hxx"
-#include "Geographics.hxx"
 
 using namespace std;
 
+// EYE - is this necessary now that we include glew.h?
 // This is defined in glext.h, which is unavailable in Windows.
 #ifndef GL_CLAMP_TO_EDGE	
 #define GL_CLAMP_TO_EDGE 0x812F
