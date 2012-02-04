@@ -27,6 +27,7 @@
 
 // C++ system files
 #include <stdexcept>
+#include <limits>
 
 // Our libraries' include files
 #include <plib/ul.h>
