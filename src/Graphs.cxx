@@ -487,6 +487,8 @@ GraphsWindow::~GraphsWindow()
     for (int i = 0; i < _GRAPH_TYPES_COUNT; i++) {
     	delete _ySliders[i];
     }
+
+    glDeleteLists(_graphDL, 1);
 }
 
 void GraphsWindow::special(int key, int x, int y)
