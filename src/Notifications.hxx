@@ -12,6 +12,23 @@
   need to know who's listening - it just says "something happened",
   and all its subscribers will be notified.
 
+  Notifications are often used within the model-view-controller (MVC)
+  paradigm in Atlas, and we try to use them in a consistent fashion.
+  Model objects neither send nor receive notifications.  They are
+  intended to be passive objects, and shouldn't have to know about
+  anything else.  Controller objects send notifications, but do not
+  receive them.  Objects "above" them (if we consider models to be at
+  the bottom of the MVC hierarchy and views at the top) listen for the
+  notifications sent by controllers.  Views listen to notifications,
+  and contact their controllers directly if they need to access or
+  modify data in models.  The reasoning behind this is that views tend
+  to be owned by a single controller; therefore, they know who to go
+  to for data.  Controllers, on the other hand, may be controlling
+  data (models) that are of interest to many other views (or
+  intermediate controllers, if any exist).  It's easier for them to
+  simply broadcast a notification when a model changes than keep track
+  of and notify each interested party.
+
   This file is part of Atlas.
 
   Atlas is free software: you can redistribute it and/or modify it
