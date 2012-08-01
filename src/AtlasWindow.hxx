@@ -35,6 +35,7 @@
 #include <plib/puAux.h>
 
 #include "AtlasBaseWindow.hxx"
+#include "Background.hxx"
 #include "Geographics.hxx"	// AtlasCoord
 #include "Notifications.hxx"
 #include "Overlays.hxx"		// Overlays::OverlayType
@@ -159,6 +160,10 @@ class InfoUI;
 class LightingUI;
 class HelpUI;
 class SearchUI;
+class MappingUI;
+class ContextualMenu;
+class TileMapper;
+class Dispatcher;
 class AtlasWindow: public AtlasBaseWindow, Subscriber {
   public:
     AtlasWindow(const char *name,
@@ -174,6 +179,11 @@ class AtlasWindow: public AtlasBaseWindow, Subscriber {
     void setOverlayVisibility(Overlays::OverlayType overlay, bool on);
     void toggleOverlay(Overlays::OverlayType overlay);
 
+    // When true, we're displaying normal scenery (ie, regular maps);
+    // when false, we're displaying scenery status (which tiles have
+    // been mapped, ...).
+    bool sceneryLayerOn() { return _sceneryLayerOn; }
+
     // Public window callback.  The graphs window needs to pass on
     // keyboard events to us, so we expose it (making sure to set our
     // window to be current).
@@ -185,6 +195,11 @@ class AtlasWindow: public AtlasBaseWindow, Subscriber {
     void searchStringChanged(const char *str);
     int noOfMatches();
     char *matchAtIndex(int i);
+
+    // Called by the contextual menu when the user asks us to render
+    // some maps.  When 'force' is true, all maps for each tile will
+    // be rendered; when false, only missing maps will be rendered.
+    void render(std::vector<Tile *>& tiles, bool force);
 
     // If we're tracking the mouse, this returns the cursor position,
     // otherwise returns the position at the centre of the window.
@@ -222,10 +237,17 @@ class AtlasWindow: public AtlasBaseWindow, Subscriber {
     bool autocentreMode() { return _autocentreMode; }
     void setAutocentreMode(bool mode);
 
+    // Mapping stuff.
+    const Dispatcher *dispatcher() const { return _dispatcher; }
+    // Called when someone (right now, just the MappingUI) wants to
+    // cancel a mapping process.
+    void cancelMapping();
+
     // Subscriber method.
     void notification(Notification::type n);
 
     friend void __atlasWindow_exitOk_cb(puObject *o);
+    friend void __atlasWindow_renderDialog_cb(puObject *o);
 
   protected:
     AtlasController *_ac;
@@ -240,7 +262,9 @@ class AtlasWindow: public AtlasBaseWindow, Subscriber {
     // the screen.
     bool _autocentreMode;
     Scenery *_scenery;
+    Background *_background;
     Overlays *_overlays;
+    bool _sceneryLayerOn;
 
     // Basic view geometry - where we're looking from, and our
     // orientation at that point.
@@ -261,8 +285,23 @@ class AtlasWindow: public AtlasBaseWindow, Subscriber {
     LightingUI *_lightingUI;
     HelpUI *_helpUI;
     SearchUI *_searchUI;
+    MappingUI *_mappingUI;
 
     AtlasDialog *_exitOkDialog;
+
+    // A floating frame that shows the chunk and tile under the mouse,
+    // shown when the tile status layer is visible.
+    puFrame *_tooltip;
+
+    // A menu showing what rendering options are available (active
+    // only when the tile status layer is visible).
+    ContextualMenu *_contextualMenu;
+    // EYE - document these
+    AtlasDialog *_renderDialog;
+    TileMapper *_mapper;
+    Dispatcher *_dispatcher;
+    bool _force;
+    std::vector<Tile *> _tiles;
 
     // We use _searchTimerScheduled to record if there are pending
     // calls to _searchTimer().  This prevents multiple search threads
@@ -284,25 +323,32 @@ class AtlasWindow: public AtlasBaseWindow, Subscriber {
     void _visibility(int state);
 
     // Update methods
-    void _setProjection();
-    void _setModelView();
     void _setShading();
     void _setAzimuthElevation();
     void _setPaletteBase();
     void _setRelativePalette(bool relative);
+    void _setSceneryLayerOn(bool on);
     void _setMEFs();
     void _setCentreType();
     void _setFlightTrack();
     void _setTitle();
 
+    // Rendering method.  This expects that _dispatcher has been
+    // initialized.  It calls the dispatcher to do a little work, and
+    // updates the interface.  If no work is left, it returns false,
+    // otherwise it returns true.
+    bool _doWork();
+
     // Timers
     void _flightTrackTimer();
     void _searchTimer();
+    void _renderTimer();
 
     void _lightingPrefixKeypressed(unsigned char key, int x, int y);
     void _debugPrefixKeypressed(unsigned char key, int x, int y);
 
     void _exitOk_cb(bool okay);
+    void _renderDialog_cb(bool okay);
 
     // Internal routines that modify _eye and _eyeUp (and OpenGL
     // state).
@@ -628,6 +674,44 @@ class SearchUI: public Search
 
   protected:
     AtlasWindow *_aw;
+};
+
+class MappingUI: public Subscriber
+{
+  public:
+    MappingUI(int x, int y, AtlasWindow *aw);
+    ~MappingUI();
+
+    bool isVisible() { return _gui->isVisible(); }
+    void reveal() { _gui->reveal(); }
+    void hide() { _gui->hide(); }
+
+    void getSize(int *w, int *h);
+    void setPosition(int x, int y);
+
+    // Subscriber method.
+    void notification(Notification::type n);
+
+    // Callbacks.
+    friend void __mappingUI_cancel_cb(puObject *o);
+
+  protected:
+    AtlasController *_ac;
+    AtlasWindow *_aw;
+
+    puGroup *_gui;
+    puFrame *_frame;
+    puText *_currentTileText;
+    puSlider *_progressSlider;
+    AtlasString _currentTileLabel, _progressLegend;
+    puButton *_autocentreCheckbox;
+    puOneShot *_cancelButton;
+
+    // Sets the current tile text and progress slider according to the
+    // current state of Atlas window's dispatcher.
+    void _setProgress();
+
+    void _cancel_cb(puObject *o);
 };
 
 #endif

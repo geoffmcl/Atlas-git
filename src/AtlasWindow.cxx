@@ -49,6 +49,7 @@ const double zoomFactor = pow(10.0, 0.1);
 // Forward declarations of all callbacks.
 //////////////////////////////////////////////////////////////////////
 void __atlasWindow_exitOk_cb(puObject *o);
+void __atlasWindow_renderDialog_cb(puObject *o);
 
 void __mainUI_zoom_cb(puObject *o);
 void __mainUI_overlay_cb(puObject *o);
@@ -78,6 +79,502 @@ void __networkPopup_serialToggle_cb(puObject *o);
 void __lightingUI_cb(puObject *o);
 
 void __helpUI_cb(puObject *o);
+
+void __mappingUI_cancel_cb(puObject *o);
+
+//////////////////////////////////////////////////////////////////////
+// ContextualMenu
+//
+// The ContextualMenu class is, not surprisingly, a contextual menu.
+// It is set up inside the Atlas window whenever we're displaying
+// scenery status.  When the user right-clicks, the menu appears,
+// giving rendering options.  When the user selects one item, a
+// callback in the contextual menu is called.
+//
+// In its callbacks, the contextual menu is responsible for setting up
+// rendering parameters, namely which tiles are to be rendered and
+// whether all maps for each tile should be rendered (ie, forced), or
+// whether just missing maps for each tile should be rendered.  It
+// calls the Atlas window with those parameters, at which point
+// rendering begins.
+//
+//////////////////////////////////////////////////////////////////////
+class ContextualMenu: public GLUTMenu, Subscriber
+// class ContextualMenu: public GLUTMenu
+{
+  public:
+    ContextualMenu(AtlasWindow *aw);
+
+    // Callbacks
+    void renderAll();
+    void rerenderAll();
+    void render10();
+    void rerender10();
+    void render1();
+    void rerender1();
+
+    // Subscriber method.
+    void notification(Notification::type n);
+
+  protected:
+    AtlasWindow *_aw;
+    
+    // When the user makes a selection from the contextual menu, we
+    // fill this vector with the tiles that need to be rendered.  This
+    // is passed on to the Atlas window.
+    vector<Tile *> _tiles;
+
+    // When called, this will completely rebuild the menu based on the
+    // current state of the scenery.
+    void _rebuild();
+
+    void _setSceneryLayerOn();
+
+    void _renderAll(bool force);
+    void _render10(bool force);
+    void _render1(bool force);
+};
+
+ContextualMenu::ContextualMenu(AtlasWindow *aw): _aw(aw)
+{
+    // Initialize our state.
+    _setSceneryLayerOn();
+
+    // We're always interested when the scenery layer is toggled on
+    // and off.
+
+    // EYE - we should also subscribe to moves (and rotates?).  These
+    // all affect the location under the mouse.  Do we need a
+    // notification that gathers these together?
+    subscribe(Notification::SceneryLayerOn);
+}
+
+void ContextualMenu::_rebuild()
+{
+    if (_aw->sceneryLayerOn()) {
+	return;
+    }
+
+    // Clear the whole thing.  We could be clever and just try to
+    // figure out what has changed, but it's more trouble than it's
+    // worth.
+    clear();
+
+    // Figure out our "global" menu entries - these are ones
+    // that don't depend on what's under the mouse.
+    TileManager *tm = _aw->ac()->tileManager();
+    static AtlasString str;
+    int count = tm->tileCount(TileManager::DOWNLOADED);
+    if (count > 0) {
+	str.printf("Rerender all maps (%d)", count);
+	addItem(str.str(), (GLUTMenu::cb)&ContextualMenu::rerenderAll);
+    }
+    count = tm->tileCount(TileManager::UNMAPPED);
+    if (count > 0) {
+	str.printf("Render all unrendered maps (%d)", count);
+	addItem(str.str(), (GLUTMenu::cb)&ContextualMenu::renderAll);
+    }
+
+    // If the cursor isn't sitting above the earth, return.
+    ScreenLocation *cursor = _aw->cursor();
+    if (!cursor->coord().valid()) {
+	return;
+    }
+
+    // If the cursor is on an empty scenery chunk, return.
+    GeoLocation loc(cursor->lat(), cursor->lon(), true);
+    // if (!Chunk::exists(Chunk::canonicalize(loc))) {
+    if (tm->chunk(loc) == NULL) {
+	return;
+    }
+
+    // Now add the chunk-level entries to the menu.
+    Chunk *c = tm->chunk(loc);
+    if (!c) {
+	return;
+    }
+
+    count = c->tileCount(TileManager::DOWNLOADED);
+    if (count > 0) {
+	str.printf("Rerender %s chunk maps (%d)", c->name(), count);
+	addItem(str.str(), (GLUTMenu::cb)&ContextualMenu::rerender10);
+    }
+    count = c->tileCount(TileManager::UNMAPPED);
+    if (count > 0) {
+	str.printf("Render all unrendered %s chunk maps (%d)", 
+		   c->name(), count);
+	addItem(str.str(), (GLUTMenu::cb)&ContextualMenu::render10);
+    }
+
+    // Now look at tile information.
+    Tile *t = c->tile(loc);
+    if (!t || !t->hasScenery()) {
+	return;
+    }
+
+    if (t->maps().any()) {
+	str.printf("Rerender %s tile maps", Tile::name(loc));
+	addItem(str.str(), (GLUTMenu::cb)&ContextualMenu::rerender1);
+    }
+    if (t->missingMaps().any()) {
+	str.printf("Render all unrendered %s tile maps", Tile::name(loc));
+	addItem(str.str(), (GLUTMenu::cb)&ContextualMenu::render1);
+    }
+}
+
+void ContextualMenu::renderAll()
+{
+    _renderAll(false);
+}
+
+void ContextualMenu::rerenderAll()
+{
+    _renderAll(true);
+}
+
+void ContextualMenu::render10()
+{
+    _render10(false);
+}
+
+void ContextualMenu::rerender10()
+{
+    _render10(true);
+}
+
+void ContextualMenu::render1()
+{
+    _render1(false);
+}
+
+void ContextualMenu::rerender1()
+{
+    _render1(true);
+}
+
+void ContextualMenu::notification(Notification::type n)
+{
+    if (n == Notification::MouseMoved) {
+	// EYE - do we also need to do this if we move, zoom, or
+	// rotate?
+	_rebuild();
+    } else if (n == Notification::SceneryLayerOn) {
+	_setSceneryLayerOn();
+    } else {
+	assert(0);
+    }
+}
+
+void ContextualMenu::_setSceneryLayerOn()
+{
+    if (_aw->sceneryLayerOn()) {
+	_aw->detach(GLUT_RIGHT_BUTTON);
+	// Since we're no longer active, ignore mouse moved events.
+	unsubscribe(Notification::MouseMoved);
+    } else {
+	_aw->attach(GLUT_RIGHT_BUTTON, this);
+	// Since we're active, track mouse moved events.
+	subscribe(Notification::MouseMoved);
+	_rebuild();
+    }
+}
+
+void ContextualMenu::_renderAll(bool force)
+{
+    _tiles.clear();
+
+    TileIterator ti(_aw->ac()->tileManager(), TileManager::DOWNLOADED);
+    for (Tile *t = ti.first(); t; t = ti++) {
+	if (force || t->missingMaps().any()) {
+	    _tiles.push_back(t);
+	}
+    }
+    _aw->render(_tiles, force);
+}
+
+void ContextualMenu::_render10(bool force)
+{
+    _tiles.clear();
+
+    GeoLocation loc(_aw->cursor()->lat(), _aw->cursor()->lon(), true);
+    Chunk *c = _aw->ac()->tileManager()->chunk(loc);
+    TileIterator i(c, TileManager::DOWNLOADED);
+    for (Tile *t = i.first(); t; t = i++) {
+	if (force || t->missingMaps().any()) {
+	    _tiles.push_back(t);
+	}
+    }
+    _aw->render(_tiles, force);
+}
+
+void ContextualMenu::_render1(bool force)
+{
+    _tiles.clear();
+
+    GeoLocation loc(_aw->cursor()->lat(), _aw->cursor()->lon(), true);
+    Tile *t = _aw->ac()->tileManager()->tile(loc);
+    assert(t);
+    _tiles.push_back(t);
+    _aw->render(_tiles, force);
+}
+
+// EYE - move into Background/Scenery file just to group things
+// nicely?  Ditto for ContextualMenu.
+class Tooltip: public puFrame, Subscriber
+{
+  public:
+    Tooltip(AtlasWindow *aw);
+    ~Tooltip();
+
+    // Subscriber method.
+    void notification(Notification::type n);
+
+  protected:
+    AtlasWindow *_aw;
+
+    void _setLocation();
+    void _setSceneryLayerOn();
+};
+
+// EYE - magic numbers
+Tooltip::Tooltip(AtlasWindow *aw): puFrame(0, 0, 175, 20), _aw(aw)
+{
+    // EYE - A sanity check, because I free whatever's there in
+    // _passiveMotion.  If it had some random startup value, we could
+    // crash.
+    assert(!getLegend());
+    setStyle(PUSTYLE_PLAIN);
+    setColour(PUCOL_FOREGROUND, 1.0, 1.0, 0.8, 0.8);
+
+    _setLocation();
+    _setSceneryLayerOn();
+
+    // We're always interested in when the scenery layer is toggled on
+    // and off.
+
+    // EYE - we should also subscribe to moves (and rotates?).  These
+    // all affect the location under the mouse.  Do we need a
+    // notification that gathers these together?
+    subscribe(Notification::SceneryLayerOn);
+}
+
+Tooltip::~Tooltip()
+{
+    free((void *)getLegend());
+}
+
+void Tooltip::notification(Notification::type n)
+{
+    if (n == Notification::MouseMoved) {
+	_setLocation();
+    } else if (n == Notification::SceneryLayerOn) {
+	_setSceneryLayerOn();
+	_setLocation();
+    } else {
+	assert(0);
+    }
+}
+
+void Tooltip::_setLocation()
+{
+    if (_aw->sceneryLayerOn()) {
+	return;
+    }
+
+    ScreenLocation *cursor = _aw->cursor();
+    if (_aw->sceneryLayerOn() || !cursor->coord().valid()) {
+	// EYE - also need to update when we zoom, move, ...
+	hide();
+    } else {
+	// EYE - make it static and compare between calls?
+	GeoLocation loc(cursor->lat(), cursor->lon(), true);
+	TileManager *tm = _aw->ac()->tileManager();
+	if (!tm->chunk(loc)) {
+	    hide();
+	} else {
+	    static AtlasString str;
+	    str.printf("%s", Chunk::name(loc));
+
+	    // And a tile name, if there is one.
+	    Tile *t = tm->tile(loc);
+	    if (t) {
+		// Add the tile name to the tooltip.
+		str.appendf("/%s", t->name());
+
+		// For tiles that have been downloaded, show how many
+		// maps have been rendered.
+		if (t->hasScenery()) {
+		    int totalMaps = t->mapLevels().count();
+		    int renderedMaps = t->maps().count();
+		    str.appendf(" (%d/%d)", renderedMaps, totalMaps);
+		}
+	    }
+	    // Remove whatever string was there before, then copy in
+	    // our new one (PUI doesn't copy the string itself).
+	    free((void *)getLegend());
+	    setLegend(strdup(str.str()));
+
+	    // Place the tooltip near the mouse, but in the window.
+	    // First, convert GLUT's upside down y to our y.
+	    int x = cursor->x(), y = cursor->y();
+	    y = _aw->height() - cursor->y();
+
+	    // Now place it centred above the mouse.
+	    int w, h;
+	    getSize(&w, &h);
+	    x -= w / 2;
+	    y += h;
+	    setPosition(x, y);
+
+	    // Reveal ourselves in all our glory.
+	    reveal();
+	}
+    }
+}
+
+void Tooltip::_setSceneryLayerOn()
+{
+    if (_aw->sceneryLayerOn()) {
+	// Ignore mouse moved events while we're not active.
+	unsubscribe(Notification::MouseMoved);
+	hide();
+    } else {
+	// Track the mouse.
+	subscribe(Notification::MouseMoved);
+	reveal();
+    }
+}
+
+//////////////////////////////////////////////////////////////////////
+// Dispatcher - passes a bit of work at a time to a TileMapper object.
+//////////////////////////////////////////////////////////////////////
+class Dispatcher {
+  public:
+    // Call the constructor with a tile mapper object and a set of
+    // tiles to be rendered.  If force is true, maps will be generated
+    // for all map levels.  If false, only missing maps will be
+    // generated.
+
+    // EYE - pass a reference to a vector?
+    Dispatcher(TileMapper *mapper, vector<Tile *> tiles, bool force);
+    ~Dispatcher();
+
+    enum MappingState {WILL_LOAD, WILL_DRAW, WILL_MAP, DONE};
+
+    // Each time this is called, the dispatcher will do the next bit
+    // of work.  After it returns, tile(), state(), and level() tells
+    // you what will happen next.
+
+    // EYE - maybe return a boolean to indicate it's not done?  Is
+    // this possible?
+    void doWork();
+
+    // EYE - should we make some more of this const?
+    Tile *tile() const { return _t; }
+    int level() const { return _level; }
+    MappingState state() const { return _state; }
+
+    // Returns the number of tiles processed.
+    // unsigned int progress() { return _i; }
+    float progress() const { return (float)_i / (float)_tiles.size(); }
+
+  protected:
+    void _firstEligibleTile();
+    bitset<TileManager::MAX_MAP_LEVEL> _missingMaps();
+
+    TileMapper *_mapper;
+    vector<Tile *> _tiles;
+    bool _force;
+    unsigned int _i;
+    Tile *_t;
+    MappingState _state;
+    unsigned int _level;
+};
+
+Dispatcher::Dispatcher(TileMapper *mapper, vector<Tile *> tiles, 
+		       bool force):
+    _mapper(mapper), _tiles(tiles), _force(force), _i(0), _t(NULL), _state(DONE)
+{
+    _firstEligibleTile();
+}
+
+Dispatcher::~Dispatcher()
+{
+}
+
+void Dispatcher::doWork()
+{
+    if (_t == NULL) {
+	assert(_state == DONE);
+	return;
+    }
+
+    if (_state == WILL_LOAD) {
+	_mapper->set(_t);
+	_state = WILL_DRAW;
+    } else if (_state == WILL_DRAW) {
+	_mapper->render();
+	_state = WILL_MAP;
+    } else {
+	_mapper->save(_level);
+	_t->setMapExists(_level++, true);
+
+	// EYE - should _firstEligibleTile do this, and should it be
+	// called _nextEligibleTile?  _nextEligibleMap?
+	const bitset<TileManager::MAX_MAP_LEVEL>& maps = _missingMaps();
+	while ((_level < TileManager::MAX_MAP_LEVEL) && !maps[_level]) {
+	    _level++;
+	}
+	if (_level == TileManager::MAX_MAP_LEVEL) {
+	    _i++;
+	    // EYE - make _firstEligibleTile return a boolean?
+	    _firstEligibleTile();
+	}
+    }
+    // EYE - return true or false?
+}
+
+// If _force is true, just sets _t to _i.  Otherwise it finds the
+// first tile, starting at _i, that has some missing maps.  If it
+// finds one, sets _t to that tile, _state to WILL_LOAD, and _level to
+// the lowest level needing mapping.  If it finds none, sets _t to
+// NULL and _state to DONE;
+void Dispatcher::_firstEligibleTile()
+{
+    while (_i < _tiles.size()) {
+	_t = _tiles[_i];
+	if (_force || _t->missingMaps().any()) {
+	    _state = WILL_LOAD;
+	    _level = 0;
+	    const bitset<TileManager::MAX_MAP_LEVEL>& maps = _missingMaps();
+	    while (!maps[_level]) {
+		_level++;
+	    }
+	    assert(_level < TileManager::MAX_MAP_LEVEL);
+	    // EYE - and return true?
+	    return;
+	}
+	_i++;
+    }
+
+    // EYE - and return false?
+    _t = NULL;
+    _state = DONE;
+}
+
+// Returns a bitset indicating what maps need to be generated for the
+// current tile.  This really means all maps (if _force is true) or
+// just missing maps (if _force is false).
+bitset<TileManager::MAX_MAP_LEVEL> Dispatcher::_missingMaps()
+{
+    bitset<TileManager::MAX_MAP_LEVEL> result;
+    if (_force) {
+	result = _t->mapLevels();
+    } else {
+	result = _t->maps() ^ _t->mapLevels();
+    }
+    return result;
+}
 
 //////////////////////////////////////////////////////////////////////
 // NetworkPopup
@@ -615,7 +1112,7 @@ MainUI::MainUI(int x, int y, AtlasWindow *aw):
     subscribe(Notification::MEFs);
     subscribe(Notification::AutocentreMode);
     subscribe(Notification::Moved);
-    subscribe(Notification::MouseMoved);
+    subscribe(Notification::CursorLocation);
     subscribe(Notification::NewScenery);
     subscribe(Notification::CentreType);
     subscribe(Notification::Zoomed);
@@ -667,7 +1164,7 @@ void MainUI::notification(Notification::type n)
     } else if (n == Notification::AutocentreMode) {
 	_setAutocentreMode();
     } else if ((n == Notification::Moved) ||
-    	       (n == Notification::MouseMoved) ||
+    	       (n == Notification::CursorLocation) ||
     	       (n == Notification::NewScenery)) {
     	_setPosition();
     } else if (n == Notification::CentreType) {
@@ -2359,6 +2856,98 @@ char *SearchUI::matchAtIndex(int i)
     return _aw->matchAtIndex(i);
 }
 
+// Create the mapping interface, with its lower-left corner at x, y.
+// Assumes that puInit() has been called.
+MappingUI::MappingUI(int x, int y, AtlasWindow *aw): _ac(aw->ac()), _aw(aw)
+{
+    // EYE - make these global?
+    const int buttonHeight = 20, buttonWidth = 80, checkHeight = 10;
+    const int bigSpace = 5;
+    const int width = 300, height = buttonHeight * 2 + bigSpace * 3;
+    _gui = new puGroup(x, y); {
+	_frame = new puFrame(0, 0, width, height);
+	int curx = bigSpace, cury = bigSpace;
+
+	// EYE - the positioning of the checkbox is very hacky
+	_autocentreCheckbox = 
+	    new puButton(curx, cury + bigSpace, 
+			 curx + checkHeight, cury + bigSpace + checkHeight, 
+			 PUBUTTON_VCHECK);
+	_autocentreCheckbox->setLabelPlace(PUPLACE_CENTERED_RIGHT);
+	_autocentreCheckbox->setLabel("Autocentre");
+
+	curx = width - bigSpace - buttonWidth;
+	_cancelButton = 
+	    new puOneShot(curx, cury, curx + buttonWidth, cury + buttonHeight);
+	_cancelButton->setLegend("Cancel");
+	_cancelButton->setUserData(this);
+	_cancelButton->setCallback(__mappingUI_cancel_cb);
+
+	curx = bigSpace;
+	cury += buttonHeight + bigSpace;
+	_currentTileText = new puText(curx, cury);
+	_currentTileText->setLabel("");
+	curx += buttonWidth + bigSpace;
+
+	_progressSlider = new puSlider(curx, cury, width - curx - bigSpace, 
+				       FALSE, buttonHeight);
+	_progressSlider->greyOut();
+	_progressSlider->setLegend("");
+    }
+    _gui->close();
+    _gui->hide();
+
+    // We need to know when tiles are dispatched.
+    subscribe(Notification::TileDispatched);
+}
+
+MappingUI::~MappingUI()
+{
+    puDeleteObject(_gui);
+}
+
+void MappingUI::getSize(int *w, int *h)
+{
+    _gui->getSize(w, h);
+}
+
+void MappingUI::setPosition(int x, int y)
+{
+    _gui->setPosition(x, y);
+}
+
+void MappingUI::notification(Notification::type n)
+{
+    if (n == Notification::TileDispatched) {
+	_setProgress();
+    } else {
+	assert(0);
+    }
+
+    _aw->postRedisplay();
+}
+
+void MappingUI::_setProgress()
+{
+    const Dispatcher *d = _aw->dispatcher();
+    Tile *t = d->tile();
+    _currentTileLabel.printf(t->name());
+    _currentTileText->setLabel(_currentTileLabel.str());
+
+    _progressLegend.printf("%.0f%%", d->progress() * 100);
+    _progressSlider->setLegend(_progressLegend.str());
+    _progressSlider->setSliderFraction(d->progress());
+
+    if (_autocentreCheckbox->getIntegerValue()) {
+	_aw->movePosition(t->centreLat(), t->centreLon());
+    }
+}
+
+void MappingUI::_cancel_cb(puObject *o)
+{
+    _aw->cancelMapping();
+}
+
 // Some compilers don't allow floats to be initialized in the class
 // declaration, so we do it out here.
 const float Route::_pointSize = 10.0;
@@ -2656,7 +3245,8 @@ AtlasWindow::AtlasWindow(const char *name,
 			 AtlasController *ac): 
     AtlasBaseWindow(name, regularFontFile, boldFontFile), _ac(ac), 
     _dragging(false), _lightingPrefixKey(false), _debugPrefixKey(false), 
-    _overlays(NULL), _exitOkDialog(NULL), _searchTimerScheduled(false)
+    // _overlays(NULL), _exitOkDialog(NULL), _searchTimerScheduled(false)
+    _overlays(NULL), _sceneryLayerOn(false), _exitOkDialog(NULL), _searchTimerScheduled(false)
 {
     // Initialize OpenGL, starting with clearing (background) color
     // and enabling depth testing.
@@ -2695,19 +3285,22 @@ AtlasWindow::AtlasWindow(const char *name,
 
     // Background map image.
 
-    // EYE - I think we need three possible backgrounds:
-    //
-    // (1) An arbitrary image (basically what we have now)
-    //
-    // (2) Blue ocean (ideal for those with complete scenery)
-    //
-    // (3) FlightGear scenery tile map
-    //
-    // So we could have a default: backgroundType: file, ocean, scenery
-    // And for the file option, have another: backgroundFilename
+    // EYE - make part of the scenery object?
+    _background = new Background(this);
     SGPath world = globals.prefs.path;
+    // EYE - add to preferences: background texture file name, show
+    // background texture, show status (or show scenery layer).  We
+    // might also want to add options for other layers (airports,
+    // navaids, ...)
+
+    // EYE - magic constant
     world.append("background");
-    _scenery->setBackgroundImage(world);
+    _background->setImage(world);
+    _background->setUseImage(true);
+    // EYE - this is wrong.  If we don't set this explicitly, and to
+    // the correct value, our subsequent call to _setSceneryLayerOn
+    // won't work correctly.
+    _background->setShowStatus(true);
 
     // Create our screen location objects.  They track the lat/lon
     // (and elevation, if available) of what's beneath the cursor and
@@ -2728,20 +3321,6 @@ AtlasWindow::AtlasWindow(const char *name,
     setOverlayVisibility(Overlays::LOW, true);
     setOverlayVisibility(Overlays::HIGH, false);
 
-    // Create our user (sub)interfaces.
-    _mainUI = new MainUI(20, 20, this);
-    _infoUI = new InfoUI(260, 20, this);
-    _lightingUI = new LightingUI(600, 20, this);
-    _helpUI = new HelpUI(250, 500, this);
-
-    // The search interface is used to search for airports and navaids.
-    _searchUI = new SearchUI(this, 0, 0, 300, 300);
-    _searchUI->hide();
-
-    if (globals.prefs.softcursor) {
-	puShowCursor();
-    }
-
     // EYE - who should initialize this - the controller or the
     // window?
     setCentre(globals.prefs.width / 2.0, globals.prefs.height / 2.0);
@@ -2752,12 +3331,36 @@ AtlasWindow::AtlasWindow(const char *name,
     _setShading();
     _setAzimuthElevation();
     _setFlightTrack();
-    // EYE - This looks inconsistent because we have the "model"
-    // (_relativePalette)
+    // EYE - These look inconsistent because we have the "model"
+    // (_relativePalette, _sceneryLayerOn)
     _setRelativePalette(false);
+    // EYE - make this dependent scenery status?  If there's some
+    // unrendered scenery, turn the scenery layer off?
+    _setSceneryLayerOn(true);
     // EYE - call other '_set' functions?
     _setMEFs();
     _setCentreType();
+
+    // Create our user (sub)interfaces.
+    _mainUI = new MainUI(20, 20, this);
+    _infoUI = new InfoUI(260, 20, this);
+    _lightingUI = new LightingUI(600, 20, this);
+    _helpUI = new HelpUI(250, 500, this);
+    _mappingUI = new MappingUI(0, 0, this);
+
+    // The search interface is used to search for airports and navaids.
+    _searchUI = new SearchUI(this, 0, 0, 300, 300);
+    _searchUI->hide();
+
+    // Tooltip
+    _tooltip = new Tooltip(this);
+
+    // Contextual menu
+    _contextualMenu = new ContextualMenu(this);
+
+    if (globals.prefs.softcursor) {
+	puShowCursor();
+    }
 
     // EYE - make sure we don't subscribe to ones we produce!
     subscribe(Notification::AircraftMoved);
@@ -2783,12 +3386,13 @@ AtlasWindow::AtlasWindow(const char *name,
     // Check network connections and serial connections periodically (as
     // specified by the "update" user preference).
     startTimer((int)(globals.prefs.update * 1000.0), 
-	       (void (GLUTWindow::*)())&AtlasWindow::_flightTrackTimer);
+	       (GLUTWindow::cb)&AtlasWindow::_flightTrackTimer);
 
     // // EYE - hacked in for now.
     // glutTimerFunc(MPTimerInterval, MPAircraftTimer, 0);
 }
 
+// EYE - make sure we delete everything we create
 AtlasWindow::~AtlasWindow()
 {
     delete _overlays;
@@ -2797,6 +3401,10 @@ AtlasWindow::~AtlasWindow()
     delete _infoUI;
     delete _helpUI;
     delete _searchUI;
+    delete _mappingUI;
+    
+    puDeleteObject(_tooltip);
+    delete _contextualMenu;
 }
 
 // #include "MPAircraft.hxx"
@@ -2814,8 +3422,13 @@ void AtlasWindow::_display()
     // Clear all pixels and depth buffer.
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+    // Background
+    _background->draw();
+
     // Scenery.
-    _scenery->draw(_ac->lightingOn());
+    if (_sceneryLayerOn) {
+	_scenery->draw(_ac->lightingOn());
+    }
 
     // Overlays.
     _overlays->draw(_ac->navData());
@@ -2865,6 +3478,11 @@ void AtlasWindow::_reshape(int width, int height)
     // (with a 20-pixel space at the bottom and right).
     _lightingUI->getSize(&w, &h);
     _lightingUI->setPosition(width - w - 20, 20);
+
+    // ... and that the mapping UI stays in the upper left corner
+    // (with a 20-pixel space at the top and elft).
+    _mappingUI->getSize(&w, &h);
+    _mappingUI->setPosition(20, height - h - 20);
 }
 
 void AtlasWindow::_mouse(int button, int state, int x, int y) 
@@ -2917,7 +3535,6 @@ void AtlasWindow::_motion(int x, int y)
     // The x, y given by GLUT marks the upper-left corner of the
     // cursor (and y increases down in GLUT coordinates).  We add 0.5
     // to both to get the centre of the cursor.
-    // // _cursor.set(x + 0.5, y + 0.5);
     setCursor(x + 0.5, y + 0.5);
 
     if (_dragging) {
@@ -2964,6 +3581,8 @@ void AtlasWindow::_passiveMotion(int x, int y)
     // cursor (and y increases down in GLUT coordinates).  We add 0.5
     // to both to get the centre of the cursor.
     setCursor(x + 0.5, y + 0.5);
+
+    postRedisplay();
 }
 
 void AtlasWindow::_keyboard(unsigned char key, int x, int y) 
@@ -3005,6 +3624,7 @@ void AtlasWindow::_keyboard(unsigned char key, int x, int y)
 	    break;
 
 	  case 0:		// ctrl-space
+	    // EYE - use '(' and ')' to create routes?
 	    if (!route.active) {
 		// EYE - later we should push a new route onto the route stack.
 		route.clear();
@@ -3260,6 +3880,21 @@ void AtlasWindow::_keyboard(unsigned char key, int x, int y)
 	    }
 	    break;
 
+	  case 'S':
+	    // Toggle scenery
+	    // EYE - change keystroke?
+	    // EYE - force scenery to stop downloading if it's toggled off
+	    _setSceneryLayerOn(!_sceneryLayerOn);
+	    glutPostRedisplay();
+	    break;
+
+	  case 'T':
+	    // Toggle background image
+	    // EYE - change keystroke
+	    _background->setUseImage(!_background->useImage());
+	    glutPostRedisplay();
+	    break;
+
 	  case 'u':
 	    // 'u'nattach (ie, detach)
 	    _ac->detachTrack();
@@ -3404,6 +4039,17 @@ void AtlasWindow::_setRelativePalette(bool relative)
     }
 }
 
+void AtlasWindow::_setSceneryLayerOn(bool on)
+{
+    if (on != _sceneryLayerOn) {
+	_sceneryLayerOn = on;
+	// EYE - should the background layer just subscribe to this as
+	// well?
+	_background->setShowStatus(!on);
+	Notification::notify(Notification::SceneryLayerOn);
+    }
+}
+
 void AtlasWindow::_setMEFs()
 {
     _scenery->setMEFs(_ac->MEFs());
@@ -3444,6 +4090,41 @@ void AtlasWindow::_setTitle()
     }
 }
 
+bool AtlasWindow::_doWork()
+{
+    bool result = false;
+    Tile *t;
+
+    if (_dispatcher && (t = _dispatcher->tile())) {
+	// Ask the dispatcher to do some work.  When it returns,
+	// tile(), state(), and level() will indicate what will happen
+	// *next*.
+	_dispatcher->doWork();
+
+	// We know we've finished mapping a tile if we've moved on to
+	// the next one.  If we haven't, we're still mapping.
+	if (t == _dispatcher->tile()) {
+	    _background->setTileStatus(t, Background::MAPPING);
+	} else {
+	    // EYE - send out a notification instead?  Are we
+	    // violating our rules about MVC communiation (see
+	    // notifications.hxx) to be calling Background and Scenery
+	    // methods directly?  Note that we also directly call
+	    // _scenery methods elsewhere, which supports this
+	    // approach.  However, SceneryTile subscribes to
+	    // notifications, which seems to violate it.  If we could
+	    // send parameters with a notification, would that solve
+	    // this problem?
+	    _background->setTileStatus(t, Background::MAPPED);
+	    _scenery->update(t);
+	}
+
+	result = (_dispatcher->state() != Dispatcher::DONE);
+    }
+
+    return result;
+}
+
 // Called periodically to check for input on network and serial ports.
 void AtlasWindow::_flightTrackTimer()
 {
@@ -3452,7 +4133,7 @@ void AtlasWindow::_flightTrackTimer()
 
     // Check again later.
     startTimer((int)(globals.prefs.update * 1000.0), 
-	       (void (GLUTWindow::*)())&AtlasWindow::_flightTrackTimer);
+	       (GLUTWindow::cb)&AtlasWindow::_flightTrackTimer);
 }
 
 // Called to initiate a new search or continue an active search.  If
@@ -3478,11 +4159,24 @@ void AtlasWindow::_searchTimer()
 
 	// Continue the search in 100ms.
 	assert(_searchTimerScheduled == true);
-	startTimer(100, (void (GLUTWindow::*)())&AtlasWindow::_searchTimer);
+	startTimer(100, (GLUTWindow::cb)&AtlasWindow::_searchTimer);
     } else {
 	// No new matches, so our search is finished.
 	_searchTimerScheduled = false;
     }
+}
+
+void AtlasWindow::_renderTimer()
+{
+    if (_doWork()) {
+	_mappingUI->reveal();
+	Notification::notify(Notification::TileDispatched);
+    	startTimer(0, (GLUTWindow::cb)&AtlasWindow::_renderTimer);
+    } else {
+	_mappingUI->hide();
+    }
+
+    glutPostRedisplay();
 }
 
 // #include <sstream>
@@ -3625,7 +4319,7 @@ void AtlasWindow::searchStringChanged(const char *str)
 {
     if (!_searchTimerScheduled) {
 	_searchTimerScheduled = true;
-	startTimer(0, (void (GLUTWindow::*)())&AtlasWindow::_searchTimer);
+	startTimer(0, (GLUTWindow::cb)&AtlasWindow::_searchTimer);
     }
 }
 
@@ -3643,6 +4337,46 @@ char *AtlasWindow::matchAtIndex(int i)
     return strdup(searchable->asString().c_str());
 }
 
+void AtlasWindow::render(vector<Tile *>& tiles, bool force)
+{
+    // EYE - copying is dumb
+    _tiles = tiles;
+    _force = force;
+
+    int noOfMaps = 0;
+    TileManager *tm = _ac->tileManager();
+    if (_force) {
+	noOfMaps = _tiles.size() * tm->mapLevels().count();
+    } else {
+	for (size_t i = 0; i < _tiles.size(); i++) {
+	    Tile *t = _tiles[i];
+	    noOfMaps += t->missingMaps().count();
+	}
+    }
+
+    assert(_renderDialog == NULL);
+    AtlasString str;
+    str.printf("Render %d tiles (%d maps)?", _tiles.size(), noOfMaps);
+    _renderDialog = new AtlasDialog(str.str(), "OK", "Cancel", "", 
+				    __atlasWindow_renderDialog_cb, this);
+
+    glutPostRedisplay();
+
+    // EYE - we should probably force a call to passiveMotion, so that
+    // the window correctly reflects the (new) mouse position (the
+    // mouse will have moved when making a menu selection).  The
+    // problem is, you can't get the mouse x,y in GLUT except when it
+    // calls one of the mouse callback functions.  So the user will
+    // just have to wiggle the mouse to force the callback to be
+    // called.
+    //
+    // Note as well that the contextual menu and tool tip continue to
+    // receive mouse events, which is a waste of processing time and
+    // visually annoying (the tooltip appears under the dialog).  It
+    // would be nice if this could be turned off while the render
+    // dialog is visible.
+}
+
 ScreenLocation *AtlasWindow::currentLocation()
 {
     if (centreType() == MOUSE) {
@@ -3655,12 +4389,13 @@ ScreenLocation *AtlasWindow::currentLocation()
 void AtlasWindow::setCursor(float x, float y)
 {
     _cursor->set(x, y);
+    Notification::notify(Notification::MouseMoved);
     if (centreType() == MOUSE) {
 	if (_relativePalette) {
 	    _setPaletteBase();
 	}
 	// EYE - call movePosition()?  Update UI's directly?
-	Notification::notify(Notification::MouseMoved);
+	Notification::notify(Notification::CursorLocation);
     }
 }
 
@@ -3847,6 +4582,30 @@ void AtlasWindow::setAutocentreMode(bool mode)
     }
 }
 
+void AtlasWindow::cancelMapping()
+{
+    // There may be some unprocessed tiles left.  We need to make sure
+    // their state in the pixmap correctly represents their real state
+    // (which will either be mapped or unmapped).
+    // for (int i = _dispatcher->progress(); i < _tiles.size(); i++) {
+    for (size_t i = 0; i < _tiles.size(); i++) {
+	Tile *t = _tiles[i];
+	if (t->isType(TileManager::UNMAPPED)) {
+	    _background->setTileStatus(t, Background::UNMAPPED);
+	} else {
+	    assert(t->isType(TileManager::MAPPED));
+	    _background->setTileStatus(t, Background::MAPPED);
+	}
+    }
+    delete _dispatcher;
+    _dispatcher = NULL;
+    delete _mapper;
+    _mapper = NULL;
+
+    // // Inform listeners that scenery has changed.
+    // Notification::notify(Notification::SceneryChanged);
+}
+
 void AtlasWindow::notification(Notification::type n)
 {
     if (n == Notification::SmoothShading) {
@@ -4023,6 +4782,47 @@ void AtlasWindow::_exitOk_cb(bool okay)
     }
 }
 
+void AtlasWindow::_renderDialog_cb(bool okay)
+{
+    puDeleteObject(_renderDialog);
+    _renderDialog = NULL;
+    if (okay) {
+	int maxMapLevel = 0;
+	for (unsigned int i = 0; i < TileManager::MAX_MAP_LEVEL; i++) {
+	    if (_ac->tileManager()->mapLevels()[i]) {
+		maxMapLevel = i;
+	    }
+	}
+	       
+	_mapper = new TileMapper(_ac->currentPalette(),
+				 _ac->oversampling() + maxMapLevel,
+				 _ac->discreteContours(),
+				 _ac->contourLines(),
+				 _ac->azimuth(),
+				 _ac->elevation(),
+				 _ac->lightingOn(),
+				 _ac->smoothShading(),
+				 _ac->imageType(),
+				 _ac->JPEGQuality());
+	_dispatcher = new Dispatcher(_mapper, _tiles, _force);
+
+	// Before we start off the dispatcher, we colour all tiles to
+	// be mapped as, well, to be mapped.  This makes it easier to
+	// follow mapping progress.
+	for (size_t i = 0; i < _tiles.size(); i++) {
+	    Tile *t = _tiles[i];
+	    // EYE - should we be calling setTileStatus directly, or
+	    // should this be done indirectly via notifications?
+	    // Should the extra tile status types be added to
+	    // Tile.hxx?
+	    _background->setTileStatus(t, Background::TO_BE_MAPPED);
+	}
+
+	// EYE - can we do this without coercion?
+	startTimer(0, (GLUTWindow::cb)&AtlasWindow::_renderTimer);
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // PUI code (callbacks)
 ///////////////////////////////////////////////////////////////////////////////
@@ -4035,6 +4835,17 @@ void __atlasWindow_exitOk_cb(puObject *o)
 	(AtlasDialog::CallbackButton)o->getDefaultValue();
     bool okay = (pos == AtlasDialog::LEFT);
     aw->_exitOk_cb(okay);
+}
+
+// Called when the user hits a button on the confirm rendering dialog
+// box.
+void __atlasWindow_renderDialog_cb(puObject *o)
+{
+    AtlasWindow *aw = (AtlasWindow *)o->getUserData();
+    AtlasDialog::CallbackButton pos = 
+	(AtlasDialog::CallbackButton)o->getDefaultValue();
+    bool okay = (pos == AtlasDialog::LEFT);
+    aw->_renderDialog_cb(okay);
 }
 
 void __mainUI_zoom_cb(puObject *o)
@@ -4198,6 +5009,12 @@ void __helpUI_cb(puObject *o)
 {
     HelpUI *helpUI = (HelpUI *)o->getUserData();
     helpUI->_cb(o);
+}
+
+void __mappingUI_cancel_cb(puObject *o)
+{
+    MappingUI *mappingUI = (MappingUI *)o->getUserData();
+    mappingUI->_cancel_cb(o);
 }
 
 // EYE - are these docs correct?
