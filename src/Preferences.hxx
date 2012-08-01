@@ -30,6 +30,8 @@
 #include <simgear/misc/sg_path.hxx> // SGPath
 #include <plib/sg.h>		    // sgVec4
 
+#include "TileMapper.hxx"	// ImageType
+
 // This class (of which there should only be one instantiated), keeps
 // Atlas' preferences.  Preferences come from 3 places:
 // 
@@ -76,6 +78,7 @@ struct SerialConnection {
 class Preferences {
 public:
     Preferences();
+    ~Preferences();
 
     // Sets the preferences, first from defaults, then the preferences
     // file, and finally from the given command line arguments.
@@ -120,25 +123,34 @@ public:
     std::vector<int> networkConnections;
     std::vector<SerialConnection> serialConnections;
 
-    // Lighting
+    // Lighting and mapping
     bool discreteContours, contourLines, lightingOn, smoothShading;
     float azimuth, elevation;
     sgVec4 lightPosition;
     char *palette;		// Palette name
+    int oversampling;
+    TileMapper::ImageType imageType;
+    unsigned int JPEGQuality;
 
     // Factory defaults
     // EYE - need to set values for these (and use them too)
-    static const float defaultLatitude, defaultLongitude, defaultZoom;
+    static const float defaultLatitude = 37.5;
+    static const float defaultLongitude = -122.25;
+    static const float defaultZoom = 125.0;
     static const int defaultWidth = 800, defaultHeight = 600;
     static const bool defaultAutocentreMode = false;
-    static const float defaultLineWidth;
-    static const float defaultAirplaneSize;
+    static const float defaultLineWidth = 1.0;
+    static const float defaultAirplaneSize = 25.0;
     static const int defaultMaxTrack = 0;
-    static const float defaultUpdate;
+    static const float defaultUpdate = 1.0;
     static const unsigned int defaultPort = 5500;
     static const char *defaultSerialDevice;
     static const int defaultBaudRate = 4800;
-    static const float defaultAzimuth, defaultElevation;
+    static const float defaultAzimuth = 315.0, defaultElevation = 55.0;
+    static const int defaultOversampling = 0;
+    static const TileMapper::ImageType defaultImageType = TileMapper::JPEG;
+    static const unsigned int defaultJPEGQuality = 75;
+    static const char *defaultPalette;
 
 protected:
     bool _loadPreferences(int argc, char *argv[]);

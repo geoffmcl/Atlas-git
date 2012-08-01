@@ -84,6 +84,10 @@ enum {FIRST_OPTION,
       SMOOTH_SHADING_OPTION,
       FLAT_SHADING_OPTION,
       LIGHT_POSITION_OPTION,
+      OVERSAMPLING_OPTION,
+      IMAGE_TYPE_JPEG_OPTION,
+      IMAGE_TYPE_PNG_OPTION,
+      JPEG_QUALITY_OPTION,
       VERSION_OPTION,
       HELP_OPTION,
       LAST_OPTION
@@ -120,6 +124,10 @@ static struct option long_options[] = {
     {"smooth-shading", no_argument, 0, SMOOTH_SHADING_OPTION},
     {"flat-shading", no_argument, 0, FLAT_SHADING_OPTION},
     {"light", required_argument, 0, LIGHT_POSITION_OPTION},
+    {"oversampling", required_argument, 0, OVERSAMPLING_OPTION},
+    {"jpeg", no_argument, 0, IMAGE_TYPE_JPEG_OPTION},
+    {"png", no_argument, 0, IMAGE_TYPE_PNG_OPTION},
+    {"jpeg-quality", required_argument, 0, JPEG_QUALITY_OPTION},
     {"version", no_argument, 0, VERSION_OPTION},
     {"help", no_argument, 0, HELP_OPTION},
     {0, 0, 0, 0}
@@ -135,9 +143,9 @@ static void print_short_help(char *name)
     printf("\t[--autocentre-mode] [--discrete-contour] [--smooth-contour]\n");
     printf("\t[--contour-lines] [--no-contour-lines] [--lighting]\n");
     printf("\t[--no-lighting] [--light=azim,elev] [--smooth-shading]\n");
-    printf("\t[--flat-shading] [--line-width=<w>] [--airplane=<path>]\n");
-    printf("\t[--airplane-size=<size>] [--version]\n");
-    printf("\t[--help] [<flight file>] ...\n");
+    printf("\t[--flat-shading] [--line-width=<w>] [--oversampling=<level>]\n");
+    printf("\t[--jpeg] [--png] [--jpeg-quality=<q>] [--airplane=<path>]\n");
+    printf("\t[--airplane-size=<size>] [--version] [--help] [<flight file>] ...\n");
 }
 
 // Formats the given strings as follows:
@@ -314,10 +322,32 @@ static void print_help_for(int option, const char *indent)
       case LIGHT_POSITION_OPTION:
 	defaultStr.printf("Default: %.1f,%.1f", Preferences::defaultAzimuth, 
 			  Preferences::defaultElevation);
-	printOne(indent, "--light=azim,elev",
+	printOne(indent, "--light=<azim,elev>",
 		 "Set light position for live maps (all units in degrees)", 
 		 "Azimuth is light direction (0 = north, 90 = east, ...)",
 		 "Elevation is height above horizon (90 = overhead)",
+		 defaultStr.str(), NULL);
+	break;
+      case OVERSAMPLING_OPTION:
+	defaultStr.printf("Default: %d", Preferences::defaultOversampling);
+	printOne(indent, "--oversampling=<i>",
+		 "Anti-alias maps using multisampling.  The value is an",
+		 "integer specifying the oversampling level (note: each",
+		 "increment of 1 quadruples video card memory usage)",
+		 defaultStr.str(), NULL);
+	break;
+      case IMAGE_TYPE_JPEG_OPTION:
+	// EYE - instead of manually adding the string "(default)", we
+	// should check defaultImageType.
+	printOne(indent, "--jpeg", "Render maps as JPEG files (default)", NULL);
+	break;
+      case IMAGE_TYPE_PNG_OPTION:
+	printOne(indent, "--png", "Render maps as PNG files", NULL);
+	break;
+      case JPEG_QUALITY_OPTION:
+	defaultStr.printf("Default: %u", Preferences::defaultJPEGQuality);
+	printOne(indent, "--jpeg-quality=<q>",
+		 "Set JPEG file quality (0 = lowest, 100 = highest)", 
 		 defaultStr.str(), NULL);
 	break;
       case VERSION_OPTION:
@@ -340,15 +370,8 @@ static void print_help() {
   }
 }
 
-const float Preferences::defaultLatitude = 37.5;
-const float Preferences::defaultLongitude = -122.25;
-const float Preferences::defaultZoom = 125.0;
-const float Preferences::defaultLineWidth = 1.0;
-const float Preferences::defaultAirplaneSize = 25.0;
-const float Preferences::defaultUpdate = 1.0;
 const char *Preferences::defaultSerialDevice = "/dev/ttyS0";
-const float Preferences::defaultAzimuth = 315.0;
-const float Preferences::defaultElevation = 55.0;
+const char *Preferences::defaultPalette = "default.ap";
 
 // All preferences should be given default values here.
 Preferences::Preferences()
@@ -403,7 +426,17 @@ Preferences::Preferences()
     smoothShading = true;
     azimuth = defaultAzimuth;
     elevation = defaultElevation;
-    palette = strdup("default.ap");
+    oversampling = defaultOversampling;
+    imageType = defaultImageType;
+    JPEGQuality = defaultJPEGQuality;
+    palette = strdup(defaultPalette);
+}
+
+Preferences::~Preferences()
+{
+    free(icao);
+    free(_serial.device);
+    free(palette);
 }
 
 // First loads preferences from ~/.atlasrc (if it exists), then checks
@@ -504,6 +537,13 @@ void Preferences::savePreferences()
     printf("%d\n", lightingOn);
     printf("%d\n", smoothShading);
     printf("<%.1f, %.1f>", azimuth, elevation);
+    printf("%d", oversampling);
+    if (imageType == TileMapper::JPEG) {
+	printf("JPEG\n");
+    } else {
+	printf("PNG\n");
+    }
+    printf("%d\n", JPEGQuality);
     printf("%s\n", palette);
 
     for (unsigned int i = 0; i < flightFiles.size(); i++) {
@@ -645,6 +685,20 @@ bool Preferences::_loadPreferences(int argc, char *argv[])
 	    if (elevation > 90.0) {
 		elevation = 90.0;
 	    }
+	    break;
+	  case OVERSAMPLING_OPTION:
+	    OPTION_CHECK(sscanf(optarg, "%d", &oversampling), 1,
+			 OVERSAMPLING_OPTION);
+	    break;
+	  case IMAGE_TYPE_JPEG_OPTION:
+	    imageType = TileMapper::JPEG;
+	    break;
+	  case IMAGE_TYPE_PNG_OPTION:
+	    imageType = TileMapper::PNG;
+	    break;
+	  case JPEG_QUALITY_OPTION:
+	    OPTION_CHECK(sscanf(optarg, "%d", &JPEGQuality), 1, 
+			 JPEG_QUALITY_OPTION);
 	    break;
 	  case AUTO_CENTRE_MODE_OPTION:
 	    autocentre_mode = true;
