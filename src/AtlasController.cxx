@@ -315,6 +315,9 @@ AtlasController::AtlasController(const char *paletteDir)
     setSmoothShading(globals.prefs.smoothShading);
     setAzimuth(globals.prefs.azimuth);
     setElevation(globals.prefs.elevation);
+    setOversampling(globals.prefs.oversampling);
+    setImageType(globals.prefs.imageType);
+    setJPEGQuality(globals.prefs.JPEGQuality);
 }
 
 AtlasController::~AtlasController()
