@@ -445,7 +445,6 @@ void Subbucket::draw()
     }
 
     // Tell OpenGL where our data is.
-    // EYE - do this inside the display list?
     glVertexPointer(3, GL_FLOAT, 0, &_vertices[0]);
     glNormalPointer(GL_FLOAT, 0, &_normals[0]);
     glColorPointer(4, GL_FLOAT, 0, &_colours[0]);
