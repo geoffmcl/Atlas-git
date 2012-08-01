@@ -51,6 +51,9 @@ using namespace std;
 // if there is FlightGear scenery at that <lat, lon>.
 static bool __exists(const GeoLocation &loc)
 {
+    if (!loc.valid()) {
+	return false;
+    }
     int row = (179 - loc.lat());
     int lon = (loc.lon() + 180) % 360;
     int byte = lon / 8;
@@ -62,11 +65,18 @@ static bool __exists(const GeoLocation &loc)
 // GeoLocation
 ////////////////////////////////////////////////////////////////////////////////
 
-GeoLocation::GeoLocation(int lat, int lon)
+// Creates a GeoLocation from the given latitude and longitude.  They
+// are assumed to be GeoLocation latitudes and longitudes - ie, 0 <=
+// lat < 180, 0 <= lon < 360.  However, if 'standard' is true, then we
+// expect standard latitudes - ie, -90 <= lat <= 90 (note the '<=
+// 90'), and standard longitudes (which actually can be anything).
+GeoLocation::GeoLocation(float lat, float lon, bool standard)
 {
-    setLoc(lat, lon);
+    setLoc(lat, lon, standard);
 }
 
+// Creates a GeoLocation from a FlightGear scenery name (eg,
+// "w123n37").
 GeoLocation::GeoLocation(const char *name)
 {
     int lat, lon;
@@ -89,6 +99,7 @@ GeoLocation::GeoLocation(const char *name)
     }
 }
 
+// Creates an invalid GeoLocation.
 GeoLocation::GeoLocation()
 {
     invalidate();
@@ -99,7 +110,6 @@ GeoLocation::~GeoLocation()
 }
 
 bool GeoLocation::valid() const
-
 {
     int lat = _loc.first;
     int lon = _loc.second;
@@ -111,8 +121,82 @@ void GeoLocation::invalidate()
     _loc.first = _loc.second = -1;
 }
 
-void GeoLocation::setLoc(int lat, int lon)
+// Return our latitude (0 <= lat < 180, -1 if we're invalid).  If
+// 'standard' is true, it returns a standard latitude (-90 <= lat <
+// 90, -91 if invalid).
+int GeoLocation::lat(bool standard) const
 {
+    int lat = _loc.first;
+    if (standard) {
+	lat -= 90;
+    }
+    return lat;
+}
+
+// Return our longitude (0 <= lon < 360, -1 if we're invalid).  If
+// 'standard' is true, it returns a standard longitude (-180 <= lon <
+// 180, -361 if invalid).
+int GeoLocation::lon(bool standard) const
+{
+    int lon = _loc.second;
+    if (standard) {
+	lon = (lon + 180) % 360 - 180;
+    }
+    return lon;
+}
+
+const char *GeoLocation::name() const
+{
+    static char name[8];
+    if (!valid()) {
+	name[0] = '\0';
+    } else {
+	char ew = 'e', ns = 'n';
+	int lat = this->lat(true);
+	if (lat < 0) {
+	    lat = -lat;
+	    ns = 's';
+	}
+	int lon = this->lon(true);
+	if (lon < 0) {
+	    lon = -lon;
+	    ew = 'w';
+	}
+
+	snprintf(name, 8, "%c%03d%c%02d", ew, lon, ns, lat);
+    }
+
+    return name;
+}
+
+// Sets a latitude and longitude.  By default, we expect GeoLocation
+// latitudes and longitudes - ie, 0 <= lat < 180, 0 <= lon < 360.  If
+// either is out of range, we become invalid.  If 'standard' is true,
+// then we expect standard latitudes - ie, -90 <= lat <= 90 (note the
+// '<= 90'), and standard longitudes (which actually can be anything).
+void GeoLocation::setLoc(float latf, float lonf, bool standard)
+{
+    int lat = floor(latf);
+    int lon = floor(lonf);
+    if (standard) {
+	if (lat == 90) {
+	    // This is a special case.  In FlightGear, a standard
+	    // scenery tile covers a rectangular area up to but *not*
+	    // including the northern and eastern boundaries of that
+	    // area - these are covered by the tiles to the north and
+	    // east respectively.  However, an exception is made at
+	    // the north pole - that tile includes the northern
+	    // boundary (which is just the north pole).
+	    lat = 89;
+	}
+	lat += 90;
+
+	// It would be nice just to be able to say lon % 360, but C's
+	// modulus operator doesn't behave well for negative numbers.
+	// We need the extra bit to handle those.
+	lon = ((lon % 360) + 360) % 360;
+    }
+
     if ((0 <= lat) && (lat < 180) && (0 <= lon) && (lon < 360)) {
 	_loc.first = lat;
 	_loc.second = lon;
@@ -146,30 +230,40 @@ int GeoLocation::operator<(const GeoLocation& right) const
 // TileManager
 ////////////////////////////////////////////////////////////////////////////////
 
-const int TileManager::NaPI = std::numeric_limits<int>::max();
+const unsigned char TileManager::NaPI = numeric_limits<unsigned char>::max();
 
 TileManager::TileManager(const SGPath& scenery, const SGPath& maps): _maps(maps)
 {
-    ////////// Chunks //////////
+    ////////// Chunks and Tiles //////////
 
-    // Create chunks (which will create tiles).  We create a chunk for
-    // each potential chunk, regardless of whether the chunk has
-    // actually been downloaded.  This information we get from the
-    // __scenery array.
-    //
-    // We know that the latitude and longitude of all chunk names are
-    // divisible by 10, so the following for loops are correct and
-    // complete.
+    // Create chunks and tiles.  We create a tile/chunk for each
+    // *potential* one, regardless of whether one has actually been
+    // downloaded.  This information we get from the __scenery array.
 
-    // EYE - have constants: min_lat, max_lat, min_lon, max_lon?
-    for (int lon = 0; lon < 360; lon += 10) {
-	for (int lat = 0; lat < 180; lat += 10) {
-	    // Only create a chunk if there's at least one scenery
-	    // tile in the area it covers.
+    // EYE - have constants: min_lat, max_lat, min_lon, max_lon,
+    // perhaps as part of GeoLocation?
+    for (int lat = 0; lat < 180; lat++) {
+	int width = Tile::width(lat);
+	for (int lon = 0; lon < 360; lon += width) {
+	    // This location is guaranteed to by tile-canonical
+	    // because we take tile widths into account.
 	    GeoLocation loc(lat, lon);
-	    if (Chunk::exists(loc)) {
-		Chunk *c = new Chunk(loc, this);
-		_chunks[loc] = c;
+	    if (__exists(loc)) {
+		// There's a tile here.
+		Tile *t = new Tile(loc, this);
+		_tiles[loc] = t;
+
+		// Now create a chunk for this tile if one hasn't been
+		// created already.
+		loc = Chunk::canonicalize(loc);
+		Chunk *c = _chunks[loc];
+		if (c == NULL) {
+		    c = new Chunk(loc, this);
+		    _chunks[loc] = c;
+		}
+
+		// Tell the chunk about this tile.
+		c->_addTile(t);
 	    }
 	}
     }
@@ -208,21 +302,22 @@ TileManager::TileManager(const SGPath& scenery, const SGPath& maps): _maps(maps)
         }
     }
 
-    ////////// Maps //////////
-
-    // Find out what map levels/directories we have.
-    _scanMapLevels();
-
-    // Finally, find out what really exists.
-    scanScenery(false);
+    // Find out what scenery has been downloaded and which maps have
+    // been rendered.
+    scanScenery();
 }
 
 TileManager::~TileManager()
 {
-    map<GeoLocation, Chunk *>::const_iterator i = _chunks.begin();
-    for (; i != _chunks.end(); i++) {
-	Chunk *c = i->second;
+    map<GeoLocation, Chunk *>::const_iterator ci = _chunks.begin();
+    for (; ci != _chunks.end(); ci++) {
+	Chunk *c = ci->second;
 	delete c;
+    }
+    map<GeoLocation, Tile *>::const_iterator ti = _tiles.begin();
+    for (; ti != _tiles.end(); ti++) {
+	Tile *t = ti->second;
+	delete t;
     }
 }
 
@@ -264,7 +359,7 @@ Chunk *TileManager::_chunk(const GeoLocation& loc) const
 // piece of scenery, we look for maps for that scenery.  The opposite
 // is not true - if there are maps with no corresponding scenery, we
 // ignore them.
-void TileManager::scanScenery(bool scanMapLevels)
+void TileManager::scanScenery()
 {
     ////////// Scenery //////////
 
@@ -284,12 +379,12 @@ void TileManager::scanScenery(bool scanMapLevels)
     // it's a good approximation.  
     //
     // Note that we go through the paths in reverse order.  This is
-    // because of the behaviour of Tile::_setScenery - it just
+    // because of the behaviour of Tile::_setSceneryIndex - it just
     // overwrites whatever scenery index it has with the one it is
     // given.  With such a behaviour, we want the last one given to it
     // to be the correct one.  Going in reverse order ensures this.
-    for (int path = _sceneryPaths.size() - 1; path >= 0 ; path--) {
-	SGPath scenery(_sceneryPaths[path]);
+    for (int i = _sceneryPaths.size() - 1; i >= 0; i--) {
+	SGPath &scenery = _sceneryPaths[i];
 	ulDir *dir;
 	ulDirEnt *ent;
 
@@ -302,8 +397,6 @@ void TileManager::scanScenery(bool scanMapLevels)
 	    // be of the form [ew]dd0[ns]d0, where 'd' is a decimal
 	    // digit, and the 1-degree directories [ew]ddd[ns]dd.
 	    int lat, lon;
-	    SGPath scenery10 = scenery;
-
 	    if (ent->d_isdir && 
 		(sscanf(ent->d_name, "%*1c%2d0%*1c%1d0", &lon, &lat) == 2)) {
 		// We've found an appropriately named chunk directory.
@@ -314,8 +407,7 @@ void TileManager::scanScenery(bool scanMapLevels)
 		    fprintf(stderr, "TileManager::scanScenery: unexpected chunk directory '%s' - ignoring\n", ent->d_name);
 		} else {
 		    // Pass the rest of the work on to the chunk.
-		    scenery10.append(ent->d_name);
-		    c->_scanScenery(scenery10, path);
+		    c->_scanScenery(i);
 		}
 	    }
 	}
@@ -326,9 +418,7 @@ void TileManager::scanScenery(bool scanMapLevels)
 
     // Check which map subdirectories exist.  This will tell us what
     // resolutions the user expects.
-    if (scanMapLevels) {
-	_scanMapLevels();
-    }
+    _scanMapLevels();
 
     // Now go through the rendered maps and tell the tiles which ones
     // exist.  Logically this would be better done in the tiles
@@ -471,41 +561,7 @@ void TileManager::setMapLevels(std::bitset<MAX_MAP_LEVEL>& levels)
     }
 }
 
-int TileManager::chunkCount(SceneryType type)
-{
-    // EYE - in the future, keep this as updated variables rather than
-    // recalculating them each time.  Perhaps chunks should update us
-    // when their status changes, just as tiles update chunks?
-    int result = 0;
-    map<GeoLocation, Chunk *>::const_iterator i;
-    for (i = _chunks.begin(); i != _chunks.end(); i++) {
-	Chunk *c = i->second;
-	if (c->tileCount(type) > 0) {
-	    result++;
-	}
-    }
-    return result;
-}
-
-Chunk *TileManager::chunk(SceneryType type, int index)
-{
-    // Note that we iterate through everything to get the ith item, so
-    // this is a bit inefficient, particularly if you want to iterate
-    // through all tiles of the given type.
-    int result = 0;
-    map<GeoLocation, Chunk *>::const_iterator i;
-    for (i = _chunks.begin(); i != _chunks.end(); i++) {
-	Chunk *c = i->second;
-	if (c->tileCount(type) > 0) {
-	    if (result == index) {
-		return c;
-	    }
-	    result++;
-	}
-    }
-    return NULL;
-}
-
+// Returns the number of tiles of the given type.
 int TileManager::tileCount(SceneryType type)
 {
     int result = 0;
@@ -515,23 +571,6 @@ int TileManager::tileCount(SceneryType type)
 	result += c->tileCount(type);
     }
     return result;
-}
-
-Tile *TileManager::tile(SceneryType type, int index)
-{
-    // Note that we iterate through everything to get the ith item, so
-    // this is a bit inefficient, particularly if you want to iterate
-    // through all tiles of the given type.
-    map<GeoLocation, Chunk *>::const_iterator i;
-    for (i = _chunks.begin(); i != _chunks.end(); i++) {
-	Chunk *c = i->second;
-	int delta = c->tileCount(type);
-	if (index < delta) {
-	    return c->tile(type, index);
-	}
-	index -= delta;
-    }
-    return NULL;
 }
 
 // Return the chunk covering the given latitude and longitude.
@@ -574,122 +613,44 @@ Tile *TileManager::tile(const char *name)
 // Chunk
 ////////////////////////////////////////////////////////////////////////////////
 
-// Helper routine to create tile and chunk names.  It uses a piece of
-// static memory for the string, so you need to copy it if you want to
-// keep it.
-static const char *__tileName(const GeoLocation &loc)
-{
-    char ew = 'e', ns = 'n';
-    int lat = loc.lat() - 90;
-    if (lat < 0) {
-	lat = -lat;
-	ns = 's';
-    }
-    int lon = loc.lon();
-    if (lon >= 180) {
-	lon = 360 - lon;
-	ew = 'w';
-    }
-
-    static char name[8];
-    snprintf(name, 8, "%c%03d%c%02d", ew, lon, ns, lat);
-
-    return name;
-}
-
-// Returns the name of the chunk covering the given latitude and
-// longitude.
+// Returns the (canonical) name of the chunk covering the given
+// latitude and longitude.
 const char *Chunk::name(const GeoLocation &loc)
 {
-    return __tileName(Chunk::canonicalize(loc));
+    return Chunk::canonicalize(loc).name();
 }
 
-// Returns the SW corner of the chunk containing the given latitude
-// and longitude.
+// Returns the canonical name of the chunk containing the given
+// latitude and longitude.  This is usually, but not always, the SW
+// corner of the containing chunk.
 GeoLocation Chunk::canonicalize(const GeoLocation &loc)
 {
     GeoLocation result;
     if (loc.valid()) {
-	result = Tile::canonicalize(loc);
-	result.setLoc(result.lat() - (result.lat() + 90) % 10,
-		      result.lon() - (result.lon() + 180) % 10);
+	int width = Tile::width(loc.lat());
+	int lat = loc.lat() / 10 * 10;
+	int lon = loc.lon() - (loc.lon() % width);
+	lon = lon / 10 * 10;
+	result.setLoc(lat, lon);
     }
     return result;
 }
 
-// True if FlightGear (but not necessarily this user) has the given
-// chunk (loc must be Chunk::canonicalized).
-bool Chunk::exists(const GeoLocation &loc)
+Chunk::Chunk(const GeoLocation &loc, TileManager *tm): 
+    _tm(tm), _loc(loc), _downloadedTiles(0), _unmappedTiles(0)
 {
-    if (loc.valid()) {
-	// Chunks are always 10 degrees high.
-	for (int lat = loc.lat(); lat < loc.lat() + 10; lat++) {
-	    // Chunks have varying EW extents as we approach the poles
-	    // - we can't count on them being 10 degrees wide, or
-	    // having a west edge that's divisible by 10.  The edges()
-	    // method will tell us what the real boundaries are.
-	    int west, east;
-	    edges(loc, lat, &west, &east);
-	    int width = Tile::width(lat);
-	    for (int lon = west; lon < east; lon += width) {
-		if (Tile::exists(GeoLocation(lat, lon))) {
-		    return true;
-		}
-	    }
-	}
-    }
-    return false;
-}
-
-// Returns the edges of the Chunk specified by loc, for the latitude
-// specified by lat.
-void Chunk::edges(const GeoLocation &loc, int lat, int *west, int *east)
-{
-    // The basic idea of chunk edges is this: a tile belongs to a
-    // chunk if its westernmost bit lies within the 10x10 area
-    // specified by the chunk.  This means that its eastern end might
-    // intrude into the next chunk.  However, it is not considered
-    // part of that chunk.
-    int width = Tile::width(lat);
-    *west = ((loc.lon() + width - 1) / width) * width;
-    *east = ((loc.lon() + 10 + width - 1) / width) * width;
-}
-
-Chunk::Chunk(const GeoLocation &loc, TileManager *tm): _tm(tm), _loc(loc)
-{
-    // Create our tiles.  We create a Tile object for each FlightGear
-    // tile, whether or not it has actually been downloaded.
-    _downloadedTiles = _unmappedTiles = 0;
-
-    // EYE - instead of going through all possible chunks and tiles,
-    // why not just go directly from __scenery, like in _exists()?
-    for (int lat = _loc.lat(); lat < _loc.lat() + 10; lat++) {
-	int west, east;
-	edges(_loc, lat, &west, &east);
-	int width = Tile::width(lat);
-	for (int lon = west; lon < east; lon += width) {
-	    GeoLocation tileLoc(lat, lon);
-	    if (Tile::exists(tileLoc)) {
-		_tiles[tileLoc] = new Tile(tileLoc, tm, this);
-	    }
-	}
-    }
 }
 
 Chunk::~Chunk()
 {
-    map<GeoLocation, Tile *>::const_iterator i = _tiles.begin();
-    for (; i != _tiles.end(); i++) {
-	Tile *t = i->second;
-	delete t;
-    }
 }
 
-const char *Chunk::name()
+const char *Chunk::name() const
 {
-    return __tileName(_loc);
+    return _loc.name();
 }
 
+// Returns the number of tiles in this chunk of the given type.
 int Chunk::tileCount(TileManager::SceneryType type)
 {
     int result = 0;
@@ -700,45 +661,10 @@ int Chunk::tileCount(TileManager::SceneryType type)
     } else if (type == TileManager::UNMAPPED) {
 	return _unmappedTiles;
     } else {
+	// TileManager::MAPPED
 	return _downloadedTiles - _unmappedTiles;
     }
     return result;
-}
-
-Tile *Chunk::tile(TileManager::SceneryType type, int index)
-{
-    int result = 0;
-    map<GeoLocation, Tile *>::const_iterator i;
-    for (i = _tiles.begin(); i != _tiles.end(); i++) {
-	Tile *t = i->second;
-	// EYE - can we go directly to the nth item?
-	if (type == TileManager::ALL) {
-	    if (result == index) {
-		return t;
-	    }
-	    result++;
-	} else if ((type == TileManager::DOWNLOADED) && (t->hasScenery())) {
-	    if (result == index) {
-		return t;
-	    }
-	    result++;
-	} else if ((type == TileManager::UNMAPPED) &&
-		   t->hasScenery() &&
-		   (t->missingMaps().count() > 0)) {
-	    if (result == index) {
-		return t;
-	    }
-	    result++;
-	} else if ((type == TileManager::MAPPED) &&
-		   t->hasScenery() && 
-		   (t->missingMaps().count() == 0)) {
-	    if (result == index) {
-		return t;
-	    }
-	    result++;
-	}
-    }
-    return NULL;
 }
 
 // Return the tile covering the given location, NULL otherwise.
@@ -753,6 +679,11 @@ Tile *Chunk::tile(const char *name)
     return _tile(GeoLocation(name));
 }
 
+void Chunk::_addTile(Tile *t)
+{
+    _tiles[t->loc()] = t; 
+}
+
 void Chunk::_reset()
 {
     _downloadedTiles = _unmappedTiles = 0;
@@ -760,19 +691,21 @@ void Chunk::_reset()
     for (; i != _tiles.end(); i++) {
 	Tile *t = i->second;
 	t->_resetExists();
-	t->_setScenery(TileManager::NaPI);
+	t->_setSceneryIndex(TileManager::NaPI);
     }
 }
 
-// Scan a chunk directory for tile directories.  For those that exist,
-// set their scenery path indices to 'path'.  Note that we may get
-// called several times, potentially once per directory in the scenery
-// search path, so it's important that our counters (_downloadedTiles,
-// _unmappedTiles) are reset before calling this routine for the first
-// time.
-void Chunk::_scanScenery(SGPath& directory, int pathIndex)
+// Scan a scenery directory for tile directories under this chunk.
+// For those that exist, set their scenery path indices to 'i'.  Note
+// that we may get called several times, potentially once per
+// directory in the scenery search path, so it's important that our
+// counters (_downloadedTiles, _unmappedTiles) are reset before
+// calling this routine for the first time.
+void Chunk::_scanScenery(unsigned char i)
 {
     // Go through the chunk subdirectory.
+    SGPath directory = _tm->sceneryPaths()[i];
+    directory.append(name());
     ulDir *dir = ulOpenDir(directory.c_str());
     ulDirEnt *ent;
     while (dir && (ent = ulReadDir(dir))) {
@@ -793,7 +726,7 @@ void Chunk::_scanScenery(SGPath& directory, int pathIndex)
 		    _downloadedTiles++;
 		    _unmappedTiles++;
 		}
-		t->_setScenery(pathIndex);
+		t->_setSceneryIndex(i);
 	    }
 	}
     }
@@ -826,7 +759,8 @@ Tile *Chunk::_tile(const GeoLocation &loc) const
 ////////////////////////////////////////////////////////////////////////////////
 
 // Returns the standard tile width at the given latitude (which must
-// be a canonical latitude, varying between 0 and 179 inclusive).
+// be a canonical latitude, varying between 0 and 179 inclusive, and
+// which refers to the latitude of the bottom of the tile).
 int Tile::width(int lat)
 {
     // EYE - clip?
@@ -853,7 +787,7 @@ int Tile::width(int lat)
 const char *Tile::name(const GeoLocation &loc)
 {
     // Convert to a canonical form.
-    return __tileName(canonicalize(loc));
+    return canonicalize(loc).name();
 }
 
 // Returns the canonical latitude and longitude for a given latitude
@@ -869,45 +803,32 @@ GeoLocation Tile::canonicalize(const GeoLocation &loc)
     return result;
 }
 
-bool Tile::exists(const GeoLocation &loc)
-{ 
-    bool result = false;
-    if (loc.valid()) {
-	result = __exists(loc); 
-    }
-    return result;
-}
-
-Tile::Tile(const GeoLocation &loc, TileManager *tm, Chunk *chunk):
-    _tm(tm), _chunk(chunk), _sceneryIndex(TileManager::NaPI), _buckets(NULL), 
-    _unmapped(true), _loc(loc)
+Tile::Tile(const GeoLocation &loc, TileManager *tm):
+    _tm(tm), _loc(loc), _sceneryIndex(TileManager::NaPI)
 {
 }
 
 // Tiles use this when returning their scenery directories in the
 // sceneryDir() call.
-SGPath Tile::__scenery;
+SGPath Tile::__sceneryPath;
 
 Tile::~Tile()
 {
-    if (_buckets) {
-	delete _buckets;
-    }
 }
 
 // Return our scenery directory.  Note that we calculate it on each
-// call, and that we use the shared __scenery instance variable.
+// call, and that we use the shared __sceneryPath instance variable.
 const SGPath& Tile::sceneryDir()
 {
     if (_sceneryIndex == TileManager::NaPI) {
-	__scenery = "";
+	__sceneryPath = "";
     } else {
-	__scenery = _tm->sceneryPaths()[_sceneryIndex];
-	__scenery.append(_chunk->name(_loc));
-	__scenery.append(name(_loc));
+	__sceneryPath = _tm->sceneryPaths()[_sceneryIndex];
+	__sceneryPath.append(chunk()->name());
+	__sceneryPath.append(name(_loc));
     }
 
-    return __scenery;
+    return __sceneryPath;
 }
 
 // EYE - use this in more places
@@ -920,28 +841,19 @@ bool Tile::isType(TileManager::SceneryType t)
 	return true;
     } else if ((t == TileManager::UNMAPPED) && 
 	       hasScenery() && 
-	       (missingMaps().count() > 0)) {
+	       missingMaps().any()) {
 	return true;
     } else if ((t == TileManager::MAPPED) &&
 	       hasScenery() && 
-	       (missingMaps().count() == 0)) {
+	       !missingMaps().any()) {
 	return true;
     }
     return false;
 }
 
-// EYE - erase bucket indices in _resetExists? _setScenery?
-const vector<long int>* Tile::bucketIndices()
+void Tile::bucketIndices(vector<long int>& indices)
 {
-    // We hold off on scanning our scenery for buckets, doing so only
-    // on demand.  This is done under the assumption that callers will
-    // rarely ask for buckets, and do so infrequently.
-    if (_buckets != NULL) {
-	return _buckets;
-    }
-
-    _buckets = new vector<long int>;
-
+    indices.clear();
     if (hasScenery()) {
 	// Scan the scenery directory for the given tile for its buckets.
 	// We deem that each .stg file represents one bucket.
@@ -967,13 +879,11 @@ const vector<long int>* Tile::bucketIndices()
 	    }
 
 	    // This is a .stg file, which is what we want.
-	    _buckets->push_back(index);
+	    indices.push_back(index);
 	}
 
 	ulCloseDir(dir);
     }
-
-    return _buckets;
 }
 
 // Tell the tile that a map at the given level exists or not.  The
@@ -993,13 +903,13 @@ void Tile::setMapExists(unsigned int i, bool exists)
     // mapped status.  Then set our _maps bitset as appropriate and
     // recheck our mapped status.  If it has changed, tell our owning
     // chunk.
-    bool wasUnmapped = _unmapped;
+    bool wasUnmapped = missingMaps().any();
     _maps[i] = exists;
-    _unmapped = (missingMaps().count() > 0);
-    if (wasUnmapped && !_unmapped) {
-	_chunk->_tileBecameMapped();
-    } else if (!wasUnmapped && _unmapped) {
-	_chunk->_tileBecameUnmapped();
+    bool isUnmapped = missingMaps().any();
+    if (wasUnmapped && !isUnmapped) {
+	chunk()->_tileBecameMapped();
+    } else if (!wasUnmapped && isUnmapped) {
+	chunk()->_tileBecameUnmapped();
     }
 }
 
@@ -1030,7 +940,12 @@ void Tile::mapSize(unsigned int level, int *width, int *height) const
 }
 
 TileIterator::TileIterator(TileManager *tm, TileManager::SceneryType type):
-    _tm(tm), _type(type)
+    _tm(tm), _c(NULL), _type(type)
+{
+}
+
+TileIterator::TileIterator(Chunk *c, TileManager::SceneryType type):
+    _tm(NULL), _c(c), _type(type)
 {
 }
 
@@ -1040,11 +955,10 @@ TileIterator::~TileIterator()
 
 Tile *TileIterator::operator++(int)
 {
-    // It seems that constantly calling _c->tiles().end() in this
+    // It seems that constantly calling foo->tiles().end() in this
     // routine is a bit expensive, so we call it once and save it in a
-    // variable to speed things up a bit.  Ditto for
-    // _tm->chunks().end().
-    map<GeoLocation, Tile *>::const_iterator tend = _c->tiles().end();
+    // variable to speed things up a bit.
+    map<GeoLocation, Tile *>::const_iterator tend = _end();
 
     // If we're already done, just return NULL.
     if (_ti == tend) {
@@ -1054,9 +968,7 @@ Tile *TileIterator::operator++(int)
     // Find the next tile with the correct type.
     _ti++;
     while (true) {
-	// Tiles are grouped in their owning chunks.  We'll either
-	// find a tile of the correct type in the current chunk, or
-	// we'll hit the end of the current chunk.
+	// Look for the next tile of the given type.
 	while (_ti != tend) {
 	    Tile *t = _ti->second;
 	    if (t->isType(_type)) {
@@ -1066,28 +978,8 @@ Tile *TileIterator::operator++(int)
 	    _ti++;
 	}
 
-	// We've run out of tiles in this chunk, so find the next
-	// chunk that has any tiles of the type we want.
-	map<GeoLocation, Chunk *>::const_iterator cend = _tm->chunks().end();
-	_ci++;
-	while (_ci != cend) {
-	    _c = _ci->second;
-	    if (_c->tileCount(_type) > 0) {
-		// This chunk has at least one tile of the right type,
-		// so break out of this loop and start searching
-		// through the chunk (done at the top of the main
-		// while(_t) loop).
-		_ti = _c->tiles().begin();
-		tend = _c->tiles().end();
-		break;
-	    }
-	    _ci++;
-	}
-	// If we've run out of chunks, return NULL to signify we're
-	// completely done.
-	if (_ci == cend) {
-	    return NULL;
-	}
+	// Nothing left.
+	return NULL;
     }
 
     return NULL;
@@ -1095,13 +987,8 @@ Tile *TileIterator::operator++(int)
 
 Tile *TileIterator::first()
 {
-    _ci = _tm->chunks().begin();
-    if (_ci == _tm->chunks().end()) {
-	return NULL;
-    }
-    _c = _ci->second;
-    _ti = _c->tiles().begin();
-    if (_ti == _c->tiles().end()) {
+    _ti = _begin();
+    if (_ti == _end()) {
 	return NULL;
     }
     Tile *t = _ti->second;
@@ -1109,5 +996,27 @@ Tile *TileIterator::first()
 	return this->operator++(0);
     } else {
 	return t;
+    }
+}
+
+map<GeoLocation, Tile *>::const_iterator TileIterator::_begin()
+{
+    assert(_tm || _c);
+    assert(!(_tm && _c));
+    if (_tm) {
+	return _tm->tiles().begin();
+    } else {
+	return _c->tiles().begin();
+    }
+}
+
+map<GeoLocation, Tile *>::const_iterator TileIterator::_end()
+{
+    assert(_tm || _c);
+    assert(!(_tm && _c));
+    if (_tm) {
+	return _tm->tiles().end();
+    } else {
+	return _c->tiles().end();
     }
 }

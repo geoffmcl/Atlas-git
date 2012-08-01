@@ -98,9 +98,16 @@
   -------------------
 
   We often refer to "canonical" locations.  A canonical location is
-  just the SW corner of a tile or chunk, which uniquely identifies
-  that tile or chunk in the FlightGear world (for example, it is used
-  to name chunk and tile directories).
+  just the standard FlightGear name of a tile or chunk, which uniquely
+  identifies that tile or chunk in the FlightGear world (for example,
+  it is used to name chunk and tile directories).
+
+  Usually the canonical name is just the SW corner of the tile or
+  chunk.  However, for chunks at the south pole (all those ending in
+  "s90"), the canonical name does *not* name its SW corner (eg,
+  w030s90's SW corner is actually s024s89).  The one exception to this
+  exception is e000s90 (although its SW corner is actually the South
+  Pole, so perhaps shouldn't be considered a corner at all).
 
   This file is part of Atlas.
 
@@ -127,7 +134,6 @@
 
 #include <simgear/misc/sg_path.hxx> // SGPath
 
-// EYE - put this in Geographics?
 // EYE - rename it to make it clear it's just used for tile and chunk
 // naming?
 
@@ -135,9 +141,11 @@
 // scenery.  It guarantees that, for valid GeoLocations, all latitudes
 // will be between 0 and 179 degrees inclusive, and all longitudes
 // between 0 and 359 degrees inclusive.  It can be initialized with a
-// latitude (0 <= lat <= 179) and longitude (0 <= lon <= 359), a
-// string in the form [ew]ddd[ns]dd (used to name tiles and chunks in
-// FlightGear scenery), or nothing (in which case it is invalid).
+// GeoLocation latitude (0 <= lat < 180) and longitude (0 <= lon <
+// 360), a 'standard' latitude (-90 <= lat <= 90) and longitude
+// (anything), a string in the form [ew]ddd[ns]dd (used to name tiles
+// and chunks in FlightGear scenery), or nothing (in which case it is
+// invalid).
 //
 // If given an invalid latitude and/or longitude, either in the
 // constructor or in setLat()/setLon(), it will silently invalidate
@@ -148,22 +156,46 @@
 // invalid GeoLocations compare equal.
 class GeoLocation {
   public:
-    GeoLocation(int lat, int lon);
+    // Creates a GeoLocation from the given latitude and longitude.
+    // By default, they should be GeoLocation latitudes and longitudes
+    // - ie, 0 <= lat < 180, 0 <= lon < 360.  However, if 'standard'
+    // is true, then we expect standard latitudes - ie, -90 <= lat <=
+    // 90 (note the '<= 90'), and standard longitudes (which actually
+    // can be anything).
+    GeoLocation(float lat, float lon, bool standard = false);
+    // Creates a GeoLocation from a FlightGear scenery name (eg,
+    // "w123n37").
     GeoLocation(const char *name);
+    // Creates an invalid GeoLocation.
     GeoLocation();
     ~GeoLocation();
 
     bool valid() const;
     void invalidate();
 
-    // Return our latitude or longitude (-1 if we're invalid).
-    int lat() const { return _loc.first; }
-    int lon() const { return _loc.second; }
+    // Return our latitude or longitude (-1 if we're invalid).  If
+    // 'standard' is true, it returns a standard latitude (-90 <= lat
+    // < 90, -91 if invalid) or longitude (-180 <= lon < 180, -361 if
+    // invalid).
+    int lat(bool standard = false) const;
+    int lon(bool standard = false) const;
 
-    // Set a latitude and longitude.  If either is out of range, we
-    // become invalid (both are set to -1).
-    void setLoc(int lat, int lon);
+    // Returns our "FlightGear" name.  It uses a piece of static
+    // memory shared amongst all GeoLocation instances for the string,
+    // so you need to copy it if you want to keep it.  If we are
+    // invalid, returns an empty string.
+    const char *name() const;
 
+    // Sets a latitude and longitude.  By default, we expect
+    // GeoLocation latitudes and longitudes - ie, 0 <= lat < 180, 0 <=
+    // lon < 360.  If either is out of range, we become invalid.  If
+    // 'standard' is true, then we expect standard latitudes - ie, -90
+    // <= lat <= 90 (note the '<= 90'), and standard longitudes (which
+    // actually can be anything).
+    void setLoc(float lat, float lon, bool standard = false);
+
+    // Useful if we want to use GeoLocations as the key in an STL map
+    // object.
     bool operator==(const GeoLocation& right) const;
     bool operator!=(const GeoLocation& right) const;
     int operator<(const GeoLocation& right) const;
@@ -201,11 +233,8 @@ class TileManager {
     // Scans the scenery and map directories to find out the current
     // state of local scenery and maps.  This is called in the
     // TileManager constructor, but you can call it if you think
-    // things have changed on disk.  If scanMapLevels is true, we scan
-    // the maps directory for maps subdirectories, telling us what map
-    // levels to expect.  If false, we assume that our internal
-    // _mapLevels bitset is correct.
-    void scanScenery(bool scanMapLevels = true);
+    // things have changed on disk.
+    void scanScenery();
 
     const std::vector<SGPath>& sceneryPaths() { return _sceneryPaths; }
     const SGPath& mapPath() { return _maps; }
@@ -215,9 +244,9 @@ class TileManager {
     // make a copy.
     const SGPath& mapPath(unsigned int level);
 
-    // This constant represents "not a path index" - an invalid
+    // This constant represents 'not a path index' - an invalid
     // scenery path index.
-    static const int NaPI;
+    static const unsigned char NaPI;
 
     // Map levels determine the resolutions of the maps generated.
     // Maps can range in size from 0 (1x1) to MAX_MAP_LEVEL - 1
@@ -227,7 +256,8 @@ class TileManager {
     // manager expects to find maps of size 10 (1024x1024) in that
     // directory.
 
-    // EYE - make this just a regular signed value?
+    // EYE - make this just a regular signed value?  And make it a
+    // char?
     static const unsigned int MAX_MAP_LEVEL = 16;
     const std::bitset<MAX_MAP_LEVEL>& mapLevels() { return _mapLevels; }
 
@@ -236,28 +266,18 @@ class TileManager {
     // be careful when calling it.
     void setMapLevels(std::bitset<MAX_MAP_LEVEL>& levels);
 
-    // Simple accessors for tiles and chunks of various types.  The
-    // fooCount() routines tell you how many exist, the foo() routines
-    // access them.  You can decide what type you're interested in:
-    // ALL means all scenery, whether downloaded or not; DOWNLOADED
-    // means only downloaded scenery (for a chunk, DOWNLOADED means it
-    // contains at least one downloaded tile), whether mapped or not;
-    // UNMAPPED means downloaded but unmapped, or at least not
-    // completely mapped (for a chunk, UNMAPPED means at least one of
-    // its downloaded tiles has missing maps).
-    //
-    // These accessors are good for occasional random access of tiles
-    // and chunks.  If you need to iterate through all tiles, the
-    // TileIterator class is a better bet.
+    // Tiles are subdivided into different types: ALL means all
+    // scenery, whether downloaded or not; DOWNLOADED means only
+    // downloaded scenery, whether mapped or not; UNMAPPED means
+    // downloaded but unmapped, or at least not completely mapped.
+    // This method tells you how many of a given type there are.  To
+    // iterate through them, use a TileIterator.
     enum SceneryType {ALL, DOWNLOADED, UNMAPPED, MAPPED};
-    int chunkCount(SceneryType type);
-    Chunk *chunk(SceneryType type, int i);
     int tileCount(SceneryType type);
-    Tile *tile(SceneryType type, int i);
 
     // Returns the chunk containing the given location, NULL if none
     // exists.  The location does not have to be chunk-canonical.
-    Chunk *chunk(const GeoLocation &loc) const;
+    Chunk *chunk(const GeoLocation& loc) const;
     // Returns the chunk with the given name (which must be
     // chunk-canonical), NULL otherwise.
     Chunk *chunk(const char *name);
@@ -266,10 +286,12 @@ class TileManager {
 
     // Returns the tile containing the given location, NULL if none
     // exists.  The location does not have to be tile-canonical.
-    Tile *tile(const GeoLocation &loc);
+    Tile *tile(const GeoLocation& loc);
     // Returns the tile with the given name (which must be
     // tile-canonical), NULL otherwise.
     Tile *tile(const char *name);
+    // Returns our map of tiles.
+    std::map<GeoLocation, Tile *>& tiles() { return _tiles; }
 
   protected:
     // This scans the maps directory to see what levels we have.
@@ -278,7 +300,7 @@ class TileManager {
     // Returns the chunk mapped at the given location, NULL if none
     // exists.  This is just a convenience routine that wraps STL's
     // find() method.
-    Chunk *_chunk(const GeoLocation &loc) const;
+    Chunk *_chunk(const GeoLocation& loc) const;
 
     // Paths
     std::vector<SGPath> _sceneryPaths;
@@ -287,8 +309,9 @@ class TileManager {
     SGPath _maps;
     std::bitset<MAX_MAP_LEVEL> _mapLevels;
 
-    // Chunks
+    // Chunks and tiles
     std::map<GeoLocation, Chunk *> _chunks;
+    std::map<GeoLocation, Tile *> _tiles;
 };
 
 // A Chunk object represents a directory of tiles, generally a 10x10
@@ -299,44 +322,31 @@ class Chunk {
     // given location, which must be valid.  Always 7 characters long.
     // You should copy it if you need to keep it - it comes from
     // static storage and may be overwritten on subsequent calls.
-    static const char *name(const GeoLocation &loc);
-    // Converts an arbitrary location into a canonical chunk location,
-    // which is the SW corner of the chunk containing the given
-    // location.  If loc is invalid, so too is the return value.
-    static GeoLocation canonicalize(const GeoLocation &loc);
-    // Returns true if the chunk specified by the chunk-canonical
-    // location exists in FlightGear.  It's not necessary for the
-    // chunk to have been downloaded.  A chunk exists if there is any
-    // scenery in the area it covers (again, not necessarily scenery
-    // that we've downloaded, but scenery that exists and we could
-    // download).  Returns false if loc is invalid.
-    static bool exists(const GeoLocation &loc);
-    // Returns the longitude of the west and east edges of the chunk
-    // specified by loc (which must be chunk-canonical), at the
-    // latitude specified by lat.
-    static void edges(const GeoLocation &loc, int lat, int *west, int *east);
+    static const char *name(const GeoLocation& loc);
+    // Returns the canonical location for the chunk containing the
+    // given location.  This is (usually) the SW corner of the chunk
+    // containing the given location.  If loc is invalid, so too is
+    // the return value.
+    static GeoLocation canonicalize(const GeoLocation& loc);
 
     // Creates a chunk for the given chunk-canonical location.
-    Chunk(const GeoLocation &loc, TileManager *tm);
+    Chunk(const GeoLocation& loc, TileManager *tm);
     ~Chunk();
 
-    // The canonical name of this tile.
-    const char *name();	      // const?
+    // The canonical name of this chunk.
+    const char *name() const;
     // Our canonical latitude and longitude.
-    const GeoLocation &loc() const { return _loc; }
-    // EYE - latitude, or an offset between 0 and 10?
-    void edges(int latitude, int *westEdge, int *eastEdge);
+    const GeoLocation& loc() const { return _loc; }
 
     TileManager *tileManager() { return _tm; }
 
-    // Similar to TileManager's fooCount() and foo() accessors, but
-    // for this chunk only.
+    // Similar to TileManager's tileCount(), but for this chunk only.
     int tileCount(TileManager::SceneryType type);
-    Tile *tile(TileManager::SceneryType type, int i);
 
-    // Returns the tile of the given latitude and longitude or name,
-    // NULL if none exists within this chunk.
-    Tile *tile(const GeoLocation &loc) const;
+    // Returns the tile containing the given latitude and longitude,
+    // or the tile with the given name, NULL if none exists within
+    // this chunk.
+    Tile *tile(const GeoLocation& loc) const;
     Tile *tile(const char *name);
     // Tiles in this chunk, referenced by location.
     const std::map<GeoLocation, Tile *>& tiles() const { return _tiles; }
@@ -345,13 +355,18 @@ class Chunk {
     friend class Tile;
 
   protected:
+    // Adds a tile to our vector.  This is meant to be called from our
+    // tile manager.
+    void _addTile(Tile *t);
+
     // Resets all of our tiles.  This is meant to be called from our
     // tile manager.
     void _reset();
 
-    // Scans the given directory for tile directories.  Like _reset(0,
-    // this is meant to be called from our tile manager.
-    void _scanScenery(SGPath& directory, int pathIndex);
+    // Scans the scenery directory at the given index for tile
+    // directories.  Like _reset(), this is meant to be called from
+    // our tile manager.
+    void _scanScenery(unsigned char i);
 
     // Informs us that a tile's mapped state changed.  A tile is
     // unmapped if it has at least one missing map, mapped if all maps
@@ -365,9 +380,16 @@ class Chunk {
     // Returns the tile mapped at the given location, NULL if none
     // exists.  This is just a convenience routine that wraps STL's
     // find() method.
-    Tile *_tile(const GeoLocation &loc) const;
+    Tile *_tile(const GeoLocation& loc) const;
 
+    // Our tile manager.
     TileManager *_tm;
+
+    // The tiles in this chunk.
+
+    // EYE - change to a vector?  If the tile manager's map was sorted
+    // by chunk and then tile, then this could also be represented as
+    // a range in the tile manager's map.
     std::map<GeoLocation, Tile *> _tiles;
 
     // Our canonical latitude and longitude.
@@ -396,32 +418,27 @@ class Tile {
   public:
     // Returns the standard tile width at the given latitude (which
     // must be a canonical latitude, varying between 0 and 179
-    // inclusive).
+    // inclusive, and which refers to the latitude of the bottom of
+    // the tile).
     static int width(int lat);
     // The "standard" name of the tile (eg, "w128n37").  Always 7
     // characters long.  You should copy it if you need to keep it -
     // it comes from static storage and may be overwritten on
     // subsequent calls.  The location is converted to a
     // tile-canonical form.
-    static const char *name(const GeoLocation &loc);
+    static const char *name(const GeoLocation& loc);
     // Converts an arbitrary location into a canonical tile location,
     // which is the SW corner of the tile containing the given
     // location.  If loc is invalid, so too is the return value.
-    static GeoLocation canonicalize(const GeoLocation &loc);
-    // True if there is a tile specified by the tile-canonical
-    // location.  Note that, as for chunks, we don't care if the tile
-    // has been downloaded yet or not, only that it *can* be
-    // downloaded.  Returns false if loc is invalid.
-    static bool exists(const GeoLocation &loc);
-    // EYE - do we need a Tile::edges() method?
+    static GeoLocation canonicalize(const GeoLocation& loc);
 
-    // Creates a chunk for the given tile-canonical location.
-    Tile(const GeoLocation &loc, TileManager *tm, Chunk *c);
+    // Creates a tile for the given tile-canonical location.
+    Tile(const GeoLocation& loc, TileManager *tm);
     ~Tile();
 
     // The canonical name for this tile.  Copy the string if you need
     // to save it.
-    const char *name() { return Tile::name(_loc); }
+    const char *name() const { return Tile::name(_loc); }
     // True if the tile is of type t.  Note that a tile can have many
     // types - it can exist, it can be downloaded, and it can be
     // mapped (or unmapped).  It is guaranteed to at least exist.
@@ -434,11 +451,17 @@ class Tile {
     const SGPath& sceneryDir();
     // Where our maps are.  This is the same for all tiles.
     const SGPath& mapsDir() const { return _tm->mapPath(); }
-    // Our buckets.  We return the bucket indices only.  To get the
-    // complete path, prepend the scenery directory, and append
-    // ".stg" or ".stg.gz".
-    const std::vector<long int>* bucketIndices();
+    // Our buckets (or, more precisely, our bucket names, sans any
+    // suffixes).  Buckets have names like "812416.stg" - ie, an
+    // integer followed by ".stg".  This method gives you the
+    // integers.  To get the complete path to the bucket, prepend the
+    // scenery directory for this tile using sceneryDir(), and append
+    // ".stg".
+    void bucketIndices(std::vector<long int>& indices);
     
+    // Our owning chunk.
+    Chunk *chunk() { return _tm->chunk(_loc); }
+
     // A bit set of all *desired* maps.  If the bitset is true at
     // index i, then we want a map i^2 pixels high.
     const std::bitset<TileManager::MAX_MAP_LEVEL>& mapLevels() const
@@ -464,13 +487,13 @@ class Tile {
     // The canonical location for the tile.  Note that this uses our
     // internal latitude and longitude system (0 <= lat < 180, 0 <=
     // lon < 360).
-    const GeoLocation &loc() const { return _loc; }
+    const GeoLocation& loc() const { return _loc; }
 
     // SW corner, width, and height of tile (all units in degrees).
     // Note that these are conventional latitudes and longitudes (-90
     // <= lat < 90, -180 <= lon < 180).
-    int lat() const { return _loc.lat() - 90; }
-    int lon() const { return (_loc.lon() + 180) % 360 - 180; }
+    int lat() const { return _loc.lat(true); }
+    int lon() const { return _loc.lon(true); }
     int width() const { return Tile::width(_loc.lat()); }
     int height() const { return 1; }
     // Centre of tile (also conventional latitudes and longitudes).
@@ -484,7 +507,7 @@ class Tile {
   protected:
     // A shared SGPath used by tiles to represent their scenery
     // directory.
-    static SGPath __scenery;
+    static SGPath __sceneryPath;
 
     // Tells us that we should assume that none of our desired maps
     // exist (ie, we're missing them all).  This will be called by our
@@ -495,22 +518,19 @@ class Tile {
 
     // Sets our scenery.  This is meant to be called by the
     // TileManager only.
-    void _setScenery(int i) { _sceneryIndex = i; }
+    void _setSceneryIndex(unsigned char i) { _sceneryIndex = i; }
 
     TileManager *_tm;		// Our tile manager.
-    Chunk *_chunk;		// Our owning chunk.
-
-    int _sceneryIndex;	      // Index into FileManager's paths array.
-    std::vector<long int> *_buckets; // Bucket indexes.
 
     // This keeps track of what maps we have.
     std::bitset<TileManager::MAX_MAP_LEVEL> _maps;
 
-    // True if we have some maps still to be rendered.
-    bool _unmapped;
-
     // SW corner of tile.
     GeoLocation _loc;
+
+    // Index into the tile manager's _sceneryPaths vector.  We use it
+    // to construct the complete path to our scenery.
+    unsigned char _sceneryIndex;
 };
 
 // A non-STL iterator that allows quick iteration through tiles of a
@@ -525,22 +545,30 @@ class Tile {
 // there are no tiles left of that type.  A given iterator can be
 // reset by calling first().
 // 
+// You have the option of iterating through all tiles (pass the tile
+// manager to the constructor) or all tiles in a chunk (pass the chunk
+// to the constructor).
+//
 // This could probably have been done with STL iterators, but I value
 // my sanity and decided not to go there.
 class TileIterator {
   public:
     TileIterator(TileManager *tm, TileManager::SceneryType type);
+    TileIterator(Chunk *c, TileManager::SceneryType type);
     ~TileIterator();
     Tile *first();
     Tile *operator++(int);
   protected:
     TileManager *_tm;
+    Chunk *_c;
     TileManager::SceneryType _type;
 
-    // These keep track of our current position as we iterate through
-    // all the chunks and their tiles.
-    std::map<GeoLocation, Chunk *>::const_iterator _ci;
-    Chunk *_c;
+    // Convenience routines to return the beginning and end of the
+    // map, either rom _tm or _c.
+    std::map<GeoLocation, Tile *>::const_iterator _begin();
+    std::map<GeoLocation, Tile *>::const_iterator _end();
+    // This keeps track of our current position as we iterate through
+    // all the tiles.
     std::map<GeoLocation, Tile *>::const_iterator _ti;
 };
 
