@@ -29,6 +29,9 @@
   simply broadcast a notification when a model changes than keep track
   of and notify each interested party.
 
+  Note that there's no guarantee about which subscriber will get
+  notified first.
+
   This file is part of Atlas.
 
   Atlas is free software: you can redistribute it and/or modify it
@@ -65,11 +68,17 @@ class Subscriber;
 // enumeration.
 class Notification {
   public:
+    // EYE - add: WindowResized (for keeping UI elements in fixed
+    // locations), MouseMoved (for any mouse moves; replace MouseMoved
+    // with CursorLocationChanged, and add CentreLocationChanged and
+    // LocationChanged events), SceneryMode/MappingMode.
     enum type {Moved = 0, 	 // Eyepoint moved
-	       MouseMoved,	 // Mouse moved (in mouse mode)
-	       CentreType,	 // Centre type changed
 	       Zoomed, 		 // Zoomed in/out
 	       Rotated,		 // View rotated about centre
+	       CursorLocation,	 // Cursor location changed (in mouse mode)
+	       MouseMoved,	 // Mouse moved (in any mode)
+	       SceneryLayerOn,	 // Scenery layer visibility toggled
+	       CentreType,	 // Centre type changed
 	       // EYE - does this overlap with SceneryChanged?
 	       NewScenery,	 // New live scenery loaded
 	       AircraftMoved,	 // Mark changed
@@ -108,6 +117,9 @@ class Notification {
 	       Palette,		 // Current palette changed
 	       PaletteList,	 // Palette list changed
 
+	       TileDispatched,   // The dispatcher has scheduled a
+				 // tile to be mapped
+
 	       All};		 // This must not be removed and must
 				 // be at the end.
 
@@ -136,7 +148,7 @@ class Subscriber {
     // successful (it always is, unless you try to subscribe to 'All',
     // which is not allowed).
     bool subscribe(Notification::type n);
-    // Unsubscribe.  If you subscribe from 'All', all current
+    // Unsubscribe.  If you unsubscribe from 'All', all current
     // subscriptions will be cancelled.
     void unsubscribe(Notification::type n = Notification::All);
 

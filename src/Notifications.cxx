@@ -21,9 +21,11 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
-#include <cassert>
-
+// Our include file
 #include "Notifications.hxx"
+
+// C++ system files
+#include <cassert>
 
 using namespace std;
 
