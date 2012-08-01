@@ -32,6 +32,7 @@ Atlas_SOURCES = \
 	Graphs.cxx Graphs.hxx \
 	Culler.cxx Culler.hxx \
 	Scenery.cxx Scenery.hxx \
+	Background.cxx Background.hxx \
 	Cache.cxx Cache.hxx \
 	LayoutManager.cxx LayoutManager.hxx \
 	Bucket.cxx Bucket.hxx \
