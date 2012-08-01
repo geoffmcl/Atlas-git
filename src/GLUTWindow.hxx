@@ -31,9 +31,11 @@
 #ifndef _GLUTWINDOW_H_
 #define _GLUTWINDOW_H_
 
+#include <vector>
 #include <map>
 #include <set>
 
+class GLUTMenu;
 class GLUTWindow {
   public:
     GLUTWindow(const char *title);
@@ -46,8 +48,9 @@ class GLUTWindow {
     // Resize the window.
     void reshape(int width, int height);
     // Start a timer.  After the given interval, call the given
-    // method.
-    void startTimer(unsigned int msecs, void (GLUTWindow::*method)());
+    // callback method.
+    typedef void (GLUTWindow::*cb)();
+    void startTimer(unsigned int msecs, cb method);
 
     // EYE - don't make virtual?
     virtual void reveal();
@@ -70,6 +73,15 @@ class GLUTWindow {
 
     // Find the GLUTWindow with the given id, NULL if none exists.
     static GLUTWindow *windowWithID(int id);
+
+    // Our window width and height.
+    int width();
+    int height();
+
+    // Attach and detach a menu to/from the given button (one of
+    // GLUT_LEFT_BUTTON, GLUT_MIDDLE_BUTTON, or GLUT_RIGHT_BUTTON).
+    void attach(int button, GLUTMenu *menu);
+    void detach(int button);
 
   protected:
     // We make the callbacks protected so we can always assume that
@@ -103,23 +115,67 @@ class GLUTWindow {
     // Our window id.
     int _id;
 
+    ////////// Window management
     // Map from a window id (given as an int in GLUT) to a GLUTWindow.
     static std::map<int, GLUTWindow *> __instanceMap;
-
     // Lookup function for a GLUTWindow using the current GLUT window
     // id (as given by glutGetWindow()).
     static GLUTWindow *__getWindow();
 
+    ////////// Timer management
     // A map from an id (passed to the GLUT timer) to a GLUTWindow
     // instance and a method.
-    static std::map<int, std::pair<GLUTWindow *, void (GLUTWindow::*)()> > 
-    __activeTimers;
+    static std::map<int, std::pair<GLUTWindow *, cb> > __activeTimers;
     // The set of all active timer ids.  We check this when generating
     // ids for new timers.
     static std::set<int> __activeTimerIDs;
     // Called by GLUT when a timer fires.  We use 'id' to tell us
     // which timer it is.
     static void __timerFunc(int id);
+};
+
+class GLUTMenu {
+  public:
+    GLUTMenu();
+    virtual ~GLUTMenu();
+    
+    // Our GLUT menu id.
+    int id() { return _menuID; }
+
+    // Adds a menu entry.  The given callback method will be called
+    // when the item is selected.
+    typedef void (GLUTMenu::*cb)();
+    void addItem(const char *label, cb method);
+    // Adds the given submenu.  We take ownership of the subment, and
+    // will deleted it when required.
+    void addSubMenu(const char *label, GLUTMenu *subMenu);
+
+    // EYE - we should probably add methods to allow interrogation of
+    // the menu, add items at certain indices, delete individual
+    // items, change callbacks and labels, etc.
+
+    // Clears all entries (including submenus).
+    void clear();
+
+  protected:
+    int _menuID;		   // Our GLUT menu id.
+    std::vector<int> _menuItemIDs;     // GLUT IDs of all our menu items.
+    std::vector<GLUTMenu *> _subMenus; // All of our immediate submenus.
+
+    // In GLUT, when a menu item is selected, the menu's callback is
+    // called with the menu item's id.  Since we can't create an
+    // arbitrary number of menu callback functions, we just have one
+    // static callback for all instances of this class.  We ensure
+    // that each menu item (over all menus) has a unique id.  When the
+    // callback is called, we use the id to get a <GLUTMenu *,
+    // callback> pair, then call it.
+    static std::map<int, std::pair<GLUTMenu *, cb> > __menuItems;
+    // The set of all menu item ids.  We check this when generating
+    // ids for new menu items.
+    static std::set<int> __menuItemIDs;
+    // Called by GLUT when a menu item is selected.  We use 'id' to
+    // tell us which menu item it was.
+    static void __menuFunc(int id);
 };
 
 #endif
