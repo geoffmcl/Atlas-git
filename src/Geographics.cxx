@@ -21,11 +21,11 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
-// C++ system files
-#include <stdexcept>
-
 // Our include file
 #include "Geographics.hxx"
+
+// C++ system files
+#include <stdexcept>
 
 // Our project's include files
 #include "LayoutManager.hxx"
