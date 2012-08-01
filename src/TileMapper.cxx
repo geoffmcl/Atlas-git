@@ -87,11 +87,13 @@ unsigned int TileMapper::maxPossibleLevel()
 TileMapper::TileMapper(Palette *p, unsigned int maxDesiredLevel, 
 		       bool discreteContours, bool contourLines,
 		       float azimuth, float elevation, bool lighting, 
-		       bool smoothShading):
+		       bool smoothShading, ImageType imageType, 
+		       unsigned int JPEGQuality):
     _palette(p), _maxLevel(maxDesiredLevel),
     _discreteContours(discreteContours), _contourLines(contourLines),
     _azimuth(azimuth), _elevation(elevation), _lighting(lighting),
-    _smoothShading(smoothShading), _tile(NULL), _fbo(0), _to(0)
+    _smoothShading(smoothShading), _imageType(imageType), 
+    _JPEGQuality(JPEGQuality), _tile(NULL), _fbo(0), _to(0)
 {
     // We must have a palette.
     if (!_palette) {
@@ -134,18 +136,17 @@ void TileMapper::set(Tile *t)
 	return;
     }
 
-    const vector<long int>* buckets = _tile->bucketIndices();
-    for (unsigned int i = 0; i < buckets->size(); i++) {
-	long int index = buckets->at(i);
+    vector<long int> indices;
+    _tile->bucketIndices(indices);
+    for (unsigned int i = 0; i < indices.size(); i++) {
+    	Bucket *b = new Bucket(_tile->sceneryDir(), indices[i]);
+    	b->load(Bucket::RECTANGULAR);
 
-	Bucket *b = new Bucket(_tile->sceneryDir(), index);
-	b->load(Bucket::RECTANGULAR);
+    	_buckets.push_back(b);
 
-	_buckets.push_back(b);
-
-	if (b->maximumElevation() > _maximumElevation) {
-	    _maximumElevation = b->maximumElevation();
-	}
+    	if (b->maximumElevation() > _maximumElevation) {
+    	    _maximumElevation = b->maximumElevation();
+    	}
     }
 }
 
@@ -180,8 +181,6 @@ void TileMapper::render()
     // Create a texture object.
     // EYE - we also need to see if our current buffer is big enough.
     // This is where we could add the tiling code.
-    // EYE - necessary to enable?  We don't actually do any texturing.
-    // glEnable(GL_TEXTURE_2D);
     // EYE - do I need to attach a depth buffer too?
     glGenTextures(1, &_to);
     glBindTexture(GL_TEXTURE_2D, _to);
@@ -205,7 +204,10 @@ void TileMapper::render()
     // The framebuffer shares its state with the current context, so
     // we push some attributes so we don't step on current OpenGL
     // state.
-    glPushAttrib(GL_VIEWPORT_BIT | GL_LIGHTING_BIT | GL_CURRENT_BIT); {
+
+    // EYE - just push GL_ALL_ATTRIB_BITS?
+    glPushAttrib(GL_VIEWPORT_BIT | GL_LIGHTING_BIT | GL_CURRENT_BIT |
+		 GL_POLYGON_BIT | GL_LINE_BIT); {
 	// Set up the view.
 	glViewport(0, 0, _width, _height);
 
@@ -226,12 +228,25 @@ void TileMapper::render()
 	glPushMatrix();
 	glLoadIdentity();
 
+	// Turn on backface culling.  We use the OpenGL standard of
+	// counterclockwise winding for front faces.
+	glEnable(GL_CULL_FACE);
+	glCullFace(GL_BACK);
+
+	// Ensure that line smoothing is on.
+	glEnable(GL_LINE_SMOOTH);
+
+	// Tie material ambient and diffuse values to the current colour.
+	glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE);
+	glEnable(GL_COLOR_MATERIAL);
+
 	// Set up lighting.  The values used here must be the same as used
 	// in Atlas if you want live scenery to match pre-rendered scenery
 	// (the same goes for the palette used).
 	sgVec4 lightPosition;
-	const float BRIGHTNESS = 0.8;
-	GLfloat diffuse[] = {BRIGHTNESS, BRIGHTNESS, BRIGHTNESS, 1.0f};
+	// EYE - make this a global constant
+	const float brightness = 0.8;
+	GLfloat diffuse[] = {brightness, brightness, brightness, 1.0f};
 	if (_lighting) {
 	    // We make a copy of the light position because we may rotate
 	    // it later.
@@ -246,9 +261,6 @@ void TileMapper::render()
 	// Ask for smooth or flat shading.
 	glShadeModel(_smoothShading ? GL_SMOOTH : GL_FLAT);
 
-	glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE);
-	glEnable(GL_COLOR_MATERIAL);
-
 	// Now that we've set everything up, we first draw an
 	// ocean-coloured rectangle covering the entire tile.  This
 	// ensures that every part of the tile is coloured, even where
@@ -257,13 +269,13 @@ void TileMapper::render()
 	assert(_palette);
 	if ((c = _palette->colour("Ocean"))) {
 	    glBegin(GL_QUADS); {
-		glColor4fv(c);
-		glNormal3f(0.0, 0.0, 1.0);
+	    	glColor4fv(c);
+	    	glNormal3f(0.0, 0.0, 1.0);
 
-		glVertex2f(lon, lat);
-		glVertex2f(lon, lat + h);
-		glVertex2f(lon + w, lat + h);
-		glVertex2f(lon + w, lat);
+	    	glVertex2f(lon, lat);
+	    	glVertex2f(lon + w, lat);
+	    	glVertex2f(lon + w, lat + h);
+	    	glVertex2f(lon, lat + h);
 	    }
 	    glEnd();
 	}
@@ -313,10 +325,6 @@ void TileMapper::render()
 #endif
 
 	for (unsigned int i = 0; i < _buckets.size(); i++) {
-	    // Buckets are smart enough to save a display list and used
-	    // that if asked to be drawn more than once.  Therefore
-	    // calling Tile::draw() more than once is relatively cheap, if
-	    // the buckets have not been unloaded.
 	    _buckets[i]->draw();
 	}
 
@@ -329,6 +337,7 @@ void TileMapper::render()
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
 
 	// EYE - before the unbinding or after?
+	// EYE - is this necessary now with the pushAttrib/popAttrib?
 	glMatrixMode(GL_PROJECTION);
 	glPopMatrix();
 	glMatrixMode(GL_MODELVIEW);
@@ -340,7 +349,7 @@ void TileMapper::render()
 // Saves the currently rendered map at the given size.  We assume that
 // render() has been called.  Note that level must be <= maxLevel
 // (given in the constructor).
-void TileMapper::save(unsigned int level, ImageType t, unsigned int jpegQuality)
+void TileMapper::save(unsigned int level)
 {
     if (!_palette || !_tile) {
 	return;
@@ -373,12 +382,12 @@ void TileMapper::save(unsigned int level, ImageType t, unsigned int jpegQuality)
     snprintf(str, 3, "%d", level);
     file.append(str);
     file.append(_tile->name());
-    if (t == PNG) {
+    if (_imageType == PNG) {
 	file.concat(".png");
 	savePNG(file.c_str(), image, width, height, _maximumElevation);
-    } else if (t == JPEG) {
+    } else if (_imageType == JPEG) {
 	file.concat(".jpg");
-	saveJPEG(file.c_str(), jpegQuality, 
+	saveJPEG(file.c_str(), _JPEGQuality, 
 		 image, width, height, _maximumElevation);
     }
     

@@ -66,6 +66,8 @@ class TileMapper {
     // the maximum level by 1.
     static unsigned int maxPossibleLevel();
 
+    enum ImageType {PNG, JPEG};
+
     // Create a tile mapper with the given rendering parameters.
     TileMapper(Palette *p,
     	       unsigned int maxDesiredLevel = 10,
@@ -74,10 +76,10 @@ class TileMapper {
     	       float azimuth = 315.0,
     	       float elevation = 55.0,
     	       bool lighting = true,
-    	       bool smoothShading = true);
+    	       bool smoothShading = true,
+	       ImageType imageType = JPEG,
+	       unsigned int jpegQuality = 75);
     ~TileMapper();
-
-    enum ImageType {PNG, JPEG};
 
     // Specify the tile upon which future operations will operate.
     // This will load the scenery for the tile.  If t is NULL, this
@@ -93,7 +95,7 @@ class TileMapper {
     // Save the current image to a file at the given level (<=
     // maxDesiredLevel).  You must call render() before the first call
     // to save() (for each tile).
-    void save(unsigned int level, ImageType t, unsigned int jpegQuality = 75);
+    void save(unsigned int level);
 
     // Accessors.
     const Palette *palette() const { return _palette; }
@@ -123,6 +125,10 @@ class TileMapper {
     bool _lighting;
     // True if we smooth polygons, false if we want "chunky" polygons.
     bool _smoothShading;
+    // JPEG or PNG
+    ImageType _imageType;
+    // If JPEG, this gives our image quality.
+    unsigned int _JPEGQuality;
 
     // The tile we're working on.
     Tile *_tile;
