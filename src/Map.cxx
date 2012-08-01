@@ -60,8 +60,8 @@ using namespace std;
 
 char *appName;
 
-// Specifies whether to create JPEGs or PNGs.
-static bool createJPEG = true;
+// Specifies what type of files to create.
+static TileMapper::ImageType imageType = TileMapper::JPEG;
 static unsigned int jpegQuality = 75;
 static bool renderToFramebuffer = true;
 // Turn the lights on or off?
@@ -119,11 +119,7 @@ void renderMap(Tile *t)
 	mapper->render();
 	for (unsigned int i = 0; i < TileManager::MAX_MAP_LEVEL; i++) {
 	    if (maps[i]) {
-		if (createJPEG) {
-		    mapper->save(i, TileMapper::JPEG, jpegQuality);
-		} else {
-		    mapper->save(i, TileMapper::PNG);
-		}
+		mapper->save(i);
 
 		if (!first) {
 		    printf(", ");
@@ -188,11 +184,11 @@ bool parse_arg(char* arg)
     } else if (strncmp(arg, "--palette=", 10) == 0) {
 	palette.set(arg + 10);
     } else if (strcmp(arg, "--png") == 0) {
-	createJPEG = false;
+	imageType = TileMapper::PNG;
     } else if (strcmp(arg, "--jpeg") == 0) {
-	createJPEG = true;
+	imageType = TileMapper::JPEG;
     } else if (sscanf(arg, "--jpeg=%d", &jpegQuality) == 1) {
-	createJPEG = true;
+	imageType = TileMapper::JPEG;
     } else if (strcmp(arg, "--discrete-contour") == 0) {
 	discreteContours = true;
     } else if (strcmp(arg, "--smooth-contour") == 0) {
@@ -523,8 +519,8 @@ int main(int argc, char **argv)
 	printf("Atlas map directory:\n\t%s\n", atlas.c_str());
 	printf("Palette file:\n\t%s\n", palettePath.c_str());
 
-	int downloadedTiles = tileManager->tileCount(TileManager::DOWNLOADED);
-	printf("Scenery:\n\t%d tiles in total\n", downloadedTiles);
+	printf("Scenery:\n\t%d tiles in total\n", 
+	       tileManager->tileCount(TileManager::DOWNLOADED));
 	printf("Map resolutions:\n");
 	const bitset<TileManager::MAX_MAP_LEVEL>& mapLevels = 
 	    tileManager->mapLevels();
@@ -536,8 +532,8 @@ int main(int argc, char **argv)
 	}
 
 	int tileCount = 0, mapCount = 0;
-	for (int i = 0; i < downloadedTiles; i++) {
-	    Tile *t = tileManager->tile(TileManager::DOWNLOADED, i);
+	TileIterator ti(tileManager, TileManager::DOWNLOADED);
+	for (Tile *t = ti.first(); t; t = ti++) {
 	    const bitset<TileManager::MAX_MAP_LEVEL>& maps = t->missingMaps();
 	    if (!maps.none()) {
 		if (tileCount == 0) {
@@ -575,11 +571,11 @@ int main(int argc, char **argv)
     //       render-to-window/render-offscreen options.
     mapper = new TileMapper(atlasPalette, bufferLevel, 
     			    discreteContours, contourLines,
-    			    azimuth, elevation, lighting, smoothShading);
+    			    azimuth, elevation, lighting, smoothShading,
+			    imageType, jpegQuality);
 
-    int downloadedTiles = tileManager->tileCount(TileManager::DOWNLOADED);
-    for (int i = 0; i < downloadedTiles; i++) {
-	Tile *t = tileManager->tile(TileManager::DOWNLOADED, i);
+    TileIterator ti(tileManager, TileManager::DOWNLOADED);
+    for (Tile *t = ti.first(); t; t = ti++) {
 	renderMap(t);
     }
 
