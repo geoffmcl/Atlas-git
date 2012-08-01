@@ -11,6 +11,16 @@
   elevation figures) on the maps.  It does *not* display navaids,
   airports, etc.
 
+  In the MVC scheme of things, one might expect the scenery object to
+  be a view.  However, it contains real data, namely live scenery and
+  MEFs.  Other objects query the scenery object to find out, for
+  example, the elevation at a certain point.  Because of this, the
+  scenery can't just listen to notification of moves and zooms to
+  update itself (unlike regular view objects).  It must be explicitly
+  asked to move and zoom, *and* this must be done before other objects
+  get notifications of moves or zooms (since they might immediately
+  query the scenery object about the newly moved or zoomed scenery).
+
   This file is part of Atlas.
 
   Atlas is free software: you can redistribute it and/or modify it
@@ -51,6 +61,9 @@ class AtlasBaseWindow;
 
 // Handles loading and unloading of a single texture (ie, map).  The
 // texture doesn't know how to draw itself.
+
+// EYE - make a base class that doesn't know about maximum elevation
+// figures, then a derived class (MapTexture) that does.
 class Texture {
     // When name() is called and there's no texture, we substitute a
     // default 8x8 checkerboard texture.  The data is in
@@ -92,8 +105,6 @@ class Scenery {
 
     AtlasBaseWindow *win() { return _win; }
 
-    void setBackgroundImage(const SGPath& f);
-
     void move(const sgdMat4 modelViewMatrix, const sgdVec3 eye);
     void zoom(const sgdFrustum& frustum, double metresPerPixel);
     void setMEFs(bool elevationLabels) { _MEFs = elevationLabels; }
@@ -103,6 +114,9 @@ class Scenery {
     bool live() const { return _live; }
     unsigned int level() const { return _level; }
     Culler::FrustumSearch* frustum() const { return _frustum; }
+
+    // Tells us that the tile's status has changed.
+    void update(Tile *t);
 
     // Calculates the intersection of the viewing ray that goes
     // through the window at <x, y> with the earth, returning true if
@@ -122,8 +136,7 @@ class Scenery {
 		      bool *validElevation = NULL);
 
   protected:
-    void _createWorlds(bool force = false);
-
+    // Draws MEF labels on the scenery.
     void _label(bool live);
 
     AtlasBaseWindow *_win;	// Our owning window.
@@ -144,13 +157,9 @@ class Scenery {
 
     TileManager *_tm;
 
-    // Background world texture and display list.
-    Texture _world;
-    GLuint _backgroundWorld;
-
-    // A SceneryTile object manages all the textures and live scenery for a 1
-    // degree by 1 degree (usually) chunk of the earth.
-    std::vector<SceneryTile *>_tiles;
+    // A SceneryTile object manages all the textures and live scenery
+    // for a 1 degree by 1 degree (usually) chunk of the earth.
+    std::map<Tile*, SceneryTile *>_tiles;
 
     // The cache is used to manage the loading of textures and buckets
     // (live scenery).

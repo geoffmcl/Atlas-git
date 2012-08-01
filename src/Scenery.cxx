@@ -41,12 +41,6 @@
 
 using namespace std;
 
-// EYE - is this necessary now that we include glew.h?
-// This is defined in glext.h, which is unavailable in Windows.
-#ifndef GL_CLAMP_TO_EDGE	
-#define GL_CLAMP_TO_EDGE 0x812F
-#endif
-
 // Drawing scenery is a little bit complex, mostly because of a desire
 // to maintain reasonable response and performance.  We try to do only
 // the minimum amount of work, and we try not to do too much at one
@@ -102,6 +96,10 @@ class SceneryTile: public Cullable, public CacheObject, Subscriber {
   public:
     SceneryTile(Tile *t, Scenery *s);
     ~SceneryTile();
+
+    // Checks its Tile object to see if maps have been added or
+    // deleted.
+    void update();
 
     // Draws a texture appropriate to the given level.
     void drawTexture(unsigned int level);
@@ -288,20 +286,14 @@ GLuint Texture::name() const
 		    bool c = ((((i & 0x1) == 0) ^ ((j & 0x1)) == 0));
 		    if (c) {
 			// Red square
-			// __defaultImage[i][j][0] = 255;
-			// __defaultImage[i][j][1] = 0;
-			// __defaultImage[i][j][2] = 0;
-			__defaultImage[i][j][0] = 0;
-			__defaultImage[i][j][1] = 255;
+			__defaultImage[i][j][0] = 255;
+			__defaultImage[i][j][1] = 0;
 			__defaultImage[i][j][2] = 0;
 		    } else {
 			// White square
-			// __defaultImage[i][j][0] = 255;
-			// __defaultImage[i][j][1] = 255;
-			// __defaultImage[i][j][2] = 255;
-			__defaultImage[i][j][0] = 0;
+			__defaultImage[i][j][0] = 255;
 			__defaultImage[i][j][1] = 255;
-			__defaultImage[i][j][2] = 0;
+			__defaultImage[i][j][2] = 255;
 		    }
 		}
 	    }
@@ -362,9 +354,7 @@ void MapTexture::draw()
 	// have state.  The state for the *current* texture unit is
 	// set by glTexEnv().
 	//
-	// The current texture is set with glBindTexture().  The
-	// current texture unit is set with glActiveTexture() (by
-	// default, it is texture unit 0).
+	// The current texture is set with glBindTexture().
 	//
 	// glEnable(GL_TEXTURE_2D) works on the current texture
 	// *unit*, and just tells OpenGL to grab texels, and that they
@@ -372,9 +362,15 @@ void MapTexture::draw()
 	// (a texture unit can have up to 4 textures attached to it -
 	// 1D, 2D, 3D, and 4D.  There is really no good reason for
 	// this; it's just part of the spec).
+	//
+	// The current texture unit is set with glActiveTexture() (by
+	// default, it is texture unit 0).
 	glBindTexture(GL_TEXTURE_2D, _t.name());
 
-	glBegin(GL_QUAD_STRIP); {
+	// It's natural to want to use a GL_QUAD_STRIP, but we can't
+	// be sure that the four corners of a 1 degree by 1 degree
+	// "square" on the earth are co-planar.
+	glBegin(GL_TRIANGLE_STRIP); {
 	    int width = Tile::width(_lat + 90);
 	    double s, n;
 	    s = _lat;
@@ -426,21 +422,11 @@ SceneryTile::SceneryTile(Tile *ti, Scenery *s):
     _ti(ti), _scenery(s), _maxElevation(Bucket::NanE), _buckets(NULL)
 {
     // Create a texture object for each level at which we have maps.
-    // EYE - since we only do this at creation, we won't notice new maps
-    const bitset<TileManager::MAX_MAP_LEVEL>& missing = _ti->missingMaps();
+    // EYE - since we only do this at creation, we won't notice new scenery
     for (unsigned int i = 0; i < _ti->mapLevels().size(); i++) {
-	if (_ti->mapLevels()[i] && !missing[i]) {
-	    char str[3];
-	    sprintf(str, "%d", i);
-
-	    SGPath f = _ti->mapsDir();
-	    f.append(str);
-	    f.append(_ti->name());
-	    _textures[i] = new MapTexture(f, _ti->lat(), _ti->lon());
-	} else {
-	    _textures[i] = (MapTexture *)NULL;
-	}
+	_textures[i] = (MapTexture *)NULL;
     }
+    update();
 
     // Subscribe to the discrete/smooth contour change and palette
     // change notifications.  When we get either, we'll tell our
@@ -462,6 +448,34 @@ SceneryTile::~SceneryTile()
 	    delete (*_buckets)[i];
 	}
 	delete _buckets;
+    }
+}
+
+// Update our _textures array to match our tile.
+void SceneryTile::update()
+{
+    const bitset<TileManager::MAX_MAP_LEVEL>& missing = _ti->missingMaps();
+    for (unsigned int i = 0; i < _ti->mapLevels().size(); i++) {
+	if (_ti->mapLevels()[i] && !missing[i]) {
+	    // Remove the old texture if it exists.  This is a bit
+	    // wasteful, since it might be perfectly valid, but we
+	    // need to guard against the case where a map was
+	    // re-rendered in a different style.
+	    if (_textures[i]) {
+		delete _textures[i];
+	    }
+
+	    char str[3];
+	    sprintf(str, "%d", i);
+
+	    SGPath f = _ti->mapsDir();
+	    f.append(str);
+	    f.append(_ti->name());
+	    _textures[i] = new MapTexture(f, _ti->lat(), _ti->lon());
+	} else if (_textures[i]) {
+	    delete _textures[i];
+	    _textures[i] = (MapTexture *)NULL;
+	}
     }
 }
 
@@ -758,10 +772,10 @@ void SceneryTile::_findBuckets()
 
     _buckets = new vector<Bucket *>;
 
-    const vector<long int>* buckets = _ti->bucketIndices();
-    for (unsigned int i = 0; i < buckets->size(); i++) {
-	long int index = buckets->at(i);
-	_buckets->push_back(new Bucket(_ti->sceneryDir(), index));
+    vector<long int> indices;
+    _ti->bucketIndices(indices);
+    for (unsigned int i = 0; i < indices.size(); i++) {
+	_buckets->push_back(new Bucket(_ti->sceneryDir(), indices[i]));
     }
 }
 
@@ -800,7 +814,7 @@ unsigned int SceneryTile::_calcBest(unsigned int level, bool loaded)
 // the given window.
 Scenery::Scenery(TileManager *tm, AtlasBaseWindow *win): 
     _win(win), _dirty(true), _level(TileManager::MAX_MAP_LEVEL), _live(false), 
-    _levels(tm->mapLevels()), _tm(tm), _backgroundWorld(0), _cache(_win->id())
+    _levels(tm->mapLevels()), _tm(tm), _cache(_win->id())
 {
     // Create a culler and a frustum searcher for it.
     _culler = new Culler();
@@ -809,11 +823,9 @@ Scenery::Scenery(TileManager *tm, AtlasBaseWindow *win):
     // Create scenery tiles.  We only care about tiles that have been
     // downloaded, regardless of whether any maps have been generated
     // for them or not.
-    int tileCount = _tm->tileCount(TileManager::DOWNLOADED);
-    for (int i = 0; i < tileCount; i++) {
-	Tile *ti = _tm->tile(TileManager::DOWNLOADED, i);
-
-	// Create a tile.
+    TileIterator i(_tm, TileManager::DOWNLOADED);
+    for (Tile *ti = i.first(); ti; ti = i++) {
+	// Create a scenery tile.
 	SceneryTile *tile = new SceneryTile(ti, this);
 
 	// Add bounds information about this tile to our Culler
@@ -835,75 +847,21 @@ Scenery::Scenery(TileManager *tm, AtlasBaseWindow *win):
 
 	tile->setBounds(bounds);
 
-	_tiles.push_back(tile);
+	_tiles[ti] = tile;
 	_culler->addObject(tile);
     }
 }
 
 Scenery::~Scenery()
 {
-    for (unsigned int i = 0; i < _tiles.size(); i++) {
-	delete _tiles[i];
+    map<Tile *, SceneryTile *>::const_iterator i;
+    for (i = _tiles.begin(); i != _tiles.end(); i++) {
+	delete i->second;
     }
+    _tiles.clear();
 
     delete _frustum;
     delete _culler;
-}
-
-// Loads the image to be used as the "background world".  The
-// background world is a single texture draped over the globe, used as
-// a background where there is no FlightGear scenery.
-void Scenery::setBackgroundImage(const SGPath& f)
-{
-    // Load the file into a Texture object.
-    _world.load(f);
-
-    // Create display list for background world.  
-    _backgroundWorld = glGenLists(1);
-    assert(_backgroundWorld != 0);
-
-    glNewList(_backgroundWorld, GL_COMPILE);
-    // Move the background world back slightly.  This is so that the
-    // scenery, when draped over the world, is not obscured by the
-    // world texture map.
-    glEnable(GL_POLYGON_OFFSET_FILL);
-    glPolygonOffset(1.0, 1.0);
-
-    // Now stretch the texture over a world.
-    glEnable(GL_TEXTURE_2D);
-    // This texture sits underneath everything, so we'll use
-    // GL_REPLACE mode.  Since the texture is just an RGB texture (no
-    // alpha), we need to explicitly set alpha to 1.0 to ensure that
-    // nothing from behind shows through (the R, G, and B values will
-    // be ignored).
-    glColor4f(1.0, 0.5, 0.0, 1.0);
-    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
-    glBindTexture(GL_TEXTURE_2D, _world.name());
-
-    // Stitch the texture to the globe in a series of EW strips.
-    for (int lat = 0; lat < 180; lat++) {
-	glBegin(GL_QUAD_STRIP); {
-	    double s, n;
-	    s = lat - 90;
-	    n = lat - 90 + 1;
-	    // "Pin" the texture at 1 degree intervals.
-	    for (int lon = 0; lon <= 360; lon++) {
-		double w = lon - 180.0;
-
-		// Note that the texture is loaded "upside-down" (the
-		// first row of the image is y = 0.0 of the texture).
-		glTexCoord2f(lon / 360.0, (180 - lat - 1) / 180.0); 
-		geodVertex3f(n, w);
-		glTexCoord2f(lon / 360.0, (180 - lat) / 180.0); 
-		geodVertex3f(s, w);
-	    }
-	}
-	glEnd();
-    }
-    glDisable(GL_TEXTURE_2D);
-
-    glDisable(GL_POLYGON_OFFSET_FILL);
-    glEndList();
 }
 
 void Scenery::move(const sgdMat4 modelViewMatrix, const sgdVec3 eye)
@@ -980,6 +938,11 @@ void Scenery::draw(bool lightingOn)
     if (_dirty) {
 	// Yes.  Update our idea of what to display, ask the culler
 	// for visible tiles, and tell the cache.
+
+	// EYE - should we do this whenever we set _dirty or whenever
+	// the scenery layer is turned off (listen to SceneryLayerOn
+	// for the latter)?  Should we make a _dirty() method to do
+	// this consistently?
 	_cache.reset(_eye);
 
 	// Now ask the culler for all visible tiles, and add them to
@@ -1002,13 +965,10 @@ void Scenery::draw(bool lightingOn)
 
     // Our strategy is:
     //
-    // (a) We display a "background world", consisting of a single
-    //     texture wrapped around the world.
-    //
-    // (b) Draw tile textures at the appropriate resolution.  We use
+    // (a) Draw tile textures at the appropriate resolution.  We use
     //     the culler to decide what tiles to draw.
     //
-    // (c) Draw scenery tiles on top of the textures if we're very
+    // (b) Draw scenery tiles on top of the textures if we're very
     //     close.  Note that scenery tiles do not replace textures,
     //     for 2 reasons: (a) we may not have loaded all the desired
     //     scenery yet, and (b) a tile covers a complete 1x1 (or
@@ -1016,19 +976,14 @@ void Scenery::draw(bool lightingOn)
     //     only cover part of that area (because part of it may be
     //     open ocean, or otherwise have no scenery).
 
-    // Render the background world if it exists.
-    if (_backgroundWorld != 0) {
-	glCallList(_backgroundWorld);
-    }
-
     // Draw textures.
     const vector<Cullable *>& intersections = _frustum->intersections();
     for (unsigned int i = 0; i < intersections.size(); i++) {
-	SceneryTile *t = dynamic_cast<SceneryTile *>(intersections[i]);
-	if (!t) {
-	    continue;
-	}
-	t->drawTexture(_level);
+    	SceneryTile *t = dynamic_cast<SceneryTile *>(intersections[i]);
+    	if (!t) {
+    	    continue;
+    	}
+    	t->drawTexture(_level);
     }
 
     // Render "live" scenery too if we're zoomed in close enough.
@@ -1060,6 +1015,16 @@ void Scenery::draw(bool lightingOn)
     if (_MEFs) {
 	_label(_live);
     }
+}
+
+// Tells us that the tile's status has changed.  We find the
+// corresponding SceneryTile and pass the message on and set _dirty to
+// true.
+void Scenery::update(Tile *t)
+{
+    // EYE - check to make sure there's an entry for the tile?
+    _tiles[t]->update();
+    _dirty = true;
 }
 
 // Labels the scenery (which means just adding an elevation figure on
