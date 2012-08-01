@@ -30,6 +30,8 @@
 #include <bitset>
 
 // Forward class declarations.
+
+// EYE - should we make an Overlay base class that these derive from?
 class AirportsOverlay;
 class AirwaysOverlay;
 class CrosshairsOverlay;

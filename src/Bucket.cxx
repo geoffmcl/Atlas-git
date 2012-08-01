@@ -42,7 +42,10 @@ bool Bucket::discreteContours = true;
 bool Bucket::contourLines = false;
 bool Bucket::polygonEdges = false;
 
-const float Bucket::NanE = -std::numeric_limits<float>::max();
+// EYE - should we make this nan()/nanl()/nanf() and have an isNanE()
+// function (which is just isnan())?  Note that we can't do simple
+// comparisons with NaNs - the results are always false.
+const float Bucket::NanE = -numeric_limits<float>::max();
 
 // EYE - chunk? tile? bucket?  In newbucket.hxx, it seems that a 1x1
 // square is a chunk, and the parts are called both tiles and buckets.
