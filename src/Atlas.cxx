@@ -120,13 +120,7 @@ int main(int argc, char **argv)
 
     // GLUT initialization.
     glutInit(&argc, argv);
-    glutInitDisplayMode(GLUT_RGB | GLUT_DEPTH | GLUT_DOUBLE);
-    // EYE - turn off depth test altogether?  We don't really need it,
-    // as the back clip plane will do everything we want for us.
-    // glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
-    // EYE - see glutInitWindowPosition man page - call glutInit() after
-    // this and pass argc, and argv to glutInit?
-    
+
     // Find our scenery fonts.
     // EYE - put in preferences
     SGPath fontDir, regularFontFile, boldFontFile;
@@ -149,6 +143,9 @@ int main(int argc, char **argv)
     // constructor does, so it's safe to call glewInit() if the graphs
     // window is created first, but *not* if the main Atlas window is.
     // Simple!
+
+    // The graphs window doesn't need a depth buffer, etc.
+    glutInitDisplayString("rgba double");
     globals.gw = new GraphsWindow("-- graphs --", 
 				  regularFontFile.c_str(),
 				  boldFontFile.c_str(),
@@ -185,6 +182,20 @@ int main(int argc, char **argv)
     }
 
     // Create our Atlas window.
+    // EYE - this seems to give us only 2 samples, which isn't enough
+    // glutInitDisplayMode(GLUT_RGBA | GLUT_DEPTH | GLUT_DOUBLE | GLUT_MULTISAMPLE);
+
+    // EYE - to see what kind of buffer we were given, start up OpenGL
+    // Profiler, and either launch Atlas with it or attach to a
+    // running Atlas process.  Open the Pixel Format window to find
+    // out the format for each OpenGL context used by the process.
+    // Note that the reported results differ depending on whether you
+    // launched Atlas with OpenGL Profiler or attached to an already
+    // running instance.  Both seem to have their uses.
+
+    // EYE - this gives us a bit more control, and for some reason
+    // defaults to 6 samples (perhaps it takes the maximum?)
+    glutInitDisplayString("rgba depth samples double");
     globals.aw = new AtlasWindow("Atlas", 
 				 regularFontFile.c_str(),
 				 boldFontFile.c_str(),

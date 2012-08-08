@@ -468,8 +468,11 @@ int main(int argc, char **argv)
 	windowSize = 256;
     }
     glutInit(&argc, argv);
-    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
-    glutInitWindowSize(windowSize, windowSize);
+    // We don't need a depth buffer, multisampling, etc.
+    glutInitDisplayString("rgba");
+    // EYE - if this is gone, we don't need the windowSize calculation
+    // above, do we?
+    // glutInitWindowSize(windowSize, windowSize);
     glutCreateWindow("Map");
   
     // Check for sufficient OpenGL capabilities.
