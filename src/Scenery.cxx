@@ -97,8 +97,8 @@ class SceneryTile: public Cullable, public CacheObject, Subscriber {
     SceneryTile(Tile *t, Scenery *s);
     ~SceneryTile();
 
-    // Checks its Tile object to see if maps have been added or
-    // deleted.
+    // Tells the SceneryTile to check its Tile object to see if maps
+    // have been added or deleted.
     void update();
 
     // Draws a texture appropriate to the given level.
