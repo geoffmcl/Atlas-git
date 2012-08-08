@@ -416,8 +416,10 @@ void Background::draw()
 		// Chunk boundary
 		GeoLocation mLoc(cursor->lat(), cursor->lon(), true);
 		// EYE - compare old and new GeoLocations to see if we
-		// need to highlight a different chunk?  Ditto for
-		// tiles?
+		//       need to highlight a different chunk?  Ditto
+		//       for tiles?
+		// EYE - should we highlight the boundary or interior
+		//       of chunks and tiles?
 		GeoLocation cLoc = Chunk::canonicalize(mLoc);
 		// EYE - is it really necessary to do a find, or can
 		// we just check if there's a valid chunk?
@@ -597,6 +599,9 @@ void Background::_init()
     // go through all the outlines and put the line segments into a
     // set.  At the end the set will contain all the unique line
     // segments.
+
+    // EYE - also create a tile grid?  Turn it on and off depending on
+    // zoom?
     set<pair<GLuint, GLuint> > segments;
     map<GeoLocation, vector<GLuint> >::const_iterator ci;
     for (ci = _chunkOutlines.begin(); ci != _chunkOutlines.end(); ci++) {
