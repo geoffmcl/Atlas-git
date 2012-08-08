@@ -667,7 +667,7 @@ AtlasDialog::AtlasDialog(const char *msg, const char *leftLabel,
     GLint windowWidth = viewport[2];
     GLint windowHeight = viewport[3];
     setPosition(windowWidth / 2 - dialogWidth / 2,
-		windowHeight / 2 + dialogHeight / 2);
+		windowHeight / 2 - dialogHeight / 2);
 
     // Create a frame with the message.
     new puFrame(0, 0, dialogWidth, dialogHeight); {
