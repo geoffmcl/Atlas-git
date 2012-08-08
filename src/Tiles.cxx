@@ -949,8 +949,43 @@ TileIterator::TileIterator(Chunk *c, TileManager::SceneryType type):
 {
 }
 
+TileIterator::TileIterator(Tile *t, TileManager::SceneryType type):
+    _tm(NULL), _c(NULL), _type(type)
+{
+    _map[t->loc()] = t;
+}
+
+TileIterator::TileIterator(): _tm(NULL), _c(NULL), _type(TileManager::ALL)
+{
+}
+
 TileIterator::~TileIterator()
 {
+}
+
+void TileIterator::init(TileManager *tm, TileManager::SceneryType type)
+{
+    _map.clear();
+    _tm = tm;
+    _c = NULL;
+    _type = type;
+}
+
+void TileIterator::init(Chunk *c, TileManager::SceneryType type)
+{
+    _map.clear();
+    _tm = NULL;
+    _c = c;
+    _type = type;
+}
+
+void TileIterator::init(Tile *t, TileManager::SceneryType type)
+{
+    _map.clear();
+    _tm = NULL;
+    _c = NULL;
+    _map[t->loc()] = t;
+    _type = type;
 }
 
 Tile *TileIterator::operator++(int)
@@ -1001,22 +1036,26 @@ Tile *TileIterator::first()
 
 map<GeoLocation, Tile *>::const_iterator TileIterator::_begin()
 {
-    assert(_tm || _c);
+    assert(_tm || _c || (_map.size() == 1));
     assert(!(_tm && _c));
     if (_tm) {
 	return _tm->tiles().begin();
-    } else {
+    } else if (_c) {
 	return _c->tiles().begin();
+    } else {
+	return _map.begin();
     }
 }
 
 map<GeoLocation, Tile *>::const_iterator TileIterator::_end()
 {
-    assert(_tm || _c);
+    assert(_tm || _c || (_map.size() == 1));
     assert(!(_tm && _c));
     if (_tm) {
 	return _tm->tiles().end();
-    } else {
+    } else if (_c) {
 	return _c->tiles().end();
+    } else {
+	return _map.end();
     }
 }

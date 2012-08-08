@@ -547,7 +547,14 @@ class Tile {
 // 
 // You have the option of iterating through all tiles (pass the tile
 // manager to the constructor) or all tiles in a chunk (pass the chunk
-// to the constructor).
+// to the constructor), or even all the tiles in a tile (ie, just one.
+// The latter is included for completeness (actually, it was included
+// just so a piece of code elsewhere could be made a tiny bit cleaner
+// - it's nice when you control the library and can indulge
+// yourself!).
+//
+// The init() routines allow you to reuse an iterator.  They work the
+// same as the constructors.
 //
 // This could probably have been done with STL iterators, but I value
 // my sanity and decided not to go there.
@@ -555,7 +562,14 @@ class TileIterator {
   public:
     TileIterator(TileManager *tm, TileManager::SceneryType type);
     TileIterator(Chunk *c, TileManager::SceneryType type);
+    TileIterator(Tile *t, TileManager::SceneryType type);
+    TileIterator();
     ~TileIterator();
+
+    void init(TileManager *tm, TileManager::SceneryType type);
+    void init(Chunk *c, TileManager::SceneryType type);
+    void init(Tile *t, TileManager::SceneryType type);
+
     Tile *first();
     Tile *operator++(int);
   protected:
@@ -564,12 +578,16 @@ class TileIterator {
     TileManager::SceneryType _type;
 
     // Convenience routines to return the beginning and end of the
-    // map, either rom _tm or _c.
+    // map, either from _tm or _c.
     std::map<GeoLocation, Tile *>::const_iterator _begin();
     std::map<GeoLocation, Tile *>::const_iterator _end();
     // This keeps track of our current position as we iterate through
     // all the tiles.
     std::map<GeoLocation, Tile *>::const_iterator _ti;
+
+    // A map containing exactly one tile, used when iterating through
+    // a single tile.
+    std::map<GeoLocation, Tile *> _map;
 };
 
 #endif	// _TILES_H_
