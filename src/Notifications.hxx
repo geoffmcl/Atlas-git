@@ -77,7 +77,7 @@ class Notification {
 	       Rotated,		 // View rotated about centre
 	       CursorLocation,	 // Cursor location changed (in mouse mode)
 	       MouseMoved,	 // Mouse moved (in any mode)
-	       SceneryLayerOn,	 // Scenery layer visibility toggled
+	       ShowOutlines,     // Show chunk and tile outlines
 	       CentreType,	 // Centre type changed
 	       // EYE - does this overlap with SceneryChanged?
 	       NewScenery,	 // New live scenery loaded

@@ -161,7 +161,7 @@ class LightingUI;
 class HelpUI;
 class SearchUI;
 class MappingUI;
-class ContextualMenu;
+class RenderDialog;
 class TileMapper;
 class Dispatcher;
 class AtlasWindow: public AtlasBaseWindow, Subscriber {
@@ -179,10 +179,10 @@ class AtlasWindow: public AtlasBaseWindow, Subscriber {
     void setOverlayVisibility(Overlays::OverlayType overlay, bool on);
     void toggleOverlay(Overlays::OverlayType overlay);
 
-    // When true, we're displaying normal scenery (ie, regular maps);
-    // when false, we're displaying scenery status (which tiles have
-    // been mapped, ...).
-    bool sceneryLayerOn() { return _sceneryLayerOn; }
+    // When true, we're displaying tile and chunk outlines on top of
+    // regular scenery.
+    bool showOutlines() { return _showOutlines; }
+    void setShowOutlines(bool on);
 
     // Public window callback.  The graphs window needs to pass on
     // keyboard events to us, so we expose it (making sure to set our
@@ -196,10 +196,11 @@ class AtlasWindow: public AtlasBaseWindow, Subscriber {
     int noOfMatches();
     char *matchAtIndex(int i);
 
-    // Called by the contextual menu when the user asks us to render
-    // some maps.  When 'force' is true, all maps for each tile will
-    // be rendered; when false, only missing maps will be rendered.
-    void render(std::vector<Tile *>& tiles, bool force);
+    // Called when the user asks us to render some maps.  When 'force'
+    // is true, all maps for each tile will be rendered; when false,
+    // only missing maps will be rendered.
+    enum RenderType {RENDER_ALL, RENDER_10, RENDER_1};
+    void render(RenderType type, bool force);
 
     // If we're tracking the mouse, this returns the cursor position,
     // otherwise returns the position at the centre of the window.
@@ -248,6 +249,7 @@ class AtlasWindow: public AtlasBaseWindow, Subscriber {
 
     friend void __atlasWindow_exitOk_cb(puObject *o);
     friend void __atlasWindow_renderDialog_cb(puObject *o);
+    friend void __atlasWindow_renderConfirmDialog_cb(puObject *o);
 
   protected:
     AtlasController *_ac;
@@ -264,7 +266,7 @@ class AtlasWindow: public AtlasBaseWindow, Subscriber {
     Scenery *_scenery;
     Background *_background;
     Overlays *_overlays;
-    bool _sceneryLayerOn;
+    bool _showOutlines;
 
     // Basic view geometry - where we're looking from, and our
     // orientation at that point.
@@ -289,15 +291,9 @@ class AtlasWindow: public AtlasBaseWindow, Subscriber {
 
     AtlasDialog *_exitOkDialog;
 
-    // A floating frame that shows the chunk and tile under the mouse,
-    // shown when the tile status layer is visible.
-    puFrame *_tooltip;
-
-    // A menu showing what rendering options are available (active
-    // only when the tile status layer is visible).
-    ContextualMenu *_contextualMenu;
-    // EYE - document these
-    AtlasDialog *_renderDialog;
+    // EYE - document these, and maybe reorganize them
+    AtlasDialog *_renderConfirmDialog;
+    RenderDialog *_renderDialog;
     TileMapper *_mapper;
     Dispatcher *_dispatcher;
     bool _force;
@@ -327,7 +323,6 @@ class AtlasWindow: public AtlasBaseWindow, Subscriber {
     void _setAzimuthElevation();
     void _setPaletteBase();
     void _setRelativePalette(bool relative);
-    void _setSceneryLayerOn(bool on);
     void _setMEFs();
     void _setCentreType();
     void _setFlightTrack();
@@ -349,6 +344,7 @@ class AtlasWindow: public AtlasBaseWindow, Subscriber {
 
     void _exitOk_cb(bool okay);
     void _renderDialog_cb(bool okay);
+    void _renderConfirmDialog_cb(bool okay);
 
     // Internal routines that modify _eye and _eyeUp (and OpenGL
     // state).
@@ -394,11 +390,14 @@ class MainUI: public Subscriber {
     friend void __mainUI_unload_cb(puObject *o);
     friend void __mainUI_trackSelect_cb(puObject *o);
     friend void __mainUI_attach_cb(puObject *o);
+    friend void __mainUI_showOutlines_cb(puObject *o);
+    friend void __mainUI_renderButton_cb(puObject *o);
+
+    friend void __mainUI_closeOk_cb(puObject *o);
+    friend void __mainUI_renderDialog_cb(puObject *o);
 
     friend void __networkPopup_ok_cb(puObject *o);
     friend void __networkPopup_cancel_cb(puObject *o);
-
-    friend void __mainUI_closeOk_cb(puObject *o);
 
   protected:
     AtlasController *_ac;
@@ -406,7 +405,7 @@ class MainUI: public Subscriber {
 
     puGroup *_gui;
     puFrame *_preferencesFrame, *_locationFrame, *_navaidsFrame, 
-	*_flightTracksFrame;
+	*_flightTracksFrame, *_renderFrame;
 
     // Location frame widgets.
     puInput *_latInput, *_lonInput, *_zoomInput;
@@ -437,11 +436,17 @@ class MainUI: public Subscriber {
     AtlasString _trackSizeLabel;
     puInput *_trackLimitInput;
 
+    // Render frame widget
+    puText *_chunkTileText;
+    puButton *_showOutlinesToggle;
+    puButton *_renderButton;
+
     // File dialog.
     puaFileSelector *_fileDialog;
     AtlasDialog *_closeOkDialog;
 
     NetworkPopup *_networkPopup;
+    RenderDialog *_renderDialog;
 
     void _setDegMinSec();
     void _setMagTrue();
@@ -454,6 +459,7 @@ class MainUI: public Subscriber {
     void _setTrackLimit();
     void _setTrack();
     void _setTrackList();
+    void _setShowOutlines();
 
     void _zoom_cb(puObject *o);
     void _overlay_cb(puObject *o);
@@ -465,10 +471,13 @@ class MainUI: public Subscriber {
     void _unload_cb(puObject *o);
     void _trackSelect_cb(puObject *o);
     void _attach_cb(puObject *o);
-
-    void _networkPopup_cb(bool okay);
+    void _showOutlines_cb(puObject *o);
+    void _renderButton_cb(puObject *o);
 
     void _closeOk_cb(bool okay);
+    void _renderDialog_cb(bool okay);
+
+    void _networkPopup_cb(bool okay);
 };
 
 //////////////////////////////////////////////////////////////////////
@@ -676,6 +685,15 @@ class SearchUI: public Search
     AtlasWindow *_aw;
 };
 
+//////////////////////////////////////////////////////////////////////
+//
+// Mapping UI
+//
+// Displays the progress of mapping.  It has a progress bar, a text
+// field giving the name of the tile being rendered, a autocentre
+// checkbox, and a cancel button.
+//
+//////////////////////////////////////////////////////////////////////
 class MappingUI: public Subscriber
 {
   public:
@@ -712,6 +730,49 @@ class MappingUI: public Subscriber
     void _setProgress();
 
     void _cancel_cb(puObject *o);
+};
+
+// EYE - how smart should this class be?  Should it figure out how
+// many tiles there are, how many need to be rendered, ...?  Should it
+// create a vector of tiles when a selection is made?  Or should all
+// this be done from the Atlas window?
+//
+// Instead of subclassing it from puDialogBox, maybe it should just
+// contain one.  Then at least we won't have to create and delete it
+// each time we need to use it (and it could contain persistent data).
+//
+// Perhaps we should pass in a vector that it can fill?
+//
+// Come up with a better name?  We also have MappingUI.
+class RenderDialog: public puDialogBox {
+  public:
+    RenderDialog(AtlasWindow *aw, puCallback cb, void *data);
+    ~RenderDialog();
+
+    AtlasWindow::RenderType type() 
+      { return _types[_choices->getIntegerValue()]; }
+    bool force() { return _forces[_choices->getIntegerValue()]; };
+
+  protected:
+    int _createStrings(AtlasWindow *aw);
+    int _addString(const char *str, AtlasWindow::RenderType t, bool force, 
+		   int i);
+    puOneShot *_makeButton(const char *label, int val, 
+			   puCallback cb, void *data);
+
+    puCallback _cb;
+
+    puButtonBox *_choices;
+    puOneShot *_cancelButton, *_okButton;
+    int _x;
+    // We can have at most 6 buttons (and therefore 6 labels) in the
+    // button box.  The array of strings must be terminated with a
+    // NULL entry; thus we need space for 7 pointers.
+    const char *_strings[7];
+    AtlasString _renderAllStr, _rerenderAllStr, _render10Str, _rerender10Str,
+	_render1Str, _rerender1Str;
+    AtlasWindow::RenderType _types[6];
+    bool _forces[6];
 };
 
 #endif

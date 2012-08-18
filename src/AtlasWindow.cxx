@@ -50,6 +50,7 @@ const double zoomFactor = pow(10.0, 0.1);
 //////////////////////////////////////////////////////////////////////
 void __atlasWindow_exitOk_cb(puObject *o);
 void __atlasWindow_renderDialog_cb(puObject *o);
+void __atlasWindow_renderConfirmDialog_cb(puObject *o);
 
 void __mainUI_zoom_cb(puObject *o);
 void __mainUI_overlay_cb(puObject *o);
@@ -70,7 +71,11 @@ void __mainUI_trackAircraft_cb(puObject *o);
 void __mainUI_centre_cb(puObject *o);
 void __mainUI_trackLimit_cb(puObject *o);
 void __mainUI_attach_cb(puObject *o);
+void __mainUI_showOutlines_cb(puObject *o);
+void __mainUI_renderButton_cb(puObject *o);
+
 void __mainUI_closeOk_cb(puObject *o);
+void __mainUI_renderDialog_cb(puObject *o);
 
 void __networkPopup_ok_cb(puObject *o);
 void __networkPopup_cancel_cb(puObject *o);
@@ -81,369 +86,6 @@ void __lightingUI_cb(puObject *o);
 void __helpUI_cb(puObject *o);
 
 void __mappingUI_cancel_cb(puObject *o);
-
-//////////////////////////////////////////////////////////////////////
-// ContextualMenu
-//
-// The ContextualMenu class is, not surprisingly, a contextual menu.
-// It is set up inside the Atlas window whenever we're displaying
-// scenery status.  When the user right-clicks, the menu appears,
-// giving rendering options.  When the user selects one item, a
-// callback in the contextual menu is called.
-//
-// In its callbacks, the contextual menu is responsible for setting up
-// rendering parameters, namely which tiles are to be rendered and
-// whether all maps for each tile should be rendered (ie, forced), or
-// whether just missing maps for each tile should be rendered.  It
-// calls the Atlas window with those parameters, at which point
-// rendering begins.
-//
-//////////////////////////////////////////////////////////////////////
-class ContextualMenu: public GLUTMenu, Subscriber
-// class ContextualMenu: public GLUTMenu
-{
-  public:
-    ContextualMenu(AtlasWindow *aw);
-
-    // Callbacks
-    void renderAll();
-    void rerenderAll();
-    void render10();
-    void rerender10();
-    void render1();
-    void rerender1();
-
-    // Subscriber method.
-    void notification(Notification::type n);
-
-  protected:
-    AtlasWindow *_aw;
-    
-    // When the user makes a selection from the contextual menu, we
-    // fill this vector with the tiles that need to be rendered.  This
-    // is passed on to the Atlas window.
-    vector<Tile *> _tiles;
-
-    // When called, this will completely rebuild the menu based on the
-    // current state of the scenery.
-    void _rebuild();
-
-    void _setSceneryLayerOn();
-
-    void _renderAll(bool force);
-    void _render10(bool force);
-    void _render1(bool force);
-};
-
-ContextualMenu::ContextualMenu(AtlasWindow *aw): _aw(aw)
-{
-    // Initialize our state.
-    _setSceneryLayerOn();
-
-    // We're always interested when the scenery layer is toggled on
-    // and off.
-
-    // EYE - we should also subscribe to moves (and rotates?).  These
-    // all affect the location under the mouse.  Do we need a
-    // notification that gathers these together?
-    subscribe(Notification::SceneryLayerOn);
-}
-
-void ContextualMenu::_rebuild()
-{
-    if (_aw->sceneryLayerOn()) {
-	return;
-    }
-
-    // Clear the whole thing.  We could be clever and just try to
-    // figure out what has changed, but it's more trouble than it's
-    // worth.
-    clear();
-
-    // Figure out our "global" menu entries - these are ones
-    // that don't depend on what's under the mouse.
-    TileManager *tm = _aw->ac()->tileManager();
-    static AtlasString str;
-    int count = tm->tileCount(TileManager::DOWNLOADED);
-    if (count > 0) {
-	str.printf("Rerender all maps (%d)", count);
-	addItem(str.str(), (GLUTMenu::cb)&ContextualMenu::rerenderAll);
-    }
-    count = tm->tileCount(TileManager::UNMAPPED);
-    if (count > 0) {
-	str.printf("Render all unrendered maps (%d)", count);
-	addItem(str.str(), (GLUTMenu::cb)&ContextualMenu::renderAll);
-    }
-
-    // If the cursor isn't sitting above the earth, return.
-    ScreenLocation *cursor = _aw->cursor();
-    if (!cursor->coord().valid()) {
-	return;
-    }
-
-    // If the cursor is on an empty scenery chunk, return.
-    GeoLocation loc(cursor->lat(), cursor->lon(), true);
-    // if (!Chunk::exists(Chunk::canonicalize(loc))) {
-    if (tm->chunk(loc) == NULL) {
-	return;
-    }
-
-    // Now add the chunk-level entries to the menu.
-    Chunk *c = tm->chunk(loc);
-    if (!c) {
-	return;
-    }
-
-    count = c->tileCount(TileManager::DOWNLOADED);
-    if (count > 0) {
-	str.printf("Rerender %s chunk maps (%d)", c->name(), count);
-	addItem(str.str(), (GLUTMenu::cb)&ContextualMenu::rerender10);
-    }
-    count = c->tileCount(TileManager::UNMAPPED);
-    if (count > 0) {
-	str.printf("Render all unrendered %s chunk maps (%d)", 
-		   c->name(), count);
-	addItem(str.str(), (GLUTMenu::cb)&ContextualMenu::render10);
-    }
-
-    // Now look at tile information.
-    Tile *t = c->tile(loc);
-    if (!t || !t->hasScenery()) {
-	return;
-    }
-
-    if (t->maps().any()) {
-	str.printf("Rerender %s tile maps", Tile::name(loc));
-	addItem(str.str(), (GLUTMenu::cb)&ContextualMenu::rerender1);
-    }
-    if (t->missingMaps().any()) {
-	str.printf("Render all unrendered %s tile maps", Tile::name(loc));
-	addItem(str.str(), (GLUTMenu::cb)&ContextualMenu::render1);
-    }
-}
-
-void ContextualMenu::renderAll()
-{
-    _renderAll(false);
-}
-
-void ContextualMenu::rerenderAll()
-{
-    _renderAll(true);
-}
-
-void ContextualMenu::render10()
-{
-    _render10(false);
-}
-
-void ContextualMenu::rerender10()
-{
-    _render10(true);
-}
-
-void ContextualMenu::render1()
-{
-    _render1(false);
-}
-
-void ContextualMenu::rerender1()
-{
-    _render1(true);
-}
-
-void ContextualMenu::notification(Notification::type n)
-{
-    if (n == Notification::MouseMoved) {
-	// EYE - do we also need to do this if we move, zoom, or
-	// rotate?
-	_rebuild();
-    } else if (n == Notification::SceneryLayerOn) {
-	_setSceneryLayerOn();
-    } else {
-	assert(0);
-    }
-}
-
-void ContextualMenu::_setSceneryLayerOn()
-{
-    if (_aw->sceneryLayerOn()) {
-	_aw->detach(GLUT_RIGHT_BUTTON);
-	// Since we're no longer active, ignore mouse moved events.
-	unsubscribe(Notification::MouseMoved);
-    } else {
-	_aw->attach(GLUT_RIGHT_BUTTON, this);
-	// Since we're active, track mouse moved events.
-	subscribe(Notification::MouseMoved);
-	_rebuild();
-    }
-}
-
-void ContextualMenu::_renderAll(bool force)
-{
-    _tiles.clear();
-
-    TileIterator ti(_aw->ac()->tileManager(), TileManager::DOWNLOADED);
-    for (Tile *t = ti.first(); t; t = ti++) {
-	if (force || t->missingMaps().any()) {
-	    _tiles.push_back(t);
-	}
-    }
-    _aw->render(_tiles, force);
-}
-
-void ContextualMenu::_render10(bool force)
-{
-    _tiles.clear();
-
-    GeoLocation loc(_aw->cursor()->lat(), _aw->cursor()->lon(), true);
-    Chunk *c = _aw->ac()->tileManager()->chunk(loc);
-    TileIterator i(c, TileManager::DOWNLOADED);
-    for (Tile *t = i.first(); t; t = i++) {
-	if (force || t->missingMaps().any()) {
-	    _tiles.push_back(t);
-	}
-    }
-    _aw->render(_tiles, force);
-}
-
-void ContextualMenu::_render1(bool force)
-{
-    _tiles.clear();
-
-    GeoLocation loc(_aw->cursor()->lat(), _aw->cursor()->lon(), true);
-    Tile *t = _aw->ac()->tileManager()->tile(loc);
-    assert(t);
-    _tiles.push_back(t);
-    _aw->render(_tiles, force);
-}
-
-// EYE - move into Background/Scenery file just to group things
-// nicely?  Ditto for ContextualMenu.
-class Tooltip: public puFrame, Subscriber
-{
-  public:
-    Tooltip(AtlasWindow *aw);
-    ~Tooltip();
-
-    // Subscriber method.
-    void notification(Notification::type n);
-
-  protected:
-    AtlasWindow *_aw;
-
-    void _setLocation();
-    void _setSceneryLayerOn();
-};
-
-// EYE - magic numbers
-Tooltip::Tooltip(AtlasWindow *aw): puFrame(0, 0, 175, 20), _aw(aw)
-{
-    // EYE - A sanity check, because I free whatever's there in
-    // _passiveMotion.  If it had some random startup value, we could
-    // crash.
-    assert(!getLegend());
-    setStyle(PUSTYLE_PLAIN);
-    setColour(PUCOL_FOREGROUND, 1.0, 1.0, 0.8, 0.8);
-
-    _setLocation();
-    _setSceneryLayerOn();
-
-    // We're always interested in when the scenery layer is toggled on
-    // and off.
-
-    // EYE - we should also subscribe to moves (and rotates?).  These
-    // all affect the location under the mouse.  Do we need a
-    // notification that gathers these together?
-    subscribe(Notification::SceneryLayerOn);
-}
-
-Tooltip::~Tooltip()
-{
-    free((void *)getLegend());
-}
-
-void Tooltip::notification(Notification::type n)
-{
-    if (n == Notification::MouseMoved) {
-	_setLocation();
-    } else if (n == Notification::SceneryLayerOn) {
-	_setSceneryLayerOn();
-	_setLocation();
-    } else {
-	assert(0);
-    }
-}
-
-void Tooltip::_setLocation()
-{
-    if (_aw->sceneryLayerOn()) {
-	return;
-    }
-
-    ScreenLocation *cursor = _aw->cursor();
-    if (_aw->sceneryLayerOn() || !cursor->coord().valid()) {
-	// EYE - also need to update when we zoom, move, ...
-	hide();
-    } else {
-	// EYE - make it static and compare between calls?
-	GeoLocation loc(cursor->lat(), cursor->lon(), true);
-	TileManager *tm = _aw->ac()->tileManager();
-	if (!tm->chunk(loc)) {
-	    hide();
-	} else {
-	    static AtlasString str;
-	    str.printf("%s", Chunk::name(loc));
-
-	    // And a tile name, if there is one.
-	    Tile *t = tm->tile(loc);
-	    if (t) {
-		// Add the tile name to the tooltip.
-		str.appendf("/%s", t->name());
-
-		// For tiles that have been downloaded, show how many
-		// maps have been rendered.
-		if (t->hasScenery()) {
-		    int totalMaps = t->mapLevels().count();
-		    int renderedMaps = t->maps().count();
-		    str.appendf(" (%d/%d)", renderedMaps, totalMaps);
-		}
-	    }
-	    // Remove whatever string was there before, then copy in
-	    // our new one (PUI doesn't copy the string itself).
-	    free((void *)getLegend());
-	    setLegend(strdup(str.str()));
-
-	    // Place the tooltip near the mouse, but in the window.
-	    // First, convert GLUT's upside down y to our y.
-	    int x = cursor->x(), y = cursor->y();
-	    y = _aw->height() - cursor->y();
-
-	    // Now place it centred above the mouse.
-	    int w, h;
-	    getSize(&w, &h);
-	    x -= w / 2;
-	    y += h;
-	    setPosition(x, y);
-
-	    // Reveal ourselves in all our glory.
-	    reveal();
-	}
-    }
-}
-
-void Tooltip::_setSceneryLayerOn()
-{
-    if (_aw->sceneryLayerOn()) {
-	// Ignore mouse moved events while we're not active.
-	unsubscribe(Notification::MouseMoved);
-	hide();
-    } else {
-	// Track the mouse.
-	subscribe(Notification::MouseMoved);
-	reveal();
-    }
-}
 
 //////////////////////////////////////////////////////////////////////
 // Dispatcher - passes a bit of work at a time to a TileMapper object.
@@ -721,13 +363,53 @@ MainUI::MainUI(int x, int y, AtlasWindow *aw):
 	preferencesHeight = boxHeight,
 	locationHeight = 4 * buttonHeight + 5 * bigSpace, 
 	navaidsHeight = 7 * buttonHeight + 2 * bigSpace + 6 * smallSpace, 
-	flightTracksHeight = 7 * buttonHeight + 8 * bigSpace;
+	flightTracksHeight = 7 * buttonHeight + 8 * bigSpace,
+	renderHeight = 3 * buttonHeight + 4 * bigSpace;
     const int width = 210, guiWidth = width - (2 * bigSpace), labelWidth = 45;
     const int boxWidth = width / 2;
+    const int trackButtonWidth = (width - 4 * bigSpace) / 3;
 
     int cury = 0, curx = bigSpace;
 
     _gui = new puGroup(x, y);
+    
+    //////////////////////////////////////////////////////////////////////
+    // Render button
+    //////////////////////////////////////////////////////////////////////
+    _renderFrame = new puFrame(0, cury, width, cury + renderHeight);
+    cury += bigSpace;
+
+    // Render button
+    _renderButton = new puOneShot(curx, cury,
+				  curx + trackButtonWidth, cury + buttonHeight);
+    _renderButton->setLegend("Render");
+    _renderButton->setUserData(this);
+    _renderButton->setCallback(__mainUI_renderButton_cb);
+
+    cury += buttonHeight + bigSpace;
+
+    // Show chunk/tile outlines toggle
+    _showOutlinesToggle = new puButton(curx + bigSpace, 
+				       cury + bigSpace,
+				       curx + bigSpace + checkHeight, 
+				       cury + bigSpace + checkHeight);
+    _showOutlinesToggle->setLabel("Show chunk/tile outlines");
+    _showOutlinesToggle->setLabelPlace(PUPLACE_CENTERED_RIGHT);
+    _showOutlinesToggle->setButtonType(PUBUTTON_VCHECK);
+    _showOutlinesToggle->setUserData(this);
+    _showOutlinesToggle->setCallback(__mainUI_showOutlines_cb);
+
+    cury += buttonHeight + bigSpace;
+    curx = bigSpace;
+
+    // Chunk/tile text
+    _chunkTileText = new puText(curx, cury);
+    // EYE - it would be nice to make all the labels line up along the
+    // colons.  Perhaps the text should be separated into two - a
+    // label and the actual text.  Or, just get a better GUI library.
+    _chunkTileText->setLabel("Map: w000n00/w000n00 (0/0)");
+
+    cury += buttonHeight + bigSpace;
 
     //////////////////////////////////////////////////////////////////////
     // Flight tracks
@@ -735,12 +417,10 @@ MainUI::MainUI(int x, int y, AtlasWindow *aw):
     _flightTracksFrame = new puFrame(0, cury, width, cury + flightTracksHeight);
     cury += bigSpace;
 
-    const int trackButtonWidth = (width - 4 * bigSpace) / 3;
-
     // Track size and track size limit.
     curx = bigSpace;
     _trackLimitInput = new puInput(curx + labelWidth * 2, cury, 
-				  curx + guiWidth, cury + buttonHeight);
+				   curx + guiWidth, cury + buttonHeight);
     _trackLimitInput->setLabel("Track limit: ");
     _trackLimitInput->setLabelPlace(PUPLACE_CENTERED_LEFT);
     _trackLimitInput->setValidData("0123456789");
@@ -758,14 +438,14 @@ MainUI::MainUI(int x, int y, AtlasWindow *aw):
     // Jump to button and track aircraft toggle
     curx = bigSpace;
     _jumpToButton = new puOneShot(curx, cury,
-				 curx + trackButtonWidth, cury + buttonHeight);
+				  curx + trackButtonWidth, cury + buttonHeight);
     _jumpToButton->setLegend("Centre");
     _jumpToButton->setUserData(_aw);
     _jumpToButton->setCallback(__mainUI_centre_cb);
     curx += trackButtonWidth + bigSpace;
 
     _trackAircraftToggle = new puButton(curx, cury, 
-				       curx + checkHeight, cury + checkHeight);
+					curx + checkHeight, cury + checkHeight);
     _trackAircraftToggle->setLabel("Follow aircraft");
     _trackAircraftToggle->setLabelPlace(PUPLACE_CENTERED_RIGHT);
     _trackAircraftToggle->setButtonType(PUBUTTON_VCHECK);
@@ -777,21 +457,21 @@ MainUI::MainUI(int x, int y, AtlasWindow *aw):
     // Save, save as, and clear  buttons.
     curx = bigSpace;
     _saveButton = new puOneShot(curx, cury,
-			       curx + trackButtonWidth, cury + buttonHeight);
+				curx + trackButtonWidth, cury + buttonHeight);
     _saveButton->setLegend("Save");
     _saveButton->setUserData(_ac);
     _saveButton->setCallback(__mainUI_save_cb);
     curx += trackButtonWidth + bigSpace;
 
     _saveAsButton = new puOneShot(curx, cury,
-				 curx + trackButtonWidth, cury + buttonHeight);
+				  curx + trackButtonWidth, cury + buttonHeight);
     _saveAsButton->setLegend("Save As");
     _saveAsButton->setUserData(this);
     _saveAsButton->setCallback(__mainUI_saveAs_cb);
     curx += trackButtonWidth + bigSpace;
 
     _clearButton = new puOneShot(curx, cury,
-				curx + trackButtonWidth, cury + buttonHeight);
+				 curx + trackButtonWidth, cury + buttonHeight);
     _clearButton->setLegend("Clear");
     _clearButton->setUserData(_ac);
     _clearButton->setCallback(__mainUI_clearFlightTrack_cb);
@@ -800,14 +480,14 @@ MainUI::MainUI(int x, int y, AtlasWindow *aw):
     // Unload and detach buttons.
     curx = bigSpace;
     _unloadButton = new puOneShot(curx, cury,
-				 curx + trackButtonWidth, cury + buttonHeight);
+				  curx + trackButtonWidth, cury + buttonHeight);
     _unloadButton->setLegend("Unload");
     _unloadButton->setUserData(this);
     _unloadButton->setCallback(__mainUI_unload_cb);
     curx += trackButtonWidth + bigSpace;
 
     _detachButton = new puOneShot(curx, cury,
-				 curx + trackButtonWidth, cury + buttonHeight);
+				  curx + trackButtonWidth, cury + buttonHeight);
     _detachButton->setLegend("Detach");
     _detachButton->setUserData(_ac);
     _detachButton->setCallback(__mainUI_detach_cb);
@@ -816,27 +496,27 @@ MainUI::MainUI(int x, int y, AtlasWindow *aw):
     // Track chooser, and next and previous arrow buttons.
     curx = bigSpace;
     _tracksComboBox = new puaComboBox(curx, 
-				     cury,
-				     curx + guiWidth - buttonHeight,
-				     cury + buttonHeight,
-				     NULL,
-				     FALSE);
+				      cury,
+				      curx + guiWidth - buttonHeight,
+				      cury + buttonHeight,
+				      NULL,
+				      FALSE);
     _tracksComboBox->setUserData(this);
     _tracksComboBox->setCallback(__mainUI_trackSelect_cb);
     curx += guiWidth - buttonHeight;
     _prevTrackButton = new puArrowButton(curx,
-					cury + buttonHeight / 2,
-					curx + buttonHeight,
-					cury + buttonHeight,
-					PUARROW_UP);
+					 cury + buttonHeight / 2,
+					 curx + buttonHeight,
+					 cury + buttonHeight,
+					 PUARROW_UP);
     _prevTrackButton->setUserData(this);
     _prevTrackButton->setCallback(__mainUI_trackSelect_cb);
     _prevTrackButton->greyOut();
     _nextTrackButton = new puArrowButton(curx,
-					cury,
-					curx + buttonHeight,
-					cury + buttonHeight / 2,
-					PUARROW_DOWN);
+					 cury,
+					 curx + buttonHeight,
+					 cury + buttonHeight / 2,
+					 PUARROW_DOWN);
     _nextTrackButton->setUserData(this);
     _nextTrackButton->setCallback(__mainUI_trackSelect_cb);
     _nextTrackButton->greyOut();
@@ -846,14 +526,14 @@ MainUI::MainUI(int x, int y, AtlasWindow *aw):
     // Load and attach buttons.
     curx = bigSpace;
     _loadButton = new puOneShot(curx, cury,
-			       curx + trackButtonWidth, cury + buttonHeight);
+				curx + trackButtonWidth, cury + buttonHeight);
     _loadButton->setLegend("Load");
     _loadButton->setUserData(this);
     _loadButton->setCallback(__mainUI_load_cb);
     curx += trackButtonWidth + bigSpace;
 
     _attachButton = new puOneShot(curx, cury,
-				curx + trackButtonWidth, cury + buttonHeight);
+				  curx + trackButtonWidth, cury + buttonHeight);
     _attachButton->setLegend("Attach");
     _attachButton->setUserData(this);
     _attachButton->setCallback(__mainUI_attach_cb);
@@ -915,7 +595,7 @@ MainUI::MainUI(int x, int y, AtlasWindow *aw):
     curx -= buttonHeight;
 
     _navaidsToggle = new puButton(curx, cury, 
-				 curx + checkHeight, cury + checkHeight);
+				  curx + checkHeight, cury + checkHeight);
     _navaidsToggle->setLabel("Navaids");
     _navaidsToggle->setLabelPlace(PUPLACE_CENTERED_RIGHT);
     _navaidsToggle->setButtonType(PUBUTTON_VCHECK);
@@ -932,7 +612,7 @@ MainUI::MainUI(int x, int y, AtlasWindow *aw):
     curx += guiWidth / 2;
 
     _MEFToggle = new puButton(curx, cury, 
-				 curx + checkHeight, cury + checkHeight);
+			      curx + checkHeight, cury + checkHeight);
     _MEFToggle->setLabel("MEF");
     _MEFToggle->setLabelPlace(PUPLACE_CENTERED_RIGHT);
     _MEFToggle->setButtonType(PUBUTTON_VCHECK);
@@ -962,7 +642,7 @@ MainUI::MainUI(int x, int y, AtlasWindow *aw):
     curx += buttonHeight;
 
     _awyLow = new puButton(curx, cury, 
-				 curx + checkHeight, cury + checkHeight);
+			   curx + checkHeight, cury + checkHeight);
     _awyLow->setLabel("Low");
     _awyLow->setLabelPlace(PUPLACE_CENTERED_RIGHT);
     _awyLow->setButtonType(PUBUTTON_VCHECK);
@@ -971,7 +651,7 @@ MainUI::MainUI(int x, int y, AtlasWindow *aw):
     cury += buttonHeight + smallSpace;
 
     _awyHigh = new puButton(curx, cury, 
-				 curx + checkHeight, cury + checkHeight);
+			    curx + checkHeight, cury + checkHeight);
     _awyHigh->setLabel("High");
     _awyHigh->setLabelPlace(PUPLACE_CENTERED_RIGHT);
     _awyHigh->setButtonType(PUBUTTON_VCHECK);
@@ -983,7 +663,7 @@ MainUI::MainUI(int x, int y, AtlasWindow *aw):
     curx -= buttonHeight;
 
     _airwaysToggle = new puButton(curx, cury, 
-				 curx + checkHeight, cury + checkHeight);
+				  curx + checkHeight, cury + checkHeight);
     _airwaysToggle->setLabel("Airways");
     _airwaysToggle->setLabelPlace(PUPLACE_CENTERED_RIGHT);
     _airwaysToggle->setButtonType(PUBUTTON_VCHECK);
@@ -992,7 +672,7 @@ MainUI::MainUI(int x, int y, AtlasWindow *aw):
     cury += buttonHeight + smallSpace;
 
     _airportsToggle = new puButton(curx, cury, 
-				 curx + checkHeight, cury + checkHeight);
+				   curx + checkHeight, cury + checkHeight);
     _airportsToggle->setLabel("Airports");
     _airportsToggle->setLabelPlace(PUPLACE_CENTERED_RIGHT);
     _airportsToggle->setButtonType(PUBUTTON_VCHECK);
@@ -1011,21 +691,21 @@ MainUI::MainUI(int x, int y, AtlasWindow *aw):
 
     // Zoom: an input field and two buttons
     _zoomInput = new puInput(curx + labelWidth, cury, 
-			    curx + guiWidth - (2 * buttonHeight),
-			    cury + buttonHeight);
+			     curx + guiWidth - (2 * buttonHeight),
+			     cury + buttonHeight);
     _zoomInput->setLabel("Zoom:");
     _zoomInput->setLabelPlace(PUPLACE_CENTERED_LEFT);
     _zoomInput->setUserData(this);
     _zoomInput->setCallback(__mainUI_zoom_cb);
     curx += guiWidth - (2 * buttonHeight);
     _zoomInButton = new puOneShot(curx, cury,
-				 curx + buttonHeight, cury + buttonHeight);
+				  curx + buttonHeight, cury + buttonHeight);
     _zoomInButton->setLegend("+");
     _zoomInButton->setUserData(this);
     _zoomInButton->setCallback(__mainUI_zoom_cb);
     curx += buttonHeight;
     _zoomOutButton = new puOneShot(curx, cury,
-				  curx + buttonHeight, cury + buttonHeight);
+				   curx + buttonHeight, cury + buttonHeight);
     _zoomOutButton->setLegend("-");
     _zoomOutButton->setUserData(this);
     _zoomOutButton->setCallback(__mainUI_zoom_cb);
@@ -1046,7 +726,7 @@ MainUI::MainUI(int x, int y, AtlasWindow *aw):
 
     // Longitude: an input field
     _lonInput = new puInput(curx + labelWidth, cury, 
-			   curx + guiWidth, cury + buttonHeight);
+			    curx + guiWidth, cury + buttonHeight);
     _lonInput->setLabel("Lon:");
     _lonInput->setLabelPlace(PUPLACE_CENTERED_LEFT);
     _lonInput->setUserData(this);
@@ -1055,7 +735,7 @@ MainUI::MainUI(int x, int y, AtlasWindow *aw):
 
     // Latitude: an input field
     _latInput = new puInput(curx + labelWidth, cury, 
-			   curx + guiWidth, cury + buttonHeight);
+			    curx + guiWidth, cury + buttonHeight);
     _latInput->setLabel("Lat:");
     _latInput->setLabelPlace(PUPLACE_CENTERED_LEFT);
     _latInput->setUserData(this);
@@ -1120,6 +800,7 @@ MainUI::MainUI(int x, int y, AtlasWindow *aw):
     subscribe(Notification::FlightTrackModified);
     subscribe(Notification::NewFlightTrack);
     subscribe(Notification::FlightTrackList);
+    subscribe(Notification::ShowOutlines);
 }
 
 MainUI::~MainUI()
@@ -1190,6 +871,8 @@ void MainUI::notification(Notification::type n)
 	// The flight track list has changed.
 	_setTrackList();
 	_setTrack();
+    } else if (n == Notification::ShowOutlines) {
+	_setShowOutlines();
     } else {
 	assert(0);
     }
@@ -1402,6 +1085,49 @@ void MainUI::_attach_cb(puObject *o)
     _networkPopup->setNetwork(true);
 }
 
+void MainUI::_showOutlines_cb(puObject *o) 
+{
+    bool on = (o->getIntegerValue() == 1);
+    _aw->setShowOutlines(on);
+    _aw->postRedisplay();
+}
+
+void MainUI::_renderButton_cb(puObject *o) 
+{
+    // EYE - grey out the render button?  What if we use the keyboard
+    // shortcut?  And when do we activate the button - when the dialog
+    // closes or when rendering finishes (or is cancelled)?  Do we
+    // need a rendering notification?  Should the keyboard shortcut
+    // code call this routine (or some publicly-exposed one), or
+    // vice-versa?
+    _renderDialog = new RenderDialog(_aw, __mainUI_renderDialog_cb, this);
+}
+
+void MainUI::_closeOk_cb(bool okay) 
+{
+    puDeleteObject(_closeOkDialog);
+    _closeOkDialog = NULL;
+    if (okay) {
+	// Unload the track with extreme prejudice.
+	_ac->removeTrack();
+    }
+}
+
+// Called from the render dialog when the "OK" or "Cancel" buttons are
+// pressed.
+void MainUI::_renderDialog_cb(bool okay) 
+{
+    AtlasWindow::RenderType rt =_renderDialog->type();
+    bool force = _renderDialog->force();
+
+    puDeleteObject(_renderDialog);
+    _renderDialog = NULL;
+
+    if (okay) {
+	_aw->render(rt, force);
+    }
+}
+
 void MainUI::_networkPopup_cb(bool okay)
 {
     if (okay) {
@@ -1438,16 +1164,6 @@ void MainUI::_networkPopup_cb(bool okay)
 
     delete _networkPopup;
     _networkPopup = NULL;
-}
-
-void MainUI::_closeOk_cb(bool okay) 
-{
-    puDeleteObject(_closeOkDialog);
-    _closeOkDialog = NULL;
-    if (okay) {
-	// Unload the track with extreme prejudice.
-	_ac->removeTrack();
-    }
 }
 
 void MainUI::_setDegMinSec()
@@ -1494,7 +1210,8 @@ void MainUI::_setPosition()
     // EYE - if the keyboard focus leaves one of these text fields,
     // the fields don't update unless an event happens (like wiggling
     // the mouse).  This should be fixed.
-    static AtlasString latStr, lonStr, elevStr;
+    // EYE - move these AtlasStrings into MainUI?
+    static AtlasString latStr, lonStr, elevStr, chunkTileStr;
     if (!_latInput->isAcceptingInput()) {
 	latStr.printf("%c%s", (lat < 0) ? 'S' : 'N', 
 		      formatAngle(lat, _ac->degMinSec()));
@@ -1513,6 +1230,33 @@ void MainUI::_setPosition()
 	elevStr.printf("Elev: n/a");
     }
     _elevText->setLabel(elevStr.str());
+
+    chunkTileStr.printf("Map: ");
+    GeoLocation gLoc(lat, lon, true);
+    TileManager *tm = _ac->tileManager();
+    Chunk *c = tm->chunk(gLoc);
+    if (c) {
+	// We have a chunk - append its name to the string.
+	chunkTileStr.appendf("%s", c->name());
+
+	// And a tile name, if there is one.
+	Tile *t = tm->tile(gLoc);
+	if (t) {
+	    // Add the tile name to the string.
+	    chunkTileStr.appendf("/%s", t->name());
+
+	    // For tiles that have been downloaded, show how many
+	    // maps have been rendered.
+	    if (t->hasScenery()) {
+		int totalMaps = t->mapLevels().count();
+		int renderedMaps = t->maps().count();
+		chunkTileStr.appendf(" (%d/%d)", renderedMaps, totalMaps);
+	    }
+	}
+    } else {
+	chunkTileStr.appendf("n/a");
+    }
+    _chunkTileText->setLabel(chunkTileStr.str());
 }
 
 void MainUI::_setCentreType()
@@ -1528,7 +1272,6 @@ void MainUI::_setCentreType()
 void MainUI::_setZoom()
 {
     if (!_zoomInput->isAcceptingInput()) {
-	// _zoomInput->setValue((float)_ac->metresPerPixel());
 	_zoomInput->setValue((float)_aw->scale());
     }
 }
@@ -1688,6 +1431,12 @@ void MainUI::_setTrackList()
     _trackListStrings[_ac->tracks().size()] = (char *)NULL;
 
     _tracksComboBox->newList(_trackListStrings);
+}
+
+// Called when we want to set the show outlines toggle.
+void MainUI::_setShowOutlines()
+{
+    _showOutlinesToggle->setValue(_aw->showOutlines());
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -2617,7 +2366,7 @@ void LightingUI::_cb(puObject *o)
 	_ac->setCurrentPalette(_paletteComboBox->getCurrentItem() + 1);
     }
 
-    glutPostRedisplay();
+    _aw->postRedisplay();
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -2856,8 +2605,9 @@ char *SearchUI::matchAtIndex(int i)
     return _aw->matchAtIndex(i);
 }
 
-// Create the mapping interface, with its lower-left corner at x, y.
-// Assumes that puInit() has been called.
+//////////////////////////////////////////////////////////////////////
+// MappingUI
+//////////////////////////////////////////////////////////////////////
 MappingUI::MappingUI(int x, int y, AtlasWindow *aw): _ac(aw->ac()), _aw(aw)
 {
     // EYE - make these global?
@@ -2946,6 +2696,168 @@ void MappingUI::_setProgress()
 void MappingUI::_cancel_cb(puObject *o)
 {
     _aw->cancelMapping();
+}
+
+//////////////////////////////////////////////////////////////////////
+// RenderDialog
+//////////////////////////////////////////////////////////////////////
+RenderDialog::RenderDialog(AtlasWindow *aw, puCallback cb, void *data):
+    puDialogBox(0, 0)
+{
+    // Create the label strings.  As a side effect, we get to find out
+    // how many entries we need for our button box.
+    int i = _createStrings(aw);
+
+    // EYE - magic numbers (and many others later).
+    const int dialogWidth = 400;
+    const int buttonHeight = 20, bigSpace = 7;
+    const int boxWidth = dialogWidth,
+	boxHeight = i * (buttonHeight + bigSpace) + bigSpace;
+    const int dialogHeight = boxHeight + buttonHeight + bigSpace * 2;
+
+    // _x is used to place buttons.  When a new button is created, we
+    // expect it to be at the left edge of the previously placed
+    // button.
+    _x = dialogWidth;
+
+    // Place the dialog box in the centre of the window.
+    GLint viewport[4];
+    glGetIntegerv(GL_VIEWPORT, viewport);
+    GLint windowWidth = viewport[2];
+    GLint windowHeight = viewport[3];
+    setPosition(windowWidth / 2 - dialogWidth / 2,
+		windowHeight / 2 - dialogHeight / 2);
+
+    // Create a frame.  We'll adjust the height later.
+    new puFrame(0, 0, dialogWidth, dialogHeight); {
+	// Create the buttons from right to left.  Note that I don't
+	// check if the strings are NULL - strcmp() seems to be smart
+	// enough to handle that.
+	_cancelButton = _makeButton("Cancel", 0, cb, data);
+	_okButton = _makeButton("OK", 1, cb, data);
+
+	// Create the button box, sized for the number of buttons we
+	// need.
+	int curx = 0;
+	int cury = bigSpace * 2 + buttonHeight;
+	// EYE - coercion!
+	_choices = new puButtonBox(curx, cury, 
+				   curx + boxWidth, cury + boxHeight,
+				   (char **)_strings, TRUE);
+	// EYE - can we associate data with *each* button in the
+	// button box?
+    }
+    close();
+    reveal();
+}
+
+RenderDialog::~RenderDialog()
+{
+}
+
+int RenderDialog::_createStrings(AtlasWindow *aw)
+{
+    int i = 0;
+
+    // Figure out our "global" menu entries - these are ones
+    // that don't depend on what's under the mouse.
+    TileManager *tm = aw->ac()->tileManager();
+    int count = tm->tileCount(TileManager::DOWNLOADED);
+    if (count > 0) {
+	_rerenderAllStr.printf("Rerender all maps (%d)", count);
+	i = _addString(_rerenderAllStr.str(), AtlasWindow::RENDER_ALL, true, i);
+    }
+    count = tm->tileCount(TileManager::UNMAPPED);
+    if (count > 0) {
+	_renderAllStr.printf("Render all unrendered maps (%d)", count);
+	i = _addString(_renderAllStr.str(), AtlasWindow::RENDER_ALL, false, i);
+    }
+
+    // If the current location isn't on the earth, return.
+    ScreenLocation *currentLoc = aw->currentLocation();
+    if (!currentLoc->coord().valid()) {
+	_strings[i] = NULL;
+	return i;
+    }
+
+    // If the current location is an empty scenery chunk, return.
+    GeoLocation loc(currentLoc->lat(), currentLoc->lon(), true);
+    if (tm->chunk(loc) == NULL) {
+	_strings[i] = NULL;
+	return i;
+    }
+
+    // Now add the chunk-level entries to the menu.
+    Chunk *c = tm->chunk(loc);
+    if (!c) {
+	_strings[i] = NULL;
+	return i;
+    }
+
+    count = c->tileCount(TileManager::DOWNLOADED);
+    if (count > 0) {
+	_rerender10Str.printf("Rerender %s chunk maps (%d)", 
+			      c->name(), count);
+	i = _addString(_rerender10Str.str(), AtlasWindow::RENDER_10, true, i);
+    }
+    count = c->tileCount(TileManager::UNMAPPED);
+    if (count > 0) {
+	_render10Str.printf("Render all unrendered %s chunk maps (%d)", 
+			    c->name(), count);
+	i = _addString(_render10Str.str(), AtlasWindow::RENDER_10, false, i);
+    }
+
+    // Now look at tile information.
+    Tile *t = c->tile(loc);
+    if (!t || !t->hasScenery()) {
+	_strings[i] = NULL;
+	return i;
+    }
+
+    if (t->maps().any()) {
+	_rerender1Str.printf("Rerender %s tile maps", Tile::name(loc));
+	i = _addString(_rerender1Str.str(), AtlasWindow::RENDER_1, true, i);
+    }
+    if (t->missingMaps().any()) {
+	_render1Str.printf("Render all unrendered %s tile maps", t->name());
+	i = _addString(_render1Str.str(), AtlasWindow::RENDER_1, false, i);
+    }
+    _strings[i] = NULL;
+
+    return i;
+}
+
+// EYE - this all seems very ugly; there must be a cleaner way to do
+// this
+int RenderDialog::_addString(const char *str, AtlasWindow::RenderType t, 
+			     bool force, int i)
+{
+    _strings[i] = str;
+    _types[i] = t;
+    _forces[i] = force;
+
+    return i + 1;
+}
+
+puOneShot *RenderDialog::_makeButton(const char *label, int val, 
+				     puCallback cb, void *data)
+{
+    // We'll adjust its position later.
+    puOneShot *button = new puOneShot(0, 0, label);
+    button->setCallback(cb);
+    button->setUserData(data);
+    button->setDefaultValue(val);
+
+    // EYE - magic number
+    // EYE - fix the button height?
+    // EYE - use bigSpace as the y value?
+    const int spacing = 5;
+    int width, height;
+    button->getSize(&width, &height);
+    _x -= spacing + width;
+    button->setPosition(_x, spacing);
+
+    return button;
 }
 
 // Some compilers don't allow floats to be initialized in the class
@@ -3238,15 +3150,14 @@ void ScreenLocation::invalidate()
     _valid = _validElevation = false;
 }
 
-// This constructor assumes that there exists a valid OpenGL context.
 AtlasWindow::AtlasWindow(const char *name, 
 			 const char *regularFontFile,
 			 const char *boldFontFile,
 			 AtlasController *ac): 
     AtlasBaseWindow(name, regularFontFile, boldFontFile), _ac(ac), 
     _dragging(false), _lightingPrefixKey(false), _debugPrefixKey(false), 
-    // _overlays(NULL), _exitOkDialog(NULL), _searchTimerScheduled(false)
-    _overlays(NULL), _sceneryLayerOn(false), _exitOkDialog(NULL), _searchTimerScheduled(false)
+    _overlays(NULL), _showOutlines(false), _exitOkDialog(NULL), 
+    _searchTimerScheduled(false)
 {
     // Initialize OpenGL, starting with clearing (background) color
     // and enabling depth testing.
@@ -3258,10 +3169,10 @@ AtlasWindow::AtlasWindow(const char *name,
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
 
-    // Standard settings for lines and points.  If you change any of
-    // these, you *must* return them to their original value after!
-    glEnable(GL_LINE_SMOOTH);
-    glEnable(GL_POINT_SMOOTH);
+    // Standard settings for multisampling, blending, lines, and
+    // points.  If you change any of these, you *must* return them to
+    // their original value after!
+    glEnable(GL_MULTISAMPLE);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glLineWidth(1.0);
@@ -3297,10 +3208,6 @@ AtlasWindow::AtlasWindow(const char *name,
     world.append("background");
     _background->setImage(world);
     _background->setUseImage(true);
-    // EYE - this is wrong.  If we don't set this explicitly, and to
-    // the correct value, our subsequent call to _setSceneryLayerOn
-    // won't work correctly.
-    _background->setShowStatus(true);
 
     // Create our screen location objects.  They track the lat/lon
     // (and elevation, if available) of what's beneath the cursor and
@@ -3332,11 +3239,8 @@ AtlasWindow::AtlasWindow(const char *name,
     _setAzimuthElevation();
     _setFlightTrack();
     // EYE - These look inconsistent because we have the "model"
-    // (_relativePalette, _sceneryLayerOn)
+    // (_relativePalette, _showOutlines)
     _setRelativePalette(false);
-    // EYE - make this dependent scenery status?  If there's some
-    // unrendered scenery, turn the scenery layer off?
-    _setSceneryLayerOn(true);
     // EYE - call other '_set' functions?
     _setMEFs();
     _setCentreType();
@@ -3351,12 +3255,6 @@ AtlasWindow::AtlasWindow(const char *name,
     // The search interface is used to search for airports and navaids.
     _searchUI = new SearchUI(this, 0, 0, 300, 300);
     _searchUI->hide();
-
-    // Tooltip
-    _tooltip = new Tooltip(this);
-
-    // Contextual menu
-    _contextualMenu = new ContextualMenu(this);
 
     if (globals.prefs.softcursor) {
 	puShowCursor();
@@ -3383,6 +3281,11 @@ AtlasWindow::AtlasWindow(const char *name,
     // change our window title.
     subscribe(Notification::NewFlightTrack);
 
+    // EYE - Note that we have to do this after our subscribers
+    // (MainUI in this case) have been created.  I wonder if we can
+    // get race conditions?
+    setShowOutlines(false);
+
     // Check network connections and serial connections periodically (as
     // specified by the "update" user preference).
     startTimer((int)(globals.prefs.update * 1000.0), 
@@ -3402,9 +3305,6 @@ AtlasWindow::~AtlasWindow()
     delete _helpUI;
     delete _searchUI;
     delete _mappingUI;
-    
-    puDeleteObject(_tooltip);
-    delete _contextualMenu;
 }
 
 // #include "MPAircraft.hxx"
@@ -3426,9 +3326,7 @@ void AtlasWindow::_display()
     _background->draw();
 
     // Scenery.
-    if (_sceneryLayerOn) {
-	_scenery->draw(_ac->lightingOn());
-    }
+    _scenery->draw(_ac->lightingOn());
 
     // Overlays.
     _overlays->draw(_ac->navData());
@@ -3446,6 +3344,10 @@ void AtlasWindow::_display()
     // 	MPAircraft *t = i->second;
     // 	t->draw();
     // }
+
+    if (_showOutlines) {
+	_background->drawOutlines();
+    }
 
     // Render the widgets.
     puDisplay();
@@ -3782,7 +3684,7 @@ void AtlasWindow::_keyboard(unsigned char key, int x, int y)
 	    } else {
 	  	_lightingUI->hide();
 	    }
-	    glutPostRedisplay();
+	    postRedisplay();
 	    break;
 
 	  case 'm':
@@ -3862,7 +3764,15 @@ void AtlasWindow::_keyboard(unsigned char key, int x, int y)
 	      break;
 
 	  case 'r':
+	    // Toggle the active status of the route.
 	    route.active = !route.active;
+	    postRedisplay();
+	    break;
+
+	  case 'R':
+	    // Render some maps.
+	    _renderDialog = 
+		new RenderDialog(this, __atlasWindow_renderDialog_cb, this);
 	    postRedisplay();
 	    break;
 
@@ -3884,15 +3794,15 @@ void AtlasWindow::_keyboard(unsigned char key, int x, int y)
 	    // Toggle scenery
 	    // EYE - change keystroke?
 	    // EYE - force scenery to stop downloading if it's toggled off
-	    _setSceneryLayerOn(!_sceneryLayerOn);
-	    glutPostRedisplay();
+	    setShowOutlines(!_showOutlines);
+	    postRedisplay();
 	    break;
 
 	  case 'T':
 	    // Toggle background image
 	    // EYE - change keystroke
 	    _background->setUseImage(!_background->useImage());
-	    glutPostRedisplay();
+	    postRedisplay();
 	    break;
 
 	  case 'u':
@@ -4039,17 +3949,6 @@ void AtlasWindow::_setRelativePalette(bool relative)
     }
 }
 
-void AtlasWindow::_setSceneryLayerOn(bool on)
-{
-    if (on != _sceneryLayerOn) {
-	_sceneryLayerOn = on;
-	// EYE - should the background layer just subscribe to this as
-	// well?
-	_background->setShowStatus(!on);
-	Notification::notify(Notification::SceneryLayerOn);
-    }
-}
-
 void AtlasWindow::_setMEFs()
 {
     _scenery->setMEFs(_ac->MEFs());
@@ -4176,7 +4075,7 @@ void AtlasWindow::_renderTimer()
 	_mappingUI->hide();
     }
 
-    glutPostRedisplay();
+    postRedisplay();
 }
 
 // #include <sstream>
@@ -4283,6 +4182,16 @@ void AtlasWindow::toggleOverlay(Overlays::OverlayType overlay)
     setOverlayVisibility(overlay, !_overlays->isVisible(overlay));
 }
 
+void AtlasWindow::setShowOutlines(bool on)
+{
+    if (on != _showOutlines) {
+	_showOutlines = on;
+	// EYE - should this be a notification, or should we modify
+	// UIs directly?
+	Notification::notify(Notification::ShowOutlines);
+    }
+}
+
 void AtlasWindow::keyboard(unsigned char key, int x, int y)
 {
     int win = set();
@@ -4337,14 +4246,33 @@ char *AtlasWindow::matchAtIndex(int i)
     return strdup(searchable->asString().c_str());
 }
 
-void AtlasWindow::render(vector<Tile *>& tiles, bool force)
+void AtlasWindow::render(RenderType type, bool force)
 {
-    // EYE - copying is dumb
-    _tiles = tiles;
+    _tiles.clear();
     _force = force;
 
+    TileIterator i;
+    TileManager *tm = ac()->tileManager();
+    ScreenLocation *sLoc = currentLocation();
+    GeoLocation gLoc(sLoc->lat(), sLoc->lon(), true);
+    switch (type) {
+      case RENDER_ALL: 
+	i.init(tm, TileManager::DOWNLOADED);
+	break;
+      case RENDER_10:
+	i.init(tm->chunk(gLoc), TileManager::DOWNLOADED);
+	break;
+      case RENDER_1:
+	i.init(tm->tile(gLoc), TileManager::DOWNLOADED);
+	break;
+    }
+    for (Tile *t = i.first(); t; t = i++) {
+	if (_force || t->missingMaps().any()) {
+	    _tiles.push_back(t);
+	}
+    }
+
     int noOfMaps = 0;
-    TileManager *tm = _ac->tileManager();
     if (_force) {
 	noOfMaps = _tiles.size() * tm->mapLevels().count();
     } else {
@@ -4354,13 +4282,14 @@ void AtlasWindow::render(vector<Tile *>& tiles, bool force)
 	}
     }
 
-    assert(_renderDialog == NULL);
+    assert(_renderConfirmDialog == NULL);
     AtlasString str;
     str.printf("Render %d tiles (%d maps)?", _tiles.size(), noOfMaps);
-    _renderDialog = new AtlasDialog(str.str(), "OK", "Cancel", "", 
-				    __atlasWindow_renderDialog_cb, this);
+    _renderConfirmDialog = 
+	new AtlasDialog(str.str(), "OK", "Cancel", "", 
+			__atlasWindow_renderConfirmDialog_cb, this);
 
-    glutPostRedisplay();
+    postRedisplay();
 
     // EYE - we should probably force a call to passiveMotion, so that
     // the window correctly reflects the (new) mouse position (the
@@ -4782,10 +4711,28 @@ void AtlasWindow::_exitOk_cb(bool okay)
     }
 }
 
+// Called from the render dialog when the "OK" or "Cancel" buttons are
+// pressed.
 void AtlasWindow::_renderDialog_cb(bool okay)
 {
+    AtlasWindow::RenderType rt =_renderDialog->type();
+    bool force = _renderDialog->force();
+
     puDeleteObject(_renderDialog);
     _renderDialog = NULL;
+
+    if (okay) {
+	render(rt, force);
+    }
+}
+
+// Called from the render confirm dialog (the one that asks the users
+// if they really really want to go ahead with rendering) when the
+// user hits the "OK" or "Cancel" buttons.
+void AtlasWindow::_renderConfirmDialog_cb(bool okay)
+{
+    puDeleteObject(_renderConfirmDialog);
+    _renderConfirmDialog = NULL;
     if (okay) {
 	int maxMapLevel = 0;
 	for (unsigned int i = 0; i < TileManager::MAX_MAP_LEVEL; i++) {
@@ -4837,15 +4784,23 @@ void __atlasWindow_exitOk_cb(puObject *o)
     aw->_exitOk_cb(okay);
 }
 
+// Called when the user hits "OK" or "Cancel" on the rendering dialog.
+void __atlasWindow_renderDialog_cb(puObject *o)
+{
+    AtlasWindow *aw = (AtlasWindow *)o->getUserData();
+    bool okay = (o->getDefaultValue() == 1);
+    aw->_renderDialog_cb(okay);
+}
+
 // Called when the user hits a button on the confirm rendering dialog
 // box.
-void __atlasWindow_renderDialog_cb(puObject *o)
+void __atlasWindow_renderConfirmDialog_cb(puObject *o)
 {
     AtlasWindow *aw = (AtlasWindow *)o->getUserData();
     AtlasDialog::CallbackButton pos = 
 	(AtlasDialog::CallbackButton)o->getDefaultValue();
     bool okay = (pos == AtlasDialog::LEFT);
-    aw->_renderDialog_cb(okay);
+    aw->_renderConfirmDialog_cb(okay);
 }
 
 void __mainUI_zoom_cb(puObject *o)
@@ -4897,18 +4852,18 @@ void __mainUI_saveAsFile_cb(puObject *o)
     mainUI->_saveAsFile_cb(o);
 }
 
-// Called to save the current track.
-void __mainUI_save_cb(puObject *o)
-{
-    AtlasController *ac = (AtlasController *)o->getUserData();
-    ac->saveTrack();
-}
-
 // Called when the user wants to 'save as' a file.
 void __mainUI_saveAs_cb(puObject *o)
 {
     MainUI *mainUI = (MainUI *)o->getUserData();
     mainUI->_saveAs_cb(o);
+}
+
+// Called to save the current track.
+void __mainUI_save_cb(puObject *o)
+{
+    AtlasController *ac = (AtlasController *)o->getUserData();
+    ac->saveTrack();
 }
 
 // Called when the user presses OK or Cancel on the load file dialog.
@@ -4970,6 +4925,19 @@ void __mainUI_attach_cb(puObject *o)
     mainUI->_attach_cb(o);
 }
 
+void __mainUI_showOutlines_cb(puObject *o)
+{ 
+    MainUI *mainUI = (MainUI *)o->getUserData();
+    mainUI->_showOutlines_cb(o);
+}
+
+// Called when the user hits the "Render" button.
+void __mainUI_renderButton_cb(puObject *o)
+{
+    MainUI *mainUI = (MainUI *)o->getUserData();
+    mainUI->_renderButton_cb(o);
+}
+
 // Called if the user hits a button on the close track dialog box.
 void __mainUI_closeOk_cb(puObject *o)
 {
@@ -4978,6 +4946,13 @@ void __mainUI_closeOk_cb(puObject *o)
 	(AtlasDialog::CallbackButton)o->getDefaultValue();
     bool okay = (pos == AtlasDialog::LEFT);
     mainUI->_closeOk_cb(okay);
+}
+
+void __mainUI_renderDialog_cb(puObject *o)
+{
+    MainUI *mainUI = (MainUI *)o->getUserData();
+    bool okay = (o->getDefaultValue() == 1);
+    mainUI->_renderDialog_cb(okay);
 }
 
 void __networkPopup_ok_cb(puObject *o)
@@ -5124,4 +5099,3 @@ void AtlasWindow::_move()
     // Notify subscribers that we've moved.
     Notification::notify(Notification::Moved);
 }
-
