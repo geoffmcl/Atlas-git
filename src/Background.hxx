@@ -76,9 +76,6 @@ class Background: public Subscriber {
     // coloured.
     bool useImage() { return _useImage; }
     void setUseImage(bool b);
-    // True if we should display the status layer, false otherwise.
-    bool showStatus() { return _showStatus; }
-    void setShowStatus(bool b);
 
     // Calling 'setImage()' will load the file and create the texture.
     // It will *not* change 'useImage'.
@@ -97,6 +94,7 @@ class Background: public Subscriber {
     void setTileStatus(Tile *t, TileStatus);
 
     void draw();
+    void drawOutlines();
 
     // Subscriber interface.
     void notification(Notification::type n);
@@ -135,7 +133,7 @@ class Background: public Subscriber {
     // using a colour
     bool _useImage;
     // True if we should show the status layer, false otherwise.
-    bool _showStatus;
+    bool _showOutlines;
     // A default clear texture substituted for the background image
     // and/or the tile status texture.
     GLuint _clearTexture;

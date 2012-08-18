@@ -68,6 +68,8 @@ Background::Background(AtlasWindow *aw):
     glGenTextures(1, &_clearTexture);
     assert(_clearTexture > 0);
     glBindTexture(GL_TEXTURE_2D, _clearTexture);
+    // EYE - just do this once, in main() or wherever.  And what's a
+    // good value to use?  Should we just use the default (4)?
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     // Since this texture is clear, we don't care about aliasing
     // artifacts, so GL_NEAREST is good enough for minification and
@@ -91,16 +93,12 @@ Background::Background(AtlasWindow *aw):
     }
 
     // Generate a texture.
-
-    // EYE - just do this once, in main() or wherever.  And what's a
-    // good value to use?  Should we just use the default (4)?
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-
     glGenTextures(1, &_statusTexture);
     glBindTexture(GL_TEXTURE_2D, _statusTexture);
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    // EYE - GL_LINEAR instead of GL_NEAREST?  Mipmaps?
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     // Because this only displays a few different colours at a few
     // different opacities, we only allocate 2 bits per channel
     // (GL_RGBA2).
@@ -110,21 +108,14 @@ Background::Background(AtlasWindow *aw):
     TileManager *tm = _aw->ac()->tileManager();
     TileIterator ti(tm, TileManager::ALL);
     for (Tile *t = ti.first(); t; t = ti++) {
-    	// EYE - in the future we also need to do this dynamically, in
-    	// response to mapping events.
 	setTileStatus(t);
     }
 
     // Set up defaults.
     setUseImage(false);
-    setShowStatus(false);
 
     // Initialize our vertex arrays.
-    // printf("_imageTexCoords = %p, _statusTexCoords = %p\n",
-    // 	   &(_imageTexCoords[0]), &(_statusTexCoords[0]));
     _init();
-    // printf("_imageTexCoords = %p, _statusTexCoords = %p\n",
-    // 	   &(_imageTexCoords[0]), &(_statusTexCoords[0]));
 }
 
 Background::~Background()
@@ -135,23 +126,12 @@ Background::~Background()
     glDeleteTextures(1, &_statusTexture);
 }
 
+// EYE - we need to decide once and for all how to deal with _dirty,
+// as well as what we should really subscribe to, if anything at all.
 void Background::setUseImage(bool b)
 {
     if (b != _useImage) {
 	_useImage = b;
-	_dirty = true;
-    }
-}
-
-void Background::setShowStatus(bool b)
-{
-    if (b != _showStatus) {
-	_showStatus = b;
-	if (_showStatus) {
-	    subscribe(Notification::MouseMoved);
-	} else {
-	    unsubscribe(Notification::MouseMoved);
-	}
 	_dirty = true;
     }
 }
@@ -213,239 +193,169 @@ GLfloat _ocean[4] = {0.573, 0.631, 0.651, 1.0};
 
 // EYE - figure out what needs to be put in display lists, how many we
 // need, and when to recreate them.
-void t(int i)
-{
-    // GLint at, bt;
-    // glGetIntegerv(GL_ACTIVE_TEXTURE, &at);
-    // glGetIntegerv(GL_TEXTURE_BINDING_2D, &bt);
-    // printf("%d: active texture: %d (%d, %s)\n", 
-    // 	   i, at, bt, glIsEnabled(GL_TEXTURE_2D) == GL_TRUE ? "on" : "off");
-}
-
-void ct(int i)
-{
-    // GLint at;
-    // glGetIntegerv(GL_CLIENT_ACTIVE_TEXTURE, &at);
-    // GLvoid *p;
-    // glGetPointerv(GL_TEXTURE_COORD_ARRAY_POINTER, &p);
-    // printf("%d: active client texture: %d (%p)\n", i, at, p);
-}
-
 void Background::draw()
 {
-    // Generate all chunk boundaries (AKA lines of latitude and
-    // longitude).  We only need to do this once.  It is actually
-    // drawn near the end of this routine.
-    if (_latLonDL == 0) {
-	_latLonDL = glGenLists(1);
-	assert(_latLonDL != 0);
-
-	// Draw the chunk boundaries.
-	glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT);
-	glNewList(_latLonDL, GL_COMPILE); {
-	    glColor3f(0.5, 0.5, 0.5);
-	    // Tell OpenGL where the vertex data is.
-
-	    // EYE - use glBindBuffer?
-	    glVertexPointer(3, GL_FLOAT, 0, &_vertices[0]);
-	    glEnableClientState(GL_VERTEX_ARRAY);
-	    glDrawElements(GL_LINES, _latLonLines.size(),
-			   GL_UNSIGNED_INT, &(_latLonLines[0]));
-	}
-	glEndList();
-	glPopClientAttrib();
-    }
-
     if (_dirty) {
     	glNewList(_DL, GL_COMPILE); {
-	    // EYE - for some reason, trying to use glPushClientAttrib
-	    // (and removing the calls to glDisableClientState at the
-	    // end) doesn't work.  Why?  Note that it isn't affected
-	    // by being in a display list, and that it doesn't work
-	    // even if we retain the calls to glDisableClientState!
+    	    // We modify the polygon offset, as well as texture units
+    	    // 0 and 1.
+            glPushAttrib(GL_POLYGON_BIT | GL_TEXTURE_BIT);
+    	    glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT); {
+    		// The background consists of three layers:
+    		//
+    		// (1) A background ocean colour (always present),
+    		//     used to colour open ocean.
+    		//
+    		// (2) A background image (optional).  If not
+    		//     displayed, use a clear texture.
+    		//
+    		// (3) A tile status texture.  This texture and the
+    		//     previous texture are combined.
 
-	    // glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT);
-	    // glPushAttrib(GL_ALL_ATTRIB_BITS);
-	    // glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS); {
+    		////////////////////////////////////////////////////////////
+    		// (1) Ocean colour.
+    		glColor4fv(_ocean);
 
-	    // We modify the polygon offset, as well as texture units
-	    // 0 and 1.
-            glPushAttrib(GL_POLYGON_BIT | GL_TEXTURE_BIT); {
-		// The background consists of three layers:
-		//
-		// (1) A background ocean colour (always present),
-		//     used to colour open ocean.
-		//
-		// (2) A background image (optional).  If not
-		//     displayed, use a clear texture.
-		//
-		// (3) A tile status texture (optional).  If not
-		//     displayed, use a clear texture.  This texture
-		//     and the previous texture are combined.
+    		////////////////////////////////////////////////////////////
+    		// (2) Background image
 
-		////////////////////////////////////////////////////////////
-		// (1) Ocean colour.
-		glColor4fv(_ocean);
+    		// Configure texture unit 0.
+    		glActiveTexture(GL_TEXTURE0);
+    		glEnable(GL_TEXTURE_2D);
+    		if (_useImage) {
+    		    // This texture sits underneath everything, so
+    		    // we'll use the GL_REPLACE texture function.
+    		    // Since the texture is just an RGB texture (no
+    		    // alpha), the default colour (layer 1) must have
+    		    // an alpha of 1.0 to ensure that nothing from
+    		    // behind shows through.
+    		    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+    		    glBindTexture(GL_TEXTURE_2D, _image.name());
+    		} else {
+    		    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL);
+    		    glBindTexture(GL_TEXTURE_2D, _clearTexture);
+    		}
 
-		////////////////////////////////////////////////////////////
-		// (2) Background image
+    		////////////////////////////////////////////////////////////
+    		// (3) Tile status
 
-		// Configure texture unit 0.
-		// printf("GL_TEXTURE0 = %d, GL_TEXTURE1 = %d\n",
-		//        GL_TEXTURE0, GL_TEXTURE1);
-		// GLint at;
-		// glGetIntegerv(GL_MAX_TEXTURE_COORDS, &at);
-		// printf("GL_MAX_TEXTURE_COORDS = %d\n", at);
-		// glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &at);
-		// printf("GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS = %d\n", at);
-		// printf("_image = %d, _statusTexture = %d, _clearTexture = %d\n",
-		//        _image.name(), _statusTexture, _clearTexture);
-		t(0);
-		glActiveTexture(GL_TEXTURE0);
-		t(1);
-		glEnable(GL_TEXTURE_2D);
-		t(2);
-		if (_useImage) {
-		    // This texture sits underneath everything, so
-		    // we'll use the GL_REPLACE texture function.
-		    // Since the texture is just an RGB texture (no
-		    // alpha), the default colour (layer 1) must have
-		    // an alpha of 1.0 to ensure that nothing from
-		    // behind shows through.
-		    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
-		    glBindTexture(GL_TEXTURE_2D, _image.name());
-		} else {
-		    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL);
-		    glBindTexture(GL_TEXTURE_2D, _clearTexture);
-		}
-		t(3);
+    		// Configure texture unit 1.
+    		glActiveTexture(GL_TEXTURE1);
+    		glEnable(GL_TEXTURE_2D);
+    		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL);
+		glBindTexture(GL_TEXTURE_2D, _statusTexture);
 
-		////////////////////////////////////////////////////////////
-		// (3) Tile status
+    		////////////////////////////////////////////////////////////
+    		// Stitch the texture to the globe.  We move the
+    		// background world back slightly so that the scenery,
+    		// when draped over the world, is not obscured by this
+    		// texture map.
+    	    	glEnable(GL_POLYGON_OFFSET_FILL);
+    	    	glPolygonOffset(1.0, 1.0);
 
-		// Configure texture unit 1.
-		glActiveTexture(GL_TEXTURE1);
-		t(4);
-		glEnable(GL_TEXTURE_2D);
-		t(5);
-		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL);
-		if (_showStatus) {
-		    glBindTexture(GL_TEXTURE_2D, _statusTexture);
-		} else {
-		    glBindTexture(GL_TEXTURE_2D, _clearTexture);
-		}
-		t(6);
+		// Specify the vertices.
+    	    	glEnableClientState(GL_VERTEX_ARRAY);
+    	    	glVertexPointer(3, GL_FLOAT, 0, &_vertices[0]);
 
-		// Stitch the texture to the globe.  We move the
-		// background world back slightly so that the scenery,
-		// when draped over the world, is not obscured by this
-		// texture map.
-	    	glEnable(GL_POLYGON_OFFSET_FILL);
-	    	glPolygonOffset(1.0, 1.0);
-	    	glEnableClientState(GL_VERTEX_ARRAY);
-	    	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+		// Specify the textures.
+    	    	glClientActiveTexture(GL_TEXTURE0);
+    	    	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+    	    	glTexCoordPointer(2, GL_FLOAT, 0, &_imageTexCoords[0]);
 
-	    	glVertexPointer(3, GL_FLOAT, 0, &_vertices[0]);
-		ct(0);
-	    	glClientActiveTexture(GL_TEXTURE0);
-		ct(1);
-	    	glTexCoordPointer(2, GL_FLOAT, 0, &_imageTexCoords[0]);
-		ct(2);
-	    	glMultiDrawElements(GL_TRIANGLE_STRIP, _counts,
-				    GL_UNSIGNED_INT, _sphere, 180);
+    	    	glClientActiveTexture(GL_TEXTURE1);
+    	    	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+    	    	glTexCoordPointer(2, GL_FLOAT, 0, &_statusTexCoords[0]);
 
-	    	// EYE - why does this crash if I comment out the
-	    	// TEXTURE0 stuff above?  Does OpenGL require that all
-	    	// "previous" texture units be active?  Interestingly,
-	    	// it seems to fail in the same way the the
-	    	// glPushClient stuff fails.
-	    	glClientActiveTexture(GL_TEXTURE1);
-		ct(3);
-		// EYE - if I have this glPushClientAttrib call and
-		// the following glPopClientAttrib, then the program
-		// crashes, but *not* on the first run through.  It
-		// crashes on the second call, at the *previous*
-		// glDrawElements call.  Why?  This happens even if we
-		// comment out all the display list stuff.
-		ct(4);
-		// glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT);
-		// EYE - this one doesn't cause problems
-		// glPushClientAttrib(GL_CLIENT_PIXEL_STORE_BIT);
-	    	glTexCoordPointer(2, GL_FLOAT, 0, &_statusTexCoords[0]);
-		ct(5);
-	    	// glDrawElements(GL_QUADS, _sphere.size(), 
-	    	// 	       GL_UNSIGNED_INT, &(_sphere[0]));
-	    	glMultiDrawElements(GL_TRIANGLE_STRIP, _counts,
-				    GL_UNSIGNED_INT, _sphere, 180);
-		// glPopClientAttrib();
-		ct(6);
-	    }
-	    glPopAttrib();
-	    // glPopClientAttrib();
-
-	    glDisableClientState(GL_VERTEX_ARRAY);
-	    glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+		// Draw.
+    	    	glMultiDrawElements(GL_TRIANGLE_STRIP, _counts,
+    				    GL_UNSIGNED_INT, _sphere, 180);
+    	    }
+    	    glPopClientAttrib();
+    	    glPopAttrib();
     	}
     	glEndList();
     	_dirty = false;
     }
 
     glCallList(_DL);
+}
 
-    // If we're showing tile status, draw the lat/lon overlay, and
-    // highlight the boundaries of the current chunk and tile.
-    if (_showStatus) {
-	// Draw all the chunk boundaries (AKA lat/lon lines).
-	glCallList(_latLonDL);
+void Background::drawOutlines()
+{
 
-	// Highlight the current chunk and tile, if we have such a
-	// thing.
-	ScreenLocation *cursor = _aw->cursor();
-	if (cursor->coord().valid()) {
-	    glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT);
-	    glPushAttrib(GL_ENABLE_BIT | GL_LINE_BIT); {
-		// EYE - get rid of depth test everywhere?
-		glDisable(GL_DEPTH_TEST);
-		glLineWidth(2.0);
+    // Generate all chunk boundaries (AKA lines of latitude and
+    // longitude).  We only need to do this once.  It is actually
+    // drawn near the end of this routine.
+    if (_latLonDL == 0) {
+    	_latLonDL = glGenLists(1);
+    	assert(_latLonDL != 0);
 
-		// Tell OpenGL where the vertex data is and enable
-		// them.
-		glVertexPointer(3, GL_FLOAT, 0, &_vertices[0]);
-		glEnableClientState(GL_VERTEX_ARRAY);
+    	// Draw the chunk boundaries.
+    	glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT);
+    	glNewList(_latLonDL, GL_COMPILE); {
+    	    glColor3f(0.5, 0.5, 0.5);
+    	    // Tell OpenGL where the vertex data is.
 
-		// Chunk boundary
-		GeoLocation mLoc(cursor->lat(), cursor->lon(), true);
-		// EYE - compare old and new GeoLocations to see if we
-		//       need to highlight a different chunk?  Ditto
-		//       for tiles?
-		// EYE - should we highlight the boundary or interior
-		//       of chunks and tiles?
-		GeoLocation cLoc = Chunk::canonicalize(mLoc);
-		// EYE - is it really necessary to do a find, or can
-		// we just check if there's a valid chunk?
-		map<GeoLocation, vector<GLuint> >::iterator ci = 
-		    _chunkOutlines.find(cLoc);
-		if (ci != _chunkOutlines.end()) {
-		    glColor3f(0.25, 1.0, 1.0);
-		    vector<GLuint>& civ = ci->second;
-		    glDrawElements(GL_LINES, civ.size(),
-				   GL_UNSIGNED_INT, &(civ[0]));
-		}
+    	    // EYE - use glBindBuffer?
+    	    glVertexPointer(3, GL_FLOAT, 0, &_vertices[0]);
+    	    glEnableClientState(GL_VERTEX_ARRAY);
+    	    glDrawElements(GL_LINES, _latLonLines.size(),
+    			   GL_UNSIGNED_INT, &(_latLonLines[0]));
+    	}
+    	glEndList();
+    	glPopClientAttrib();
+    }
 
-		// Tile boundary
-		GeoLocation tLoc = Tile::canonicalize(mLoc);
-		map<GeoLocation, vector<GLuint> >::iterator ti = 
-		    _tileOutlines.find(tLoc);
-		if (ti != _tileOutlines.end()) {
-		    glColor3f(1.0, 0.25, 1.0);
-		    vector<GLuint>& tiv = ti->second;
-		    glDrawElements(GL_LINES, tiv.size(),
-				   GL_UNSIGNED_INT, &(tiv[0]));
-		}
+    // Draw all the chunk boundaries (AKA lat/lon lines).
+    glCallList(_latLonDL);
+
+    // Highlight the current chunk and tile, if we have such a
+    // thing.
+    ScreenLocation *currentLoc = _aw->currentLocation();
+    if (currentLoc->coord().valid()) {
+	glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT);
+	glPushAttrib(GL_ENABLE_BIT | GL_LINE_BIT); {
+	    // EYE - get rid of depth test everywhere?
+	    glDisable(GL_DEPTH_TEST);
+	    glLineWidth(2.0);
+
+	    // Tell OpenGL where the vertex data is and enable
+	    // them.
+	    glVertexPointer(3, GL_FLOAT, 0, &_vertices[0]);
+	    glEnableClientState(GL_VERTEX_ARRAY);
+
+	    // Chunk boundary
+	    GeoLocation mLoc(currentLoc->lat(), currentLoc->lon(), true);
+	    // EYE - compare old and new GeoLocations to see if we
+	    //       need to highlight a different chunk?  Ditto
+	    //       for tiles?
+	    // EYE - should we highlight the boundary or interior
+	    //       of chunks and tiles?
+	    GeoLocation cLoc = Chunk::canonicalize(mLoc);
+	    // EYE - is it really necessary to do a find, or can
+	    // we just check if there's a valid chunk?
+	    map<GeoLocation, vector<GLuint> >::iterator ci = 
+		_chunkOutlines.find(cLoc);
+	    if (ci != _chunkOutlines.end()) {
+		glColor3f(0.25, 1.0, 1.0);
+		vector<GLuint>& civ = ci->second;
+		glDrawElements(GL_LINES, civ.size(),
+			       GL_UNSIGNED_INT, &(civ[0]));
 	    }
-	    glPopAttrib();
-	    glPopClientAttrib();
+
+	    // Tile boundary
+	    GeoLocation tLoc = Tile::canonicalize(mLoc);
+	    map<GeoLocation, vector<GLuint> >::iterator ti = 
+		_tileOutlines.find(tLoc);
+	    if (ti != _tileOutlines.end()) {
+		glColor3f(1.0, 0.25, 1.0);
+		vector<GLuint>& tiv = ti->second;
+		glDrawElements(GL_LINES, tiv.size(),
+			       GL_UNSIGNED_INT, &(tiv[0]));
+	    }
 	}
+	glPopAttrib();
+	glPopClientAttrib();
     }
 }
 
@@ -515,6 +425,12 @@ void Background::_init()
 	    _indices[index++] = _getVertexIndex(lat - 90, lon - 180);
 	}
     }
+
+    // Create chunk and tile outlines.  Tile outlines are easy, since
+    // they are always rectangles (at least on a rectangular
+    // projection).  Chunks aren't - most chunks are also rectangles,
+    // but the ones at the north and south poles aren't.  To handle
+    // these, we resort to the rather tricky code below.
 
     // These are the tiles and chunks in the row above the current
     // row.
@@ -631,7 +547,10 @@ GLuint Background::_getVertexIndex(GeoLocation &loc)
 //
 // Note that longitudes of -180 and 180 will return different indices,
 // although the vertices at those indices will have the same values.
-// This makes dealing with texture coordinate arrays easier.
+// Ditto for the north and south poles - you will get a different
+// index for <-90, 42> and <-90, 43>, even those refer to the same
+// point (the south pole).  This makes dealing with texture coordinate
+// arrays easier.
 GLuint Background::_getVertexIndex(int lat, int lon)
 {
     assert((lat >= -90) && (lat <= 90));
