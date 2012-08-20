@@ -21,6 +21,11 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
 
+// This is a special exception to the usual rule of including our
+// include file first.  We include gl.h in Background.hxx (for some
+// type definitions) and glew insists on being loaded before OpenGL.
+#include <GL/glew.h>
+
 // Our include file
 #include "Background.hxx"
 
