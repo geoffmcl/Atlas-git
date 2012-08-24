@@ -485,15 +485,22 @@ int main(int argc, char **argv)
     	fprintf(stderr, "OpenGL version 1.5 not supported!\n");
 	exit(0);
     }
-    if (verbose) {
-	printf("OpenGL 1.5 supported\n");
-    }
+    // EYE - Really we should just ask for OpenGL 3.0, which
+    // incorporated all the following as core functions.  However,
+    // some people, namely the developer, are living in the past and
+    // don't have OpenGL 3.0.
     if (!GLEW_EXT_framebuffer_object) {
 	fprintf(stderr, "EXT_framebuffer_object not supported!\n");
 	exit(0);
     }
+    if (!GLEW_EXT_framebuffer_multisample) {
+	fprintf(stderr, "EXT_framebuffer_multisample not supported!\n");
+	exit(0);
+    }
     if (verbose) {
+	printf("OpenGL 1.5 supported\n");
 	printf("OpenGL framebuffer object extension supported\n");
+	printf("OpenGL framebuffer multisample extension supported\n");
     }
 
     // Check if largest desired size will fit into a texture.  In some
@@ -502,18 +509,18 @@ int main(int argc, char **argv)
     // to load.
     GLint textureSize = min(mapSize, 0x1 << TileMapper::maxPossibleLevel());
     if (verbose) {
-	printf("Maximum supported texture size <= map size: %dx%d\n", 
+	printf("Maximum supported texture/buffer size <= map size: %dx%d\n", 
 	       (int)textureSize, (int)textureSize);
     }
 
     if (textureSize < mapSize) {
 	printf("Warning: you have requested maps of maximum size %dx%d,\n",
 	       mapSize, mapSize);
-	printf("which is larger than the largest texture size supported by\n");
-	printf("this machine's graphics hardware (%dx%d).\n",
+	printf("which is larger than the largest texture/buffer size\n");
+	printf("supported by this machine's graphics hardware (%dx%d).\n",
 	       (int)textureSize, (int)textureSize);
-	printf("Although Map can generate the maps, Atlas will probably not\n");
-	printf("be able to read them on this machine.\n");
+	printf("Although Map can probably generate the maps, Atlas will\n");
+	printf("probably not be able to read them on this machine.\n");
     }
 
     if (test) {
