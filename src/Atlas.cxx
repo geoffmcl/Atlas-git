@@ -176,8 +176,16 @@ int main(int argc, char **argv)
     	fprintf(stderr, "OpenGL version 1.5 not supported!\n");
 	exit(0);
     }
+    // EYE - Really we should just ask for OpenGL 3.0, which
+    // incorporated all the following as core functions.  However,
+    // some people, namely the developer, are living in the past and
+    // don't have OpenGL 3.0.
     if (!GLEW_EXT_framebuffer_object) {
 	fprintf(stderr, "EXT_framebuffer_object not supported!\n");
+	exit(0);
+    }
+    if (!GLEW_EXT_framebuffer_multisample) {
+	fprintf(stderr, "EXT_framebuffer_multisample not supported!\n");
 	exit(0);
     }
 
