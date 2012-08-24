@@ -57,7 +57,7 @@
 #include "Tiles.hxx"		// TileManager::MAX_MAP_LEVEL
 
 // Forward class declarations
-class AtlasBaseWindow;
+class AtlasWindow;
 
 // Handles loading and unloading of a single texture (ie, map).  The
 // texture doesn't know how to draw itself.
@@ -95,15 +95,14 @@ class Texture {
 class SceneryTile;
 class Scenery {
   public:
-    // A Scenery object needs a TileManager to get tile information,
-    // and needs to know what window to display everything into (this
-    // is mostly because textures are loaded asynchronously, and we
-    // need to make sure that the textures are being created in the
-    // right OpenGL context).
-    Scenery(TileManager *tm, AtlasBaseWindow *win);
+    // A Scenery object needs to know what window to display
+    // everything into (this is mostly because textures are loaded
+    // asynchronously, and we need to make sure that the textures are
+    // being created in the right OpenGL context).
+    Scenery(AtlasWindow *aw);
     ~Scenery();
 
-    AtlasBaseWindow *win() { return _win; }
+    AtlasWindow *win() { return _aw; }
 
     void move(const sgdMat4 modelViewMatrix, const sgdVec3 eye);
     void zoom(const sgdFrustum& frustum, double metresPerPixel);
@@ -139,7 +138,7 @@ class Scenery {
     // Draws MEF labels on the scenery.
     void _label(bool live);
 
-    AtlasBaseWindow *_win;	// Our owning window.
+    AtlasWindow *_aw;		// Our owning window.
     bool _dirty;		// True if the eyepoint has moved or
 				// we've zoomed.
     bool _MEFs;			// True if we need to draw MEFs.
@@ -148,14 +147,13 @@ class Scenery {
     double _metresPerPixel;	// Current zoom level.
     unsigned int _level;	// Current texture level to display.
     bool _live;			// True if we need to display live scenery.
+    TileManager *_tm;
     // Bit <n> is set if we have a texture directory for level <n>.
     const std::bitset<TileManager::MAX_MAP_LEVEL>& _levels;
 
     Culler *_culler;
     Culler::FrustumSearch *_frustum;
     unsigned int _tileType;	// Type id for tiles in the culler object.
-
-    TileManager *_tm;
 
     // A SceneryTile object manages all the textures and live scenery
     // for a 1 degree by 1 degree (usually) chunk of the earth.

@@ -33,7 +33,8 @@
 #include <cassert>
 
 // Our project's include files
-#include "AtlasBaseWindow.hxx"
+#include "AtlasWindow.hxx"
+#include "AtlasController.hxx"
 #include "Bucket.hxx"
 #include "Geographics.hxx"
 #include "Image.hxx"
@@ -212,8 +213,6 @@ void Texture::load(SGPath f, float *maximumElevation)
     glGenTextures(1, &_name);
     assert(_name > 0);
 
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-
     glBindTexture(GL_TEXTURE_2D, _name);
 
     // Standard pixelized texture.
@@ -297,8 +296,6 @@ GLuint Texture::name() const
 		    }
 		}
 	    }
-
-	    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
 	    glGenTextures(1, &__defaultTexture);
 	    assert(__defaultTexture != 0);
@@ -809,12 +806,11 @@ unsigned int SceneryTile::_calcBest(unsigned int level, bool loaded)
     return TileManager::MAX_MAP_LEVEL;
 }
 
-// Creates a Scenery object.  The given TileManager will supply tile
-// information, and we assume that all scenery will be displayed in
-// the given window.
-Scenery::Scenery(TileManager *tm, AtlasBaseWindow *win): 
-    _win(win), _dirty(true), _level(TileManager::MAX_MAP_LEVEL), _live(false), 
-    _levels(tm->mapLevels()), _tm(tm), _cache(_win->id())
+// Creates a Scenery object.  We assume that all scenery will be
+// displayed in the given window.
+Scenery::Scenery(AtlasWindow *aw): 
+    _aw(aw), _dirty(true), _level(TileManager::MAX_MAP_LEVEL), _live(false), 
+    _tm(_aw->ac()->tileManager()), _levels(_tm->mapLevels()), _cache(_aw->id())
 {
     // Create a culler and a frustum searcher for it.
     _culler = new Culler();
@@ -938,11 +934,6 @@ void Scenery::draw(bool lightingOn)
     if (_dirty) {
 	// Yes.  Update our idea of what to display, ask the culler
 	// for visible tiles, and tell the cache.
-
-	// EYE - should we do this whenever we set _dirty or whenever
-	// the scenery layer is turned off (listen to SceneryLayerOn
-	// for the latter)?  Should we make a _dirty() method to do
-	// this consistently?
 	_cache.reset(_eye);
 
 	// Now ask the culler for all visible tiles, and add them to

@@ -3169,14 +3169,16 @@ AtlasWindow::AtlasWindow(const char *name,
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
 
-    // Standard settings for multisampling, blending, lines, and
-    // points.  If you change any of these, you *must* return them to
-    // their original value after!
+    // Standard settings for multisampling, blending, lines, points,
+    // and pixel storage.  If you change any of these, you *must*
+    // return them to their original value after!
     glEnable(GL_MULTISAMPLE);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glLineWidth(1.0);
     glPointSize(1.0);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
     // Tie material ambient and diffuse values to the current colour.
     glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE);
@@ -3190,9 +3192,8 @@ AtlasWindow::AtlasWindow(const char *name,
     // We use light0.
     glEnable(GL_LIGHT0);
 
-    // Initalize scenery object.  Note that we specify that scenery
-    // should be displayed in this window.
-    _scenery = new Scenery(_ac->tileManager(), this);
+    // Initalize scenery object.
+    _scenery = new Scenery(this);
 
     // Background map image.
 
