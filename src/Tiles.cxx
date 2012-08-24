@@ -929,8 +929,11 @@ void Tile::mapSize(unsigned int level, int *width, int *height) const
 
     // The width is proportional to the height, scaled by the latitude
     // (the real latitude, not our special one) and the width of tiles
-    // at that latitude.
-    double w = *height * cos(lat() * SGD_DEGREES_TO_RADIANS) * Tile::width();
+    // at that latitude.  Note that we use centreLat(), not lat() -
+    // using lat() would mean (possibly) different widths for northern
+    // and southern tiles, especially near the poles.
+    double w = 
+	*height * cos(centreLat() * SGD_DEGREES_TO_RADIANS) * Tile::width();
 
     // Oh yeah, and it has to be a power of 2, and non-zero.
     *width = pow(2.0, round(log2f(w)));
