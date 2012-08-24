@@ -128,7 +128,6 @@ public:
     float azimuth, elevation;
     sgVec4 lightPosition;
     char *palette;		// Palette name
-    int oversampling;
     TileMapper::ImageType imageType;
     unsigned int JPEGQuality;
 
@@ -147,7 +146,6 @@ public:
     static const char *defaultSerialDevice;
     static const int defaultBaudRate = 4800;
     static const float defaultAzimuth = 315.0, defaultElevation = 55.0;
-    static const int defaultOversampling = 0;
     static const TileMapper::ImageType defaultImageType = TileMapper::JPEG;
     static const unsigned int defaultJPEGQuality = 75;
     static const char *defaultPalette;

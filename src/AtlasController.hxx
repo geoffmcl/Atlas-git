@@ -156,8 +156,6 @@ class AtlasController
     void setElevation(float f);
 
     // Mapping
-    int oversampling() {return _oversampling; }
-    void setOversampling(int i);
     TileMapper::ImageType imageType() {return _imageType; }
     void setImageType(TileMapper::ImageType it);
     int JPEGQuality() { return _JPEGQuality; }
@@ -236,7 +234,6 @@ class AtlasController
     // Lighting and mapping variables.
     bool _discreteContours, _contourLines, _lightingOn, _smoothShading;
     float _azimuth, _elevation;
-    int _oversampling;
     TileMapper::ImageType _imageType;
     int _JPEGQuality;
 

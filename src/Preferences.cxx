@@ -84,7 +84,6 @@ enum {FIRST_OPTION,
       SMOOTH_SHADING_OPTION,
       FLAT_SHADING_OPTION,
       LIGHT_POSITION_OPTION,
-      OVERSAMPLING_OPTION,
       IMAGE_TYPE_JPEG_OPTION,
       IMAGE_TYPE_PNG_OPTION,
       JPEG_QUALITY_OPTION,
@@ -124,7 +123,6 @@ static struct option long_options[] = {
     {"smooth-shading", no_argument, 0, SMOOTH_SHADING_OPTION},
     {"flat-shading", no_argument, 0, FLAT_SHADING_OPTION},
     {"light", required_argument, 0, LIGHT_POSITION_OPTION},
-    {"oversampling", required_argument, 0, OVERSAMPLING_OPTION},
     {"jpeg", no_argument, 0, IMAGE_TYPE_JPEG_OPTION},
     {"png", no_argument, 0, IMAGE_TYPE_PNG_OPTION},
     {"jpeg-quality", required_argument, 0, JPEG_QUALITY_OPTION},
@@ -143,8 +141,8 @@ static void print_short_help(char *name)
     printf("\t[--autocentre-mode] [--discrete-contour] [--smooth-contour]\n");
     printf("\t[--contour-lines] [--no-contour-lines] [--lighting]\n");
     printf("\t[--no-lighting] [--light=azim,elev] [--smooth-shading]\n");
-    printf("\t[--flat-shading] [--line-width=<w>] [--oversampling=<level>]\n");
-    printf("\t[--jpeg] [--png] [--jpeg-quality=<q>] [--airplane=<path>]\n");
+    printf("\t[--flat-shading] [--line-width=<w>] [--jpeg] [--png]\n");
+    printf("\t[--jpeg-quality=<q>] [--airplane=<path>]\n");
     printf("\t[--airplane-size=<size>] [--version] [--help] [<flight file>] ...\n");
 }
 
@@ -328,14 +326,6 @@ static void print_help_for(int option, const char *indent)
 		 "Elevation is height above horizon (90 = overhead)",
 		 defaultStr.str(), NULL);
 	break;
-      case OVERSAMPLING_OPTION:
-	defaultStr.printf("Default: %d", Preferences::defaultOversampling);
-	printOne(indent, "--oversampling=<i>",
-		 "Anti-alias maps using multisampling.  The value is an",
-		 "integer specifying the oversampling level (note: each",
-		 "increment of 1 quadruples video card memory usage)",
-		 defaultStr.str(), NULL);
-	break;
       case IMAGE_TYPE_JPEG_OPTION:
 	// EYE - instead of manually adding the string "(default)", we
 	// should check defaultImageType.
@@ -426,7 +416,6 @@ Preferences::Preferences()
     smoothShading = true;
     azimuth = defaultAzimuth;
     elevation = defaultElevation;
-    oversampling = defaultOversampling;
     imageType = defaultImageType;
     JPEGQuality = defaultJPEGQuality;
     palette = strdup(defaultPalette);
@@ -537,7 +526,6 @@ void Preferences::savePreferences()
     printf("%d\n", lightingOn);
     printf("%d\n", smoothShading);
     printf("<%.1f, %.1f>", azimuth, elevation);
-    printf("%d", oversampling);
     if (imageType == TileMapper::JPEG) {
 	printf("JPEG\n");
     } else {
@@ -685,10 +673,6 @@ bool Preferences::_loadPreferences(int argc, char *argv[])
 	    if (elevation > 90.0) {
 		elevation = 90.0;
 	    }
-	    break;
-	  case OVERSAMPLING_OPTION:
-	    OPTION_CHECK(sscanf(optarg, "%d", &oversampling), 1,
-			 OVERSAMPLING_OPTION);
 	    break;
 	  case IMAGE_TYPE_JPEG_OPTION:
 	    imageType = TileMapper::JPEG;

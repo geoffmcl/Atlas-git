@@ -315,7 +315,6 @@ AtlasController::AtlasController(const char *paletteDir)
     setSmoothShading(globals.prefs.smoothShading);
     setAzimuth(globals.prefs.azimuth);
     setElevation(globals.prefs.elevation);
-    setOversampling(globals.prefs.oversampling);
     setImageType(globals.prefs.imageType);
     setJPEGQuality(globals.prefs.JPEGQuality);
 }
@@ -380,14 +379,6 @@ void AtlasController::setElevation(float f)
     if (_elevation != f) {
 	_elevation = f;
 	Notification::notify(Notification::Elevation);
-    }
-}
-
-void AtlasController::setOversampling(int i)
-{
-    if (_oversampling != i) {
-	_oversampling = i;
-	Notification::notify(Notification::Oversampling);
     }
 }
 

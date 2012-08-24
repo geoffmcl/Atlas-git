@@ -4743,7 +4743,7 @@ void AtlasWindow::_renderConfirmDialog_cb(bool okay)
 	}
 	       
 	_mapper = new TileMapper(_ac->currentPalette(),
-				 _ac->oversampling() + maxMapLevel,
+				 maxMapLevel,
 				 _ac->discreteContours(),
 				 _ac->contourLines(),
 				 _ac->azimuth(),

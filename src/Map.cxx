@@ -77,12 +77,6 @@ static float azimuth = 315.0, elevation = 55.0;
 // True if we want smooth shading, false if we want flat shading.
 static bool smoothShading = true;
 
-// Used to specify over-sampling.  This is given as an exponent, to be
-// added to the file resolution.  So, for example, if the desired file
-// size is 8 (2^8 = 256), and the rescale factor is 2 (2^2 = 4), then
-// the map will be rendered at 1024x1024 (2^10 = 1024), but saved at
-// 256x256.
-static unsigned int rescaleFactor = 0;
 // If true, we just print out what we would do, then exit.
 static bool test = false;
 // Print extra information while processing.
@@ -153,8 +147,6 @@ void print_help()
     printf("  --jpeg             Create JPEG images with quality %u (default)\n",
 	   jpegQuality);
     printf("  --jpeg=integer     Create JPEG images with specified quality\n");
-    printf("  --aafactor=integer Antialiasing factor (default = %u)\n",
-	   rescaleFactor);
     printf("  --render-offscreen Render offscreen (default)\n");
     printf("  --render-to-window Render to a window\n");
     printf("  --discrete-contour Don't blend contour colours (default)\n");
@@ -197,8 +189,6 @@ bool parse_arg(char* arg)
 	contourLines = true;
     } else if (strcmp(arg, "--no-contour-lines") == 0) {
 	contourLines = false;
-    } else if (sscanf(arg, "--aafactor=%d", &rescaleFactor) == 1) {
-	;
     } else if (strcmp(arg, "--render-offscreen") == 0) {
 	renderToFramebuffer = true;
     } else if (strcmp(arg, "--render-to-window") == 0) {
@@ -444,7 +434,7 @@ int main(int argc, char **argv)
     }
 
     // Find out what our maximum desired map and buffer sizes are.
-    int mapSize = 0, bufferLevel;
+    int bufferLevel;
     const bitset<TileManager::MAX_MAP_LEVEL>& mapLevels = 
 	tileManager->mapLevels();
     for (int i = TileManager::MAX_MAP_LEVEL - 1; i >= 0; i--) {
@@ -453,12 +443,10 @@ int main(int argc, char **argv)
 	    break;
 	}
     }
-    // The final maximum map size is given by mapSize; the final
-    // buffer size needed to render it (accounting for oversampling)
-    // is given by bufferSize; the logarithm base 2 of bufferSize is
-    // bufferLevel (or, in other words, 2^bufferLevel = bufferSize).
-    mapSize = 1 << bufferLevel;
-    bufferLevel += rescaleFactor;
+
+    // The final buffer size needed to render maps is given by
+    // bufferSize; the logarithm base 2 of bufferSize is bufferLevel
+    // (or, in other words, 2^bufferLevel = bufferSize).
     bufferSize = 1 << bufferLevel;
 
     // Initialize OpenGL.
@@ -507,15 +495,15 @@ int main(int argc, char **argv)
     // ways this is immaterial to Map.  However, the user should be
     // warned if she is about to create maps that Atlas will be unable
     // to load.
-    GLint textureSize = min(mapSize, 0x1 << TileMapper::maxPossibleLevel());
+    GLint textureSize = min(bufferSize, 0x1 << TileMapper::maxPossibleLevel());
     if (verbose) {
 	printf("Maximum supported texture/buffer size <= map size: %dx%d\n", 
 	       (int)textureSize, (int)textureSize);
     }
 
-    if (textureSize < mapSize) {
+    if (textureSize < bufferSize) {
 	printf("Warning: you have requested maps of maximum size %dx%d,\n",
-	       mapSize, mapSize);
+	       bufferSize, bufferSize);
 	printf("which is larger than the largest texture/buffer size\n");
 	printf("supported by this machine's graphics hardware (%dx%d).\n",
 	       (int)textureSize, (int)textureSize);

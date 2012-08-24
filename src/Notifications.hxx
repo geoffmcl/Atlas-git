@@ -107,7 +107,6 @@ class Notification {
 	       Azimuth,	         // Changed light azimuth
 	       Elevation,        // Changed light elevation
 
-	       Oversampling,     // Changed oversampling level
 	       ImageType,        // Changed image type (JPEG, PNG)
 	       JPEGQuality,      // Changed JPEG quality
 
