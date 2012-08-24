@@ -243,15 +243,20 @@ void FlightTracksOverlay::_drawAirplane(FlightData *d, const sgVec4 colour)
 	if (_haveImage) {
 	    // Draw texture.
 	    float b = globals.prefs.airplaneImageSize / 2.0;
-	    glEnable(GL_TEXTURE_2D);
-	    glBindTexture(GL_TEXTURE_2D, _airplaneTexture.name());
-	    glBegin(GL_QUADS); {
-		glTexCoord2f(0.0, 1.0); glVertex3f(-b, -b, 0.0);
-		glTexCoord2f(1.0, 1.0); glVertex3f( b, -b, 0.0);
-		glTexCoord2f(1.0, 0.0); glVertex3f( b,  b, 0.0);
-		glTexCoord2f(0.0, 0.0); glVertex3f(-b,  b, 0.0);
-	    } glEnd();
-	    glDisable(GL_TEXTURE_2D);
+	    // EYE - instead of enabling and disable GL_TEXTURE_2D,
+	    // maybe we should push and pop GL_TEXTURE_BIT (elsewhere
+	    // too).
+	    glPushAttrib(GL_TEXTURE_BIT); {
+		glEnable(GL_TEXTURE_2D);
+		glBindTexture(GL_TEXTURE_2D, _airplaneTexture.name());
+		glBegin(GL_QUADS); {
+		    glTexCoord2f(0.0, 1.0); glVertex3f(-b, -b, 0.0);
+		    glTexCoord2f(1.0, 1.0); glVertex3f( b, -b, 0.0);
+		    glTexCoord2f(1.0, 0.0); glVertex3f( b,  b, 0.0);
+		    glTexCoord2f(0.0, 0.0); glVertex3f(-b,  b, 0.0);
+		} glEnd();
+	    }
+	    glPopAttrib();
 	} else {
 	    // Draw crude stick-figure aircraft.
 	    glBegin(GL_LINES); {
