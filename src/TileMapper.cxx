@@ -55,13 +55,13 @@ unsigned int TileMapper::maxPossibleLevel()
     glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);
     
     // Now take into account the texture format.  Note that for this
-    // test to be accurate, we need to make the parameters (GL_RGB,
+    // test to be accurate, we need to make the parameters (GL_RGB8,
     // ...) the same as the ones we'll use in Atlas when loading the
     // texture.
     while (true) {
 	GLint tmp = 0;
 	glTexImage2D(GL_PROXY_TEXTURE_2D, 0, GL_RGB8,
-		     maxTextureSize, maxTextureSize, 0, 
+    		     maxTextureSize, maxTextureSize, 0, 
 		     GL_RGB, GL_UNSIGNED_BYTE, NULL);
 	glGetTexLevelParameteriv(GL_PROXY_TEXTURE_2D, 0,
 				 GL_TEXTURE_WIDTH, &tmp);
@@ -74,7 +74,9 @@ unsigned int TileMapper::maxPossibleLevel()
 	maxTextureSize /= 2;
     };
 
-    // Now check buffer sizes.
+    // Now check buffer sizes.  Note that multisampling changes the
+    // calculation - the problem is I don't know how (except to reduce
+    // the maximum buffer size).  Let the user beware!
     GLint maxBufferSize;
     glGetIntegerv(GL_MAX_RENDERBUFFER_SIZE_EXT, &maxBufferSize);
 
@@ -93,7 +95,7 @@ TileMapper::TileMapper(Palette *p, unsigned int maxDesiredLevel,
     _discreteContours(discreteContours), _contourLines(contourLines),
     _azimuth(azimuth), _elevation(elevation), _lighting(lighting),
     _smoothShading(smoothShading), _imageType(imageType), 
-    _JPEGQuality(JPEGQuality), _tile(NULL), _fbo(0), _to(0)
+    _JPEGQuality(JPEGQuality), _tile(NULL), _to(0)
 {
     // We must have a palette.
     if (!_palette) {
@@ -111,16 +113,14 @@ TileMapper::TileMapper(Palette *p, unsigned int maxDesiredLevel,
     Bucket::palette = _palette;
     Bucket::discreteContours = _discreteContours;
     Bucket::contourLines = _contourLines;
-
-    // Create the framebuffer object.
-    glGenFramebuffersEXT(1, &_fbo);
-    assert(_fbo != 0);
 }
 
 TileMapper::~TileMapper()
 {
     _unloadBuckets();
-    glDeleteFramebuffersEXT(1, &_fbo);
+
+    // Delete the texture object.
+    glDeleteTextures(1, &_to);
 }
 
 // Tells TileMapper which tile is to be rendered.  We load the tile's
@@ -150,14 +150,8 @@ void TileMapper::set(Tile *t)
     }
 }
 
-// Draws the tile into a texture attached to a framebuffer.
-
-// EYE - should we draw instead to a renderbuffer?  I'm not sure which
-// is considered superior, but renderbuffers do have
-// glRenderbufferStorageMultisample(), which may give us nice
-// anti-aliasing.  Render buffer multisampling is supported under the
-// EXT_framebuffer_multisample extension (dating from 2005), or core
-// version 3.0.
+// Draws the tile into a mipmapped texture (_to) via a multisampled
+// renderbuffer (fboms/rbo).
 void TileMapper::render()
 {
     // EYE - remove this eventually
@@ -168,46 +162,52 @@ void TileMapper::render()
 	return;
     }
 
-    // Bind the framebuffer so that all rendering goes to it.
-    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, _fbo);
-
-    // EYE - assert _to is 0?
-
     // Calculate the proper width and height for the given level.
     // Note that we don't check if _maxLevel is reasonable - that's up
     // to the caller.
     _tile->mapSize(_maxLevel, &_width, &_height);
+    // EYE - What could reasonably be described as a hack.  At the
+    // poles, a tile is 4x wider than it is high.  At a map resolution
+    // of 10, this results in a 4096x1024 renderbuffer/texture/map.
+    // More importantly, with my video card it hangs the machine.  I
+    // can find no way to query OpenGL state to predict reliably that
+    // this will happen.  However, limiting the width of the tiles to
+    // no more than the height works (for a reasonable height of
+    // course).  It's a bit scary, and it would be nice to have a
+    // reliable way to determine buffer size limits.
+    if (_width > _height) {
+	_width = _height;
+    }
 
-    // Create a texture object.
-    // EYE - we also need to see if our current buffer is big enough.
-    // This is where we could add the tiling code.
-    // EYE - do I need to attach a depth buffer too?
-    glGenTextures(1, &_to);
-    glBindTexture(GL_TEXTURE_2D, _to);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, _width, _height, 0, GL_RGB, 
-		 GL_UNSIGNED_BYTE, 0);
-    // EYE - Strictly speaking, this is not necessary.  However, due
-    // to a bug in Nvidia drivers (as of January 2012), we need to add
-    // this line.  This bug is discussed in:
-    //
-    // http://www.opengl.org/wiki/Common_Mistakes#Render_To_Texture
-    //
-    glGenerateMipmapEXT(GL_TEXTURE_2D);
-    glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT,
-    			      GL_COLOR_ATTACHMENT0_EXT,
-    			      GL_TEXTURE_2D,
-    			      _to,
-    			      0);
+    // Create the main framebuffer object and bind it to our context.
+    // We'll attach a multisampled renderbuffer to it.
+    GLuint fboms;
+    glGenFramebuffersEXT(1, &fboms);
+    assert(fboms != 0);
+    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fboms);
+
+    // Create a multisampled renderbuffer object with as many samples
+    // as we can get.
+    GLuint rbo;
+    glGenRenderbuffersEXT(1, &rbo);
+    glBindRenderbufferEXT(GL_RENDERBUFFER, rbo);
+    int samples;
+    glGetIntegerv(GL_MAX_SAMPLES, &samples);
+    glRenderbufferStorageMultisampleEXT(GL_RENDERBUFFER, samples, GL_RGB8, 
+    					_width, _height);
+
+    // Attach it to our framebuffer, fbmos.
+    glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
+				 GL_RENDERBUFFER_EXT, rbo);
     assert(glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT) == 
     	   GL_FRAMEBUFFER_COMPLETE_EXT);
 
     // The framebuffer shares its state with the current context, so
     // we push some attributes so we don't step on current OpenGL
     // state.
-
-    // EYE - just push GL_ALL_ATTRIB_BITS?
     glPushAttrib(GL_VIEWPORT_BIT | GL_LIGHTING_BIT | GL_CURRENT_BIT |
-		 GL_POLYGON_BIT | GL_LINE_BIT); {
+		 GL_POLYGON_BIT | GL_LINE_BIT | GL_MULTISAMPLE_BIT |
+		 GL_TEXTURE_BIT); {
 	// Set up the view.
 	glViewport(0, 0, _width, _height);
 
@@ -233,8 +233,8 @@ void TileMapper::render()
 	glEnable(GL_CULL_FACE);
 	glCullFace(GL_BACK);
 
-	// Ensure that line smoothing is on.
-	glEnable(GL_LINE_SMOOTH);
+	// Ensure that multisampling is on.
+	glEnable(GL_MULTISAMPLE);
 
 	// Tie material ambient and diffuse values to the current colour.
 	glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE);
@@ -324,24 +324,75 @@ void TileMapper::render()
 	}
 #endif
 
+	// After all that work, the drawing is a bit anticlimactic.
 	for (unsigned int i = 0; i < _buckets.size(); i++) {
 	    _buckets[i]->draw();
 	}
 
-	glFinish();
-
-	// Create mipmaps and unbind the framebuffer.  We should now
-	// have a map of the appropriate size in the texture object
-	// _to.
-	glGenerateMipmapEXT(GL_TEXTURE_2D);
-	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
-
-	// EYE - before the unbinding or after?
-	// EYE - is this necessary now with the pushAttrib/popAttrib?
+	// Clean up our matrices.
 	glMatrixMode(GL_PROJECTION);
 	glPopMatrix();
 	glMatrixMode(GL_MODELVIEW);
 	glPopMatrix();
+
+	// Disconnect the framebuffer.
+	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+
+	// At this point rbo (our multisampled renderbuffer) will have
+	// the rendered scene, but not in a format that we can access
+	// (eg, with glReadPixels()).  To use it, we need to resolve
+	// the multiple samples to a single sample.  This is done via
+	// a call to glBlitFramebuffer(), which requires another,
+	// single-sampled, framebuffer (fbo), to which we attach our
+	// texture _to.  The net result is that _to will contain the
+	// full anti-aliased scene.
+	GLuint fbo;
+	glGenFramebuffersEXT(1, &fbo);
+	assert(fbo != 0);
+	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo);
+
+	// Bind our texture (creating it if we haven't already).
+	if (_to == 0) {
+	    glGenTextures(1, &_to);
+	    assert(_to != 0);
+
+	    // Configure the texture.
+	    glBindTexture(GL_TEXTURE_2D, _to);
+	    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, 
+			    GL_LINEAR_MIPMAP_LINEAR);
+	}
+	glBindTexture(GL_TEXTURE_2D, _to);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, _width, _height, 0, GL_RGB, 
+		     GL_UNSIGNED_BYTE, 0);
+	glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT,
+				  GL_COLOR_ATTACHMENT0_EXT,
+				  GL_TEXTURE_2D,
+				  _to,
+				  0);
+	assert(glGetError() == GL_NO_ERROR);
+	assert(glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT) == 
+	       GL_FRAMEBUFFER_COMPLETE_EXT);
+	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+
+	// Okay, we're ready to go.  We read from our multisampled
+	// framebuffer into our single-sampled framebuffer.
+	glBindFramebufferEXT(GL_READ_FRAMEBUFFER_EXT, fboms);
+	glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER_EXT, fbo);
+	glBlitFramebufferEXT(0, 0, _width, _height, 
+			     0, 0, _width, _height,
+			     GL_COLOR_BUFFER_BIT, GL_LINEAR);
+	glGenerateMipmapEXT(GL_TEXTURE_2D);
+	glBindFramebufferEXT(GL_READ_FRAMEBUFFER_EXT, 0);
+	glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER_EXT, 0);
+
+	// Delete the renderbuffer and framebuffer objects.  In the
+	// end we're left with the texture, _to.
+	glDeleteRenderbuffersEXT(1, &rbo);
+	glDeleteFramebuffersEXT(1, &fboms);
+	glDeleteFramebuffersEXT(1, &fbo);
     }
     glPopAttrib();
 }
@@ -367,32 +418,32 @@ void TileMapper::save(unsigned int level)
     }
 
     // Grab the image.
-    // EYE - should we worry about enabling textures, ...?
-    // EYE - pushAttrib - pixelstorei, texture
-    glBindTexture(GL_TEXTURE_2D, _to);
-    GLubyte *image = new GLubyte[width * height * 3];
-    assert(image);
-    glPixelStorei(GL_PACK_ALIGNMENT, 1);
-    glGetTexImage(GL_TEXTURE_2D, shrinkage, GL_RGB, GL_UNSIGNED_BYTE, image);
+    glPushAttrib(GL_TEXTURE_BIT); {
+	glBindTexture(GL_TEXTURE_2D, _to);
+	GLubyte *image = new GLubyte[width * height * 3];
+	assert(image);
+	glGetTexImage(GL_TEXTURE_2D, shrinkage, GL_RGB, GL_UNSIGNED_BYTE, 
+		      image);
 
-    // Save to a file.  We save it in _atlas/size/_name.<type> (if
-    // that makes any sense).
-    SGPath file = _tile->mapsDir();
-    char str[3];
-    snprintf(str, 3, "%d", level);
-    file.append(str);
-    file.append(_tile->name());
-    if (_imageType == PNG) {
-	file.concat(".png");
-	savePNG(file.c_str(), image, width, height, _maximumElevation);
-    } else if (_imageType == JPEG) {
-	file.concat(".jpg");
-	saveJPEG(file.c_str(), _JPEGQuality, 
-		 image, width, height, _maximumElevation);
-    }
+	// Save to a file.  We save it in _atlas/size/_name.<type> (if
+	// that makes any sense).
+	SGPath file = _tile->mapsDir();
+	char str[3];
+	snprintf(str, 3, "%d", level);
+	file.append(str);
+	file.append(_tile->name());
+	if (_imageType == PNG) {
+	    file.concat(".png");
+	    savePNG(file.c_str(), image, width, height, _maximumElevation);
+	} else if (_imageType == JPEG) {
+	    file.concat(".jpg");
+	    saveJPEG(file.c_str(), _JPEGQuality, 
+		     image, width, height, _maximumElevation);
+	}
     
-    delete[] image;
-    glBindTexture(GL_TEXTURE_2D, 0);
+	delete[] image;
+    }
+    glPopAttrib();
 }
 
 // Cleans things up - unloads buckets, resets the maximum elevation
@@ -410,9 +461,4 @@ void TileMapper::_unloadBuckets()
     // buckets, that means we can no longer trust the maximum
     // elevation figure.
     _maximumElevation = Bucket::NanE;
-
-    // Delete the texture object.  We need to do this because
-    // different tiles may have different sizes.
-    glDeleteTextures(1, &_to);
-    _to = 0;
 }

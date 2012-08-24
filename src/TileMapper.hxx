@@ -143,8 +143,8 @@ class TileMapper {
     // The width and height of the full-sized tile.
     int _width, _height;
 
-    // Framebuffer and texture objects.
-    GLuint _fbo, _to;
+    // Our texture object, the ultimate destination for our rendering.
+    GLuint _to;
 };
 
 #endif	// _TILEMAPPER_H_
