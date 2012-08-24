@@ -73,12 +73,13 @@ Background::Background(AtlasWindow *aw):
     glGenTextures(1, &_clearTexture);
     assert(_clearTexture > 0);
     glBindTexture(GL_TEXTURE_2D, _clearTexture);
-    // EYE - just do this once, in main() or wherever.  And what's a
-    // good value to use?  Should we just use the default (4)?
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
     // Since this texture is clear, we don't care about aliasing
     // artifacts, so GL_NEAREST is good enough for minification and
-    // magnification.
+    // magnification.  I'm not so sure about the best texture wrap
+    // parameter.
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA2, 1, 1, 0, 
@@ -101,7 +102,10 @@ Background::Background(AtlasWindow *aw):
     glGenTextures(1, &_statusTexture);
     glBindTexture(GL_TEXTURE_2D, _statusTexture);
 
-    // EYE - GL_LINEAR instead of GL_NEAREST?  Mipmaps?
+    // EYE - GL_LINEAR instead of GL_NEAREST?  Mipmaps?  And what's
+    // the best texture wrap parameter?
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     // Because this only displays a few different colours at a few
