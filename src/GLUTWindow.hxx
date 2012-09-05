@@ -55,12 +55,13 @@ class GLUTWindow {
     // EYE - don't make virtual?
     virtual void reveal();
     virtual void hide();
+    bool isVisible() { return _visible; }
 
     // Our GLUT window id.
     int id() { return _id; }
 
     // Set the new current GLUT window to id, returning the id of the
-    // previouw GLUT window.
+    // previous GLUT window.
     static int set(int id);
     // Set ourselves to be the new current window, returning the
     // window id of the previous window.
@@ -114,6 +115,10 @@ class GLUTWindow {
 
     // Our window id.
     int _id;
+
+    // Our visibility.  We track it ourselves because GLUT has no
+    // ability to query a window's visibility.
+    bool _visible;
 
     ////////// Window management
     // Map from a window id (given as an int in GLUT) to a GLUTWindow.

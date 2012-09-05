@@ -43,7 +43,9 @@ using namespace std;
 int GLUTWindow::set(int id)
 {
     int oldID = glutGetWindow();
-    if (oldID != id) {
+    // Switch to the new window if it's different than this one (and
+    // if it's a legal GLUT window id).
+    if ((oldID != id) && (id != 0)) {
 	glutSetWindow(id);
     }
     return oldID;
@@ -64,7 +66,7 @@ GLUTWindow *GLUTWindow::windowWithID(int id)
     return result;
 }
 
-GLUTWindow::GLUTWindow(const char *title)
+GLUTWindow::GLUTWindow(const char *title): _visible(true)
 {
     _id = glutCreateWindow(title);
     __instanceMap[_id] = this;
@@ -137,16 +139,16 @@ void GLUTWindow::startTimer(unsigned int msecs, cb method)
 
 void GLUTWindow::reveal()
 {
-    // EYE - save current window and restore at end?
     set();
     glutShowWindow();
+    _visible = true;
 }
 
 void GLUTWindow::hide()
 {
-    // EYE - save current window and restore at end?
     set();
     glutHideWindow();
+    _visible = false;
 }
 
 int GLUTWindow::width()
