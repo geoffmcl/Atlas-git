@@ -63,14 +63,21 @@ void atlasSphere::extendBy(double lat, double lon)
 //////////////////////////////////////////////////////////////////////
 
 atlasFntTexFont::atlasFntTexFont(): 
-    _bound(false), _padding(0.1), _ascent(-1.0), _descent(1.0)
+    _file(NULL), _bound(false), _padding(0.1), _ascent(-1.0), _descent(1.0)
 {
+}
+
+atlasFntTexFont::~atlasFntTexFont()
+{
+    delete _file;
 }
 
 int atlasFntTexFont::load(const char *fname, GLenum mag, GLenum min)
 {
+    _file = strdup(fname);
+
     // EYE - get padding from file name
-    int result = fntTexFont::load(fname, mag, min);
+    int result = fntTexFont::load(_file, mag, min);
 
     if (result == TRUE) {
 	_calcAscentDescent();

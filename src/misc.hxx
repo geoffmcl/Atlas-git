@@ -78,10 +78,12 @@ class atlasSphere: public sgdSphere {
 class atlasFntTexFont: public fntTexFont {
   public:
     atlasFntTexFont();
+    ~atlasFntTexFont();
 
     int load(const char *fname, 
 	     GLenum mag = GL_NEAREST, 
 	     GLenum min = GL_LINEAR_MIPMAP_LINEAR);
+    const char *file() { return _file; }
 
     void getBBox(const char *s, float pointsize, float italic,
                  float *left, float *right,
@@ -95,6 +97,7 @@ class atlasFntTexFont: public fntTexFont {
     void putch(sgVec3 curpos, float pointsize, float italic, char c);
     
   protected:
+    char *_file;
     bool _bound;
     float _padding, _ascent, _descent;
 
