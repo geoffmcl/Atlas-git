@@ -155,25 +155,6 @@ static void _smoother_cb(puObject *cb)
 
 GraphsUI::GraphsUI(GraphsWindow *gw): _gw(gw)
 {
-    // PUI texture-based fonts must be loaded per-window - they are
-    // textures, and are local to a single OpenGL context.
-    // EYE - copied from Atlas.cxx - just pass it in instead?
-    SGPath fontFile;
-    fontFile = globals.prefs.path;
-    fontFile.append("Fonts");
-    fontFile.append("Helvetica.100.txf");
-    _texFont = new atlasFntTexFont;
-    if (_texFont->load(fontFile.c_str()) != TRUE) {
-	fprintf(stderr, "Required font file '%s' not found.\n",
-		fontFile.c_str());
-	exit(-1);
-    }
-    // EYE - magic number
-    _font.initialize(_texFont, 10.0);
-    puFont legend, label;
-    puGetDefaultFonts(&legend, &label);
-    puSetDefaultFonts(_font, _font);
-
     const int vSpace = 4, hSpace = 5;
     int width = 100, height = 100;
     int smootherHeight = 15;
@@ -260,28 +241,12 @@ GraphsUI::GraphsUI(GraphsWindow *gw): _gw(gw)
 	y += height + vSpace;
 	_yFrame->setSize(width, y);
 	_yGroup->setSize(width, y);
-
-	// // Smoothing slider.
-	// _smoother = new puSlider(0, 0, width, FALSE, smootherHeight);
-	// _smoother->setLabelPlace(PUPLACE_TOP_CENTERED);
-	// _smoother->setLabel("Smoothing (s)");
-	// _smoother->setMinValue(0.0); // 0.0 = no smoothing
-	// _smoother->setMaxValue(60.0); // 60.0 = smooth over a 60s interval
-	// _smoother->setStepSize(1.0);
-	// // Our initial smoothing value is 10s (rates of climb and
-	// // descent will be smoothed over a 10s interval).
-	// _smoother->setValue(10);    // EYE - magic number?
-	// _smoother->setLegend("10"); // EYE - call callback instead?
-	// _smoother->setCallback(_smoother_cb);
-	// _smoother->setUserData((void *)this);
     }
     _mainGroup->close();
     _mainGroup->reveal();
 
     _w = width;
     _h = height;
-
-    puSetDefaultFonts(legend, label);
 }
 
 GraphsUI::~GraphsUI()
@@ -427,6 +392,11 @@ GraphsWindow::GraphsWindow(const char *name, const char *regularFontFile,
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glLineWidth(1.0);
 
+    // Set up fonts for this window.  By default AtlasBaseWindow fonts
+    // are 12.0 points; we want them to be smaller.
+    puFont uiFont(_regularFont, 10.0);
+    puSetDefaultFonts(uiFont, uiFont);
+
     // EYE - allocate _time and _dist too?  Add to _values?  Have
     // _xValues and _yValues?  Make strings part of
     // preferences/internationalization stuff?
@@ -483,9 +453,9 @@ GraphsWindow::~GraphsWindow()
 	delete _values[t];
     }
 
-    delete _xSlider;
+    puDeleteObject(_xSlider);
     for (int i = 0; i < _GRAPH_TYPES_COUNT; i++) {
-    	delete _ySliders[i];
+    	puDeleteObject(_ySliders[i]);
     }
 
     glDeleteLists(_graphDL, 1);
@@ -1223,7 +1193,6 @@ GraphsWindow::Values::Values(const char *label):
 GraphsWindow::Values::~Values()
 {
     free(_label);
-    puDeleteObject(_slider);
 }
 
 void GraphsWindow::Values::setFlightTrack(FlightTrack *ft)

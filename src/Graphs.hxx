@@ -410,8 +410,6 @@ class GraphsUI {
     void _setScale(_AxisUI *axis);
 
     GraphsWindow *_gw;
-    atlasFntTexFont *_texFont;
-    puFont _font;
 
     puGroup *_mainGroup, *_xGroup, *_yGroup;
     puFrame *_mainFrame, *_xFrame, *_yFrame;
