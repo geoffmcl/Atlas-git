@@ -80,7 +80,7 @@ class Notification {
 	       ShowOutlines,     // Show chunk and tile outlines
 	       CentreType,	 // Centre type changed
 	       // EYE - does this overlap with SceneryChanged?
-	       NewScenery,	 // New live scenery loaded
+	       NewScenery,	 // New maps or live scenery loaded
 	       AircraftMoved,	 // Mark changed
 	       FlightTrackModified, // Point added/deleted/modified,
 				    // name changed
