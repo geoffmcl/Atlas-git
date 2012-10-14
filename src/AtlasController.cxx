@@ -248,7 +248,8 @@ AtlasController::AtlasController(const char *paletteDir)
     // Create a tile manager.  In its creator it will see which scenery
     // directories we have, and whether there are maps generated for
     // those directories.
-    _tm = new TileManager(globals.prefs.scenery_root, globals.prefs.path);
+    Preferences& p = globals.prefs;
+    _tm = new TileManager(p.scenery_root, p.path);
     if (_tm->mapLevels().none()) {
 	// EYE - magic numbers
 	bitset<TileManager::MAX_MAP_LEVEL> levels;
@@ -275,7 +276,7 @@ AtlasController::AtlasController(const char *paletteDir)
 
     // Load our navaid and airport data (and add strings to the
     // Searcher object).
-    _navData = new NavData(globals.prefs.fg_root.c_str(), _searcher);
+    _navData = new NavData(p.fg_root.get().c_str(), _searcher);
 
     // EYE - should this and the previous defaults be command-line
     // options?  Should we also initialize them by passing in the
@@ -293,10 +294,11 @@ AtlasController::AtlasController(const char *paletteDir)
     // (3) The first palette
 
     // EYE - use try?  Does the above search policy belong here?
-    globals.str.printf("%s", globals.prefs.palette);
+    globals.str.printf("%s", p.palette.get().c_str());
     size_t i = _palettes->find(globals.str.str());
     if (i == Palettes::NaP) {
-	fprintf(stderr, "Failed to read palette '%s'\n", globals.prefs.palette);
+	fprintf(stderr, "Failed to read palette '%s'\n", 
+		p.palette.get().c_str());
 
 	// If we can't find the specified palette, we fall back to
 	// "default".
@@ -309,14 +311,15 @@ AtlasController::AtlasController(const char *paletteDir)
     }
     setCurrentPalette(i);
 
-    setContourLines(globals.prefs.contourLines);
-    setDiscreteContours(globals.prefs.discreteContours);
-    setLightingOn(globals.prefs.lightingOn);
-    setSmoothShading(globals.prefs.smoothShading);
-    setAzimuth(globals.prefs.azimuth);
-    setElevation(globals.prefs.elevation);
-    setImageType(globals.prefs.imageType);
-    setJPEGQuality(globals.prefs.JPEGQuality);
+    setDiscreteContours(p.discreteContours.get());
+    setContourLines(p.contourLines.get());
+    setLightingOn(p.lightingOn.get());
+    setSmoothShading(p.smoothShading.get());
+    const Prefs::LightPosition& l = p.lightPosition;
+    setAzimuth(l.azimuth());
+    setElevation(l.elevation());
+    setImageType(p.imageType);
+    setJPEGQuality(p.JPEGQuality);
 }
 
 AtlasController::~AtlasController()
@@ -332,69 +335,69 @@ AtlasController::~AtlasController()
 void AtlasController::setDiscreteContours(bool b)
 {
     if (_discreteContours != b) {
-	_discreteContours = b;
-	// EYE - I think this is necessary.
-	Bucket::discreteContours = _discreteContours;
-	// EYE - Scenery tile objects subscribe to this.  Should we
-	// inform them directly?
-	Notification::notify(Notification::DiscreteContours);
+    	_discreteContours = b;
+    	// EYE - I think this is necessary.
+    	Bucket::discreteContours = _discreteContours;
+    	// EYE - Scenery tile objects subscribe to this.  Should we
+    	// inform them directly?
+    	Notification::notify(Notification::DiscreteContours);
     }
 }
 
 void AtlasController::setContourLines(bool b)
 {
     if (_contourLines != b) {
-	_contourLines = b;
-	Bucket::contourLines = _contourLines;
-	Notification::notify(Notification::ContourLines);
+    	_contourLines = b;
+    	Bucket::contourLines = _contourLines;
+    	Notification::notify(Notification::ContourLines);
     }
 }
 
 void AtlasController::setLightingOn(bool b)
 {
     if (_lightingOn != b) {
-	_lightingOn = b;
-	Notification::notify(Notification::LightingOn);
+    	_lightingOn = b;
+    	Notification::notify(Notification::LightingOn);
     }
 }
 
 void AtlasController::setSmoothShading(bool b)
 {
     if (_smoothShading != b) {
-	_smoothShading = b;
-	Notification::notify(Notification::SmoothShading);
+    	_smoothShading = b;
+    	Notification::notify(Notification::SmoothShading);
     }
 }
 
 void AtlasController::setAzimuth(float f)
 {
     if (_azimuth != f) {
-	_azimuth = f;
-	Notification::notify(Notification::Azimuth);
+    	_azimuth = f;
+    	Notification::notify(Notification::Azimuth);
     }
 }
 
 void AtlasController::setElevation(float f)
 {
     if (_elevation != f) {
-	_elevation = f;
-	Notification::notify(Notification::Elevation);
+    	_elevation = f;
+    	Notification::notify(Notification::Elevation);
     }
 }
 
 void AtlasController::setImageType(TileMapper::ImageType it)
 {
     if (_imageType != it) {
-	_imageType = it;
-	Notification::notify(Notification::ImageType);
+    	_imageType = it;
+    	Notification::notify(Notification::ImageType);
     }
 }
 
 void AtlasController::setJPEGQuality(int i)
 {
     if (_JPEGQuality != i) {
-	_JPEGQuality = i;
-	Notification::notify(Notification::JPEGQuality);
+    	_JPEGQuality = i;
+    	Notification::notify(Notification::JPEGQuality);
     }
 }
 

@@ -45,6 +45,8 @@
 #include "Graphs.hxx"
 #include "NavData.hxx"
 
+using namespace std;
+
 // Our main controller.  It acts as the mediator between our "model"
 // (all the data) and our views (AtlasWindow, GraphsWindow).
 AtlasController *_ac;
@@ -63,27 +65,29 @@ int main(int argc, char **argv)
 
     // Load our preferences.  If there's a problem with any of the
     // arguments, it will print some errors to stderr, and return false.
-    if (!globals.prefs.loadPreferences(argc, argv)) {
+    Preferences& p = globals.prefs;
+    if (!p.load(argc, argv)) {
     	exit(1);
     }
 
     // A bit of post-preference processing.
-    if (access(globals.prefs.path.c_str(), F_OK)==-1) {
+    SGPath path = p.path;
+    if (access(path.c_str(), F_OK) == -1) {
 	printf("\nWarning: path %s doesn't exist. Maps won't be loaded!\n", 
-	       globals.prefs.path.c_str());
+	       path.c_str());
     }
 
     // Get our palette directory.
-    SGPath paletteDir = globals.prefs.path;
+    SGPath paletteDir = p.path;
     paletteDir.append("Palettes");
 
     // One controller to rule them all.
     _ac = new AtlasController(paletteDir.c_str());
 
     // Read in files.
-    for (unsigned int i = 0; i < globals.prefs.flightFiles.size(); i++) {
+    for (unsigned int i = 0; i < p.flightFiles.size(); i++) {
     	// First check if we've loaded that file already.
-    	const char *file = globals.prefs.flightFiles[i].c_str();
+    	const char *file = p.flightFiles[i].c_str();
     	if (_ac->find(file) == FlightTracks::NaFT) {
     	    // Nope - open it.
     	    try {
@@ -97,23 +101,25 @@ int main(int argc, char **argv)
     	}
     }
     // Make network connections.
-    for (unsigned int i = 0; i < globals.prefs.networkConnections.size(); i++) {
+    const vector<int>& ncs = p.networkConnections.prefs();
+    for (unsigned int i = 0; i < ncs.size(); i++) {
     	// Already loaded?.
-    	int port = globals.prefs.networkConnections[i];
+    	int port = ncs[i];
     	if (_ac->find(port) == FlightTracks::NaFT) {
     	    FlightTrack *f = 
-    		new FlightTrack(_ac->navData(), port, globals.prefs.max_track);
+    		new FlightTrack(_ac->navData(), port, p.maxTrack);
     	    _ac->addTrack(f);
     	}
     }
     // Make serial connections.
-    for (unsigned int i = 0; i < globals.prefs.serialConnections.size(); i++) {
+    const vector<Prefs::SerialConnection>& scs = p.serialConnections.prefs();
+    for (unsigned int i = 0; i < scs.size(); i++) {
     	// Already loaded?.
-    	const char *device = globals.prefs.serialConnections[i].device;
-    	int baud = globals.prefs.serialConnections[i].baud;
-    	if (_ac->find(device, baud) == FlightTracks::NaFT) {
-    	    FlightTrack *f = new FlightTrack(_ac->navData(), device, baud, 
-    					     globals.prefs.max_track);
+    	const string& device = scs[i].device();
+    	int baud = scs[i].baud();
+    	if (_ac->find(device.c_str(), baud) == FlightTracks::NaFT) {
+    	    FlightTrack *f = new FlightTrack(_ac->navData(), device.c_str(), 
+					     baud, p.maxTrack);
     	    _ac->addTrack(f);
     	}
     }
@@ -124,25 +130,23 @@ int main(int argc, char **argv)
     // Find our scenery fonts.
     // EYE - put in preferences
     SGPath fontDir, regularFontFile, boldFontFile;
-    fontDir = globals.prefs.path;
+    fontDir = p.path;
     fontDir.append("Fonts");
     regularFontFile = fontDir;
     regularFontFile.append("Helvetica.100.txf");
     boldFontFile = fontDir;
     boldFontFile.append("Helvetica-Bold.100.txf");
 
+    //////////////////////////////////////////////////////////////////////
     // Create the graphs window.  Why create the graphs window first?
-    // Two reasons: (1) It is hidden by default.  The second window -
-    // the main Atlas window - is in front, so by creating it second
-    // it automatically appears in front.  (2) More importantly, it
-    // allows us to initialize GLEW with a minimum of fuss.  GLEW can
-    // only be initialized after a OpenGL context (ie, window) exists.
-    // Moreover, we can't do anything that depends on GLEW before
-    // glewInit() is called.  The graphs window constructor doesn't do
-    // anything that requires GLEW, but the main Atlas window
-    // constructor does, so it's safe to call glewInit() if the graphs
-    // window is created first, but *not* if the main Atlas window is.
-    // Simple!
+    // It allows us to initialize GLEW with a minimum of fuss.  GLEW
+    // can only be initialized after a OpenGL context (ie, window)
+    // exists.  Moreover, we can't do anything that depends on GLEW
+    // before glewInit() is called.  The graphs window constructor
+    // doesn't do anything that requires GLEW, but the main Atlas
+    // window constructor does, so it's safe to call glewInit() if the
+    // graphs window is created first, but *not* if the main Atlas
+    // window is.  Simple!
 
     // The graphs window doesn't need a depth buffer, etc.
     glutInitDisplayString("rgba double");
@@ -163,6 +167,7 @@ int main(int argc, char **argv)
     globals.gw->setYAxisType(GraphsWindow::SPEED, true);
     globals.gw->setYAxisType(GraphsWindow::CLIMB_RATE, true);
       
+    //////////////////////////////////////////////////////////////////////
     // Now that we have a valid OpenGL context, initialize GLEW.
     // Because of the features we use, we need at least OpenGL 1.5,
     // along with the FBO extension.  One of these years we'll advance
@@ -189,6 +194,7 @@ int main(int argc, char **argv)
 	exit(0);
     }
 
+    //////////////////////////////////////////////////////////////////////
     // Create our Atlas window.
     // EYE - this seems to give us only 2 samples, which isn't enough
     // glutInitDisplayMode(GLUT_RGBA | GLUT_DEPTH | GLUT_DOUBLE | GLUT_MULTISAMPLE);
@@ -208,18 +214,19 @@ int main(int argc, char **argv)
 				 regularFontFile.c_str(),
 				 boldFontFile.c_str(),
 				 _ac);
-    globals.aw->reshape(globals.prefs.width, globals.prefs.height);
+    const Prefs::Geometry& g = p.geometry;
+    globals.aw->reshape(g.width(), g.height());
 
     // Initial position (this may be changed by the --airport option,
     // or by loading flight tracks).
-    double latitude = globals.prefs.latitude, 
-	longitude = globals.prefs.longitude;
+    double latitude = p.latitude, longitude = p.longitude;
     globals.aw->movePosition(latitude, longitude);
     
     // Handle --airport option.
-    if (strlen(globals.prefs.icao) != 0) {
-	if (_ac->searcher()->findMatches(globals.prefs.icao, globals.aw->eye(), 
-					 -1)) {
+    SGPath icao(p.icao);
+    if (!icao.isNull()) {
+	if (_ac->searcher()->findMatches(icao.c_str(), 
+					 globals.aw->eye(), -1)) {
 	    // We found some matches.  The question is: which one to
 	    // use?  Answer: the first one that's actually an airport,
 	    // for lack of a better choice.
@@ -232,20 +239,18 @@ int main(int argc, char **argv)
 		}
 	    }
 	} else {
-	    fprintf(stderr, "Unknown airport: '%s'\n", globals.prefs.icao);
+	    fprintf(stderr, "Unknown airport: '%s'\n", icao.c_str());
 	}
     }
   
     // Set our default zoom and position.
-    globals.aw->zoomTo(globals.prefs.zoom);
+    globals.aw->zoomTo(p.zoom);
     if (!_ac->tracks().empty()) {
 	// If we've loaded some tracks, display the first one and
 	// centre the map on the aircraft.
 	_ac->setCurrentTrack(0);
 	globals.aw->centreMapOnAircraft();
     }
-    // // Update all our track information.
-    // newFlightTrack();
 
     glutMainLoop();
  

@@ -63,6 +63,7 @@ class Route {
     void addPoint(SGGeod &p);
     void deleteLastPoint();
     void clear();
+    // size_t size() { return _points.size(); }
 
     SGGeod lastPoint();
 
@@ -73,6 +74,7 @@ class Route {
 	      bool magTrue);
     
     // EYE - move out later?
+    // bool active, front;
     bool active;
 
   protected:
@@ -101,7 +103,8 @@ class Route {
 //////////////////////////////////////////////////////////////////////
 class ScreenLocation {
   public:
-    ScreenLocation(Scenery &scenery);
+    ScreenLocation(Scenery *scenery);
+    // ScreenLocation(ScreenLocation &loc);
 
     // Set x, y.  This also causes us to be invalidated.
     void set(float x, float y);
@@ -133,7 +136,7 @@ class ScreenLocation {
   protected:
     // We use this to figure out what's beneath our given screen
     // coordinates.
-    Scenery &_scenery;
+    Scenery *_scenery;
 
     // Note that both ScreenLocation and AtlasCoord have notions of
     // validity.  When the ScreenLocation is valid (_valid = true),
@@ -196,11 +199,17 @@ class AtlasWindow: public AtlasBaseWindow, Subscriber {
     int noOfMatches();
     char *matchAtIndex(int i);
 
+    // These are used by render() to determine what to render.
+    // Callers have the choice of rendering all maps (RENDER_ALL),
+    // just those in a chunk (RENDER_10), or just those in a tile
+    // (RENDER_1).
+    enum RenderType {RENDER_ALL, RENDER_10, RENDER_1};
     // Called when the user asks us to render some maps.  When 'force'
     // is true, all maps for each tile will be rendered; when false,
-    // only missing maps will be rendered.
-    enum RenderType {RENDER_ALL, RENDER_10, RENDER_1};
-    void render(RenderType type, bool force);
+    // only missing maps will be rendered.  When 'type' is RENDER_10
+    // or RENDER_1, 'sLoc' tells us what chunk/tile is being referred
+    // to.
+    void render(ScreenLocation& sLoc, RenderType type, bool force);
 
     // If we're tracking the mouse, this returns the cursor position,
     // otherwise returns the position at the centre of the window.
@@ -240,6 +249,9 @@ class AtlasWindow: public AtlasBaseWindow, Subscriber {
 
     // Mapping stuff.
     const Dispatcher *dispatcher() const { return _dispatcher; }
+    // Called when someone wants to start a rendering job.  It begins
+    // by presenting a list of choices to the user.
+    void render();
     // Called when someone (right now, just the MappingUI) wants to
     // cancel a mapping process.
     void cancelMapping();
@@ -291,10 +303,13 @@ class AtlasWindow: public AtlasBaseWindow, Subscriber {
 
     AtlasDialog *_exitOkDialog;
 
-    // EYE - document these, and maybe reorganize them
-    AtlasDialog *_renderConfirmDialog;
+    // Presents the user with a set of rendering choices (all, all
+    // unrendered, ...).
     RenderDialog *_renderDialog;
-    TileMapper *_mapper;
+    // Asks the user if he/she wants to go ahead with rendering.
+    AtlasDialog *_renderConfirmDialog;
+    // The dispatcher creates a tile mapper (which does the actual
+    // rendering), sending it work in bite-sized chunks.
     Dispatcher *_dispatcher;
     bool _force;
     std::vector<Tile *> _tiles;
@@ -394,7 +409,6 @@ class MainUI: public Subscriber {
     friend void __mainUI_renderButton_cb(puObject *o);
 
     friend void __mainUI_closeOk_cb(puObject *o);
-    friend void __mainUI_renderDialog_cb(puObject *o);
 
     friend void __networkPopup_ok_cb(puObject *o);
     friend void __networkPopup_cancel_cb(puObject *o);
@@ -439,14 +453,13 @@ class MainUI: public Subscriber {
     // Render frame widget
     puText *_chunkTileText;
     puButton *_showOutlinesToggle;
-    puButton *_renderButton;
+    puButton *_renderButton, *_lightingButton;
 
     // File dialog.
     puaFileSelector *_fileDialog;
     AtlasDialog *_closeOkDialog;
 
     NetworkPopup *_networkPopup;
-    RenderDialog *_renderDialog;
 
     void _setDegMinSec();
     void _setMagTrue();
@@ -473,9 +486,9 @@ class MainUI: public Subscriber {
     void _attach_cb(puObject *o);
     void _showOutlines_cb(puObject *o);
     void _renderButton_cb(puObject *o);
+    void _lighting_cb(puObject *o);
 
     void _closeOk_cb(bool okay);
-    void _renderDialog_cb(bool okay);
 
     void _networkPopup_cb(bool okay);
 };
@@ -557,7 +570,7 @@ class NetworkPopup {
 //
 // This allows the user to adjust lighting parameters: discrete/smooth
 // contours, contour lines on/off, lighting on/off, smooth/flat
-// polygon shading, and current palette.
+// polygon shading, current palette, map file type, and JPEG quality.
 //
 //////////////////////////////////////////////////////////////////////
 class LightingUI: public Subscriber {
@@ -586,7 +599,6 @@ class LightingUI: public Subscriber {
 
     // Lighting toggles
     puButtonBox *_contours, *_lines, *_lighting, *_polygons;
-    puText *_contoursLabel, *_linesLabel, *_lightingLabel, *_polygonsLabel;
     const char *_contoursLabels[3], *_linesLabels[3], *_lightingLabels[3], 
 	*_polygonsLabels[3];
 
@@ -603,6 +615,12 @@ class LightingUI: public Subscriber {
     puaComboBox *_paletteComboBox;
     puArrowButton *_prevPalette, *_nextPalette;
 
+    // Map file parameters
+    puFrame *_imageFrame;
+    puButtonBox *_imageType;
+    const char *_imageTypeLabels[3];
+    puSlider *_JPEGQualitySlider;
+
     // Sets our UI elements based on model values (in
     // AtlasController).
     void _setDiscreteContours();
@@ -613,6 +631,8 @@ class LightingUI: public Subscriber {
     void _setElevation();
     void _setPalette();
     void _setPaletteList();
+    void _setImageType();
+    void _setJPEGQuality();
 
     // Callback for all UI events.  This will set our model values
     // based on the user input.
@@ -732,6 +752,18 @@ class MappingUI: public Subscriber
     void _cancel_cb(puObject *o);
 };
 
+// A render dialog presents a list of things that can be rendered,
+// based on the AtlasWindow's current location and the state of tiles
+// as maintained by the tile manager.  When the users hits "OK" or
+// "Cancel", 'cb' will be called with the render dialog as its
+// parameter.  You can associate an arbitrary bit of data with the
+// dialog - generally this would be the address of some object that is
+// going to deal with rendering.
+//
+// The button pressed can be queried with o->getDefaultValue() (where
+// 'o' is the render dialog passed in to the callback).  The user data
+// can be queried with o->getUserData().
+//
 // EYE - how smart should this class be?  Should it figure out how
 // many tiles there are, how many need to be rendered, ...?  Should it
 // create a vector of tiles when a selection is made?  Or should all
@@ -749,9 +781,19 @@ class RenderDialog: public puDialogBox {
     RenderDialog(AtlasWindow *aw, puCallback cb, void *data);
     ~RenderDialog();
 
+    // After the dialog has been dismissed, the following 3 items
+    // together determine what is to be rendered (assuming OK was
+    // pressed; if Cancel was pressed, the items are undefined).
+    //
+    // Says whether all maps should be looked at, just the ones in a
+    // chunk, or just the ones in a tile.
     AtlasWindow::RenderType type() 
       { return _types[_choices->getIntegerValue()]; }
+    // Says whether all maps should be rendered (true), or just ones
+    // that are missing maps (false).
     bool force() { return _forces[_choices->getIntegerValue()]; };
+    // Says what chunk/tile is referred to by RENDER_10 and RENDER_1.
+    ScreenLocation &screenLocation() { return _currentLoc; }
 
   protected:
     int _createStrings(AtlasWindow *aw);
@@ -773,6 +815,9 @@ class RenderDialog: public puDialogBox {
 	_render1Str, _rerender1Str;
     AtlasWindow::RenderType _types[6];
     bool _forces[6];
+
+    // The AtlasWindow's current location, when we were created.
+    ScreenLocation _currentLoc;
 };
 
 #endif

@@ -75,7 +75,6 @@ void __mainUI_showOutlines_cb(puObject *o);
 void __mainUI_renderButton_cb(puObject *o);
 
 void __mainUI_closeOk_cb(puObject *o);
-void __mainUI_renderDialog_cb(puObject *o);
 
 void __networkPopup_ok_cb(puObject *o);
 void __networkPopup_cancel_cb(puObject *o);
@@ -88,120 +87,157 @@ void __helpUI_cb(puObject *o);
 void __mappingUI_cancel_cb(puObject *o);
 
 //////////////////////////////////////////////////////////////////////
-// Dispatcher - passes a bit of work at a time to a TileMapper object.
+// Dispatcher - passes a bit of work at a time to a TileMapper object
+// that it manages.
 //////////////////////////////////////////////////////////////////////
 class Dispatcher {
   public:
-    // Call the constructor with a tile mapper object and a set of
+    // Call the constructor with the Atlas controller and a set of
     // tiles to be rendered.  If force is true, maps will be generated
     // for all map levels.  If false, only missing maps will be
     // generated.
-
-    // EYE - pass a reference to a vector?
-    Dispatcher(TileMapper *mapper, vector<Tile *> tiles, bool force);
+    Dispatcher(AtlasController *ac, vector<Tile *>& tiles, bool force);
     ~Dispatcher();
 
     enum MappingState {WILL_LOAD, WILL_DRAW, WILL_MAP, DONE};
 
     // Each time this is called, the dispatcher will do the next bit
-    // of work.  After it returns, tile(), state(), and level() tells
-    // you what will happen next.
+    // of work.  "A bit of work" could mean loading a tile, rendering
+    // a tile, or saving a map to disk.  After it returns, tile() (and
+    // i()), state(), and level() tell you what will happen next, and
+    // to what <tile, level> pair.  Returns true if it there's still
+    // work left to do, false otherwise.
+    bool doWork();
+    // Cancels all mapping (ie, sets state() to DONE).
+    void cancel();
 
-    // EYE - maybe return a boolean to indicate it's not done?  Is
-    // this possible?
-    void doWork();
-
-    // EYE - should we make some more of this const?
+    // Accessors.  Use these to monitor mapping progress.
+    vector<Tile *>& tiles() const { return _tiles; }
+    size_t i() const { return _i; }
     Tile *tile() const { return _t; }
-    int level() const { return _level; }
     MappingState state() const { return _state; }
-
-    // Returns the number of tiles processed.
-    // unsigned int progress() { return _i; }
-    float progress() const { return (float)_i / (float)_tiles.size(); }
+    int level() const { return _level; }
 
   protected:
-    void _firstEligibleTile();
+    // Starting from, and including, the current _t (and _i) and
+    // _level, find the first <tile, level> that needs some work done.
+    void _advance();
+    // Returns our notion of missing maps for the current tile, _t.
     bitset<TileManager::MAX_MAP_LEVEL> _missingMaps();
 
+    // The thing that does all the real work.
     TileMapper *_mapper;
-    vector<Tile *> _tiles;
+    // The tiles that need to be rendered.
+    vector<Tile *>& _tiles;
+    // If false, only generate a map if it's missing; if true,
+    // generate a map regardless.
     bool _force;
-    unsigned int _i;
+    // The index of the current tile, and the tile itself.
+    size_t _i;
     Tile *_t;
+    // What we need to do next.
     MappingState _state;
+    // The map that needs to be generated next for the current tile.
     unsigned int _level;
 };
 
-Dispatcher::Dispatcher(TileMapper *mapper, vector<Tile *> tiles, 
-		       bool force):
-    _mapper(mapper), _tiles(tiles), _force(force), _i(0), _t(NULL), _state(DONE)
+Dispatcher::Dispatcher(AtlasController *ac, vector<Tile *>& tiles, bool force):
+    _tiles(tiles), _force(force), _i(0), _t(NULL), _state(WILL_LOAD),
+    _level(0)
 {
-    _firstEligibleTile();
+    // Create a tile mapper.
+    int maxMapLevel = 0;
+    for (unsigned int i = 0; i < TileManager::MAX_MAP_LEVEL; i++) {
+	if (ac->tileManager()->mapLevels()[i]) {
+	    maxMapLevel = i;
+	}
+    }
+	       
+    _mapper = new TileMapper(ac->currentPalette(),
+			     maxMapLevel,
+			     ac->discreteContours(),
+			     ac->contourLines(),
+			     ac->azimuth(),
+			     ac->elevation(),
+			     ac->lightingOn(),
+			     ac->smoothShading(),
+			     ac->imageType(),
+			     ac->JPEGQuality());
+
+    // Starting with the map indicated by _t (and _i) and _level, find
+    // the first <tile, level> pair that needs some work done.
+    _advance();
 }
 
 Dispatcher::~Dispatcher()
 {
+    delete _mapper;
 }
 
-void Dispatcher::doWork()
+bool Dispatcher::doWork()
 {
-    if (_t == NULL) {
-	assert(_state == DONE);
-	return;
-    }
-
     if (_state == WILL_LOAD) {
+	// Load the tile.
 	_mapper->set(_t);
 	_state = WILL_DRAW;
     } else if (_state == WILL_DRAW) {
+	// Render the map.
 	_mapper->render();
 	_state = WILL_MAP;
-    } else {
+    } else if (_state == WILL_MAP) {
+	// Save the rendered map at the current level.
 	_mapper->save(_level);
 	_t->setMapExists(_level++, true);
 
-	// EYE - should _firstEligibleTile do this, and should it be
-	// called _nextEligibleTile?  _nextEligibleMap?
-	const bitset<TileManager::MAX_MAP_LEVEL>& maps = _missingMaps();
-	while ((_level < TileManager::MAX_MAP_LEVEL) && !maps[_level]) {
-	    _level++;
-	}
-	if (_level == TileManager::MAX_MAP_LEVEL) {
-	    _i++;
-	    // EYE - make _firstEligibleTile return a boolean?
-	    _firstEligibleTile();
-	}
+	// Move on to the next level that needs a map, or, if none are
+	// left, the next tile that needs a map, or, if none are left,
+	// simply set _state to DONE.
+	_advance();
     }
-    // EYE - return true or false?
+
+    return (_state != Dispatcher::DONE);
 }
 
-// If _force is true, just sets _t to _i.  Otherwise it finds the
-// first tile, starting at _i, that has some missing maps.  If it
-// finds one, sets _t to that tile, _state to WILL_LOAD, and _level to
-// the lowest level needing mapping.  If it finds none, sets _t to
-// NULL and _state to DONE;
-void Dispatcher::_firstEligibleTile()
+void Dispatcher::cancel()
+{
+    _t = NULL;
+    _state = DONE;
+}
+
+// Starting from, and including, the current _t (and _i) and _level,
+// find the first <tile, level> pair that needs some work done.  There
+// are basically 4 possibilities:
+//
+// (1) The current <tile, level> pair needs work.  No state variables
+//     are changed.
+//
+// (2) The current tile needs work, but at a different level.  Only
+//     _level is changed.
+//
+// (3) The current tile is done, but a subsequent tile at some level
+//     needs work.  Both _t and _level are changed, and _state is set
+//     to WILL_LOAD (since we need to load the new tile).
+//
+// (4) There is nothing more to be done.  Set _t to NULL and _state to
+//     DONE.
+void Dispatcher::_advance()
 {
     while (_i < _tiles.size()) {
 	_t = _tiles[_i];
-	if (_force || _t->missingMaps().any()) {
-	    _state = WILL_LOAD;
-	    _level = 0;
-	    const bitset<TileManager::MAX_MAP_LEVEL>& maps = _missingMaps();
-	    while (!maps[_level]) {
-		_level++;
-	    }
-	    assert(_level < TileManager::MAX_MAP_LEVEL);
-	    // EYE - and return true?
+	const unsigned int mml = TileManager::MAX_MAP_LEVEL;
+	const bitset<mml>& maps = _missingMaps();
+	for (; (_level < mml) && !maps[_level]; _level++) {
+	}
+	if (_level < mml) {
 	    return;
 	}
 	_i++;
+	_state = WILL_LOAD;
+	_level = 0;
     }
 
-    // EYE - and return false?
-    _t = NULL;
-    _state = DONE;
+    // There is no next eligible tile, so we're done.
+    cancel();
 }
 
 // Returns a bitset indicating what maps need to be generated for the
@@ -279,7 +315,7 @@ NetworkPopup::NetworkPopup(int x, int y, MainUI *mainUI)
 	curx = bigSpace;
 	cury += buttonHeight + bigSpace;
 	_networkButton = new puButton(curx, cury, 
-				     curx + buttonHeight, cury + buttonHeight);
+				      curx + buttonHeight, cury + buttonHeight);
 	_networkButton->setLabel("Network");
 	_networkButton->setLabelPlace(PUPLACE_CENTERED_RIGHT);
 	_networkButton->setButtonType(PUBUTTON_CIRCLE);
@@ -374,7 +410,7 @@ MainUI::MainUI(int x, int y, AtlasWindow *aw):
     _gui = new puGroup(x, y);
     
     //////////////////////////////////////////////////////////////////////
-    // Render button
+    // Render frame
     //////////////////////////////////////////////////////////////////////
     _renderFrame = new puFrame(0, cury, width, cury + renderHeight);
     cury += bigSpace;
@@ -1077,9 +1113,11 @@ void MainUI::_attach_cb(puObject *o)
     _networkPopup = new NetworkPopup(100, 100, this);
 
     // Fill in default values.
-    _networkPopup->setPort((int)Preferences::defaultPort);
-    _networkPopup->setDevice(Preferences::defaultSerialDevice);
-    _networkPopup->setBaud(Preferences::defaultBaudRate);
+    Preferences& p = globals.prefs;
+    _networkPopup->setPort(p.networkConnections.get(Pref::FACTORY));
+    const Prefs::SerialConnection& sc = p.serialConnections.get(Pref::FACTORY);
+    _networkPopup->setDevice(sc.device().c_str());
+    _networkPopup->setBaud(sc.baud());
 
     // Make the network stuff selected by default.
     _networkPopup->setNetwork(true);
@@ -1094,13 +1132,7 @@ void MainUI::_showOutlines_cb(puObject *o)
 
 void MainUI::_renderButton_cb(puObject *o) 
 {
-    // EYE - grey out the render button?  What if we use the keyboard
-    // shortcut?  And when do we activate the button - when the dialog
-    // closes or when rendering finishes (or is cancelled)?  Do we
-    // need a rendering notification?  Should the keyboard shortcut
-    // code call this routine (or some publicly-exposed one), or
-    // vice-versa?
-    _renderDialog = new RenderDialog(_aw, __mainUI_renderDialog_cb, this);
+    _aw->render();
 }
 
 void MainUI::_closeOk_cb(bool okay) 
@@ -1110,21 +1142,6 @@ void MainUI::_closeOk_cb(bool okay)
     if (okay) {
 	// Unload the track with extreme prejudice.
 	_ac->removeTrack();
-    }
-}
-
-// Called from the render dialog when the "OK" or "Cancel" buttons are
-// pressed.
-void MainUI::_renderDialog_cb(bool okay) 
-{
-    AtlasWindow::RenderType rt =_renderDialog->type();
-    bool force = _renderDialog->force();
-
-    puDeleteObject(_renderDialog);
-    _renderDialog = NULL;
-
-    if (okay) {
-	_aw->render(rt, force);
     }
 }
 
@@ -1424,7 +1441,7 @@ void MainUI::_setTrackList()
 
     _trackListStrings = (char **)malloc(sizeof(char *) * 
 					(_ac->tracks().size() + 1));
-    for (unsigned int i = 0; i < _ac->tracks().size(); i++) {
+    for (size_t i = 0; i < _ac->tracks().size(); i++) {
 	// The display styles are the same as in the graphs window.
 	_trackListStrings[i] = strdup(_ac->trackAt(i)->niceName());
     }
@@ -1590,10 +1607,10 @@ static void __VORsAsString(vector<NAV *> &navs, int x,
     string *id = NULL;
     double vorStrength = 0.0, dmeStrength = 0.0;
     double dmeDistance = 0.0;
-    unsigned int matchingNavaids = 0;
+    size_t matchingNavaids = 0;
 
     // Find VOR and/or DME with strongest signal.
-    for (unsigned int i = 0; i < navs.size(); i++) {
+    for (size_t i = 0; i < navs.size(); i++) {
 	NAV *n = navs[i];
 
 	// We assume that signal strength is proportional to the
@@ -1717,7 +1734,7 @@ static void __ILSsAsString(vector<NAV *> &navs, int x,
     // localizer strength.
     map<string, vector<NAV *> > groups;
 
-    for (unsigned int i = 0; i < navs.size(); i++) {
+    for (size_t i = 0; i < navs.size(); i++) {
 	NAV *n = navs[i];
 	groups[n->id].push_back(n);
     }
@@ -1729,7 +1746,7 @@ static void __ILSsAsString(vector<NAV *> &navs, int x,
 	 i != groups.end(); i++) {
 	vector<NAV *> &components = i->second;
 
-	for (unsigned int j = 0; j < components.size(); j++) {
+	for (size_t j = 0; j < components.size(); j++) {
 	    NAV *n = components[j];
 	    if (n->navtype == NAV_ILS) {
 		// To prevent divide-by-zero errors, we arbitrarily
@@ -1759,7 +1776,7 @@ static void __ILSsAsString(vector<NAV *> &navs, int x,
 	double ar, d;
 	const char *magTrueChar = "T";
 
-	for (unsigned int j = 0; j < chosen->size(); j++) {
+	for (size_t j = 0; j < chosen->size(); j++) {
 	    NAV *n = chosen->at(j);
 	    if (n->navtype == NAV_ILS) {
 		loc = n;
@@ -1825,7 +1842,7 @@ static void __NDBsAsString(vector<NAV *> &navs, int x,
     double strength = 0.0;
 
     // Find NDB with strongest signal.
-    for (unsigned int i = 0; i < navs.size(); i++) {
+    for (size_t i = 0; i < navs.size(); i++) {
 	NAV *n = navs[i];
 
 	// We assume that signal strength is proportional to the
@@ -1943,7 +1960,7 @@ void InfoUI::_setText()
     	// Separate navaids based on frequency.
     	vector<NAV *> VOR1s, VOR2s, NDBs;
     	const vector<NAV *> &navaids = p->navaids();
-    	for (unsigned int i = 0; i < navaids.size(); i++) {
+    	for (size_t i = 0; i < navaids.size(); i++) {
     	    NAV *n = navaids[i];
     	    if (p->nav1_freq == n->freq) {
     		VOR1s.push_back(n);
@@ -1996,7 +2013,7 @@ LightingUI::LightingUI(int x, int y, AtlasWindow *aw): _aw(aw), _ac(aw->ac())
 {
     // EYE - magic numbers
     const int bigSpace = 5;
-    const int labelWidth = 75, labelHeight = 20;
+    const int labelWidth = 100, labelHeight = 20;
     const int boxHeight = 55, boxWidth = 100;
 
     const int directionHeight = boxHeight + labelHeight + bigSpace * 3;
@@ -2004,8 +2021,10 @@ LightingUI::LightingUI(int x, int y, AtlasWindow *aw): _aw(aw), _ac(aw->ac())
 
     const int paletteHeight = labelHeight * 2 + bigSpace * 3;
 
-    // const int height = boxHeight * 3 + directionHeight + paletteHeight;
-    const int height = boxHeight * 4 + directionHeight + paletteHeight;
+    const int fileHeight = boxHeight + labelHeight + bigSpace * 2;
+
+    const int height = 
+	boxHeight * 4 + directionHeight + paletteHeight + fileHeight;
     const int width = labelWidth + boxWidth;
 
     const int paletteWidth = width - 2 * bigSpace - labelHeight;
@@ -2017,6 +2036,46 @@ LightingUI::LightingUI(int x, int y, AtlasWindow *aw): _aw(aw), _ac(aw->ac())
 
 	curx = 0;
 	cury = 0;
+
+	//////////////////////////////////////////////////////////////////////
+	// File parameters
+	//////////////////////////////////////////////////////////////////////
+	_imageFrame = new puFrame(curx, cury, curx + width, cury + fileHeight);
+
+	// curx = bigSpace;
+	curx = width - boxWidth;
+	cury += bigSpace;
+	// EYE - needless to say, 'foo' is not very descriptive
+	int foo = width - labelWidth - bigSpace;
+	_JPEGQualitySlider = new puSlider(curx, cury, 
+					  foo, FALSE, 
+					  labelHeight);
+	_JPEGQualitySlider->setMinValue(0.0);
+	_JPEGQualitySlider->setMaxValue(100.0);
+	_JPEGQualitySlider->setStepSize(1.0);
+	_JPEGQualitySlider->setLabelPlace(PUPLACE_CENTERED_LEFT);
+	_JPEGQualitySlider->setLabel("JPEG Quality");
+	_JPEGQualitySlider->setUserData(this);
+	_JPEGQualitySlider->setCallback(__lightingUI_cb);
+	cury += labelHeight;
+
+	curx = width - boxWidth;
+	cury += bigSpace;
+	_imageTypeLabels[0] = "JPEG";
+	_imageTypeLabels[1] = "PNG";
+	_imageTypeLabels[2] = NULL;
+	_imageType = new puButtonBox(curx, cury,
+				     curx + boxWidth, cury + boxHeight,
+				     (char **)_imageTypeLabels, TRUE);
+	_imageType->setLabelPlace(PUPLACE_UPPER_LEFT);
+	_imageType->setLabel("File Type");
+	_imageType->setUserData(this);
+	_imageType->setCallback(__lightingUI_cb);
+	cury += boxHeight;
+
+	// EYE - to do: label in slider, ...
+	curx = 0;
+	cury = fileHeight;
 
 	//////////////////////////////////////////////////////////////////////
 	// Palettes
@@ -2086,7 +2145,7 @@ LightingUI::LightingUI(int x, int y, AtlasWindow *aw): _aw(aw), _ac(aw->ac())
 	_directionLabel = new puText(curx, cury);
 	_directionLabel->setLabel("Light direction");
 
-	cury = paletteHeight + directionHeight;
+	cury += labelHeight + bigSpace;
 
 	//////////////////////////////////////////////////////////////////////
 	// Lighting toggles
@@ -2094,18 +2153,15 @@ LightingUI::LightingUI(int x, int y, AtlasWindow *aw): _aw(aw), _ac(aw->ac())
 
 	// Smooth/flat polygon shading
 	curx = 0;
-	cury += boxHeight / 2;
-	_polygonsLabel = new puText(curx, cury);
-	_polygonsLabel->setLabel("Polygons");
-
 	curx += labelWidth;
-	cury -= boxHeight / 2;
 	_polygonsLabels[0] = "smooth";
 	_polygonsLabels[1] = "flat";
 	_polygonsLabels[2] = NULL;
 	_polygons = new puButtonBox(curx, cury, 
 				   curx + boxWidth, cury + boxHeight,
 				   (char **)_polygonsLabels, TRUE);
+	_polygons->setLabelPlace(PUPLACE_UPPER_LEFT);
+	_polygons->setLabel("Polygons");
 	_polygons->setUserData(this);
 	_polygons->setCallback(__lightingUI_cb);
 
@@ -2113,18 +2169,15 @@ LightingUI::LightingUI(int x, int y, AtlasWindow *aw): _aw(aw), _ac(aw->ac())
 	cury += boxHeight;
 
 	// Lighting
-	cury += boxHeight / 2;
-	_lightingLabel = new puText(curx, cury);
-	_lightingLabel->setLabel("Lighting");
-
 	curx += labelWidth;
-	cury -= boxHeight / 2;
 	_lightingLabels[0] = "on";
 	_lightingLabels[1] = "off";
 	_lightingLabels[2] = NULL;
 	_lighting = new puButtonBox(curx, cury, 
 				   curx + boxWidth, cury + boxHeight,
 				   (char **)_lightingLabels, TRUE);
+	_lighting->setLabelPlace(PUPLACE_UPPER_LEFT);
+	_lighting->setLabel("Lighting");
 	_lighting->setUserData(this);
 	_lighting->setCallback(__lightingUI_cb);
 
@@ -2132,41 +2185,33 @@ LightingUI::LightingUI(int x, int y, AtlasWindow *aw): _aw(aw), _ac(aw->ac())
 	cury += boxHeight;
 
 	// Contour _lines
-	cury += boxHeight / 2;
-	_linesLabel = new puText(curx, cury);
-	_linesLabel->setLabel("Contour\nlines");
-
 	curx += labelWidth;
-	cury -= boxHeight / 2;
 	_linesLabels[0] = "on";
 	_linesLabels[1] = "off";
 	_linesLabels[2] = NULL;
 	_lines = new puButtonBox(curx, cury, 
 				curx + boxWidth, cury + boxHeight,
 				(char **)_linesLabels, TRUE);
+	_lines->setLabelPlace(PUPLACE_UPPER_LEFT);
+	_lines->setLabel("Contour lines");
 	_lines->setUserData(this);
 	_lines->setCallback(__lightingUI_cb);
-	_lines->setLegend("you shouldn't see this");
 
 	curx = 0;
 	cury += boxHeight;
 
 	// Discrete/smoothed contour colours
-	cury += boxHeight / 2;
-	_contoursLabel = new puText(curx, cury);
-	_contoursLabel->setLabel("Contours");
-
 	curx += labelWidth;
-	cury -= boxHeight / 2;
 	_contoursLabels[0] = "discrete";
 	_contoursLabels[1] = "smoothed";
 	_contoursLabels[2] = NULL;
 	_contours = new puButtonBox(curx, cury, 
 				   curx + boxWidth, cury + boxHeight,
 				   (char **)_contoursLabels, TRUE);
+	_contours->setLabelPlace(PUPLACE_UPPER_LEFT);
+	_contours->setLabel("Contours");
 	_contours->setUserData(this);
 	_contours->setCallback(__lightingUI_cb);
-	_contours->setLegend("you shouldn't see this");
 
 	cury += boxHeight;
     }
@@ -2181,16 +2226,24 @@ LightingUI::LightingUI(int x, int y, AtlasWindow *aw): _aw(aw), _ac(aw->ac())
     _setAzimuth();
     _setElevation();
     _setPaletteList();
+    _setImageType();
+    _setJPEGQuality();
 
-    // Subscribe to notifications of interest.
+    // Subscribe to lighting changes ...
     subscribe(Notification::DiscreteContours);
     subscribe(Notification::ContourLines);
     subscribe(Notification::LightingOn);
     subscribe(Notification::SmoothShading);
     subscribe(Notification::Azimuth);
     subscribe(Notification::Elevation);
+
+    // ... and palette changes ...
     subscribe(Notification::Palette);
     subscribe(Notification::PaletteList);
+
+    // ... and mapping changes.
+    subscribe(Notification::ImageType);
+    subscribe(Notification::JPEGQuality);
 }
 
 LightingUI::~LightingUI()
@@ -2226,6 +2279,10 @@ void LightingUI::notification(Notification::type n)
 	_setPalette();
     } else if (n == Notification::PaletteList) {
 	_setPaletteList();
+    } else if (n == Notification::ImageType) {
+	_setImageType();
+    } else if (n == Notification::JPEGQuality) {
+	_setJPEGQuality();
     } else {
 	assert(0);
     }
@@ -2251,6 +2308,16 @@ void LightingUI::_setLightingOn()
 {
     if (_lighting->getValue() == _ac->lightingOn()) {
 	_lighting->setValue(!_ac->lightingOn());
+    }
+
+    // It's possible that _setLightingOn will get called with our GUI
+    // in an inconsistent state, so we can't assume that if the
+    // _lighting widget agrees with the mapping controller that the
+    // _polygons widget will be correct as well.
+    if (_ac->lightingOn() && !_polygons->isActive()) {
+	_polygons->activate();
+    } else if (!_ac->lightingOn() && _polygons->isActive()) {
+	_polygons->greyOut();
     }
 }
 
@@ -2328,7 +2395,7 @@ void LightingUI::_setPaletteList()
 
     const vector<Palette *>& p = _ac->palettes();
     paletteList = (char **)malloc(sizeof(char *) * (p.size() + 1));
-    for (unsigned int i = 0; i < p.size(); i++) {
+    for (size_t i = 0; i < p.size(); i++) {
 	// Display the filename of the palette (but not the path).
 	SGPath full(p[i]->path());
 	paletteList[i] = strdup(full.file().c_str());
@@ -2340,6 +2407,26 @@ void LightingUI::_setPaletteList()
     // Now that we've updated the palette list, set the currently
     // selected one.
     _setPalette();
+}
+
+void LightingUI::_setImageType()
+{
+    if (_ac->imageType() == TileMapper::JPEG) {
+	_imageType->setValue(0);
+	_JPEGQualitySlider->activate();
+    } else {
+	_imageType->setValue(1);
+	_JPEGQualitySlider->greyOut();
+    }
+}
+
+void LightingUI::_setJPEGQuality()
+{
+    static AtlasString str;
+    int quality = _ac->JPEGQuality();
+    str.printf("%d", quality);
+    _JPEGQualitySlider->setLegend(str.str());
+    _JPEGQualitySlider->setValue(_ac->JPEGQuality());
 }
 
 void LightingUI::_cb(puObject *o)
@@ -2364,6 +2451,14 @@ void LightingUI::_cb(puObject *o)
 	_ac->setCurrentPalette(_paletteComboBox->getCurrentItem() - 1);
     } else if (o == _nextPalette) {
 	_ac->setCurrentPalette(_paletteComboBox->getCurrentItem() + 1);
+    } else if (o == _imageType) {
+	if (_imageType->getIntegerValue() == 0) {
+	    _ac->setImageType(TileMapper::JPEG);
+	} else {
+	    _ac->setImageType(TileMapper::PNG);
+	}
+    } else if (o == _JPEGQualitySlider) {
+	_ac->setJPEGQuality(_JPEGQualitySlider->getIntegerValue());
     }
 
     _aw->postRedisplay();
@@ -2433,18 +2528,19 @@ HelpUI::HelpUI(int x, int y, AtlasWindow *aw):
     _gui->hide();
 
     // General information.
+    Preferences& p = globals.prefs;
     globals.str.printf("$FG_ROOT\n");
-    globals.str.appendf("    %s\n", globals.prefs.fg_root.c_str());
+    globals.str.appendf("    %s\n", p.fg_root.get().c_str());
     globals.str.appendf("$FG_SCENERY\n");
-    globals.str.appendf("    %s\n", globals.prefs.scenery_root.c_str());
+    globals.str.appendf("    %s\n", p.scenery_root.get().c_str());
     globals.str.appendf("Atlas maps\n");
-    globals.str.appendf("    %s\n", globals.prefs.path.c_str());
+    globals.str.appendf("    %s\n", p.path.get().c_str());
     // EYE - this can change!  We need to track changes in the
     // palette, or indicate that this is the default palette.  Also,
     // we really need a function to give us the palette path.
-    SGPath palette(globals.prefs.path);
+    SGPath palette(p.path.get());
     palette.append("Palettes");
-    palette.append(globals.prefs.palette);
+    palette.append(p.palette.get().c_str());
     globals.str.appendf("Atlas palette\n");
     globals.str.appendf("    %s\n", palette.c_str());
 
@@ -2466,16 +2562,16 @@ HelpUI::HelpUI(int x, int y, AtlasWindow *aw):
     globals.str.appendf("\n");
     globals.str.appendf("Airports\n");
     globals.str.appendf("    %s/Airports/apt.dat.gz\n", 
-			 globals.prefs.fg_root.c_str());
+			p.fg_root.get().c_str());
     globals.str.appendf("Navaids\n");
     globals.str.appendf("    %s/Navaids/nav.dat.gz\n", 
-			 globals.prefs.fg_root.c_str());
+			p.fg_root.get().c_str());
     globals.str.appendf("Fixes\n");
     globals.str.appendf("    %s/Navaids/fix.dat.gz\n", 
-			 globals.prefs.fg_root.c_str());
+			p.fg_root.get().c_str());
     globals.str.appendf("Airways\n");
     globals.str.appendf("    %s/Navaids/awy.dat.gz\n", 
-			 globals.prefs.fg_root.c_str());
+			p.fg_root.get().c_str());
 
     globals.str.appendf("\nOpenGL\n");
     globals.str.appendf("    vendor: %s\n", glGetString(GL_VENDOR));
@@ -2524,10 +2620,13 @@ HelpUI::HelpUI(int x, int y, AtlasWindow *aw):
     globals.str.appendf(fmt.str(), "P", "toggle auto-centering");
     globals.str.appendf(fmt.str(), "q", "quit");
     globals.str.appendf(fmt.str(), "r", "activate/deactivate route");
+    globals.str.appendf(fmt.str(), "R", "render maps");
     globals.str.appendf(fmt.str(), "s", "save current track");
-    globals.str.appendf(fmt.str(), "w", "close current flight track");
+    globals.str.appendf(fmt.str(), "S", "toggle chunk outlines");
+    globals.str.appendf(fmt.str(), "T", "toggle background map");
     globals.str.appendf(fmt.str(), "u", "detach (unattach) current connection");
     globals.str.appendf(fmt.str(), "v", "toggle labels");
+    globals.str.appendf(fmt.str(), "w", "close current flight track");
     globals.str.appendf(fmt.str(), "x", "toggle x-axis type (time/dist)");
     globals.str.appendf(fmt.str(), "delete", 
 			 "delete inactive route/last point of active route");
@@ -2684,9 +2783,10 @@ void MappingUI::_setProgress()
     _currentTileLabel.printf(t->name());
     _currentTileText->setLabel(_currentTileLabel.str());
 
-    _progressLegend.printf("%.0f%%", d->progress() * 100);
+    float progress = (float)d->i() / (float)d->tiles().size();
+    _progressLegend.printf("%.0f%%", progress * 100);
     _progressSlider->setLegend(_progressLegend.str());
-    _progressSlider->setSliderFraction(d->progress());
+    _progressSlider->setSliderFraction(progress);
 
     if (_autocentreCheckbox->getIntegerValue()) {
 	_aw->movePosition(t->centreLat(), t->centreLon());
@@ -2702,7 +2802,7 @@ void MappingUI::_cancel_cb(puObject *o)
 // RenderDialog
 //////////////////////////////////////////////////////////////////////
 RenderDialog::RenderDialog(AtlasWindow *aw, puCallback cb, void *data):
-    puDialogBox(0, 0)
+    puDialogBox(0, 0), _currentLoc(*(aw->currentLocation()))
 {
     // Create the label strings.  As a side effect, we get to find out
     // how many entries we need for our button box.
@@ -2761,6 +2861,12 @@ int RenderDialog::_createStrings(AtlasWindow *aw)
 
     // Figure out our "global" menu entries - these are ones
     // that don't depend on what's under the mouse.
+    
+    // EYE - we should probably choose by default the most reasonable
+    // option: (1) When there are unrendered maps, choose "render all
+    // unrendered maps", (2) When there are no unrendered maps, choose
+    // "render all tile/chunk maps", depending on which one is the
+    // smallest.
     TileManager *tm = aw->ac()->tileManager();
     int count = tm->tileCount(TileManager::DOWNLOADED);
     if (count > 0) {
@@ -2774,14 +2880,13 @@ int RenderDialog::_createStrings(AtlasWindow *aw)
     }
 
     // If the current location isn't on the earth, return.
-    ScreenLocation *currentLoc = aw->currentLocation();
-    if (!currentLoc->coord().valid()) {
+    if (!_currentLoc.coord().valid()) {
 	_strings[i] = NULL;
 	return i;
     }
 
     // If the current location is an empty scenery chunk, return.
-    GeoLocation loc(currentLoc->lat(), currentLoc->lon(), true);
+    GeoLocation loc(_currentLoc.lat(), _currentLoc.lon(), true);
     if (tm->chunk(loc) == NULL) {
 	_strings[i] = NULL;
 	return i;
@@ -2864,6 +2969,7 @@ puOneShot *RenderDialog::_makeButton(const char *label, int val,
 // declaration, so we do it out here.
 const float Route::_pointSize = 10.0;
 
+// Route::Route(): active(false), front(false)
 Route::Route(): active(false)
 {
 }
@@ -3042,6 +3148,13 @@ void Route::_draw(GreatCircle &gc, float distance, double metresPerPixel,
 	} else {
 	    glColor3f(1.0, 0.4, 0.4); // salmon
 	}
+	// if (active) {
+	//     glColor3f(1.0, 0.0, 0.0);
+	// } else if (front) {
+	//     glColor3f(1.0, 0.65, 0.0); // orange
+	// } else {
+	//     glColor3f(1.0, 0.4, 0.4); // salmon
+	// }
 	gc.draw(metresPerPixel, frustum, m);
 
 	// EYE - for all this stuff, should we somehow check for visibility?
@@ -3107,11 +3220,19 @@ void Route::_draw(GreatCircle &gc, float distance, double metresPerPixel,
 // Global route.
 // EYE - move into globals?  Allow many to be created?
 Route route;
+// // EYE - make into an overlay?  Combine with flight tracks?
+// vector<Route> routes;
 
-ScreenLocation::ScreenLocation(Scenery &scenery): 
+ScreenLocation::ScreenLocation(Scenery *scenery): 
     _scenery(scenery), _valid(false), _validElevation(false)
 {
 }
+
+// ScreenLocation::ScreenLocation(ScreenLocation &loc): 
+//     _scenery(loc._scenery)
+// {
+//     set(loc.x(), loc.y());
+// }
 
 void ScreenLocation::set(float x, float y)
 {
@@ -3125,7 +3246,7 @@ AtlasCoord &ScreenLocation::coord()
     if (!_valid) {
     	SGVec3<double> cart;
 	// EYE - Should scenery be an overlay?
-    	_valid = _scenery.intersection(_x, _y, &cart, &_validElevation);
+    	_valid = _scenery->intersection(_x, _y, &cart, &_validElevation);
     	if (_valid) {
     	    _loc.set(cart);
     	} else {
@@ -3157,7 +3278,8 @@ AtlasWindow::AtlasWindow(const char *name,
     AtlasBaseWindow(name, regularFontFile, boldFontFile), _ac(ac), 
     _dragging(false), _lightingPrefixKey(false), _debugPrefixKey(false), 
     _overlays(NULL), _showOutlines(false), _exitOkDialog(NULL), 
-    _searchTimerScheduled(false)
+    _renderDialog(NULL), _renderConfirmDialog(NULL),
+    _dispatcher(NULL), _searchTimerScheduled(false)
 {
     // Initialize OpenGL, starting with clearing (background) color
     // and enabling depth testing.
@@ -3199,7 +3321,8 @@ AtlasWindow::AtlasWindow(const char *name,
 
     // EYE - make part of the scenery object?
     _background = new Background(this);
-    SGPath world = globals.prefs.path;
+    Preferences& p = globals.prefs;
+    SGPath world = p.path;
     // EYE - add to preferences: background texture file name, show
     // background texture, show status (or show scenery layer).  We
     // might also want to add options for other layers (airports,
@@ -3213,8 +3336,8 @@ AtlasWindow::AtlasWindow(const char *name,
     // Create our screen location objects.  They track the lat/lon
     // (and elevation, if available) of what's beneath the cursor and
     // the centre of the screen, respectively.
-    _cursor = new ScreenLocation(*_scenery);
-    _centre = new ScreenLocation(*_scenery);
+    _cursor = new ScreenLocation(_scenery);
+    _centre = new ScreenLocation(_scenery);
 
     // Create our overlays and initialize them.
     _overlays = new Overlays(this);
@@ -3231,9 +3354,10 @@ AtlasWindow::AtlasWindow(const char *name,
 
     // EYE - who should initialize this - the controller or the
     // window?
-    setCentre(globals.prefs.width / 2.0, globals.prefs.height / 2.0);
+    const Prefs::Geometry& g = p.geometry;
+    setCentre(g.width() / 2.0, g.height() / 2.0);
     setCentreType(CROSSHAIRS);
-    setAutocentreMode(globals.prefs.autocentre_mode);
+    setAutocentreMode(p.autocentreMode.get());
     
     // Initialize our view and lighting variables.
     _setShading();
@@ -3257,7 +3381,7 @@ AtlasWindow::AtlasWindow(const char *name,
     _searchUI = new SearchUI(this, 0, 0, 300, 300);
     _searchUI->hide();
 
-    if (globals.prefs.softcursor) {
+    if (p.softcursor.get()) {
 	puShowCursor();
     }
 
@@ -3289,7 +3413,7 @@ AtlasWindow::AtlasWindow(const char *name,
 
     // Check network connections and serial connections periodically (as
     // specified by the "update" user preference).
-    startTimer((int)(globals.prefs.update * 1000.0), 
+    startTimer((int)(p.update * 1000.0), 
 	       (GLUTWindow::cb)&AtlasWindow::_flightTrackTimer);
 
     // // EYE - hacked in for now.
@@ -3306,6 +3430,8 @@ AtlasWindow::~AtlasWindow()
     delete _helpUI;
     delete _searchUI;
     delete _mappingUI;
+
+    // EYE - delete _exitOkDialog, ...?
 }
 
 // #include "MPAircraft.hxx"
@@ -3337,7 +3463,15 @@ void AtlasWindow::_display()
     glGetDoublev(GL_MODELVIEW_MATRIX, (GLdouble *)mvm);
     route.draw(_metresPerPixel, _frustum, 
     	       mvm, eye(), regularFont(),
-	       _ac->magTrue());
+    	       _ac->magTrue());
+    // for (size_t i = 0; i < routes.size(); i++) {
+    // 	sgdMat4 mvm;
+    // 	glGetDoublev(GL_MODELVIEW_MATRIX, (GLdouble *)mvm);
+    // 	routes[i].draw(_metresPerPixel, _frustum, 
+    // 		       // mvm, eye(), regularFont(),
+    // 		       mvm, currentLocation()->data(), regularFont(),
+    // 		       _ac->magTrue());
+    // }
 
     // // Draw the MP aircraft.
     // map<string, MPAircraft*>::const_iterator i = MPAircraftMap.begin();
@@ -3529,24 +3663,48 @@ void AtlasWindow::_keyboard(unsigned char key, int x, int y)
 	  case 0:		// ctrl-space
 	    // EYE - use '(' and ')' to create routes?
 	    if (!route.active) {
-		// EYE - later we should push a new route onto the route stack.
-		route.clear();
-		route.active = true;
+	    	// EYE - later we should push a new route onto the route stack.
+	    	route.clear();
+	    	route.active = true;
 	    }
 	    {
-		SGGeod geod;
-		SGGeodesy::SGCartToGeod(SGVec3<double>(eye()[0], 
-						       eye()[1], 
-						       eye()[2]), 
-					geod);
-		if (geod == route.lastPoint()) {
-		    // EYE - check if there have been intervening
-		    // moves, keypresses, ...?
-		    route.active = false;
-		} else {
-		    route.addPoint(geod);
-		}
+	    	SGGeod geod;
+	    	SGGeodesy::SGCartToGeod(SGVec3<double>(eye()[0], 
+	    					       eye()[1], 
+	    					       eye()[2]), 
+	    				geod);
+	    	if (geod == route.lastPoint()) {
+	    	    // EYE - check if there have been intervening
+	    	    // moves, keypresses, ...?
+	    	    route.active = false;
+	    	} else {
+	    	    route.addPoint(geod);
+	    	}
 	    }
+	    // if ((routes.size() == 0) || (!routes.back().active)) {
+	    // 	if (routes.size() > 0) {
+	    // 	    routes.back().front = false;
+	    // 	}
+	    // 	Route r;
+	    // 	routes.push_back(r);
+	    // 	routes.back().active = true;
+	    // 	routes.back().front = true;
+	    // }
+	    // {
+	    // 	// SGGeod geod;
+	    // 	// SGGeodesy::SGCartToGeod(SGVec3<double>(eye()[0], 
+	    // 	// 				       eye()[1], 
+	    // 	// 				       eye()[2]), 
+	    // 	// 			geod);
+	    // 	SGGeod geod = currentLocation()->geod();
+	    // 	if (geod == routes.back().lastPoint()) {
+	    // 	    // EYE - check if there have been intervening
+	    // 	    // moves, keypresses, ...?
+	    // 	    routes.back().active = false;
+	    // 	} else {
+	    // 	    routes.back().addPoint(geod);
+	    // 	}
+	    // }
 	    postRedisplay();
 	    break;
 
@@ -3554,21 +3712,21 @@ void AtlasWindow::_keyboard(unsigned char key, int x, int y)
 	    // Next flight track.  The setCurrentTrack() method is
 	    // smart enough to ignore indexes beyond the end of the
 	    // flight track array.
-	      {
-		  size_t i = _ac->currentTrackNo();
-		  if (i != FlightTracks::NaFT) {
-		      _ac->setCurrentTrack(i + 1);
-		  }
-	      }
+	    {
+		size_t i = _ac->currentTrackNo();
+		if (i != FlightTracks::NaFT) {
+		    _ac->setCurrentTrack(i + 1);
+		}
+	    }
 	    break;
 
 	  case 16:		// ctrl-p
 	    // Previous flight track.
-	      {
-		  size_t i = _ac->currentTrackNo();
-		  if ((i != FlightTracks::NaFT) && (i > 0)) {
-		      _ac->setCurrentTrack(i - 1);
-		  }
+	    {
+		size_t i = _ac->currentTrackNo();
+		if ((i != FlightTracks::NaFT) && (i > 0)) {
+		    _ac->setCurrentTrack(i - 1);
+		}
 	    }
 	    break;
 
@@ -3646,13 +3804,24 @@ void AtlasWindow::_keyboard(unsigned char key, int x, int y)
 
  	  case 'i':
 	    // Zoom airplane image.
- 	    globals.prefs.airplaneImageSize *= 1.1;
+
+	    // EYE - should we add airplaneImageSize to
+	    // AtlasController?  Or should we go the other way and
+	    // move some stuff out of AtlasController and use
+	    // Preferences instead?
+	    {
+		TypedPref<float>& ais = globals.prefs.airplaneImageSize;
+		ais.set(ais * 1.1);
+	    }
 	    postRedisplay();
  	    break;
 
  	  case 'I':
 	    // Shrink airplane image.
- 	    globals.prefs.airplaneImageSize /= 1.1;
+	    {
+		TypedPref<float>& ais = globals.prefs.airplaneImageSize;
+		ais.set(ais / 1.1);
+	    }
 	    postRedisplay();
  	    break;
 
@@ -3681,9 +3850,9 @@ void AtlasWindow::_keyboard(unsigned char key, int x, int y)
 	  case 'l':
 	    // Turn lighting UI on/off.
 	    if (!_lightingUI->isVisible()) {
-	  	_lightingUI->reveal();
+		_lightingUI->reveal();
 	    } else {
-	  	_lightingUI->hide();
+		_lightingUI->hide();
 	    }
 	    postRedisplay();
 	    break;
@@ -3742,38 +3911,41 @@ void AtlasWindow::_keyboard(unsigned char key, int x, int y)
 
 	  case 'q':
 	    // Quit
-	      {
-		  // If there are unsaved tracks, warn the user first.
-		  bool modifiedTracks = false;
-		  for (unsigned int i = 0; i < _ac->tracks().size(); i++) {
-		      if (_ac->trackAt(i)->modified()) {
-			  modifiedTracks = true;
-			  break;
-		      }
-		  }
-		  if (modifiedTracks) {
-		      // Create a warning dialog.
-		      _exitOkDialog = new AtlasDialog("You have unsaved tracks.\nIf you exit now, they will be lost.\nDo you want to exit?", 
-						      "OK", "Cancel", "",
-						      __atlasWindow_exitOk_cb, 
-						      this);
-		      postRedisplay();
-		  } else {
-		      exit(0);
-		  }
-	      }
-	      break;
+	    {
+		// If there are unsaved tracks, warn the user first.
+		bool modifiedTracks = false;
+		for (size_t i = 0; i < _ac->tracks().size(); i++) {
+		    if (_ac->trackAt(i)->modified()) {
+			modifiedTracks = true;
+			break;
+		    }
+		}
+		if (modifiedTracks) {
+		    // Create a warning dialog.
+		    _exitOkDialog = 
+			new AtlasDialog("You have unsaved tracks.\n"
+					"If you exit now, they will be lost.\n"
+					"Do you want to exit?", 
+					"OK", "Cancel", "",
+					__atlasWindow_exitOk_cb, 
+					this);
+		    postRedisplay();
+		} else {
+		    exit(0);
+		}
+	    }
+	    break;
 
 	  case 'r':
 	    // Toggle the active status of the route.
 	    route.active = !route.active;
+	    // routes.back().active = !routes.back().active;
 	    postRedisplay();
 	    break;
 
 	  case 'R':
 	    // Render some maps.
-	    _renderDialog = 
-		new RenderDialog(this, __atlasWindow_renderDialog_cb, this);
+	    render();
 	    postRedisplay();
 	    break;
 
@@ -3829,10 +4001,21 @@ void AtlasWindow::_keyboard(unsigned char key, int x, int y)
 	  case 127:	// delete
 	    // EYE - delete same on non-OS X systems?
 	    if (route.active) {
-		route.deleteLastPoint();
+	    	route.deleteLastPoint();
 	    } else {
-		route.clear();
+	    	route.clear();
 	    }
+
+	    // // EYE - what if routes is empty?  Does routes.back() make
+	    // // sense?
+	    // if (routes.back().active && (routes.back().size() > 1)) {
+	    // 	routes.back().deleteLastPoint();
+	    // } else if (routes.size() > 0) {
+	    // 	// Why, oh why, doesn't pop_back() check if the vector
+	    // 	// is empty itself?
+	    // 	routes.pop_back();
+	    // 	routes.back().front = true;
+	    // }
 	    postRedisplay();
 	    break;
 	}
@@ -3999,7 +4182,7 @@ bool AtlasWindow::_doWork()
 	// Ask the dispatcher to do some work.  When it returns,
 	// tile(), state(), and level() will indicate what will happen
 	// *next*.
-	_dispatcher->doWork();
+	result = _dispatcher->doWork();
 
 	// We know we've finished mapping a tile if we've moved on to
 	// the next one.  If we haven't, we're still mapping.
@@ -4018,8 +4201,6 @@ bool AtlasWindow::_doWork()
 	    _background->setTileStatus(t, Background::MAPPED);
 	    _scenery->update(t);
 	}
-
-	result = (_dispatcher->state() != Dispatcher::DONE);
     }
 
     return result;
@@ -4074,6 +4255,8 @@ void AtlasWindow::_renderTimer()
     	startTimer(0, (GLUTWindow::cb)&AtlasWindow::_renderTimer);
     } else {
 	_mappingUI->hide();
+	delete _dispatcher;
+	_dispatcher = NULL;
     }
 
     postRedisplay();
@@ -4247,15 +4430,14 @@ char *AtlasWindow::matchAtIndex(int i)
     return strdup(searchable->asString().c_str());
 }
 
-void AtlasWindow::render(RenderType type, bool force)
+void AtlasWindow::render(ScreenLocation& sLoc, RenderType type, bool force)
 {
     _tiles.clear();
     _force = force;
 
     TileIterator i;
     TileManager *tm = ac()->tileManager();
-    ScreenLocation *sLoc = currentLocation();
-    GeoLocation gLoc(sLoc->lat(), sLoc->lon(), true);
+    GeoLocation gLoc(sLoc.lat(), sLoc.lon(), true);
     switch (type) {
       case RENDER_ALL: 
 	i.init(tm, TileManager::DOWNLOADED);
@@ -4291,20 +4473,6 @@ void AtlasWindow::render(RenderType type, bool force)
 			__atlasWindow_renderConfirmDialog_cb, this);
 
     postRedisplay();
-
-    // EYE - we should probably force a call to passiveMotion, so that
-    // the window correctly reflects the (new) mouse position (the
-    // mouse will have moved when making a menu selection).  The
-    // problem is, you can't get the mouse x,y in GLUT except when it
-    // calls one of the mouse callback functions.  So the user will
-    // just have to wiggle the mouse to force the callback to be
-    // called.
-    //
-    // Note as well that the contextual menu and tool tip continue to
-    // receive mouse events, which is a waste of processing time and
-    // visually annoying (the tooltip appears under the dialog).  It
-    // would be nice if this could be turned off while the render
-    // dialog is visible.
 }
 
 ScreenLocation *AtlasWindow::currentLocation()
@@ -4512,26 +4680,35 @@ void AtlasWindow::setAutocentreMode(bool mode)
     }
 }
 
+void AtlasWindow::render()
+{
+    // EYE - grey out the render button?  And when do we activate the
+    // button - when the dialog closes or when rendering finishes (or
+    // is cancelled)?  Do we need a rendering notification?
+    if (!_renderDialog && !_dispatcher) {
+	_renderDialog = 
+	    new RenderDialog(this, __atlasWindow_renderDialog_cb, this);
+	postRedisplay();
+    }
+}
+
 void AtlasWindow::cancelMapping()
 {
     // There may be some unprocessed tiles left.  We need to make sure
     // their state in the pixmap correctly represents their real state
     // (which will either be mapped or unmapped).
-    // for (int i = _dispatcher->progress(); i < _tiles.size(); i++) {
-    for (size_t i = 0; i < _tiles.size(); i++) {
+    _dispatcher->cancel();
+    for (size_t i = _dispatcher->i(); i < _tiles.size(); i++) {
 	Tile *t = _tiles[i];
-	if (t->isType(TileManager::UNMAPPED)) {
-	    _background->setTileStatus(t, Background::UNMAPPED);
-	} else {
-	    assert(t->isType(TileManager::MAPPED));
-	    _background->setTileStatus(t, Background::MAPPED);
-	}
+    	if (t->isType(TileManager::UNMAPPED)) {
+    	    _background->setTileStatus(t, Background::UNMAPPED);
+    	} else {
+    	    assert(t->isType(TileManager::MAPPED));
+    	    _background->setTileStatus(t, Background::MAPPED);
+    	}
     }
-    delete _dispatcher;
-    _dispatcher = NULL;
-    delete _mapper;
-    _mapper = NULL;
 
+    // EYE - do we need this?
     // // Inform listeners that scenery has changed.
     // Notification::notify(Notification::SceneryChanged);
 }
@@ -4716,6 +4893,7 @@ void AtlasWindow::_exitOk_cb(bool okay)
 // pressed.
 void AtlasWindow::_renderDialog_cb(bool okay)
 {
+    ScreenLocation& sLoc = _renderDialog->screenLocation();
     AtlasWindow::RenderType rt =_renderDialog->type();
     bool force = _renderDialog->force();
 
@@ -4723,7 +4901,7 @@ void AtlasWindow::_renderDialog_cb(bool okay)
     _renderDialog = NULL;
 
     if (okay) {
-	render(rt, force);
+	render(sLoc, rt, force);
     }
 }
 
@@ -4735,24 +4913,7 @@ void AtlasWindow::_renderConfirmDialog_cb(bool okay)
     puDeleteObject(_renderConfirmDialog);
     _renderConfirmDialog = NULL;
     if (okay) {
-	int maxMapLevel = 0;
-	for (unsigned int i = 0; i < TileManager::MAX_MAP_LEVEL; i++) {
-	    if (_ac->tileManager()->mapLevels()[i]) {
-		maxMapLevel = i;
-	    }
-	}
-	       
-	_mapper = new TileMapper(_ac->currentPalette(),
-				 maxMapLevel,
-				 _ac->discreteContours(),
-				 _ac->contourLines(),
-				 _ac->azimuth(),
-				 _ac->elevation(),
-				 _ac->lightingOn(),
-				 _ac->smoothShading(),
-				 _ac->imageType(),
-				 _ac->JPEGQuality());
-	_dispatcher = new Dispatcher(_mapper, _tiles, _force);
+	_dispatcher = new Dispatcher(_ac, _tiles, _force);
 
 	// Before we start off the dispatcher, we colour all tiles to
 	// be mapped as, well, to be mapped.  This makes it easier to
@@ -4947,13 +5108,6 @@ void __mainUI_closeOk_cb(puObject *o)
 	(AtlasDialog::CallbackButton)o->getDefaultValue();
     bool okay = (pos == AtlasDialog::LEFT);
     mainUI->_closeOk_cb(okay);
-}
-
-void __mainUI_renderDialog_cb(puObject *o)
-{
-    MainUI *mainUI = (MainUI *)o->getUserData();
-    bool okay = (o->getDefaultValue() == 1);
-    mainUI->_renderDialog_cb(okay);
 }
 
 void __networkPopup_ok_cb(puObject *o)

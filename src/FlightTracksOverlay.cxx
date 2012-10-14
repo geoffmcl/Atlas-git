@@ -36,14 +36,15 @@ FlightTracksOverlay::FlightTracksOverlay(Overlays& overlays):
     _overlays(overlays), _isDirty(false), _dl(0)
 {
     // Load image for airplane display if requested.
-    if (globals.prefs.airplaneImage.str().empty()) {
+    const SGPath& p = globals.prefs.airplaneImage;
+    if (p.str().empty()) {
 	_haveImage = false;
-    } else if (globals.prefs.airplaneImage.exists()) {
-	_airplaneTexture.load(globals.prefs.airplaneImage);
+    } else if (p.exists()) {
+	_airplaneTexture.load(p);
 	if (!_airplaneTexture.loaded()) {
 	    fprintf(stderr, "Airplane image file %s could not be read.\n"
 		    "Falling back to line drawing\n",
-		    globals.prefs.airplaneImage.c_str());
+		    p.c_str());
 	    _haveImage = false;
 	} else {
 	    _haveImage = true;
@@ -51,7 +52,7 @@ FlightTracksOverlay::FlightTracksOverlay(Overlays& overlays):
     } else {
 	fprintf(stderr, "Airplane image file %s was not found.\n"
 		"Falling back to line drawing\n",
-		globals.prefs.airplaneImage.c_str());
+		p.c_str());
 	_haveImage = false;
     }
 

@@ -38,399 +38,733 @@
 #include "misc.hxx"
 
 using namespace std;
-
-// This is a space-saving macro used when parsing command-line
-// arguments.  The function 'f' is assumed to be sscanf().
-#define OPTION_CHECK(f,n,t) if ((f) != (n)) {\
-	fprintf(stderr, "%s: bad option argument\n", basename(argv[0]));\
-	print_help_for(t, "   ");					\
-	return false;	  \
-    }
+using namespace Prefs;
 
 // Preferences file.
 const char *atlasrc = ".atlasrc";
 
-// These are used to tag options.  They *cannot* begin at 0, they
-// *must* be consecutive, FIRST_OPTION *must* come first, LAST_OPTION
-// *must* come last, and the option *cannot* have the value 63 (ASCII
-// '?').  Other than that, you can do anything you want. :-)
-enum {FIRST_OPTION, 
-      FG_ROOT_OPTION, 
-      FG_SCENERY_OPTION,
-      PATH_OPTION, 
-      PALETTE_OPTION, 
-      LAT_OPTION, 
-      LON_OPTION, 
-      AIRPORT_OPTION, 
-      ZOOM_OPTION, 
-      GLUTFONTS_OPTION,
-      GEOMETRY_OPTION,
-      SOFTCURSOR_OPTION,
-      UDP_OPTION,
-      SERIAL_OPTION,
-      BAUD_OPTION,
-      MAX_TRACK_OPTION,
-      UPDATE_OPTION,
-      AUTO_CENTRE_MODE_OPTION,
-      LINE_WIDTH_OPTION,
-      AIRPLANE_IMAGE_OPTION,
-      AIRPLANE_SIZE_OPTION,
-      DISCRETE_CONTOURS_OPTION,
-      SMOOTH_CONTOURS_OPTION,
-      CONTOUR_LINES_OPTION,
-      NO_CONTOUR_LINES_OPTION,
-      LIGHTING_ON_OPTION,
-      LIGHTING_OFF_OPTION,
-      SMOOTH_SHADING_OPTION,
-      FLAT_SHADING_OPTION,
-      LIGHT_POSITION_OPTION,
-      IMAGE_TYPE_JPEG_OPTION,
-      IMAGE_TYPE_PNG_OPTION,
-      JPEG_QUALITY_OPTION,
-      VERSION_OPTION,
-      HELP_OPTION,
-      LAST_OPTION
-};
-
-// Used by getopt_long()
-static struct option long_options[] = {
-    {"fg-root", required_argument, 0, FG_ROOT_OPTION},
-    {"fg-scenery", required_argument, 0, FG_SCENERY_OPTION},
-    {"atlas", required_argument, 0, PATH_OPTION},
-    {"palette", required_argument, 0, PALETTE_OPTION},
-    {"lat", required_argument, 0, LAT_OPTION},
-    {"lon", required_argument, 0, LON_OPTION},
-    {"airport", required_argument, 0, AIRPORT_OPTION},
-    {"zoom", required_argument, 0, ZOOM_OPTION},
-    {"glutfonts", no_argument, 0, GLUTFONTS_OPTION},
-    {"geometry", required_argument, 0, GEOMETRY_OPTION},
-    {"softcursor", no_argument, 0, SOFTCURSOR_OPTION},
-    {"udp", optional_argument, 0, UDP_OPTION},
-    {"serial", optional_argument, 0, SERIAL_OPTION},
-    {"baud", required_argument, 0, BAUD_OPTION},
-    {"update", required_argument, 0, UPDATE_OPTION},
-    {"max-track", required_argument, 0, MAX_TRACK_OPTION},
-    {"autocentre-mode", no_argument, 0, AUTO_CENTRE_MODE_OPTION},
-    {"line-width", required_argument, 0, LINE_WIDTH_OPTION},
-    {"airplane", required_argument, 0, AIRPLANE_IMAGE_OPTION},
-    {"airplane-size", required_argument, 0, AIRPLANE_SIZE_OPTION},
-    {"discrete-contours", no_argument, 0, DISCRETE_CONTOURS_OPTION},
-    {"smooth-contours", no_argument, 0, SMOOTH_CONTOURS_OPTION},
-    {"contour-lines", no_argument, 0, CONTOUR_LINES_OPTION},
-    {"no-contour-lines", no_argument, 0, NO_CONTOUR_LINES_OPTION},
-    {"lighting", no_argument, 0, LIGHTING_ON_OPTION},
-    {"no-lighting", no_argument, 0, LIGHTING_OFF_OPTION},
-    {"smooth-shading", no_argument, 0, SMOOTH_SHADING_OPTION},
-    {"flat-shading", no_argument, 0, FLAT_SHADING_OPTION},
-    {"light", required_argument, 0, LIGHT_POSITION_OPTION},
-    {"jpeg", no_argument, 0, IMAGE_TYPE_JPEG_OPTION},
-    {"png", no_argument, 0, IMAGE_TYPE_PNG_OPTION},
-    {"jpeg-quality", required_argument, 0, JPEG_QUALITY_OPTION},
-    {"version", no_argument, 0, VERSION_OPTION},
-    {"help", no_argument, 0, HELP_OPTION},
-    {0, 0, 0, 0}
-};
-
-static void print_short_help(char *name) 
+//////////////////////////////////////////////////////////////////////
+//
+// A little routine to chop up a string into pieces of the given
+// length or less, respecting word boundaries.  It probably isn't very
+// efficient, returning an entire vector, but it won't be called very
+// often.
+static vector<string> __chop(const char *str, int len = 80)
 {
-    printf("usage: %s [--atlas=<path>] [--fg-root=<path>] [--fg-scenery=<path>]\n", 
-	   name);
-    printf("\t[--palette=<path>] [--lat=<x>] [--lon=<x>] [--zoom=<m/pixel>]\n");
-    printf("\t[--airport=<icao>] [--glutfonts] [--geometry=<w>x<h>]\n");
-    printf("\t[--softcursor] [--udp[=<port>]] [--serial=[<dev>]] [--baud=<rate>]\n");
-    printf("\t[--autocentre-mode] [--discrete-contour] [--smooth-contour]\n");
-    printf("\t[--contour-lines] [--no-contour-lines] [--lighting]\n");
-    printf("\t[--no-lighting] [--light=azim,elev] [--smooth-shading]\n");
-    printf("\t[--flat-shading] [--line-width=<w>] [--jpeg] [--png]\n");
-    printf("\t[--jpeg-quality=<q>] [--airplane=<path>]\n");
-    printf("\t[--airplane-size=<size>] [--version] [--help] [<flight file>] ...\n");
-}
-
-// Formats the given strings as follows:
-//
-// (a) Each line starts with 'indent'.
-//
-// (b) The first line has 'option', left-justified, occupying 20
-//     spaces, then 'str'.
-//
-// (c) Subsequent lines have 20 spaces, then subsequent strings from
-//     the varargs list.
-//
-// (d) The end of the list (ie, the last argument) must be NULL.
-static void printOne(const char *indent, const char *option, 
-		     const char *str, ...)
-{
-    const int width = 20;
-    AtlasString formatStr;
-    formatStr.printf("%%s%%-%ds%%s\n", width);
-    printf(formatStr.str(), indent, option, str);
-
-    va_list ap;
-    char *s;
-    va_start(ap, str);
-    while ((s = va_arg(ap, char *)) != NULL) {
-	printf(formatStr.str(), indent, "", s);
+    vector<string> result;
+    size_t start = 0, end = 0;
+    char ws[] = " \t";
+    size_t n = strlen(str);
+    while (end < n) {
+	start = strspn(str + start, ws) + start;
+	end = min(start + len, n);
+	if (end < n) {
+	    // Move back until we get to a whitespace character.
+	    while(!strchr(ws, str[end]) && (end > start)) {
+		end--;
+	    }
+	    // Move back to the first whitespace character in this
+	    // group.
+	    while(strchr(ws, str[end]) && (end > start)) {
+		end--;
+	    }
+	    end++;
+	}
+	result.push_back(string(str, start, end - start));
+	start = end;
     }
-    va_end(ap);
+
+    return result;
 }
 
-// Prints a long entry for the given option.
-static void print_help_for(int option, const char *indent)
+//////////////////////////////////////////////////////////////////////
+// Pref
+//////////////////////////////////////////////////////////////////////
+
+vector<Pref *> Pref::__options;
+int Pref::__val;
+
+Pref::Pref(const char *name, int has_arg, const char *shortHelp, 
+	   const char *longHelp): _dirty(false)
 {
-    static AtlasString defaultStr;
-    switch(option) {
-      case FG_ROOT_OPTION:
-	printOne(indent, "--fg-root=<path>", 
-		 "Overrides FG_ROOT environment variable", NULL);
-	break;
-      case FG_SCENERY_OPTION:
-	printOne(indent, "--fg-scenery=<path>", 
-		 "Overrides FG_SCENERY environment variable", NULL);
-	break;
-      case PATH_OPTION:
-	printOne(indent, "--atlas=<path>", "Set path for map images", NULL);
-	break;
-      case PALETTE_OPTION:
-	printOne(indent, "--palette=<palette>", 
-		 "Specify Atlas palette", NULL);
-	break;
-      case LAT_OPTION:
-	defaultStr.printf("Default: %.2f", Preferences::defaultLatitude);
-	printOne(indent, "--lat=<x>", 
-		 "Start browsing at latitude x (south is negative)", 
-		 defaultStr.str(), NULL);
-	break;
-      case LON_OPTION:
-	defaultStr.printf("Default %.2f", Preferences::defaultLongitude);
-	printOne(indent, "--lon=<x>",
-		 "Start browsing at longitude x (west is negative)", 
-		 defaultStr.str(), NULL);
-	break;
-      case AIRPORT_OPTION:
-	printOne(indent, "--airport=<str>", 
-		 "Start browsing at an airport specified by ICAO code", 
-		 "or airport name", NULL);
-	break;
-      case ZOOM_OPTION:
-	defaultStr.printf("Default %.2f", Preferences::defaultZoom);
-	printOne(indent, "--zoom=<x>", "Set zoom level to x metres/pixel", 
-		 defaultStr.str(), NULL);
-	break;
-      case GLUTFONTS_OPTION:
-	printOne(indent, "--glutfonts", 
-		 "Use GLUT bitmap fonts (fast for software rendering)", NULL);
-	break;
-      case GEOMETRY_OPTION:
-	defaultStr.printf("Default: %dx%d", 
-		       Preferences::defaultWidth, Preferences::defaultHeight);
-	printOne(indent, "--geometry=<w>x<h>", "Set initial window size", 
-		 defaultStr.str(), NULL);
-	break;
-      case SOFTCURSOR_OPTION:
-	printOne(indent, "--softcursor", 
-		 "Draw mouse cursor using OpenGL (for fullscreen Voodoo",
-		 "cards)", NULL);
-	break;
-      case UDP_OPTION:
-	defaultStr.printf("Default: %d", Preferences::defaultPort);
-	printOne(indent, "--udp[=<port>]",
-		 "Input read from UDP socket at specified port", 
-		 defaultStr.str(), NULL);
-	break;
-      case SERIAL_OPTION:
-	defaultStr.printf("Default: %s", Preferences::defaultSerialDevice);
-	printOne(indent, "--serial[=<dev>]", 
-		 "Input read from serial port with specified device",
-		 defaultStr.str(), NULL);
-	break;
-      case BAUD_OPTION:
-	defaultStr.printf("Default: %d", Preferences::defaultBaudRate);
-	printOne(indent, "--baud=<rate>",
-		 "Set serial port baud rate", defaultStr.str(), NULL);
-	break;
-      case UPDATE_OPTION:
-	defaultStr.printf("Default: %.2f", Preferences::defaultUpdate);
-	printOne(indent, "--update=<s>", 
-		 "Check for position updates every s seconds",
-		 defaultStr.str(), NULL);
-	break;
-      case MAX_TRACK_OPTION:
-	defaultStr.printf("Default: %d", Preferences::defaultMaxTrack);
-	printOne(indent, "--max-track=<x>",
-		 "Maximum number of points to record while tracking a",
-		 "flight (0 = unlimited)", defaultStr.str(), NULL);
-	break;
-      case AUTO_CENTRE_MODE_OPTION:
-	defaultStr.printf("Default: %s", Preferences::defaultAutocentreMode ? 
-			  "true" : "false");
-	printOne(indent, "--autocentre-mode",
-		 "Automatically centre map on aircraft",
-		 defaultStr.str(), NULL);
-	break;
-      case LINE_WIDTH_OPTION:
-	defaultStr.printf("Default: %.2f", Preferences::defaultLineWidth);
- 	printOne(indent, "--line-width=<w>",
-		 "Set line width of flight track overlays (in pixels)",
-		 defaultStr.str(), NULL);
- 	break;
-      case AIRPLANE_IMAGE_OPTION:
- 	printOne(indent, "--airplane=<path>",
-		 "Specify image to be used as airplane symbol in flight",
-		 "tracks.  If not present, a default image is used.", NULL);
-	break;
-      case AIRPLANE_SIZE_OPTION:
-	defaultStr.printf("Default: %.2f", Preferences::defaultAirplaneSize);
- 	printOne(indent, "--airplane-size=<x>",
-		 "Set the size of the airplane image in pixels",
-		 defaultStr.str(), NULL);
-	break;
-      case DISCRETE_CONTOURS_OPTION:
-	printOne(indent, "--discrete-contours",
-		 "Don't blend contour colours on live maps (default)", NULL);
-	break;
-      case SMOOTH_CONTOURS_OPTION:
-	printOne(indent, "--smooth-contours",
-		 "Blend contour colours on live maps", NULL);
-	break;
-      case CONTOUR_LINES_OPTION:
-	printOne(indent, "--contour-lines",
-		 "Draw contour lines at contour boundaries", NULL);
-	break;
-      case NO_CONTOUR_LINES_OPTION:
-	printOne(indent, "--no-contour-lines",
-		 "Don't draw contour lines at contour boundaries (default)", 
-		 NULL);
-	break;
-      case LIGHTING_ON_OPTION:
-	printOne(indent, "--lighting",
-		 "Light the terrain on live maps (default)", NULL);
-	break;
-      case LIGHTING_OFF_OPTION:
-	printOne(indent, "--no-lighting",
-		 "Don't light the terrain on live maps (ie, flat light)", NULL);
-	break;
-      case SMOOTH_SHADING_OPTION:
-	printOne(indent, "--smooth-shading",
-		 "Smooth polygons on live maps (default)", NULL);
-	break;
-      case FLAT_SHADING_OPTION:
-	printOne(indent, "--flat-shading",
-		 "Don't smooth polygons on live maps", NULL);
-	break;
-      case LIGHT_POSITION_OPTION:
-	defaultStr.printf("Default: %.1f,%.1f", Preferences::defaultAzimuth, 
-			  Preferences::defaultElevation);
-	printOne(indent, "--light=<azim,elev>",
-		 "Set light position for live maps (all units in degrees)", 
-		 "Azimuth is light direction (0 = north, 90 = east, ...)",
-		 "Elevation is height above horizon (90 = overhead)",
-		 defaultStr.str(), NULL);
-	break;
-      case IMAGE_TYPE_JPEG_OPTION:
-	// EYE - instead of manually adding the string "(default)", we
-	// should check defaultImageType.
-	printOne(indent, "--jpeg", "Render maps as JPEG files (default)", NULL);
-	break;
-      case IMAGE_TYPE_PNG_OPTION:
-	printOne(indent, "--png", "Render maps as PNG files", NULL);
-	break;
-      case JPEG_QUALITY_OPTION:
-	defaultStr.printf("Default: %u", Preferences::defaultJPEGQuality);
-	printOne(indent, "--jpeg-quality=<q>",
-		 "Set JPEG file quality (0 = lowest, 100 = highest)", 
-		 defaultStr.str(), NULL);
-	break;
-      case VERSION_OPTION:
-	printOne(indent, "--version", "Print version number", NULL);
-	break;
-      case HELP_OPTION:
-	printOne(indent, "--help", "Print this help", NULL);
-	break;
+    // Note that we don't deal with combinations of deleting and
+    // creating preference entries.  We assume that all preferences
+    // will be created in one fell swoop, and never deleted (until the
+    // program exits).
+    _defined.reset();
+
+    _option.name = strdup(name);
+    _option.has_arg = has_arg;
+    _option.flag = &__val;
+    _option.val = __options.size();
+
+    AtlasString str;
+    if (has_arg == no_argument) {
+	str.printf("--%s", name);
+    } else if (has_arg == optional_argument) {
+	str.printf("--%s[=%s]", name, shortHelp);
+    } else {
+	str.printf("--%s=%s", name, shortHelp);
+    }
+    _shortHelp = strdup(str.str());
+    _longHelp = strdup(longHelp);
+
+    __options.push_back(this);
+}
+
+Pref::~Pref()
+{
+    free((void *)_option.name);
+    free(_shortHelp);
+    free(_longHelp);
+}
+
+void Pref::reset() 
+{
+    // EYE - is this the same as set(get(FACTORY))?
+    _defined[CMD_LINE] = false;
+    if (_defined[PREF_FILE]) {
+	_defined[PREF_FILE] = false;
+	_dirty = true;
+    }
+};
+
+bool Pref::save(ostream& ostr) 
+{
+    _dirty = false;
+    if (isDefault()) {
+	return false;
+    }
+    vector<string> strs = __chop(longHelp(), 78);
+    for (size_t i = 0; i < strs.size(); i++) {
+	ostr << "# " << strs[i] << "\n";
+    }
+
+    return true;
+}
+
+//////////////////////////////////////////////////////////////////////
+// NoArgPref
+//////////////////////////////////////////////////////////////////////
+
+NoArgPref::NoArgPref(const char *name, const char *longHelp):
+    Pref(name, no_argument, "", longHelp), _seen(0)
+{
+}
+
+bool NoArgPref::save(std::ostream& ostr)
+{
+    bool result = false;
+    if (Pref::save(ostr)) {
+	for (int i = 0; i < _seen; i++) {
+	    ostr << "--" << name() << "\n\n";
+	}
+	result = true;
+    }
+
+    return result;
+}
+
+//////////////////////////////////////////////////////////////////////
+// TypedPref
+//////////////////////////////////////////////////////////////////////
+
+// Note that I've placed the template class method implementations in
+// the .cxx file, which is unusual for templates.  I did this because
+// it's so annoying to have to recompile almost everything whenever I
+// change an implementation detail (a lot of code depends on
+// Preferences.hxx).  Putting it here means only Preferences.cxx will
+// be recompiled.  However, templates don't work well in .cxx files,
+// so I need to explicitly instantiate the instances I'll need at the
+// end of the file (which see).
+template<class T>
+TypedPref<T>::TypedPref(const char *name,
+			const char *shortHelp, 
+			const char *longHelp):
+    Pref(name, required_argument, shortHelp, longHelp), _optionalValue(NULL)
+{
+    _values.resize(SOURCE_COUNT);
+}
+
+template<class T>
+TypedPref<T>::TypedPref(const char *name, 
+			const char *optionalValue,
+			const char *shortHelp, 
+			const char *longHelp):
+    Pref(name, optional_argument, shortHelp, longHelp)
+{
+    _values.resize(SOURCE_COUNT);
+    _optionalValue = strdup(optionalValue);
+}
+
+template<class T>
+TypedPref<T>::~TypedPref()
+{
+    free(_optionalValue);
+}
+
+template<class T>
+inline T TypedPref<T>::get(PrefSource s) const
+{
+    for (int i = s; i < SOURCE_COUNT; i++) {
+	if (_defined.test(i)) {
+	    return _values[i];
+	}
+    }
+    return T();
+}
+
+// Set our value for the given source, setting ourselves to dirty if
+// our PREF_FILE value has changed.
+template<class T>
+inline void TypedPref<T>::set(T v, PrefSource s) 
+{
+    assert(s != SOURCE_COUNT);
+    _defined[s] = true;
+    _values[s] = v;
+    if (s == PREF_FILE) {
+	_dirty = true;
     }
 }
 
-// This prints a long help message.
-static void print_help() {
-  // EYE - use executable name here?
-  printf("ATLAS - A map browsing utility for FlightGear\n\nUsage:\n\n");
-  // EYE - use executable name here?
-  printf("Atlas <options> [<flight file>] ...\n\n");
-  for (int i = FIRST_OPTION + 1; i < LAST_OPTION; i++) {
-      print_help_for(i, "   ");
-  }
+template<class T>
+inline bool TypedPref<T>::parse(const char *str, PrefSource s) 
+{
+    assert(s != SOURCE_COUNT);
+    _defined[s] = false;
+    bool result = false;
+    // If there is no option string, but we accept optional arguments,
+    // set 'str' to the predefined optional value.
+    if (!str && (option().has_arg == optional_argument)) {
+	str = _optionalValue;
+    }
+    // If there's an argument, parse it.
+    if (str) {
+	istringstream stream(str);
+	stream >> _values[s];
+	if (stream) {
+	    _defined[s] = true;
+	    result = true;
+	}
+    }
+
+    return result;
 }
 
-const char *Preferences::defaultSerialDevice = "/dev/ttyS0";
-const char *Preferences::defaultPalette = "default.ap";
-
-// All preferences should be given default values here.
-Preferences::Preferences()
+template<class T>
+inline bool TypedPref<T>::save(ostream &ostr) 
 {
-    latitude = defaultLatitude;
-    longitude = defaultLongitude;
-    zoom = defaultZoom;		// metres/pixel
-    icao = strdup("");
+    bool result = false;
+    if (Pref::save(ostr)) {
+	ostr << "--" << name() << "=" << get(Pref::PREF_FILE) << "\n\n";
+	result = true;
+    }
 
+    return result;
+}
+
+//////////////////////////////////////////////////////////////////////
+// TypedPrefVector
+//////////////////////////////////////////////////////////////////////
+
+template<class T>
+TypedPrefVector<T>::TypedPrefVector(const char *name,
+				    const char *shortHelp, 
+				    const char *longHelp):
+    TypedPref<T>(name, shortHelp, longHelp), _dirty(false)
+{
+}
+template<class T>
+TypedPrefVector<T>::TypedPrefVector(const char *name,
+				    const char *optionalValue,
+				    const char *shortHelp, 
+				    const char *longHelp):
+    TypedPref<T>(name, optionalValue, shortHelp, longHelp), _dirty(false)
+{
+}
+
+template<class T>
+inline void TypedPrefVector<T>::setPrefs(vector<T>& v) 
+{
+    _prefs = v;
+    _dirty = true;
+}
+
+template<class T>
+inline bool TypedPrefVector<T>::save(ostream& ostr)
+{
+    bool result = false;
+    if (Pref::save(ostr)) {
+	for (size_t i = 0; i < _prefs.size(); i++) {
+	    // We need to use 'this->' here, for complicated reasons.
+	    // See 11.8.2 "Name lookup, templates, and accessing
+	    // members of base classes" in the GCC manual.
+	    ostr << "--" << this->name() << "=" << _prefs[i] << "\n";
+	}
+	ostr << "\n";
+	result = true;
+    }
+
+    return result;
+}
+
+//////////////////////////////////////////////////////////////////////
+// SGPath
+//////////////////////////////////////////////////////////////////////
+
+// operator>> for SGPath
+istream& operator>> (istream& is, SGPath& p)
+{
+    string buf;
+    is >> buf;
+    p.set(buf);
+
+    return is;
+}
+
+//////////////////////////////////////////////////////////////////////
+// Geometry
+//////////////////////////////////////////////////////////////////////
+
+Geometry::Geometry(): _w(0), _h(0)
+{
+}
+
+Geometry::Geometry(int w, int h): _w(w), _h(h)
+{
+}
+
+Geometry::Geometry(const Geometry& g)
+{
+    _w = g._w;
+    _h = g._h;
+}
+
+int Geometry::operator==(const Geometry& right) const
+{
+    return ((_w == right._w) && (_h == right._h));
+}
+
+int Geometry::operator!=(const Geometry& right) const
+{
+    return !(*this == right);
+}
+
+// EYE - why do I need to add Prefs:: here (and for other friend functions)?
+istream& Prefs::operator>>(istream& str, Geometry& g)
+{
+    char by;
+    str >> g._w;
+    str >> by;
+    if (by != 'x') {
+	str.setstate(ios::failbit);
+    }
+    return str >> g._h;
+}
+
+ostream& Prefs::operator<<(ostream& str, const Geometry& g)
+{
+    return str << g._w << "x" << g._h;
+}
+
+//////////////////////////////////////////////////////////////////////
+// Bool
+//////////////////////////////////////////////////////////////////////
+
+Bool::Bool(): _b(false)
+{
+}
+
+Bool::Bool(bool b): _b(b)
+{
+}
+
+Bool::Bool(const Bool& b)
+{
+    _b = b._b;
+}
+
+int Bool::operator==(const Bool& right) const
+{
+    return (_b == right._b);
+}
+
+int Bool::operator!=(const Bool& right) const
+{
+    return !(*this == right);
+}
+
+istream& Prefs::operator>>(istream& istr, Bool& b)
+{
+    string str;
+    istr >> str;
+    if ((str == "true") || (str == "t") ||
+	(str == "yes") || (str == "y") ||
+	(str == "on") || (str == "1")) {
+	b._b = true;
+    } else {
+	b._b = false;
+    }
+    return istr;
+}
+
+ostream& Prefs::operator<<(ostream& str, const Bool& b)
+{
+    if (b._b) {
+	// // return str << "";
+	// return str << "on";
+	return str << "y";
+    } else {
+	// return str << "off";
+	return str << "n";
+    }
+}
+
+//////////////////////////////////////////////////////////////////////
+// LightPosition
+//////////////////////////////////////////////////////////////////////
+
+LightPosition::LightPosition(): _azimuth(0.0), _elevation(0.0)
+{
+}
+
+LightPosition::LightPosition(float azim, float elev): 
+    _azimuth(azim), _elevation(elev)
+{
+}
+
+LightPosition::LightPosition(const LightPosition& g)
+{
+    _azimuth = g._azimuth;
+    _elevation = g._elevation;
+}
+
+int LightPosition::operator==(const LightPosition& right) const
+{
+    return ((_azimuth == right._azimuth) && (_elevation == right._elevation));
+}
+
+int LightPosition::operator!=(const LightPosition& right) const
+{
+    return !(*this == right);
+}
+
+istream& Prefs::operator>>(istream& istr, LightPosition& g)
+{
+    char comma;
+    istr >> g._azimuth;
+    istr >> comma;
+    if (comma != ',') {
+	istr.setstate(ios::failbit);
+    }
+    return istr >> g._elevation;
+}
+
+ostream& Prefs::operator<<(ostream& ostr, const LightPosition& g)
+{
+    return ostr << g._azimuth << "," << g._elevation;
+}
+
+//////////////////////////////////////////////////////////////////////
+// ImageType
+//////////////////////////////////////////////////////////////////////
+
+istream& operator>>(istream& istr, TileMapper::ImageType& i)
+{
+    string str;
+    istr >> str;
+    if (strcasecmp("jpeg", str.c_str()) == 0) {
+	i = TileMapper::JPEG;
+    } else if (strcasecmp("jpg", str.c_str()) == 0) {
+	i = TileMapper::JPEG;
+    } else if (strcasecmp("png", str.c_str()) == 0) {
+	i = TileMapper::PNG;
+    } else {
+	istr.setstate(ios::failbit);
+    }
+    return istr;
+}
+
+ostream& operator<<(ostream& ostr, const TileMapper::ImageType& i)
+{
+    if (i == TileMapper::JPEG) {
+	return ostr << "JPEG";
+    } else {
+	return ostr << "PNG";
+    }
+}
+
+//////////////////////////////////////////////////////////////////////
+// SerialConnection
+//////////////////////////////////////////////////////////////////////
+
+SerialConnection::SerialConnection(): _device("/dev/ttyS0"), _baud(4800)
+{
+}
+
+SerialConnection::SerialConnection(string device, int baud): 
+    _device(device), _baud(baud)
+{
+}
+
+SerialConnection::SerialConnection(const SerialConnection& sc)
+{
+    _device = sc._device;
+    _baud = sc._baud;
+}
+
+int SerialConnection::operator==(const SerialConnection& right) const
+{
+    return ((_device == right._device) && (_baud == right._baud));
+}
+
+int SerialConnection::operator!=(const SerialConnection& right) const
+{
+    return !(*this == right);
+}
+
+istream& Prefs::operator>>(istream& istr, SerialConnection& sc)
+{
+    char comma;
+    istr >> sc._baud;
+    istr >> comma;
+    if (comma != ',') {
+	istr.setstate(ios::failbit);
+    }
+    return istr >> sc._device;
+}
+
+ostream& Prefs::operator<<(ostream& ostr, const SerialConnection& sc)
+{
+    return ostr << sc._baud << "," << sc._device;
+}
+
+//////////////////////////////////////////////////////////////////////
+// Preferences
+//////////////////////////////////////////////////////////////////////
+
+const int Preferences::noAtlasrcFile = -1;
+const int Preferences::noAtlasrcVersion = 0;
+
+Preferences::Preferences():
+    latitude("lat", "<x>", "Start browsing at latitude x (south is negative)"),
+    longitude("lon", "<x>", "Start browsing at longitude x (west is negative)"),
+    zoom("zoom", "<x>", "Set zoom level to x metres/pixel"),
+    icao("airport", "<airport>", 
+	 "Start browsing at an airport specified by ICAO code or airport name"),
+
+    path("atlas", "<path>", "Set path for map images"),
+    fg_root("fg-root", "<path>", "Overrides FG_ROOT environment variable"),
+    scenery_root("fg-scenery", "<path>", 
+		 "Overrides FG_SCENERY environment variable"),
+
+    // EYE - instead of "Set ...", just "..."?  In other words,
+    // replace the verb phrase with a noun phrase?
+    // EYE - deprecate softcursor, texturefonts, serial, baudrate?
+    geometry("geometry", "<w>x<h>", "Set initial window size"),
+    textureFonts("glutfonts", "y", "y|n",
+		 "Use GLUT bitmap fonts (fast for software rendering)"),
+    softcursor("softcursor", "y", "y|n",
+	       "Draw mouse cursor using OpenGL (for fullscreen Voodoo cards)"),
+
+    autocentreMode("autocentre-mode", "y", "y|n",
+		   "Automatically center map on aircraft"),
+    lineWidth("line-width", "<w>", 
+	      "Set line width of flight track overlays (in pixels)"),
+    airplaneImage("airplane", "<path>", 
+		  "Specify image to be used as airplane symbol in flight "
+		  "tracks.  If not present, a default image is used."),
+    airplaneImageSize("airplane-size", "<size>", 
+		      "Set the size of the airplane image (in pixels)"),
+
+    update("update", "<s>", "Check for position updates every s seconds"),
+    maxTrack("max-track", "<x>", 
+	     "Maximum number of points to record while tracking a "
+	     "flight (0 = unlimited)"),
+    networkConnections("udp", "5500", "<port>", 
+		       "Read input from UDP socket at specified port"),
+    serialConnections("serial", "<baud,device>", 
+		      "Read input at the specified baud rate from the "
+		      "specified device"),
+
+    discreteContours("discrete-contours", "y", "y|n",
+		     "Don't blend contour colours on maps"),
+    contourLines("contour-lines", "y", "y|n",
+		 "Draw contour lines at contour boundaries"),
+    lightingOn("lighting", "y", "y|n", "Light the terrain on maps"),
+    smoothShading("smooth-shading", "y", "y|n", "Smooth polygons on maps"),
+    lightPosition("light", "<azim,elev>",
+		  "Set light position for maps (all units in degrees).  "
+		  "Azimuth is light direction (0 = north, 90 = east, ...).  "
+		  "Elevation is height above horizon (90 = overhead)."),
+    imageType("image-type", "{JPEG,PNG}", "Set output map file type"),
+    JPEGQuality("jpeg-quality", "<q>", 
+		"Set JPEG file quality (0 = lowest, 100 = highest)"),
+    palette("palette", "<name>", "Specify Atlas palette"),
+
+    version("version", "Print version number"),
+    help("help", "Print this help"),
+
+    _atlasrcVersion(noAtlasrcFile)
+{
+    latitude.set(37.5, Pref::FACTORY);
+    longitude.set(-122.25, Pref::FACTORY);
+    zoom.set(125.0, Pref::FACTORY);
+    icao.set("", Pref::FACTORY);
+
+    // EYE - we could get all this from a running instance of FlightGear:
+    //
+    // /sim/fg-root
+    // /sim/fg-scenery
+    // /sim/fg-scenery[1]
     char *env = getenv("FG_ROOT");
     if (env == NULL) {
 	// EYE - can this not be defined?  Should we just get rid of
 	// FGBASE_DIR altogether?
-	fg_root.set(FGBASE_DIR);
+	fg_root.set(SGPath(FGBASE_DIR), Pref::FACTORY);
     } else {
-	fg_root.set(env);
+	fg_root.set(SGPath(env), Pref::FACTORY);
     }
 
     env = getenv("FG_SCENERY");
     if (env == NULL) {
-	scenery_root.set(fg_root.str() + "/Scenery");
+	SGPath p(fg_root.get());
+	p.append("Scenery");
+	scenery_root.set(p, Pref::FACTORY);
     } else {
-	scenery_root.set(env);
+	scenery_root.set(SGPath(env), Pref::FACTORY);
     }
 
-    if (fg_root.str().length() != 0) {
-	path.set(fg_root.str());
-    } else {
-	path.set(FGBASE_DIR);
+    // EYE - just get()?
+    SGPath p(fg_root.get(Pref::FACTORY));
+    if (p.isNull()) {
+	p.set(FGBASE_DIR);
     }
-    path.append("Atlas");
+    p.append("Atlas");
+    path.set(p, Pref::FACTORY);
 
-    textureFonts = true;
-    width = defaultWidth;
-    height = defaultHeight;
-    softcursor = false;
-    _port = defaultPort;
-    _serial.device = strdup(defaultSerialDevice);
-    _serial.baud = defaultBaudRate;
-    update = defaultUpdate;
-    max_track = defaultMaxTrack;
-    autocentre_mode = defaultAutocentreMode;
-    lineWidth = defaultLineWidth;
-    airplaneImage.set(path.str());
-    airplaneImage.append("airplane_image.png");
-    airplaneImageSize = defaultAirplaneSize;
+    Geometry g(800, 600);
+    geometry.set(g, Pref::FACTORY);
+    textureFonts.set(true, Pref::FACTORY);
+    softcursor.set(false, Pref::FACTORY);
 
-    // Lighting and rendering stuff.
-    discreteContours = true;
-    contourLines = false;
-    lightingOn = true;
-    smoothShading = true;
-    azimuth = defaultAzimuth;
-    elevation = defaultElevation;
-    imageType = defaultImageType;
-    JPEGQuality = defaultJPEGQuality;
-    palette = strdup(defaultPalette);
+    autocentreMode.set(false, Pref::FACTORY);
+    lineWidth.set(1.0, Pref::FACTORY);
+    p = path.get();
+    p.append("airplane_image.png");
+    airplaneImage.set(p, Pref::FACTORY);
+    airplaneImageSize.set(25.0, Pref::FACTORY);
+
+    update.set(1.0, Pref::FACTORY);
+    maxTrack.set(2000, Pref::FACTORY);
+    networkConnections.set(5500, Pref::FACTORY);
+    SerialConnection sc;
+    serialConnections.set(sc, Pref::FACTORY);
+
+    discreteContours.set(true, Pref::FACTORY);
+    contourLines.set(false, Pref::FACTORY);
+    lightingOn.set(true, Pref::FACTORY);
+    smoothShading.set(true, Pref::FACTORY);
+    LightPosition l(315.0, 55.0);
+    lightPosition.set(l, Pref::FACTORY);
+    JPEGQuality.set(75, Pref::FACTORY);
+    imageType.set(TileMapper::JPEG, Pref::FACTORY);
+    palette.set("default.ap", Pref::FACTORY);
+
+    int n = (int)Pref::options().size();
+    _long_options = (struct option *)malloc(sizeof(struct option) * (n + 1));
+    for (int i = 0; i < n; i++) {
+	_long_options[i] = Pref::options()[i]->option();
+    }
+    _long_options[n].name = (char *)0;
+    _long_options[n].has_arg = 0;
+    _long_options[n].flag = (int *)0;
+    _long_options[n].val = 0;
 }
 
 Preferences::~Preferences()
 {
-    free(icao);
-    free(_serial.device);
-    free(palette);
+    free(_long_options);
 }
 
-// First loads preferences from ~/.atlasrc (if it exists), then checks
-// the command line options passed in via argc and argv.
-bool Preferences::loadPreferences(int argc, char *argv[])
+void Preferences::usage(int option)
+{
+    // Usage for an option is printed something like this:
+    //
+    //   --airport=<airport>       Start browsing at an airport specified by 
+    //                             ICAO code or airport name
+    //
+    // There's some leading indentation, then the short help, then the
+    // long help (possibly split over several lines).
+    //
+    // EYE - we should really indicate default values too
+
+    // Our indentation.
+    char indent[] = "  ";
+
+    // Calculate the space needed for the short and long help strings.
+    // Yeah, I know we should only do this once, not every time
+    // usage() is called, but it won't be called very often.
+    size_t shortSize = 0, longSize;
+    int n = (int)Pref::options().size();
+    for (int i = 0; i < n; i++) {
+	Pref *e = Pref::options()[i];
+	if (strlen(e->shortHelp()) > shortSize) {
+	    shortSize = strlen(e->shortHelp());
+	}
+    }
+    shortSize++;
+    longSize = 80 - shortSize - strlen(indent);
+
+    AtlasString fmt;
+    fmt.printf("%%s%%-%ds%%s\n", shortSize);
+    if ((option < 0) || (option >= n)) {
+	for (option = 0; option < n; option++) {
+	    Pref *e = Pref::options()[option];
+	    vector<string> strs = __chop(e->longHelp(), longSize);
+	    printf(fmt.str(), indent, e->shortHelp(), strs[0].c_str());
+	    for (size_t i = 1; i < strs.size(); i++) {
+		printf(fmt.str(), indent, "", strs[i].c_str());
+	    }
+	}
+	printf("\n");
+
+	const char *str = 
+	    "Note: For all boolean options (those with [=y|n] parameters), "
+	    "other values can be used.  Specifically, 'true', 't', 'yes', "
+	    "'y', 'on', '1' or nothing at all turn the option on.  Anything "
+	    "else (eg, 'false', 'off', 'banana', ...) turns it off.";
+	vector<string> strs = __chop(str);
+	for (size_t i = 0; i < strs.size(); i++) {
+	    printf("%s\n", strs[i].c_str());
+	}
+    } else {
+	Pref *e = Pref::options()[option];
+	vector<string> strs = __chop(e->longHelp(), longSize);
+	printf(fmt.str(), indent, e->shortHelp(), strs[0].c_str());
+	for (size_t i = 1; i < strs.size(); i++) {
+	    printf(fmt.str(), indent, "", strs[i].c_str());
+	}
+    }
+}
+
+void Preferences::shortUsage(int i)
+{
+    int n = (int)Pref::options().size();
+    if ((i < 0) || (i >= n)) {
+	// EYE - split lines?
+	for (int i = 0; i < n; i++) {
+	    Pref *e = Pref::options()[i];
+	    printf("[%s] ", e->shortHelp());
+	}
+	printf("[<flight file>] ...\n");
+    } else {
+	Pref *e = Pref::options()[i];
+	printf("  %-20s %s\n", e->shortHelp(), e->longHelp());
+    }
+}
+
+bool Preferences::load(int argc, char *argv[])
 {
     // Check for a preferences file.
     char* homedir = getenv("HOME");
@@ -444,6 +778,11 @@ bool Preferences::loadPreferences(int argc, char *argv[])
 
     ifstream rc(rcpath.c_str());
     if (rc.is_open()) {
+	// We have a file, so change _atlasrcVersion from noAtlasFile
+	// to noAtlasVersion.  If we find a version line in the file,
+	// we'll put the version number into _atlasrcVersion.
+	_atlasrcVersion = noAtlasrcVersion;
+
 	char *lines[2];
 	string line;
 
@@ -458,30 +797,31 @@ bool Preferences::loadPreferences(int argc, char *argv[])
 	while (!rc.eof()) {
 	    getline(rc, line);
 
-	    // Skip comments and emtpy lines.  Our version is given in
-	    // a special comment of the format "#ATLASRC Version x".
-	    int version;
+	    // Skip emtpy lines.
 	    if (line.length() == 0) {
 		continue;
 	    }
-	    if (sscanf(line.c_str(), "#ATLASRC Version %d", &version) == 1) {
-		if (version > 1) {
-		    fprintf(stderr, "%s: Unknown %s version: %d\n",
-			    basename(argv[0]), atlasrc, version);
-		    return false;
-		}
-		continue;
+
+	    // Check for a version string.  Our version is given in a
+	    // special comment of the format "#ATLASRC Version x".
+	    int v;
+	    if (sscanf(line.c_str(), "#ATLASRC Version %d", &v) == 1) {
+		// We have a version string, so copy the version
+		// number.
+		_atlasrcVersion = v;
 	    }
+
+	    // Skip all other comments.
 	    if (line[0] == '#') {
 		continue;
 	    }
 
-	    // EYE - should we remove leading and trailing whitespace?
-	    // I guess it's a real option.
-	    lines[1] = (char *)line.c_str();
+	    // I guess it's a real option.  We'll put it in lines[1],
+	    // starting with the first non-whitespace character.
+	    lines[1] = (char *)(line.c_str() + strspn(line.c_str(), " \t"));
 
 	    // Try to make sense of it.
-	    if (!_loadPreferences(2, lines)) {
+	    if (!_load(2, lines, Pref::PREF_FILE)) {
 		fprintf(stderr, "%s: Error in %s: '%s'.\n",
 			basename(argv[0]), atlasrc, lines[1]);
 		return false;
@@ -492,231 +832,102 @@ bool Preferences::loadPreferences(int argc, char *argv[])
     }
 
     // Now parse the real command-line arguments.
-    return _loadPreferences(argc, argv);
+    if (!_load(argc, argv, Pref::CMD_LINE)) {
+	return false;
+    }
+
+    if (version.seen()) {
+	printf("%s version %s\n", basename(argv[0]), VERSION);
+	return false;
+    }
+    if (help.seen()) {
+	printf("ATLAS - A map browsing utility for FlightGear\n\n"
+	       "Usage:\n\n");
+	printf("%s <options> [<flight file>] ...\n\n", basename(argv[0]));
+	usage();
+	return false;
+    }
+
+    return true;
 }
 
-void Preferences::savePreferences()
+void Preferences::save(ostream& ostr)
 {
-    printf("%.2f\n", latitude);
-    printf("%.2f\n", longitude);
-    printf("%.2f\n", zoom);
-    printf("%s\n", icao);
-    printf("%s\n", path.c_str());
-    printf("%s\n", fg_root.c_str());
-    printf("%d\n", textureFonts);
-    printf("%d\n", width);
-    printf("%d\n", height);
-    printf("%d\n", softcursor);
-    for (unsigned int i = 0; i < networkConnections.size(); i++) {
-	printf("net: %u\n", networkConnections[i]);
+    // If nothing has changed, we don't need to save anything.
+    if (!isDirty()) {
+	return;
     }
-    for (unsigned int i = 0; i < serialConnections.size(); i++) {
-	printf("serial: %s@%u\n", 
-	       serialConnections[i].device, serialConnections[i].baud);
-    }
-    printf("%.1f\n", update);
-    printf("%s\n", scenery_root.c_str());
-    printf("%d\n", max_track);
-    printf("%d\n", autocentre_mode);
-    printf("%f\n", lineWidth);
-    printf("%s\n", airplaneImage.c_str());
 
-    printf("%d\n", discreteContours);
-    printf("%d\n", contourLines);
-    printf("%d\n", lightingOn);
-    printf("%d\n", smoothShading);
-    printf("<%.1f, %.1f>", azimuth, elevation);
-    if (imageType == TileMapper::JPEG) {
-	printf("JPEG\n");
-    } else {
-	printf("PNG\n");
+    ostr << "#ATLASRC VERSION " << ATLASRC_VERSION << "\n\n";
+    int n = (int)Pref::options().size();
+    for (int i = 0; i < n; i++) {
+	Pref *e = Pref::options()[i];
+	e->save(ostr);
     }
-    printf("%d\n", JPEGQuality);
-    printf("%s\n", palette);
 
-    for (unsigned int i = 0; i < flightFiles.size(); i++) {
-	printf("%s\n", flightFiles[i].c_str());
-    }						
+    // Save flight files.
+    for (size_t i = 0; i < flightFiles.size(); i++) {
+	// EYE - get absolute file names.  Unfortunately, SGPath's
+	// realpath() is broken (for Windows and Mac).
+	printf("%s\n", flightFiles[i].str().c_str());
+    }
 }
 
-// Checks the given set of preferences.  Returns true (and sets the
-// appropriate variables in Preferences) if there are no problems.
-// Returns false (and prints an error message as appropriate) if
-// there's a problem, or if the user asked for --version or --help.
-bool Preferences::_loadPreferences(int argc, char *argv[])
+bool Preferences::isDirty()
+{
+    int n = (int)Pref::options().size();
+    for (int i = 0; i < n; i++) {
+	Pref *e = Pref::options()[i];
+	if (e->isDirty()) {
+	    return true;
+	}
+    }
+    return false;
+}
+
+bool Preferences::_load(int argc, char *argv[], Pref::PrefSource source)
 {
     int c;
     int option_index = 0;
-    SGPath p;
-
-    // The use of optind (or optind and optreset, depending on your
-    // system) is necessary because we may call getopt_long() many
-    // times.
-#ifdef HAVE_OPTRESET
+    // EYE - the documentation says I need to set optreset and optind
+    // to 1 on the second and subsequent sets of calls to getopt, but
+    // I only seem to need to set optind.  Why?
     optreset = 1;
     optind = 1;
-#else
-    optind = 0;
-#endif
-    while ((c = getopt_long(argc, argv, "", long_options, &option_index)) 
-	   != -1) {
-	switch (c) {
-	  case LAT_OPTION:
-	    OPTION_CHECK(sscanf(optarg, "%f", &latitude), 1, LAT_OPTION);
-	    break;
-	  case LON_OPTION:
-	    OPTION_CHECK(sscanf(optarg, "%f", &longitude), 1, LON_OPTION);
-	    break;
-	  case ZOOM_OPTION:
-	    OPTION_CHECK(sscanf(optarg, "%f", &zoom), 1, ZOOM_OPTION);
-	    break;
-	  case AIRPORT_OPTION:
-	    free(icao);
-	    icao = strdup(optarg);
-	    // Make sure it's in uppercase only.
-	    for (unsigned int i = 0; i < strlen(icao); ++i) {
-		icao[i] = toupper(icao[i]);
-	    }
-	    break;
-	  case PATH_OPTION:
-	    path.set(optarg);
-	    break;
-	  case FG_ROOT_OPTION:
-	    fg_root.set(optarg);
-	    break;
-	  case PALETTE_OPTION:
-	    free(palette);
-	    palette = strdup(optarg);
-	    break;
-	  case GLUTFONTS_OPTION:
-	    textureFonts = false;
-	    break;
-	  case GEOMETRY_OPTION:
-	    OPTION_CHECK(sscanf(optarg, "%dx%d", &width, &height), 2, GEOMETRY_OPTION);
-	    break;
-	  case SOFTCURSOR_OPTION:
-	    softcursor = true;
-	    break;
-	  case UDP_OPTION: {
-	      // EYE - we need better documentation about how the UDP,
-	      // SERIAL, and BAUD options interact.
 
-	      // Whenever a unique --udp appears on the command line, we
-	      // create an entry for it in networkConnections.  Whenever
-	      // a unique --serial appears, we create an entry for it
-	      // (using the current baud rate).  Whenever --baud
-	      // appears, we just change the baud variable.  It does not
-	      // affect --serial's that appear before it.
-	      unsigned int thisPort = _port;
-	      if (optarg) {
-		  OPTION_CHECK(sscanf(optarg, "%u", &thisPort), 1, UDP_OPTION);
-	      }
-	      networkConnections.push_back(thisPort);
-	      break;
-	  }
-	  case SERIAL_OPTION: {
-	      SerialConnection thisConnection;
-	      thisConnection.baud = _serial.baud;
-	      if (optarg) {
-		  thisConnection.device = strdup(optarg);
-	      } else {
-		  thisConnection.device = strdup(_serial.device);
-	      }
-	      serialConnections.push_back(thisConnection);
-	      break;
-	  }
-	  case BAUD_OPTION:
-	    OPTION_CHECK(sscanf(optarg, "%u", &_serial.baud), 1, BAUD_OPTION);
-	    break;
-	  case UPDATE_OPTION:
-	    OPTION_CHECK(sscanf(optarg, "%f", &update), 1, UPDATE_OPTION);
-	    break;
-	  case FG_SCENERY_OPTION:
-	    scenery_root.set(optarg);
-	    break;
-	  case MAX_TRACK_OPTION:
-	    OPTION_CHECK(sscanf(optarg, "%d", &max_track), 1, MAX_TRACK_OPTION);
-	    break;
-	  case DISCRETE_CONTOURS_OPTION:
-	    discreteContours = true;
-	    break;
-	  case SMOOTH_CONTOURS_OPTION:
-	    discreteContours = false;
-	    break;
-	  case CONTOUR_LINES_OPTION:
-	    contourLines = true;
-	    break;
-	  case NO_CONTOUR_LINES_OPTION:
-	    contourLines = false;
-	    break;
-	  case LIGHTING_ON_OPTION:
-	    lightingOn = true;
-	    break;
-	  case LIGHTING_OFF_OPTION:
-	    lightingOn = false;
-	    break;
-	  case SMOOTH_SHADING_OPTION:
-	    smoothShading = true;
-	    break;
-	  case FLAT_SHADING_OPTION:
-	    smoothShading = false;
-	    break;
-	  case LIGHT_POSITION_OPTION:
-	    OPTION_CHECK(sscanf(optarg, "%f, %f", &azimuth, &elevation), 
-			 2, LIGHT_POSITION_OPTION);
-	    // Azimuths are normalized to 0 <= azimuth < 360.
-	    azimuth = normalizeHeading(azimuth);
-	    // Elevation values are clamped to 0 <= elevation <= 90.
-	    if (elevation < 0.0) {
-		elevation = 0.0;
+    while ((c = getopt_long(argc, argv, ":", _long_options, &option_index)) 
+    	   != -1) {
+	if (c == '?') {
+	    printf("%s: unknown option '%s'.  Usage:\n",
+		   basename(argv[0]), argv[optind - 1]);
+	    printf("%s ", basename(argv[0]));
+	    shortUsage();
+	    // EYE - throw an error?
+	    return false;
+	} else if (c == ':') {
+	    // Missing option argument.
+	    //
+	    // Unfortunately, getopt_long() doesn't return a valid
+	    // option_index for options that are missing arguments
+	    // (why?).  Consequently, I can't give an error message
+	    // specific to the option in question.  Instead, I just
+	    // blurt out a general usage message.
+	    printf("%s: option '%s' missing argument.  Options:\n",
+		   basename(argv[0]), argv[optind - 1]);
+	    usage();
+	    return false;
+	} else if (c == 0) {
+	    Pref *e = Pref::options()[option_index];
+	    if (!e->parse(optarg, source)) {
+		printf("%s: option '--%s' given bad argument ('%s').  "
+		       "Usage:\n", 
+		       basename(argv[0]), e->name(), optarg);
+		usage(option_index);
+		return false;
 	    }
-	    if (elevation > 90.0) {
-		elevation = 90.0;
-	    }
-	    break;
-	  case IMAGE_TYPE_JPEG_OPTION:
-	    imageType = TileMapper::JPEG;
-	    break;
-	  case IMAGE_TYPE_PNG_OPTION:
-	    imageType = TileMapper::PNG;
-	    break;
-	  case JPEG_QUALITY_OPTION:
-	    OPTION_CHECK(sscanf(optarg, "%d", &JPEGQuality), 1, 
-			 JPEG_QUALITY_OPTION);
-	    break;
-	  case AUTO_CENTRE_MODE_OPTION:
-	    autocentre_mode = true;
-	    break;
- 	  case LINE_WIDTH_OPTION:
- 	    OPTION_CHECK(sscanf(optarg, "%f", &lineWidth), 1, 
-			 LINE_WIDTH_OPTION);
- 	    break;
- 	  case AIRPLANE_IMAGE_OPTION:
-	    airplaneImage.set(optarg); 
- 	    break;
- 	  case AIRPLANE_SIZE_OPTION:
-	    OPTION_CHECK(sscanf(optarg, "%f", &airplaneImageSize), 1,
-			 AIRPLANE_SIZE_OPTION);
- 	    break;
-	  case HELP_OPTION:
-	    print_help();
-	    return false;
-	    break;
-	  case VERSION_OPTION:
-	    printf("%s version %s\n", basename(argv[0]), VERSION);
-	    return false;
-	    break;
-	  case '?':
-	    // Note: We must make sure our _OPTION variables don't
-	    // equal '?' (63).
-	    print_short_help(basename(argv[0]));
-	    return false;
-	    break;
-	  default:
-	    // We should never get here.
-	    assert(false);
 	}
     }
+    SGPath p;
     while (optind < argc) {
 	p.set(argv[optind++]);
 	flightFiles.push_back(p);
@@ -724,3 +935,21 @@ bool Preferences::_loadPreferences(int argc, char *argv[])
 
     return true;
 }
+
+// Explicit instantiations of TypedPref and TypedPrefVector, required
+// (at least by GCC) so that we can put the implementation of
+// TypedPref into a .cxx file, rather than a .hxx file.  This solution
+// is not ideal, since we need to know about all the different
+// instantiations used in project, but that's not a huge deal since we
+// only use these classes internally.
+template class TypedPref<int>;
+template class TypedPref<unsigned int>;
+template class TypedPref<float>;
+template class TypedPref<SGPath>;
+template class TypedPref<string>;
+template class TypedPref<char>;
+template class TypedPref<Geometry>;
+template class TypedPref<LightPosition>;
+template class TypedPref<TileMapper::ImageType>;
+template class TypedPrefVector<int>;
+template class TypedPrefVector<SerialConnection>;
