@@ -170,7 +170,7 @@ class AtlasController
 
     // Palettes
     Palette *currentPalette() { return _palettes->current(); }
-    int currentPaletteNo() { return _palettes->currentNo(); }
+    size_t currentPaletteNo() { return _palettes->currentNo(); }
     // Sets the current palette (does nothing if i is out of bounds).
     void setCurrentPalette(size_t i);
     const std::vector<Palette *>& palettes() { return _palettes->palettes(); }
