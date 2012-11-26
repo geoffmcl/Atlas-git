@@ -643,7 +643,7 @@ Preferences::Preferences():
     p.append("Atlas");
     path.set(p, Pref::FACTORY);
 
-    Geometry g(800, 600);
+    Geometry g(1000, 750);
     geometry.set(g, Pref::FACTORY);
     textureFonts.set(true, Pref::FACTORY);
     softcursor.set(false, Pref::FACTORY);
@@ -656,7 +656,7 @@ Preferences::Preferences():
     airplaneImageSize.set(25.0, Pref::FACTORY);
 
     update.set(1.0, Pref::FACTORY);
-    maxTrack.set(2000, Pref::FACTORY);
+    maxTrack.set(0, Pref::FACTORY);
     networkConnections.set(5500, Pref::FACTORY);
     SerialConnection sc;
     serialConnections.set(sc, Pref::FACTORY);
@@ -889,11 +889,28 @@ bool Preferences::_load(int argc, char *argv[], Pref::PrefSource source)
 {
     int c;
     int option_index = 0;
-    // EYE - the documentation says I need to set optreset and optind
-    // to 1 on the second and subsequent sets of calls to getopt, but
-    // I only seem to need to set optind.  Why?
-    optreset = 1;
+
+    // In case getopt32 was already called:
+    // reset the libc getopt() function, which keeps internal state.
+    //
+    // BSD-derived getopt() functions require that optind be set to 1
+    // in order to reset getopt() state.  This used to be generally
+    // accepted way of resetting getopt().  However, glibc's getopt()
+    // has additional getopt() state beyond optind, and requires that
+    // optind be set to zero to reset its state.  So the unfortunate
+    // state of affairs is that BSD-derived versions of getopt()
+    // misbehave if optind is set to 0 in order to reset getopt(), and
+    // glibc's getopt() will core dump if optind is set 1 in order to
+    // reset getopt().
+    //
+    // More modern versions of BSD require that optreset be set to 1
+    // in order to reset getopt().  Sigh.  Standards, anyone?
+#ifdef __GLIBC__
+    optind = 0;
+#else /* BSD style */
     optind = 1;
+    optreset = 1; 
+#endif
 
     while ((c = getopt_long(argc, argv, ":", _long_options, &option_index)) 
     	   != -1) {
