@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2012 Brian Schack
+  Copyright (C) 2009 - 2013 Brian Schack
 
   A palette tells Atlas (and Map) how to colour maps.  It specifies
   colours for elevations and materials.  The palette object can load
@@ -29,9 +29,10 @@
 #ifndef _PALETTE_H_
 #define _PALETTE_H_
 
-#include <deque>
-#include <map>
 #include <string>
+#include <map>
+#include <deque>
+#include <vector>
 
 #include <plib/sg.h>		// sgVec4
 
@@ -101,7 +102,10 @@ class Palette {
     // Deque of <elevation, colour> pairs.  The first and last pairs
     // are generated internally by the Palette class to make
     // calculating smooth colour values easier.
-    std::deque<Contour> _elevations, _offsetElevations;
+    std::deque<Contour> _elevations;
+    // This is a copy of _elevations, but with all elevations offset
+    // by _base.
+    std::vector<Contour> _offsetElevations;
     
     // Index of last colour index returned from contourIndex().  I'm
     // guessing that successive calls to this method will be for

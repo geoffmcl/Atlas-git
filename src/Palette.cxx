@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2012 Brian Schack
+  Copyright (C) 2009 - 2013 Brian Schack
 
   This file is part of Atlas.
 
@@ -153,9 +153,12 @@ Palette::Palette(const char *path): _metres(true), _base(0.0), _i(1)
     fake.elevation += _elevations[i].elevation - _elevations[i - 1].elevation;
     _elevations.push_back(fake);
 
-    // Copy the raw elevations data in _elevations to ones offset by
-    // _base, in _offsetElevations.
-    _offsetElevations = _elevations;
+    // Copy the raw elevation data into _offsetElevations.  When
+    // setBase() is called, _offsetElevations will be changed -
+    // _elevations never changes.
+    for (size_t i = 0; i < _elevations.size(); i++) {
+	_offsetElevations.push_back(_elevations[i]);
+    }
 
     _path = path;
 }
