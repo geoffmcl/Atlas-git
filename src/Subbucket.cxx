@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2012 Brian Schack
+  Copyright (C) 2009 - 2013 Brian Schack
 
   This file is part of Atlas.
 
@@ -28,6 +28,7 @@
 #include "Palette.hxx"
 
 using namespace std;
+using namespace tr1;
 
 Subbucket::Subbucket(const SGPath &p): 
     _path(p), _loaded(false), _palettized(false),
@@ -41,22 +42,13 @@ Subbucket::~Subbucket()
     unload();
 }
 
-// Documentation on the BTG file format can be found at:
-//
-// http://wiki.flightgear.org/index.php/BTG_File_Format
-//
 bool Subbucket::load(Bucket::Projection projection)
 {
     // Clear out whatever was there first.
     unload();
 
-    if (!_chunk.read_bin(_path.c_str())) {
-	// EYE - throw an error?
-	return false;
-    }
-
-    // A chunk contains a bunch of points in 3D cartesian space, where
-    // the origin is at the centre of the earth, the X axis goes
+    // A BTG file contains a bunch of points in 3D cartesian space,
+    // where the origin is at the centre of the earth, the X axis goes
     // through 0 degrees latitude, 0 degrees longitude (near Africa),
     // the Y axis goes through 0 degrees latitude, 90 degrees west
     // latitude (in the Indian Ocean), and the Z axis goes through the
@@ -64,159 +56,257 @@ bool Subbucket::load(Bucket::Projection projection)
     //
     // http://www.flightgear.org/Docs/Scenery/CoordinateSystem/CoordinateSystem.html
     //
-    // for more.
+    // for more.  In the meantime, here are some useful notes about
+    // the organization of BTG files, including a supposition about
+    // normals not mentioned in the FlightGear documentation, as far
+    // as I can tell:
+    //
+    // The actual vertex and normal data are in the wgs84_nodes and
+    // normals vectors.  Points in wgs84_nodes have to be added to
+    // gbs_center to get a true world cartesian coordinate.  We ignore
+    // the colors and texcoords vectors.
+    //
+    // Triangles, strips, and fans are accessed with get_<foo>_v and
+    // get_<foo>_n (where <foo> is "tris", "strips", or "fans").  Note
+    // that these return a VECTOR OF VECTORS OF INDICES.
+    //
+    // So, get_fans_v()[i] returns the vertex indices for the ith
+    // triangle fan, and get_fans_n()[i] does the same for its normals
+    // (get_tris_v()[i] returns vertex indices for 1 or more
+    // triangles).
+    //
+    // To save typing, we'll write get_<foo>_v()[i][j] (the jth vertex
+    // index of the ith triangle thingy) as v[i][j].
+    //
+    // Remember, v[i][j] is a vertex INDEX.  The actual vertex is
+    // wgs84_nodes[v[i][j]].
+    //
+    // And normals?  Although this is not documented as far as I can
+    // tell, there seem to be two situations in BTG files:
+    //
+    // (a) v[i].size() == n[i].size()
+    //
+    //     If so, then:
+    //
+    //     wgs84_nodes[v[i][j]] and normals[n[i][j]] are the actual
+    //     vertex and normal
+    //
+    //     and
+    //
+    //     v[i][j] != n[i][j] (generally, although they may
+    //     coincidentally be the same).
+    //
+    // OR
+    //
+    // (b) n[i].size() == 0
+    //
+    //     If so, then:
+    //
+    //     wgs84_nodes[v[i][j]] and normals[v[i][j]] are the actual
+    //     vertex and normal
+    //
+    // Some documentation on the BTG file format can be found at:
+    //
+    // http://wiki.flightgear.org/index.php/BTG_File_Format
 
-    // Each chunk has a reference point, given by get_gbs_center().
-    // All points within the chunk are relative to the reference
-    // point.  Therefore, to place points in absolute 3D space, we
-    // need to add the reference point to all points.
-    const SGVec3<double>& gbs_p = _chunk.get_gbs_center();
+    SGBinObject btg;
+    if (!btg.read_bin(_path.c_str())) {
+	// EYE - throw an error?
+	return false;
+    }
 
-    // Get all the points, and use them to set our maximum elevation
-    // figure.
+    //////////////////////////////////////////////////////////////////////
+    //
+    // When we load a BTG file, we take the data we need, then convert
+    // it into a format that makes OpenGL happy.  There are two big
+    // conversions:
+    //
+    // (a) Converting BTG <vertex, normal> pairs into single indicees.
+    //     In the BTG file, a particular point in a triangle might use
+    //     the 7th vertex and the 21st normal.  We use OpenGL's
+    //     glDrawElements, and it doesn't like that - it wants to use
+    //     the 7th vertex and the 7th normal.
+    //
+    // (b) The BTG file includes triangles, triangle strips, and
+    //     triangle fans (and just points, but we don't use those).
+    //     To make programming easier, we convert everything to
+    //     triangles (it also turns out the with the Scenery 2.0
+    //     release, BTG files seem to exclusively use triangles
+    //     anyway).
+    //
+    //////////////////////////////////////////////////////////////////////
+
+    // Perform step (a) - create a map (vnMap) from the BTG file's
+    // <vertex, normal> pairs to unique indices.  
+    //
+    // Also, since vertex and normal indexes are the same, we no
+    // longer need the BTG file's separate vertex and normal indices
+    // (ie, tris_v and tris_n, strips_v and strips_n, and fans_v and
+    // fans_n).  Instead, we replace them with our own tris, strips,
+    // and fans variables, which use the unique indices created in
+    // vnMap.
+    VNMap vnMap;
+    group_list tris, strips, fans;
+    _massageIndices(btg.get_tris_v(), btg.get_tris_n(), vnMap, tris);
+    _massageIndices(btg.get_strips_v(), btg.get_strips_n(), vnMap, strips);
+    _massageIndices(btg.get_fans_v(), btg.get_fans_n(), vnMap, fans);
+
+    // The BTG file's tris_v, tris_n, strips_v, ... lists just contain
+    // indices - the real data is in the wgs84_nodes (ie, vertices)
+    // and normals lists.  Because our new tris, strips, and fans
+    // lists have modified indices, we need modified vertex and normal
+    // lists (_vertices and _normals).  As well, we want to record an
+    // elevation for each point, so we have an _elevations list.
+    // 
+    // Because we fill them willy-nilly, first set them to the correct
+    // size.
+    _vertices.resize(vnMap.size() * 3);
+    _normals.resize(vnMap.size() * 3);
+    _elevations.resize(vnMap.size());
+
+    const vector<SGVec3<double> > &wgs84_nodes = btg.get_wgs84_nodes();
+    const SGVec3<double> &gbs_p = btg.get_gbs_center();
+    const vector<SGVec3<float> >& m_norms = btg.get_normals();
     _maxElevation = -numeric_limits<double>::max();
-    const vector<SGVec3<double> >& wgs84_nodes = _chunk.get_wgs84_nodes();
-    for (unsigned int i = 0; i < wgs84_nodes.size(); i++) {
-	// Make the point absolute.  Note that the documentation for
-	// BTG files says that vertices are stored as floats (and
-	// sg_binobj.cxx shows that that is true) - strange that it
-	// would serve them up as doubles.
-	SGVec3<double> node = wgs84_nodes[i] + gbs_p;
-	
-	// Calculate lat, lon, elevation.
+    for (VNMap::const_iterator i = vnMap.begin(); i != vnMap.end(); i++) {
+	// vn gives the <vertex, normal> pair in the BTG file; index
+	// is our new index.
+	pair<int, int> vn = i->first;
+	int index = i->second;
+	int v = vn.first;
+	int n = vn.second;
+
+	// Each BTG file has a reference point, given by
+	// get_gbs_center().  All vertices within the BTG file are
+	// relative to the reference point.  Therefore, to place
+	// vertices in absolute 3D space, we need to add the reference
+	// point to all vertices.
+	//
+	// Note that the documentation for BTG files says that
+     	// vertices are stored as floats (and sg_binobj.cxx shows that
+     	// that is true) - strange that it would serve them up as
+     	// doubles.
+	SGVec3<double> node = wgs84_nodes[v] + gbs_p;
+
+	// Calculate lat, lon, and elevation.
 	SGGeod geod = SGGeod::fromCart(node);
 
-	// Now convert the point using the given projection.
-	if (projection == Bucket::CARTESIAN) {
-	    // This is a true 3D rendering.
-	    _vertices.push_back(node[0]);
-	    _vertices.push_back(node[1]);
-	    _vertices.push_back(node[2]);
-	} else if (projection == Bucket::RECTANGULAR) {
-	    // This is a flat projection.  X and Y are determined by
-	    // longitude and latitude, respectively.  We don't care
-	    // about Z, so set it to 0.0.  The colour will be
-	    // determined separately, and the shading will be
-	    // determined by the vertex normals.
-	    _vertices.push_back(geod.getLongitudeDeg());
-	    _vertices.push_back(geod.getLatitudeDeg());
-	    _vertices.push_back(0.0);
-	}
-
-	// Save our elevation.  This value is used to do elevation
-	// colouring, as well as calculate our maximum elevation
-	// figure.
+    	// Save our elevation.  This value is used to do elevation
+    	// colouring, as well as calculate our maximum elevation
+    	// figure.
 	double e = geod.getElevationM();
-	_elevations.push_back(e);
+	_elevations[index] = e;
 	if (e > _maxElevation) {
 	    _maxElevation = e;
 	}
+
+	// Note that the _vertices and _normals arrays contain <x, y,
+	// z> triples - the ith vertex is at _vertices[i * 3],
+	// _vertices[i * 3 + 1], and _vertices[i * 3 + 2] (ditto for
+	// the ith normal).
+	index *= 3;
+	v *= 3;
+    	// Now convert the point using the given projection.
+	if (projection == Bucket::CARTESIAN) {
+	    // This is a true 3D rendering.
+	    _vertices[index] = node[0];
+	    _vertices[index + 1] = node[1];
+	    _vertices[index + 2] = node[2];
+	} else if (projection == Bucket::RECTANGULAR) {
+    	    // This is a flat projection.  X and Y are determined by
+    	    // longitude and latitude, respectively.  We don't care
+    	    // about Z, so set it to 0.0.  The colour will be
+    	    // determined separately, and the shading will be
+    	    // determined by the vertex normals.
+	    _vertices[index] = geod.getLongitudeDeg();
+	    _vertices[index + 1] = geod.getLatitudeDeg();
+	    _vertices[index + 2] = 0.0;
+	}
+
+	const SGVec3<float>& normals = m_norms[n];
+	_normals[index] = normals[0];
+	_normals[index + 1] = normals[1];
+	_normals[index + 2] = normals[2];
     }
     _maxElevation *= SG_METER_TO_FEET;
+    
+    // Perform step (b) - convert everything to plain old triangles.
+    // These triangles go into the _triangles map based on their
+    // material type (eg, all the "water" triangles are put in
+    // _triangles["water"]).  
+    //
+    // Note that the BTG file doesn't use a C++ map as we do - it uses
+    // parallel lists instead.  So, for example, if tri_materials[i]
+    // is "water", then tris_v[i] contains all the water vertices.
+    //
+    // Note as well that we check if any two vertices of a triangle
+    // are the same.  If they are, we throw out the triangle, since it
+    // isn't really a triangle any more.  This may seem an odd check
+    // to make, but in my experience, it's typical for 40% of all
+    // triangles in Scenery 2.0 files to get tossed in this way.  They
+    // don't seem to be limited to any particular kind of feature
+    // (water, railroad, etc).  They also occur in Scenery 1.0, but
+    // very rarely, and only in airports.
+    _triangles.clear();
 
-    // Same as above for normals.
-    const vector<SGVec3<float> >& m_norms = _chunk.get_normals();
-    for (unsigned int i = 0; i < m_norms.size(); i++) {
-	const SGVec3<float>& normal = m_norms[i];
-	_normals.push_back(normal[0]);
-	_normals.push_back(normal[1]);
-	_normals.push_back(normal[2]);
+    // Triangles
+    const string_list &tri_materials = btg.get_tri_materials();
+    for (size_t i = 0; i < btg.get_tris_v().size(); i++) {
+    	const int_list &oldTris = tris[i];
+    	vector<GLuint> &newTris = _triangles[tri_materials[i]];
+    	for (size_t j = 0; j < oldTris.size(); j += 3) {
+    	    int i0 = oldTris[j], i1 = oldTris[j + 1], i2 = oldTris[j + 2];
+	    // Check for zero-area triangle.
+    	    if ((i0 == i1) || (i1 == i2) || (i2 == i0)) {
+    		continue;
+    	    }
+    	    newTris.push_back(i0);
+    	    newTris.push_back(i1);
+    	    newTris.push_back(i2);
+    	}
+    }
+    // Strips
+    const string_list &strip_materials = btg.get_strip_materials();
+    for (size_t i = 0; i < btg.get_strips_v().size(); i++) {
+    	const int_list &oldStrips = strips[i];
+    	vector<GLuint> &newTris = _triangles[strip_materials[i]];
+    	for (size_t j = 0; j < oldStrips.size() - 2; j++) {
+    	    int i0 = oldStrips[j], i1 = oldStrips[j + 1], i2 = oldStrips[j + 2];
+	    // Check for zero-area triangle.
+    	    if ((i0 == i1) || (i1 == i2) || (i2 == i0)) {
+    		continue;
+    	    }
+    	    if (j % 2 == 0) {
+    		newTris.push_back(i0);
+    		newTris.push_back(i1);
+    		newTris.push_back(i2);
+    	    } else {
+    		newTris.push_back(i1);
+    		newTris.push_back(i0);
+    		newTris.push_back(i2);
+    	    }
+    	}
+    }
+    // Fans
+    const string_list &fan_materials = btg.get_fan_materials();
+    for (size_t i = 0; i < btg.get_fans_v().size(); i++) {
+    	const int_list &oldFans = fans[i];
+    	vector<GLuint> &newTris = _triangles[fan_materials[i]];
+    	int i0 = oldFans[0];
+    	for (size_t j = 1; j < oldFans.size() - 1; j++) {
+    	    int i1 = oldFans[j], i2 = oldFans[j + 1];
+	    // Check for zero-area triangle.
+    	    if ((i0 == i1) || (i1 == i2) || (i2 == i0)) {
+    		continue;
+    	    }
+    	    newTris.push_back(i0);
+    	    newTris.push_back(i1);
+    	    newTris.push_back(i2);
+    	}
     }
     
-    assert(_vertices.size() == _elevations.size() * 3);
-    // EYE - what about points?  Colours, materials, textures?
-
-    // Some sanity checking.  There seem to be two types of BTG files:
-    // terrain and airport.  For reasons I don't understand, terrain
-    // files never have triangles and strips, but only fans, whereas
-    // airports are the opposite.  Moreover, airport files always have
-    // more vertices than normals, and, more strangely, they only ever
-    // use the first normal.  Note that 99% of the time, a "terrain"
-    // file has exactly the same number of vertices and normals.
-    // However, there are rare exceptions where there is one extra
-    // normal (eg, w053n47/2089568.btg).  This seems to indicate a bug
-    // in TerraGear, if you ask me.
-    if (wgs84_nodes.size() > m_norms.size()) {
-    	// Airport file - triangles and triangle strips.
-    	_airport = true;
-
-    	assert(_chunk.get_tris_v().size() > 0);
-    	assert(_chunk.get_tris_v().size() ==_chunk.get_tris_n().size());
-    	for (size_t i = 0; i < _chunk.get_tris_v().size(); i++) {
-    	    // There is a separate specification of normals...
-    	    assert(_chunk.get_tris_n().at(i).size() > 0);
-    	    // ... with one normal per vertex.
-    	    assert(_chunk.get_tris_v().at(i).size() == 
-    		   _chunk.get_tris_n().at(i).size());
-    	    for (size_t j = 0; j < _chunk.get_tris_n().at(i).size(); j++) {
-    		// However, it's always the first normal.
-    		assert(_chunk.get_tris_n().at(i).at(j) == 0);
-    	    }
-    	}
-
-    	// Make sure the vertex indices are valid.
-    	for (size_t i = 0; i < _chunk.get_tris_v().size(); i++) {
-    	    const int_list& vs = _chunk.get_tris_v()[i];
-    	    for (size_t j = 0; j < vs.size(); j++) {
-    		assert(vs[j] < _elevations.size());
-    	    }
-    	}
-
-    	// Ditto for triangle strips.
-    	assert(_chunk.get_strips_v().size() > 0);
-    	assert(_chunk.get_strips_v().size() ==_chunk.get_strips_n().size());
-    	for (size_t i = 0; i < _chunk.get_strips_n().size(); i++) {
-    	    assert(_chunk.get_strips_n().at(i).size() > 0);
-    	    assert(_chunk.get_strips_v().at(i).size() ==
-    		   _chunk.get_strips_n().at(i).size());
-    	    for (size_t j = 0; j < _chunk.get_strips_n().at(i).size(); j++) {
-    		assert(_chunk.get_strips_n().at(i).at(j) == 0);
-    	    }
-    	}
-
-    	// Make sure the vertex indices are valid.
-    	for (size_t i = 0; i < _chunk.get_strips_v().size(); i++) {
-    	    const int_list& vs = _chunk.get_strips_v()[i];
-    	    for (size_t j = 0; j < vs.size(); j++) {
-    		assert(vs[j] < _elevations.size());
-    	    }
-    	}
-
-    	// But no triangle fans.
-    	assert(_chunk.get_fans_v().size() == 0);
-    	assert(_chunk.get_fans_n().size() == 0);
-    } else {
-    	// Terrain file - no triangles or triangle strips.
-    	_airport = false;
-
-    	assert(_chunk.get_tris_v().size() == 0);
-    	assert(_chunk.get_tris_n().size() == 0);
-    	assert(_chunk.get_strips_v().size() == 0);
-    	assert(_chunk.get_strips_n().size() == 0);
-
-    	// But triangle fans.
-    	assert(_chunk.get_fans_v().size() > 0);
-    	assert(_chunk.get_fans_n().size() > 0);
-    	for (size_t i = 0; i < _chunk.get_fans_n().size(); i++) {
-    	    // There is no separate set of normal indices; the nth
-    	    // vertex uses the nth normal.
-    	    assert(_chunk.get_fans_n().at(i).size() == 0);
-    	}
-
-    	// Make sure the vertex indices are valid.
-    	for (size_t i = 0; i < _chunk.get_fans_v().size(); i++) {
-    	    const int_list& vs = _chunk.get_fans_v()[i];
-    	    for (size_t j = 0; j < vs.size(); j++) {
-    		assert(vs[j] < _elevations.size());
-    	    }
-    	}
-    }
-
-    // Estimate the size of the subbucket.  We just count the vertices
-    // and normals.  There are probably other bits we should count,
-    // but I think it's close enough.
-    _size = _vertices.size() * sizeof(sgVec3);
-    _size += _normals.size() * sizeof(sgVec3);
+    // Record the "base" size - the number of raw vertices.
+    _size = _vertices.size() / 3;
     
     _loaded = true;
 
@@ -242,8 +332,37 @@ void Subbucket::unload()
     _loaded = false;
 }
 
+// The (very) approximate size of the subbucket, in bytes.  Basically
+// we return the base size of the _vertices, _normals, _elevations,
+// _triangles, _elevationIndices, and _colours vectors, *ignoring* the
+// extra stuff created by contour chopping.
+unsigned int Subbucket::size()
+{
+    unsigned int result = 0;
+
+    // Vertices and normals.
+    result += _size * sizeof(sgVec3) * 2;
+
+    // Elevations.
+    result += _size * sizeof(float);
+
+    // Triangles (we ignore the string keys).
+    map<string, vector<GLuint> >::const_iterator i;
+    for (i = _triangles.begin(); i != _triangles.end(); i++) {
+	const vector<GLuint> &tris = i->second;
+	result += tris.size() * sizeof(GLuint);
+    }
+
+    // Elevation indices and colours.
+    result += _size * sizeof(int);
+    result += _size * sizeof(float) * 4;
+
+    return result;
+}
+
 // Called to notify us that the palette in Bucket::palette has
-// changed.  We need to delete all of our display lists and flag that
+// changed.  We need to delete the display lists that depend on the
+// palette (that's all of them except _polygonEdgesDL) and flag that
 // we need to re-palettize.
 void Subbucket::paletteChanged() 
 {
@@ -253,8 +372,6 @@ void Subbucket::paletteChanged()
     _contoursDL = 0;
     glDeleteLists(_contourLinesDL, 1);
     _contourLinesDL = 0;
-    glDeleteLists(_polygonEdgesDL, 1);
-    _polygonEdgesDL = 0;
 
     _palettized = false;
 }
@@ -267,6 +384,53 @@ void Subbucket::discreteContoursChanged()
     glDeleteLists(_contoursDL, 1);
     _contoursDL = 0;
 }
+
+// This is a helper routine for the load() method.  For each unique
+// <vertex, normal> pair, we add an entry to map consisting of that
+// pair and our new index.  For each point in vertices/normals, we add
+// a point to indices that uses that new index.  Note that vertices
+// and normals, and therefore indices, are vectors of vectors.
+//
+// So, if vertices[3][7] = 22, and normals[3][7] = 76, then we check
+// if map has an entry for <22, 76>.  If it doesn't, we add a new
+// entry to map, using <22, 76> as the key, and a new index for the
+// value (indices are generated sequentially from 0; for our example,
+// let's say the index is 42).  We also add that index, 42, to
+// indices[3].
+void Subbucket::_massageIndices(const group_list &vertices, 
+				const group_list &normals,
+				VNMap &map, group_list &indices)
+{
+    // EYE - is this the preferred way to set the initial size?
+    indices.resize(vertices.size());
+    for (size_t i = 0; i < vertices.size(); i++) {
+	assert(vertices.size() == normals.size());
+	int_list &is = indices[i];
+    	for (size_t j = 0; j < vertices[i].size(); j++) {
+    	    int v = vertices[i][j];
+	    int n = v;
+	    if (normals[i].size() > 0) {
+		// We have independently specified normals.
+		assert(vertices[i].size() == normals[i].size());
+		n = normals[i][j];
+	    }
+	    // Now that we have our <vertex, normal> pair, see if it's
+	    // in the map already.  If not, add it.  Use the index of
+	    // the pair in our 'is' list.
+	    pair<int, int> vn(v, n);
+	    int index;
+	    VNMap::const_iterator vni = map.find(vn);
+	    if (vni != map.end()) {
+		index = vni->second;
+	    } else {
+		index = map.size();
+		map[vn] = index;
+	    }
+	    is.push_back(index);
+	}
+    }
+}
+
 
 // A palette tells us how to colour a subbucket.  Colouring occurs for
 // 2 reasons: (1) a triangle has a certain material type, or (2) a
@@ -284,14 +448,12 @@ void Subbucket::_palettize()
     // the extra vertices (and their normals, elevations, ...) created
     // by contour slicing.  The "base" data (directly loaded from the
     // file) remains valid however.
-    _vertices.resize(_chunk.get_wgs84_nodes().size() * 3);
-    _normals.resize(_chunk.get_normals().size() * 3);
+    _vertices.resize(_size * 3);
+    _normals.resize(_size * 3);
+    _elevations.resize(_size);
 
-    // Elevation values remain valid as well (but elevation indices
-    // don't - they depend on the palette).
-    _elevations.resize(_chunk.get_wgs84_nodes().size());
-
-    // Recalculate elevation indices and colours.
+    // Elevation indices and colours don't remain valid - they depend
+    // on the palette.
     _elevationIndices.clear();
     _colours.clear();
     for (unsigned int i = 0; i < _elevations.size(); i++) {
@@ -310,120 +472,31 @@ void Subbucket::_palettize()
 
     // Now start slicing and dicing.
     _materials.clear();
-    _materialsN.clear();
     _contours.clear();
     _contours.resize(Bucket::palette->size());
     _contourLines.clear();
-    _polygonEdges.clear();
-    _edgeContours.clear();
 
-    // First, triangles.
-    const group_list& tris = _chunk.get_tris_v();
-    const string_list& tri_mats = _chunk.get_tri_materials();
-    for (size_t i = 0; i < tris.size(); i++) {
-	const string& material = tri_mats[i];
+    // Look at our triangles, material by material.  If the material
+    // is listed in the palette (ie, those triangles are to be
+    // coloured according to the material colour), then just record
+    // the material.  If the triangles are to be coloured by
+    // elevation, then we need to chop them up.
+    for (map<string, vector<GLuint> >::const_iterator i = _triangles.begin();
+	 i != _triangles.end();
+	 i++) {
+	const string &material = i->first;
+	const vector<GLuint> &tris = i->second;
 	if (Bucket::palette->colour(material.c_str()) != NULL) {
-	    // Transfer the triangles into our vector.
-	    vector<GLuint>& triangles = _materials[material];
-	    for (size_t j = 0; j < tris[i].size(); j++) {
-		triangles.push_back(tris[i][j]);
-	    }
+	    _materials.insert(material);
 	} else {
-	    // Contours.
-	    _chopTriangles(tris[i]);
-	}
-
-	// Polygon edges
-	assert((tris[i].size() % 3) == 0);
-	for (size_t j = 0; j < tris[i].size() / 3; j++) {
-	    _polygonEdges.push_back(tris[i][j * 3]);
-	    _polygonEdges.push_back(tris[i][j * 3 + 1]);
-	    _polygonEdges.push_back(tris[i][j * 3 + 1]);
-	    _polygonEdges.push_back(tris[i][j * 3 + 2]);
-	    _polygonEdges.push_back(tris[i][j * 3 + 2]);
-	    _polygonEdges.push_back(tris[i][j * 3]);
-	}
-    }
-
-    // Second, triangle strips.
-    const group_list& strips = _chunk.get_strips_v();
-    const string_list& strip_mats = _chunk.get_strip_materials();
-    for (size_t i = 0; i < strips.size(); i++) {
-	const string& material = strip_mats[i];
-	if (Bucket::palette->colour(material.c_str()) != NULL) {
-	    // Make raw triangles out of the strips.
-	    vector<GLuint>& triangles = _materials[material];
-	    for (size_t j = 0; j < strips[i].size() - 2; j++) {
-		if (j % 2 == 0) {
-		    triangles.push_back(strips[i][j]);
-		    triangles.push_back(strips[i][j + 1]);
-		    triangles.push_back(strips[i][j + 2]);
-		} else {
-		    triangles.push_back(strips[i][j + 1]);
-		    triangles.push_back(strips[i][j]);
-		    triangles.push_back(strips[i][j + 2]);
-		}
-	    }
-	} else {
-	    // Contours.
-	    _chopTriangleStrip(strips[i]);
-	}
-
-	// Polygon edges
-	for (size_t j = 0; j < strips[i].size() - 2; j++) {
-	    if (j % 2 == 0) {
-		_polygonEdges.push_back(strips[i][j]);
-		_polygonEdges.push_back(strips[i][j + 1]);
-		_polygonEdges.push_back(strips[i][j + 1]);
-		_polygonEdges.push_back(strips[i][j + 2]);
-		_polygonEdges.push_back(strips[i][j + 2]);
-		_polygonEdges.push_back(strips[i][j]);
-	    } else {
-		_polygonEdges.push_back(strips[i][j + 1]);
-		_polygonEdges.push_back(strips[i][j]);
-		_polygonEdges.push_back(strips[i][j]);
-		_polygonEdges.push_back(strips[i][j + 2]);
-		_polygonEdges.push_back(strips[i][j + 2]);
-		_polygonEdges.push_back(strips[i][j + 1]);
-	    }
-	}
-    }
-
-    // Finally, triangle fans.
-    const group_list& fans = _chunk.get_fans_v();
-    const string_list& fan_mats = _chunk.get_fan_materials();
-    for (size_t i = 0; i < fans.size(); i++) {
-	const string& material = fan_mats[i];
-	if (Bucket::palette->colour(material.c_str()) != NULL) {
-	    // Make raw triangles out of the fans.  Triangle fans have
-	    // per-vertex normals, so add them to _materialsN, not
-	    // _materials.
-	    vector<GLuint>& triangles = _materialsN[material];
-	    for (size_t j = 1; j < fans[i].size() - 1; j++) {
-		triangles.push_back(fans[i][0]);
-		triangles.push_back(fans[i][j]);
-		triangles.push_back(fans[i][j + 1]);
-	    }
-	} else {
-	    // Contours.
-	    _chopTriangleFan(fans[i]);
-	}
-
-	// Polygon edges
-	for (size_t j = 1; j < fans[i].size() - 1; j++) {
-	    _polygonEdges.push_back(fans[i][0]);
-	    _polygonEdges.push_back(fans[i][j]);
-	    _polygonEdges.push_back(fans[i][j]);
-	    _polygonEdges.push_back(fans[i][j + 1]);
-	    _polygonEdges.push_back(fans[i][j + 1]);
-	    _polygonEdges.push_back(fans[i][0]);
+	    _chopTriangles(tris);
 	}
     }
     _edgeMap.clear();
 
     // Add all contours that run along the shared edges of triangles
     // to the _contourLines vector.
-    tr1::unordered_set<pair<int, int>, PairHash>::const_iterator i;
+    unordered_set<pair<int, int>, PairHash>::const_iterator i;
     for (i = _edgeContours.begin(); i != _edgeContours.end(); i++) {
 	_contourLines.push_back(i->first);
 	_contourLines.push_back(i->second);
@@ -445,9 +518,9 @@ void Subbucket::draw()
     }
 
     // Tell OpenGL where our data is.
-    glVertexPointer(3, GL_FLOAT, 0, &_vertices[0]);
-    glNormalPointer(GL_FLOAT, 0, &_normals[0]);
-    glColorPointer(4, GL_FLOAT, 0, &_colours[0]);
+    glVertexPointer(3, GL_FLOAT, 0, _vertices.data());
+    glNormalPointer(GL_FLOAT, 0, _normals.data());
+    glColorPointer(4, GL_FLOAT, 0, _colours.data());
 
     // Now create the display lists.
     // ---------- Materials ----------
@@ -458,36 +531,21 @@ void Subbucket::draw()
 	glNewList(_materialsDL, GL_COMPILE);
 	glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT); {
 	    glEnableClientState(GL_VERTEX_ARRAY);
+	    glEnableClientState(GL_NORMAL_ARRAY);
 	    glDisableClientState(GL_COLOR_ARRAY);
 
 	    // Draw the "material" objects (ie, objects coloured based on
 	    // their material, not elevation).  Note that we assume that
-	    // glColorMaterial() has been called.  First draw the ones
-	    // that don't use the normals array.
-	    glDisableClientState(GL_NORMAL_ARRAY);
-	    glNormal3f(_normals[0], _normals[1], _normals[2]);
-	    map<string, vector<GLuint> >::iterator m;
-	    for (m = _materials.begin(); m != _materials.end(); m++) {
-		const string& material = m->first;
-		vector<GLuint>& triangles = m->second;
-
+	    // glColorMaterial() has been called.
+	    for (set<string>::const_iterator i = _materials.begin();
+		 i != _materials.end();
+		 i++) {
+		const string &material = *i;
+		vector<GLuint> &triangles = _triangles[material];
 		if (!triangles.empty()) {
 		    glColor4fv(Bucket::palette->colour(material.c_str()));
 		    glDrawElements(GL_TRIANGLES, triangles.size(),
-				   GL_UNSIGNED_INT, &(triangles[0]));
-		}
-	    }
-
-	    // Now draw ones that use the normals array.
-	    glEnableClientState(GL_NORMAL_ARRAY);
-	    for (m = _materialsN.begin(); m != _materialsN.end(); m++) {
-		const string& material = m->first;
-		vector<GLuint>& triangles = m->second;
-
-		if (!triangles.empty()) {
-		    glColor4fv(Bucket::palette->colour(material.c_str()));
-		    glDrawElements(GL_TRIANGLES, triangles.size(),
-				   GL_UNSIGNED_INT, &(triangles[0]));
+				   GL_UNSIGNED_INT, triangles.data());
 		}
 	    }
 	}
@@ -503,15 +561,11 @@ void Subbucket::draw()
 	glNewList(_contoursDL, GL_COMPILE);
 	glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT); {
 	    glEnableClientState(GL_VERTEX_ARRAY);
+	    glEnableClientState(GL_NORMAL_ARRAY);
 
 	    // Draw "contours" objects (ie, objects coloured based on
 	    // their elevation).
-	    if (_airport) {
-	    	glDisableClientState(GL_NORMAL_ARRAY);
-	    	glNormal3f(_normals[0], _normals[1], _normals[2]);
-	    } else {
-		glEnableClientState(GL_NORMAL_ARRAY);
-	    }
+
 	    // EYE - we could also generate two display lists - one
 	    // for discrete contours, the other for smoothed contours,
 	    // but this seems like overkill.
@@ -528,7 +582,7 @@ void Subbucket::draw()
 		int_list& indices = _contours[i];
 		if (!indices.empty()) {
 		    glDrawElements(GL_TRIANGLES, indices.size(), 
-				   GL_UNSIGNED_INT, &(indices[0]));
+				   GL_UNSIGNED_INT, indices.data());
 		}
 	    }
 	}
@@ -555,7 +609,7 @@ void Subbucket::draw()
 	    glLineWidth(0.5);
 	    glColor4f(0.0, 0.0, 0.0, 1.0);
 	    glDrawElements(GL_LINES, _contourLines.size(), GL_UNSIGNED_INT,
-	    		   &(_contourLines[0]));
+	    		   _contourLines.data());
 	}
 	glPopClientAttrib();
 	glPopAttrib();
@@ -563,26 +617,32 @@ void Subbucket::draw()
     }
 
     // ---------- Polygon edges ----------
-    if ((_polygonEdgesDL == 0) && Bucket::polygonEdges &&
-	!_polygonEdges.empty()) {
-	_polygonEdgesDL = glGenLists(1);
-	assert(_polygonEdgesDL != 0);
+    if ((_polygonEdgesDL == 0) && Bucket::polygonEdges) {
+    	_polygonEdgesDL = glGenLists(1);
+    	assert(_polygonEdgesDL != 0);
 
-	glNewList(_polygonEdgesDL, GL_COMPILE);
-	glPushAttrib(GL_LINE_BIT | GL_CURRENT_BIT);
-	glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT); {
-	    glEnableClientState(GL_VERTEX_ARRAY);
-	    glDisableClientState(GL_NORMAL_ARRAY);
-	    glDisableClientState(GL_COLOR_ARRAY);
+    	glNewList(_polygonEdgesDL, GL_COMPILE);
+    	glPushAttrib(GL_LINE_BIT | GL_POLYGON_BIT | GL_CURRENT_BIT);
+    	glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT); {
+    	    glEnableClientState(GL_VERTEX_ARRAY);
+    	    glDisableClientState(GL_NORMAL_ARRAY);
+    	    glDisableClientState(GL_COLOR_ARRAY);
 
-	    glLineWidth(0.5);
-	    glColor4f(1.0, 0.0, 0.0, 1.0);
-	    glDrawElements(GL_LINES, _polygonEdges.size(), GL_UNSIGNED_INT,
-	    		   &(_polygonEdges[0]));
-	}
-	glPopClientAttrib();
-	glPopAttrib();
-	glEndList();
+    	    glPolygonMode(GL_FRONT, GL_LINE);
+    	    glLineWidth(0.5);
+    	    glColor4f(1.0, 0.0, 0.0, 1.0);
+    	    map<string, vector<GLuint> >::const_iterator i;
+    	    for (i = _triangles.begin(); i != _triangles.end(); i++) {
+    		const vector<GLuint> &triangles = i->second;
+    		if (!triangles.empty()) {
+    		    glDrawElements(GL_TRIANGLES, triangles.size(),
+    				   GL_UNSIGNED_INT, triangles.data());
+    		}
+    	    }
+    	}
+    	glPopClientAttrib();
+    	glPopAttrib();
+    	glEndList();
     }
 
     // Materials
@@ -612,32 +672,10 @@ void Subbucket::draw()
 
 // Takes a vector representing a series of triangles (ie, GL_TRIANGLES
 // format) and chops each triangle along contour lines.
-void Subbucket::_chopTriangles(const int_list& triangles)
+void Subbucket::_chopTriangles(const vector<GLuint> &triangles)
 {
     for (size_t i = 0; i < triangles.size(); i += 3) {
 	_chopTriangle(triangles[i], triangles[i + 1], triangles[i + 2]);
-    }
-}
-
-// Takes a vector representing a triangle strip (ie, GL_TRIANGLE_STRIP
-// format) and chops each triangle along contour lines.
-void Subbucket::_chopTriangleStrip(const int_list& strip)
-{
-    for (size_t i = 0; i < strip.size() - 2; i++) {
-	if (i % 2 == 0) {
-	    _chopTriangle(strip[i], strip[i + 1], strip[i + 2]);
-	} else {
-	    _chopTriangle(strip[i + 1], strip[i], strip[i + 2]);
-	}
-    }
-}
-
-// Takes a vector representing a triangle fan (ie, GL_TRIANGLE_FAN
-// format) and chops each triangle along contour lines.
-void Subbucket::_chopTriangleFan(const int_list& fan)
-{
-    for (size_t i = 1; i < fan.size() - 1; i++) {
-	_chopTriangle(fan[0], fan[i], fan[i + 1]);
     }
 }
 
@@ -860,7 +898,7 @@ void Subbucket::_doEdgeContour(int i0, int i1, int e0)
 // it's imperative that it be as efficient as possible.
 pair<int, int> Subbucket::_chopEdge(int i0, int i1)
 {
-    pair<int, int> result = make_pair(0, 0);
+    pair<int, int> result(0, 0);
 
     // For convenience, and to make sure we name edges consistently,
     // we force i0 to be lower (topographically) than i1.  If they're
@@ -871,13 +909,9 @@ pair<int, int> Subbucket::_chopEdge(int i0, int i1)
 	swap(i0, i1);
     }
 
-    if (i0 == i1) {
-    	// Believe it or not, BTG files sometimes have "edges" where
-    	// the two endpoints are the same.
-    	// fprintf(stderr, "%s: triangle has two identical vertices!\n",
-    	// 	_path.file().c_str());
-    	return result;
-    }
+    // We should never get an edge where the two endpoints are the
+    // same (these are explicitly filtered out in load()).
+    assert(i0 != i1);
 
     // Now we're ready.  First see if the edge has been processed
     // already.  The following code is a bit of a trick, relying on
@@ -948,17 +982,15 @@ pair<int, int> Subbucket::_chopEdge(int i0, int i1)
 	_vertices.push_back(v[1]);
 	_vertices.push_back(v[2]);
 
-	if (!_airport) {
-	    // Interpolate the normal.
-	    sgVec3 n;
-	    float *n0 = &(_normals[i0 * 3]), *n1 = &(_normals[i1 * 3]);
-	    sgSubVec3(n, n1, n0);
-	    sgScaleVec3(n, scaling);
-	    sgAddVec3(n, n0);
-	    _normals.push_back(n[0]);
-	    _normals.push_back(n[1]);
-	    _normals.push_back(n[2]);
-	}
+	// Interpolate the normal.
+	sgVec3 n;
+	float *n0 = &(_normals[i0 * 3]), *n1 = &(_normals[i1 * 3]);
+	sgSubVec3(n, n1, n0);
+	sgScaleVec3(n, scaling);
+	sgAddVec3(n, n0);
+	_normals.push_back(n[0]);
+	_normals.push_back(n[1]);
+	_normals.push_back(n[2]);
 
 	result.second++;
     }

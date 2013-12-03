@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2012 Brian Schack
+  Copyright (C) 2009 - 2013 Brian Schack
 
   A subbucket is a part of a bucket (which is a part of a tile, blah,
   blah, blah).  It contains the polygon information for a single
@@ -38,6 +38,10 @@
 #include <deque>
 #include <map>
 #include <vector>
+#include <set>
+// A lot of the operations in Subbucket are very time-critical, so we
+// use the TR1 unordered_set and unordered_map, as they are about
+// twice as fast.
 #if (defined(_MSC_VER) && !defined(HAVE_TRI_UNORDERED))
     #include <boost/tr1/unordered_set.hpp>
     #include <boost/tr1/unordered_map.hpp>
@@ -52,14 +56,21 @@
 #include "Bucket.hxx"		// Bucket::Projection, ...
 
 // Create a hash function for pairs of integers.  This will be used in
-// the _edgeMap unordered_map.
+// several of the unordered sets and maps.
 struct PairHash {
     size_t operator()(const std::pair<int, int>& x) const
     {
-	// Note: the decision to use XOR to combine the two values was
-	// made on the basis of pure ignorance.  There are, no doubt,
-	// better ways.
-	return std::tr1::hash<int>()(x.first ^ x.second);
+	// We use a simple hash function: the top half of the hash is
+	// occupied by the first element in the pair, the bottom half
+	// by the second (assuming ints are half the size of size_t,
+	// although in the end the exact sizes aren't critical).
+	size_t hash = x.first;
+	// The sizeof(hash) * 4 expression equates to half the size of
+	// the hash, in bits.  Thus we shift the bottom half of the
+	// hash to the top half.
+	hash = (hash << (sizeof(hash) * 4)) + x.second;
+
+	return hash;
     }
 };
 
@@ -71,7 +82,8 @@ class Subbucket {
     bool load(Bucket::Projection p = Bucket::CARTESIAN);
     bool loaded() const { return _loaded; }
     void unload();
-    unsigned int size() { return _size; }
+    // The (very) approximate size of the subbucket, in bytes.
+    unsigned int size();
     double maximumElevation() const { return _maxElevation; }
 
     void paletteChanged();
@@ -80,31 +92,51 @@ class Subbucket {
     void draw();
 
   protected:
+    // Normally I avoid typedefs, but this one is just too darned
+    // long.  A VNMap maps from the <vertex, normal> pairs in the
+    // original BTG file to our corrected indices.  It is used
+    // internally in load() and _massageIndices().
+    typedef std::tr1::unordered_map<std::pair<int, int>, int, PairHash> VNMap;
+    void _massageIndices(const group_list &vertices, const group_list &normals, 
+    			 VNMap &map, group_list &indices);
+
     void _palettize();
-    void _chopTriangles(const int_list& triangles);
-    void _chopTriangleStrip(const int_list& strip);
-    void _chopTriangleFan(const int_list& fan);
+    void _chopTriangles(const std::vector<GLuint> &triangles);
     void _chopTriangle(int i0, int i1, int i2);
     std::pair<int, int> _chopEdge(int i0, int i1);
     void _createTriangle(int i0, int i1, int i2, bool cw, int e);
     void _checkTriangle(int i0, int i1, int i2, int e);
     void _doEdgeContour(int i0, int i1, int e0);
-    void _addElevationSlice(std::deque<int>& vs, int e, bool cw);
+    void _addElevationSlice(std::deque<int> &vs, int e, bool cw);
 
     SGPath _path;
-    bool _loaded, _airport;
+    bool _loaded;
     double _maxElevation;
-    SGBinObject _chunk;
-    // Vertices, normals, and elevations are all calculated directly
-    // from the chunk.  We may add to these vectors if contours cut
-    // through any chunk objects.  If there are n vertices, then the
-    // size of the vertices and normals vectors is n * 3, while the
-    // elevations vector is n.
+    // Vertices, normals, and elevations for objects in the scenery
+    // file.  The _vertices and _normals arrays are of the same size.
+    // The nth vertex is an <x, y, z> triplet, and is at _vertices[n *
+    // 3], _vertices[n * 3 + 1], and _vertices[n * 3 + 2].  The
+    // corresponding normal for that vertex is at the same place in
+    // the _normals array.  The elevation of that vertex is at
+    // _elevations[n].
     std::vector<float> _vertices, _normals;
     std::vector<float> _elevations;
 
+    // All of our triangles, indexed by material.  For example, all of
+    // the "water" triangles can be found at _triangles["water"].  The
+    // triangles are indices into _vertices, and _normals, stored in
+    // GL_TRIANGLES format.  For example, _triangles["water"][n * 3]
+    // is the index of the first vertex (in _vertices) and normal (in
+    // _normals) of the nth triangle.  Note that _elevations[n] gives
+    // the elevation of that vertex.
+    //
+    // Depending on the palette, some of these will be coloured by
+    // their material, while others will be coloured by their
+    // elevation.
+    std::map<std::string, std::vector<GLuint> > _triangles;
+
     // These depend on the palette that we have loaded.  The elevation
-    // indices vector stores contour indexes (as returned by the
+    // indices vector stores contour indices (as returned by the
     // palette), while the colours has smoothed RGBA colours (also as
     // returned by the palette).  If there are n vertices, then the
     // size of the elevation indices is n, while the colours vectors
@@ -124,20 +156,18 @@ class Subbucket {
     // polygons (before being sliced).
     GLuint _materialsDL, _contoursDL, _contourLinesDL, _polygonEdgesDL;
 
-    unsigned int _size;	// Size of subbucket (approximately) in bytes.
+    // The number of vertices, normals, elevations, etc, before
+    // contour chopping.
+    unsigned int _size;
 
-    // These contain references to all objects to be coloured by a
-    // single material (eg, "water", "railroad", ...).  Each vector
-    // contains a list of vertices, in GL_TRIANGLES format (ie, each
-    // set of 3 indices represents one triangle).  The first map,
-    // _materials, is for objects with a common normal; the second,
-    // _materialsN, are for those objects with per-vertex normals.
-    std::map<std::string, std::vector<GLuint> > _materials;
-    std::map<std::string, std::vector<GLuint> > _materialsN;
+    // When we load a palette, we see which triangles (in _triangles)
+    // are to be coloured by material - those materials are added to
+    // this set.  When we actually draw the subbucket, we use this set
+    // to index _triangles.
+    std::set<std::string> _materials;
 
     // To colour "contour" objects (objects coloured by their
-    // elevation), we have to chop up triangles, strips, and fans into
-    // simple triangles, then slice them if a contour line goes
+    // elevation), we have to slice triangles if a contour line goes
     // through them (creating more, smaller, triangles).  We store
     // these triangles based on their colour index in the palette.
     // So, for example, _contours[3] has a list of vertex indices for
@@ -148,9 +178,7 @@ class Subbucket {
     // line segment (ie, GL_LINES format).  This is used for drawing
     // contour lines.
     int_list _contourLines;
-    // Similar to _contourLines, except for the edges of raw scenery
-    // polygons.  This is intended for "debugging" scenery.
-    int_list _polygonEdges;
+
     // A temporary varible used to handle a special case: contours
     // that run along a triangle edge (as opposed to cutting through a
     // triangle).  These may be shared by an adjacent triangle, and we
