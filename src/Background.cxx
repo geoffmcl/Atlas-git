@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2012 Brian Schack
+  Copyright (C) 2012 - 2013 Brian Schack
 
   This file is part of Atlas.
 
@@ -264,16 +264,16 @@ void Background::draw()
 
 		// Specify the vertices.
     	    	glEnableClientState(GL_VERTEX_ARRAY);
-    	    	glVertexPointer(3, GL_FLOAT, 0, &_vertices[0]);
+    	    	glVertexPointer(3, GL_FLOAT, 0, _vertices.data());
 
 		// Specify the textures.
     	    	glClientActiveTexture(GL_TEXTURE0);
     	    	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-    	    	glTexCoordPointer(2, GL_FLOAT, 0, &_imageTexCoords[0]);
+    	    	glTexCoordPointer(2, GL_FLOAT, 0, _imageTexCoords.data());
 
     	    	glClientActiveTexture(GL_TEXTURE1);
     	    	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-    	    	glTexCoordPointer(2, GL_FLOAT, 0, &_statusTexCoords[0]);
+    	    	glTexCoordPointer(2, GL_FLOAT, 0, _statusTexCoords.data());
 
 		// Draw.
     	    	glMultiDrawElements(GL_TRIANGLE_STRIP, _counts,
@@ -306,10 +306,10 @@ void Background::drawOutlines()
     	    // Tell OpenGL where the vertex data is.
 
     	    // EYE - use glBindBuffer?
-    	    glVertexPointer(3, GL_FLOAT, 0, &_vertices[0]);
+    	    glVertexPointer(3, GL_FLOAT, 0, _vertices.data());
     	    glEnableClientState(GL_VERTEX_ARRAY);
     	    glDrawElements(GL_LINES, _latLonLines.size(),
-    			   GL_UNSIGNED_INT, &(_latLonLines[0]));
+    			   GL_UNSIGNED_INT, _latLonLines.data());
     	}
     	glEndList();
     	glPopClientAttrib();
@@ -330,7 +330,7 @@ void Background::drawOutlines()
 
 	    // Tell OpenGL where the vertex data is and enable
 	    // them.
-	    glVertexPointer(3, GL_FLOAT, 0, &_vertices[0]);
+	    glVertexPointer(3, GL_FLOAT, 0, _vertices.data());
 	    glEnableClientState(GL_VERTEX_ARRAY);
 
 	    // Chunk boundary
@@ -349,7 +349,7 @@ void Background::drawOutlines()
 		glColor3f(0.25, 1.0, 1.0);
 		vector<GLuint>& civ = ci->second;
 		glDrawElements(GL_LINES, civ.size(),
-			       GL_UNSIGNED_INT, &(civ[0]));
+			       GL_UNSIGNED_INT, civ.data());
 	    }
 
 	    // Tile boundary
@@ -360,7 +360,7 @@ void Background::drawOutlines()
 		glColor3f(1.0, 0.25, 1.0);
 		vector<GLuint>& tiv = ti->second;
 		glDrawElements(GL_LINES, tiv.size(),
-			       GL_UNSIGNED_INT, &(tiv[0]));
+			       GL_UNSIGNED_INT, tiv.data());
 	    }
 	}
 	glPopAttrib();
