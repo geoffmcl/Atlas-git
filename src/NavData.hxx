@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2012 Brian Schack
+  Copyright (C) 2012 - 2014 Brian Schack
 
   This contains all the classes used to read in and access our navaid
   and airport data.  The various classes are gathered together in the
@@ -50,13 +50,13 @@ enum NavSubType {DME, DME_ILS, GS, IGS, ILS_cat_I, ILS_cat_II, ILS_cat_III,
 struct NAV: public Searchable, Cullable {
   public:
     // Searchable interface.
-    const double *location() const { return bounds.center; }
+    const double *location() const { return _bounds.center; }
     virtual double distanceSquared(const sgdVec3 from) const;
     virtual const std::vector<std::string>& tokens();
     virtual const std::string& asString();
 
     // Cullable interface.
-    const atlasSphere& Bounds() { return bounds; }
+    const atlasSphere& bounds() { return _bounds; }
     double latitude() { return lat; }
     double longitude() { return lon; }
 
@@ -77,7 +77,7 @@ struct NAV: public Searchable, Cullable {
     //   GS - ssshhh.hhh - slope * 100,000 and true heading (degrees)
     //   DME - bias (metres)
     float magvar;
-    atlasSphere bounds;
+    atlasSphere _bounds;
 
   protected:
     std::vector<std::string> _tokens;
@@ -87,20 +87,20 @@ struct NAV: public Searchable, Cullable {
 struct FIX: public Searchable, Cullable {
   public:
     // Searchable interface.
-    const double *location() const { return bounds.center; }
+    const double *location() const { return _bounds.center; }
     virtual double distanceSquared(const sgdVec3 from) const;
     virtual const std::vector<std::string>& tokens();
     virtual const std::string& asString();
 
     // Cullable interface.
-    const atlasSphere& Bounds() { return bounds; }
+    const atlasSphere& bounds() { return _bounds; }
     double latitude() { return lat; }
     double longitude() { return lon; }
 
     char name[6];		// Fixes are always 5 characters or less.
     double lat, lon;
     bool low, high;
-    atlasSphere bounds;
+    atlasSphere _bounds;
 
   protected:
     std::vector<std::string> _tokens;
@@ -120,7 +120,7 @@ struct AwyLabel {
 // AWY - a single airway segment, perhaps shared by several airways.
 struct AWY: public Cullable {
     // Cullable interface.
-    const atlasSphere& Bounds() { return bounds; }
+    const atlasSphere& bounds() { return _bounds; }
     // EYE - an approximation - use centre?
     double latitude() { return start.lat; }
     double longitude() { return start.lon; }
@@ -129,7 +129,7 @@ struct AWY: public Cullable {
     struct AwyLabel start, end;
     bool isLow;			// True if a low airway, false if high
     int base, top;		// Base and top of airway in 100's of feet
-    atlasSphere bounds;
+    atlasSphere _bounds;
     double length;		// Length of segment in metres
 };
 
@@ -139,7 +139,7 @@ struct RWY {
     float hdg;			// true heading, in degrees
     float length, width;	// metres
 
-    atlasSphere bounds;
+    atlasSphere _bounds;
     sgdVec3 ahead, aside, above;
 };
 
@@ -152,14 +152,13 @@ typedef std::map<std::string, std::set<int> > FrequencyMap;
 struct ARP: public Searchable, Cullable {
   public:
     // Searchable interface.
-    const double *location() const { return bounds.center; }
+    const double *location() const { return _bounds.center; }
     virtual double distanceSquared(const sgdVec3 from) const;
     virtual const std::vector<std::string>& tokens();
     virtual const std::string& asString();
 
     // Cullable interface.
-    // EYE - change Bounds() to something better
-    const atlasSphere& Bounds() { return bounds; }
+    const atlasSphere& bounds() { return _bounds; }
     double latitude() { return lat; }
     double longitude() { return lon; }
 
@@ -175,7 +174,7 @@ struct ARP: public Searchable, Cullable {
     std::vector<RWY *> rwys;
     std::map<ATCCodeType, FrequencyMap> freqs;
 
-    atlasSphere bounds;
+    atlasSphere _bounds;
 
   protected:
     std::vector<std::string> _tokens;

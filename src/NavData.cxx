@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2012 Brian Schack
+  Copyright (C) 2012 - 2014 Brian Schack
 
   This file is part of Atlas.
 
@@ -42,7 +42,7 @@ using namespace std;
 //////////////////////////////////////////////////////////////////////
 double NAV::distanceSquared(const sgdVec3 from) const
 {
-    return sgdDistanceSquaredVec3(bounds.center, from);
+    return sgdDistanceSquaredVec3(_bounds.center, from);
 }
 
 // Returns our tokens, generating them if they haven't been already.
@@ -153,7 +153,7 @@ const std::string& NAV::asString()
 
 double FIX::distanceSquared(const sgdVec3 from) const
 {
-    return sgdDistanceSquaredVec3(bounds.center, from);
+    return sgdDistanceSquaredVec3(_bounds.center, from);
 }
 
 // Returns our tokens, generating them if they haven't been already.
@@ -184,7 +184,7 @@ const std::string& FIX::asString()
 
 double ARP::distanceSquared(const sgdVec3 from) const
 {
-    return sgdDistanceSquaredVec3(bounds.center, from);
+    return sgdDistanceSquaredVec3(_bounds.center, from);
 }
 
 // Returns our tokens, generating them if they haven't been already.
@@ -692,8 +692,8 @@ void NavData::_loadNavaids810(float cycle, const gzFile& arp)
 	sgdVec3 center;
 	atlasGeodToCart(lat, lon, elev * SG_FEET_TO_METER, center);
 
-	n->bounds.setCenter(center);
-	n->bounds.setRadius(n->range);
+	n->_bounds.setCenter(center);
+	n->_bounds.setRadius(n->range);
 
 	// Add to our culler.
 	_frustumCullers[NAVAIDS]->culler().addObject(n);
@@ -780,8 +780,8 @@ void NavData::_loadFixes600(const gzFile& arp)
 	atlasGeodToCart(f->lat, f->lon, 0.0, point);
 
 	// We arbitrarily say fixes have a radius of 1000m.
-	f->bounds.radius = 1000.0;
-	f->bounds.setCenter(point);
+	f->_bounds.radius = 1000.0;
+	f->_bounds.setCenter(point);
 
 	// Until determined otherwise, fixes are not assumed to be
 	// part of any low or high altitude airways.
@@ -881,9 +881,9 @@ void NavData::_loadAirways640(const gzFile& arp)
 	// EYE - save these two points
 	sgdVec3 point;
 	atlasGeodToCart(a->start.lat, a->start.lon, 0.0, point);
-	a->bounds.extend(point);
+	a->_bounds.extend(point);
 	atlasGeodToCart(a->end.lat, a->end.lon, 0.0, point);
-	a->bounds.extend(point);
+	a->_bounds.extend(point);
 	double az1, az2, s;
 	geo_inverse_wgs_84(0.0, a->start.lat, a->start.lon, 
 			   a->end.lat, a->end.lon,
@@ -1033,9 +1033,9 @@ static void __airportLatLon(ARP *ap)
     double lat, lon, alt;
     sgdVec3 c;
     sgdSetVec3(c,
-	       ap->bounds.center[0], 
-	       ap->bounds.center[1], 
-	       ap->bounds.center[2]);
+	       ap->_bounds.center[0], 
+	       ap->_bounds.center[1], 
+	       ap->_bounds.center[2]);
     sgCartToGeod(c, &lat, &lon, &alt);
     ap->lat = lat * SGD_RADIANS_TO_DEGREES;
     ap->lon = lon * SGD_RADIANS_TO_DEGREES;
@@ -1099,10 +1099,10 @@ void __runwayExtents(RWY *rwy, float elev)
     // Calculate our bounding sphere.
     sgdVec3 center;
     atlasGeodToCart(rwy->lat, rwy->lon, elev, center);
-    sgdCopyVec3(rwy->bounds.center, center);
+    sgdCopyVec3(rwy->_bounds.center, center);
 
     sgdMat4 mat;
-    sgdMakeTransMat4(mat, rwy->bounds.center);
+    sgdMakeTransMat4(mat, rwy->_bounds.center);
     sgdPreMultMat4(mat, rot);
 
     sgdVec3 ll = {rwy->width / 2,  0.0, -rwy->length / 2};
@@ -1114,10 +1114,10 @@ void __runwayExtents(RWY *rwy, float elev)
     sgdXformPnt3(lr, mat);
     sgdXformPnt3(ll, mat);
     sgdXformPnt3(ur, mat);
-    rwy->bounds.extend(ul);
-    rwy->bounds.extend(ll);
-    rwy->bounds.extend(ll);
-    rwy->bounds.extend(ur);
+    rwy->_bounds.extend(ul);
+    rwy->_bounds.extend(ll);
+    rwy->_bounds.extend(ll);
+    rwy->_bounds.extend(ur);
 }
 
 void NavData::_loadAirports810(const gzFile& arp)
@@ -1243,7 +1243,7 @@ void NavData::_loadAirports810(const gzFile& arp)
 		ap->rwys.push_back(rwy);
 
 		__runwayExtents(rwy, ap->elev);
-		ap->bounds.extend(&(rwy->bounds));
+		ap->_bounds.extend(&(rwy->_bounds));
 
 		// According to the FAA's "VFR Aeronautical Chart
 		// Symbols", lighting codes on VFR maps refer to
