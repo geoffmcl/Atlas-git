@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2012 Brian Schack
+  Copyright (C) 2009 - 2014 Brian Schack
 
   A simple culling structure.  Atlas uses it to quickly look up
   navaids, airports, etc in a given area.
@@ -86,7 +86,7 @@ class Cullable {
   public:
     virtual ~Cullable() {}
 
-    virtual const atlasSphere& Bounds() = 0;
+    virtual const atlasSphere& bounds() = 0;
     virtual double latitude() = 0;
     virtual double longitude() = 0;
 };

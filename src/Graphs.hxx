@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2007 - 2012 Brian Schack
+  Copyright (C) 2007 - 2014 Brian Schack
 
   The graphs object draws graphs for a flight track in a window.
 
@@ -37,7 +37,7 @@
 // Forward class declarations
 class AtlasController;
 class FlightTrack;
-class NAV;
+struct NAV;
 
 class GraphsUI;
 class GraphsWindow: public AtlasBaseWindow, Subscriber {

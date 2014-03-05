@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2012 Brian Schack
+  Copyright (C) 2009 - 2014 Brian Schack
 
   Loads and draws navaids (VORs, NDBs, ILS systems, and DMEs).
 
@@ -32,7 +32,7 @@
 // Forward class declarations
 class Overlays;
 class NavData;
-class NAV;
+struct NAV;
 class FlightData;
 
 // Used for drawing labels on navaids.

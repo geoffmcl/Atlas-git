@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2007 - 2012 Brian Schack
+  Copyright (C) 2007 - 2014 Brian Schack
 
   This file is part of Atlas.
 
@@ -1860,7 +1860,7 @@ void GraphsWindow::Altitudes::_createPlanes(NAV *n, _Planes *planes)
     // x-axis) to the navaid's actual orientation.
     sgdMat4 rot, mat;
     sgdMakeRotMat4(rot, n->lon - 90.0, n->lat, -gsHeading + 180.0);
-    sgdMakeTransMat4(mat, n->bounds.center);
+    sgdMakeTransMat4(mat, n->_bounds.center);
     sgdPreMultMat4(mat, rot);
 
     ////////////

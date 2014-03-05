@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2008 - 2012 Brian Schack
+  Copyright (C) 2008 - 2014 Brian Schack
 
   This file is part of Atlas.
 
@@ -45,8 +45,6 @@
 
 using namespace std;
 
-void airportLatLon(ARP *ap);
-void runwayExtents(RWY *rwy, float elev);
 void drawRunway(RWY *rwy, float border = 0.0);
 
 // EYE - move to policy?
@@ -301,7 +299,7 @@ void AirportsOverlay::drawBackgrounds(NavData *navData)
 		colour = arp_uncontrolled_colour;
 	    }
 
-	    rA = ap->bounds.radius / _metresPerPixel; // pixels
+	    rA = ap->_bounds.radius / _metresPerPixel; // pixels
 	    if (rA > rI) {
 		glColor4fv(colour);
 		for (unsigned int j = 0; j < ap->rwys.size(); j++) {
@@ -352,7 +350,7 @@ void AirportsOverlay::drawForegrounds(NavData *navData)
 		continue;
 	    }
 
-	    rA = ap->bounds.radius / _metresPerPixel; // pixels
+	    rA = ap->_bounds.radius / _metresPerPixel; // pixels
 	    if (rA > rAMin) {
 
 		for (unsigned int j = 0; j < ap->rwys.size(); j++) {
@@ -382,7 +380,7 @@ void AirportsOverlay::drawForegrounds(NavData *navData)
 	    if (!ap) {
 		continue;
 	    }
-	    rA = ap->bounds.radius / _metresPerPixel; // pixels
+	    rA = ap->_bounds.radius / _metresPerPixel; // pixels
 
 	    // Only draw the beacon if it has one and if the airport
 	    // is being drawn as an airport (outlined runways).
@@ -448,7 +446,7 @@ void AirportsOverlay::drawLabels(NavData *navData)
 		continue;
 	    }
 
-	    rA = ap->bounds.radius / _metresPerPixel; // pixels
+	    rA = ap->_bounds.radius / _metresPerPixel; // pixels
 	    if (rA > rI) {
 		for (unsigned int j = 0; j < ap->rwys.size(); j++) {
 		    RWY *rwy = ap->rwys[j];
@@ -468,7 +466,7 @@ void AirportsOverlay::drawLabels(NavData *navData)
 
 	    // We don't label airports unless they're at least the
 	    // minimum size.
-	    rA = ap->bounds.radius / _metresPerPixel;
+	    rA = ap->_bounds.radius / _metresPerPixel;
 	    if (rA > rMin) {
 		_labelAirport(ap, rA);
 	    }
@@ -544,7 +542,7 @@ void AirportsOverlay::_drawIcon(ARP *ap, float radius)
 {
     // Radius is passed in in pixels; we convert it to metres
     radius = radius * _metresPerPixel;
-    geodPushMatrix(ap->bounds.center, ap->lat, ap->lon); {
+    geodPushMatrix(ap->_bounds.center, ap->lat, ap->lon); {
 	glScalef(radius, radius, radius);
 	glCallList(_airportIconDL);
     }
@@ -771,10 +769,9 @@ void AirportsOverlay::_labelRunway(RWY *rwy)
     // Add runway length and width.  According to Canadian rules,
     // width is indicated only if different than 200', the standard
     // width.  Length is drawn alongside the runway (to the foot).
-    // Diagrams also indicated slope, actual magnetic heading,
-    // lighting symbols (eg, dots down the runway to indicate centre
-    // lighting), runway threshold elevation in feet, magnetic
-    // variation.
+    // Diagrams also indicate slope, actual magnetic heading, lighting
+    // symbols (eg, dots down the runway to indicate centre lighting),
+    // runway threshold elevation in feet, magnetic variation.
     //
     // British charts indicate lengths in metres (and always write
     // both, in the form length x width).  They also show the highest

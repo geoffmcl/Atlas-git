@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2008 - 2012 Brian Schack
+  Copyright (C) 2008 - 2014 Brian Schack
 
   The airways overlay manages the loading and drawing of airways.
 
@@ -37,7 +37,7 @@
 // Forward class declarations
 class Overlays;
 class NavData;
-class AWY;
+struct AWY;
 class LayoutManager;
 
 class Overlays;

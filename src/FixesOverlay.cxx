@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2012 Brian Schack
+  Copyright (C) 2009 - 2014 Brian Schack
 
   This file is part of Atlas.
 
@@ -152,7 +152,7 @@ void FixesOverlay::draw(NavData *navData)
 // Renders the given fix.
 void FixesOverlay::_render(const FIX *f)
 {
-    geodPushMatrix(f->bounds.center, f->lat, f->lon); {
+    geodPushMatrix(f->_bounds.center, f->lat, f->lon); {
 	glBegin(GL_POINTS); {
 	    glVertex2f(0.0, 0.0);
 	}
@@ -173,7 +173,7 @@ void FixesOverlay::_label(const FIX *f, LayoutManager& lm)
     lm.setText(f->name);
     lm.moveTo(-labelOffset, 0.0, LayoutManager::CR);
 
-    geodDrawText(lm, f->bounds.center, f->lat, f->lon);
+    geodDrawText(lm, f->_bounds.center, f->lat, f->lon);
 }
 
 // Called when somebody posts a notification that we've subscribed to.

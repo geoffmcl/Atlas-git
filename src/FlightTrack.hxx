@@ -4,7 +4,7 @@
   Written by Per Liedman, started July 2000.
 
   Copyright (C) 2000 Per Liedman, liedman@home.se
-  Copyright (C) 2009 - 2012 Brian Schack
+  Copyright (C) 2009 - 2014 Brian Schack
 
   A flight track contains the data for a FlightGear session.  It
   includes things like the aircraft's position, speed, altitude, etc.
@@ -39,7 +39,7 @@
 
 // Forward class declarations
 class NavData;
-class NAV;
+struct NAV;
 class SGIOChannel;
 
 // EYE - it's wasteful to have the radio stuff in a FlightData struct,

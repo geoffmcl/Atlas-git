@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2008 - 2012 Brian Schack
+  Copyright (C) 2008 - 2014 Brian Schack
 
   The airports overlay manages the loading and drawing of airports.
 
@@ -37,8 +37,8 @@
 // Forward class declarations
 class Overlays;
 class NavData;
-class ARP;
-class RWY;
+struct ARP;
+struct RWY;
 
 // Determines how airports are drawn.
 // EYE - add colours, runway label stuff, fonts?

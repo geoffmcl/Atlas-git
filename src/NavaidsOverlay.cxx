@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2012 Brian Schack
+  Copyright (C) 2009 - 2014 Brian Schack
 
   This file is part of Atlas.
 
@@ -959,7 +959,7 @@ void NavaidsOverlay::_renderVOR(const NAV *n)
 	radius = maxVORSize;
     }
 
-    geodPushMatrix(n->bounds.center, n->lat, n->lon); {
+    geodPushMatrix(n->_bounds.center, n->lat, n->lon); {
 	////////////////////
 	// VOR icon
 	////////////////////
@@ -1137,7 +1137,7 @@ void NavaidsOverlay::_renderNDB(const NAV *n)
 	live = true;
     }
 
-    geodPushMatrix(n->bounds.center, n->lat, n->lon); {
+    geodPushMatrix(n->_bounds.center, n->lat, n->lon); {
 	glPushMatrix(); {
 	    ////////////////////
 	    // NDB icon
@@ -1282,7 +1282,7 @@ void NavaidsOverlay::_renderILS(const NAV *n)
 	labelPointSize = labelPointSize * 50.0 / _metresPerPixel;
     }
 
-    geodPushMatrix(n->bounds.center, n->lat, n->lon); {
+    geodPushMatrix(n->_bounds.center, n->lat, n->lon); {
 	glPushMatrix(); {
 	    glRotatef(-n->magvar, 0.0, 0.0, 1.0);
 	    glScalef(ilsLength, ilsLength, ilsLength);
@@ -1405,7 +1405,7 @@ void NavaidsOverlay::_renderMarker(const NAV *n)
 	}
     }
 
-    geodPushMatrix(n->bounds.center, n->lat, n->lon); {
+    geodPushMatrix(n->_bounds.center, n->lat, n->lon); {
 	glRotatef(-n->magvar + 90.0, 0.0, 0.0, 1.0);
 	if (n->navtype == NAV_OM) {
 	    glCallList(_ILSMarkerDLs[0]);
@@ -1438,7 +1438,7 @@ void NavaidsOverlay::_renderDME(const NAV *n)
 	radius = maxDMESize;
     }
 
-    geodPushMatrix(n->bounds.center, n->lat, n->lon); {
+    geodPushMatrix(n->_bounds.center, n->lat, n->lon); {
 	////////////////////
 	// DME icon
 	////////////////////
@@ -1504,7 +1504,7 @@ void NavaidsOverlay::_renderDMEILS(const NAV *n)
 	radius = maxDMESize;
     }
 
-    geodPushMatrix(n->bounds.center, n->lat, n->lon); {
+    geodPushMatrix(n->_bounds.center, n->lat, n->lon); {
 	////////////////////
 	// DME icon
 	////////////////////

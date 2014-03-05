@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2012 Brian Schack
+  Copyright (C) 2009 - 2014 Brian Schack
 
   This file is part of Atlas.
 
@@ -267,7 +267,7 @@ void Culler::Leaf::push_back(Cullable *obj)
 	largest++;
     }
 #endif
-    _bounds.extend(&(obj->Bounds()));
+    _bounds.extend(&(obj->bounds()));
 }
 
 void Culler::Leaf::intersections(const sgdFrustum& frustum, sgdMat4 m,
@@ -292,7 +292,7 @@ void Culler::Leaf::intersections(const sgdFrustum& frustum, sgdMat4 m,
     for (unsigned int i = 0; i < children.size(); i++) {
 	Cullable *c = children[i];
 
-	tmp = c->Bounds();
+	tmp = c->bounds();
 	tmp.orthoXform(m);
 	result = frustum.contains(&tmp);
 	if (result != SG_OUTSIDE) {
@@ -321,8 +321,8 @@ void Culler::Leaf::intersections(const sgdVec3 point,
     for (unsigned int i = 0; i < children.size(); i++) {
 	Cullable *c = children[i];
 
-	result = sgdDistanceVec3(point, c->Bounds().getCenter());
-	if (result <= c->Bounds().getRadius()) {
+	result = sgdDistanceVec3(point, c->bounds().getCenter());
+	if (result <= c->bounds().getRadius()) {
 	    intersections.push_back(c);
 	}
     }
