@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2012 Brian Schack
+  Copyright (C) 2009 - 2014 Brian Schack
 
   This file is part of Atlas.
 
@@ -337,7 +337,7 @@ void TileManager::_scanMapLevels()
 	unsigned int level;
 	if (entity->d_isdir &&
 	    sscanf(entity->d_name, "%u", &level) == 1) {
-	    if ((level >= 0) && (level < MAX_MAP_LEVEL)) {
+	    if (level < MAX_MAP_LEVEL) {
 		_mapLevels[level] = true;
 	    }
 	}
