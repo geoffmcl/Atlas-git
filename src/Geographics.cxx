@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2012 Brian Schack
+  Copyright (C) 2009 - 2014 Brian Schack
 
   This file is part of Atlas.
 
@@ -187,8 +187,8 @@ void GreatCircle::draw(double metresPerPixel, const sgdFrustum& frustum,
     //
     // Depending on the zoom, that may result in very short segments
     // (when zoomed out far), or very long segments (when zoomed in
-    // close).  We don't let segments shrink to less than
-    // pixeslPerSegment.
+    // close).  We don't let segments shrink to fewer pixels than
+    // minPixelsPerSegment.
     const float degreesPerSegment = 1 / 60.0;
     const int minPixelsPerSegment = 10;
     const float metresPerDegree = 1e7 / 90.0;
