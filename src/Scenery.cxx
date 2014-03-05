@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2008 - 2012 Brian Schack
+  Copyright (C) 2008 - 2014 Brian Schack
 
   This file is part of Atlas.
 
@@ -114,7 +114,7 @@ class SceneryTile: public Cullable, public CacheObject, Subscriber {
 	
     // Cullable interface.
     void setBounds(atlasSphere& bounds) { _bounds = bounds; }
-    const atlasSphere& Bounds() { return _bounds; }
+    const atlasSphere& bounds() { return _bounds; }
     double latitude() { return _ti->centreLat(); }
     double longitude() { return _ti->centreLon(); }
 
@@ -344,7 +344,7 @@ void MapTexture::draw()
 	glEnable(GL_TEXTURE_2D);
 	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL);
 
-	// A few note on textures for my benefit: 
+	// A few notes on textures for my benefit: 
 	//
 	// Textures have state.  Texture state for the *current*
 	// texture is set by glTexParameter().  Texture units also
@@ -1092,6 +1092,9 @@ bool Scenery::intersection(double x, double y,
     GLdouble mvmatrix[16], projmatrix[16];
     GLdouble wx, wy, wz;	// World x, y, z coords.
 
+    // Make sure we're the active window.
+    int oldWindow = _aw->set();
+
     // Our line is given by two points: the intersection of our
     // viewing "ray" with the near depth plane and far depth planes.
     // This assumes that we're using an orthogonal projection - in a
@@ -1157,14 +1160,19 @@ bool Scenery::intersection(double x, double y,
 	}
 	glPopMatrix();
 	glMatrixMode(GL_MODELVIEW);
+    }
+    // Beyond this point, we don't do any OpenGL stuff, so we can
+    // restore the old active window.
+    _aw->set(oldWindow);
 
-	if (*validElevation) {
-	    return true;
-	}
+    // If the user was interested in getting an elevation and we
+    // actually got one, we can return now.
+    if ((validElevation != NULL) && *validElevation) {
+	return true;
     }
 
     // If we got here, that means no tiles intersected or the user
-    // isn't intersted in an elevation.  So, we'll just use a simple
+    // isn't interested in an elevation.  So, we'll just use a simple
     // earth/ray intersection with a standard earth ellipsoid.  This
     // will give us the lat/lon, but the elevation will always be 0
     // (sea level).
