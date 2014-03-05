@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2012 Brian Schack
+  Copyright (C) 2009 - 2014 Brian Schack
 
   A group of classes for keeping track of scenery information: names,
   directories, which maps exist, size, latitude, longitude, ....
@@ -56,7 +56,7 @@
   In the TileManager, Tile, and Chunk classes, latitudes and
   longitudes are measured in degrees.  Unless stated otherwise,
   latitudes must be in the range 0 <= lat < 180, and longitudes in the
-  range 0 <= lon < 359.  A latitude of 0 corresponds to the south pole
+  range 0 <= lon < 360.  A latitude of 0 corresponds to the south pole
   (-90 degrees on a regular map), and 180 to the north pole (90
   degrees on a regular map).  A longitude of 0 corresponds to the
   prime meridian (0 degrees on a regular map), 180 to the
