@@ -282,7 +282,7 @@ GLuint Texture::name() const
 	    // Nope.  Create it.
 	    for (int i = 0; i < __defaultSize; i ++) {
 		for (int j = 0; j < __defaultSize; j++) {
-		    bool c = ((((i & 0x1) == 0) ^ ((j & 0x1)) == 0));
+		    bool c = (((i & 0x1) == 0) ^ ((j & 0x1) == 0));
 		    if (c) {
 			// Red square
 			__defaultImage[i][j][0] = 255;
