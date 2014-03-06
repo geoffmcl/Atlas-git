@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2012 Brian Schack
+  Copyright (C) 2012 - 2014 Brian Schack
 
   This file is part of Atlas.
 
@@ -1618,7 +1618,7 @@ static void __VORsAsString(vector<NAV *> &navs, int x,
 	// square of the distance.  But 'we' may be wrong.  To prevent
 	// divide-by-zero errors, we arbitrarily set 1 metre as the
 	// minimum distance.
-	double d = SG_MAX2(sgdDistanceVec3(p->cart, n->bounds.center), 1.0);
+	double d = SG_MAX2(sgdDistanceVec3(p->cart, n->bounds().center), 1.0);
 	double s = (double)n->range / d;
 	s *= s;
 
@@ -1752,7 +1752,8 @@ static void __ILSsAsString(vector<NAV *> &navs, int x,
 		// To prevent divide-by-zero errors, we arbitrarily
 		// set 1 metre as the minimum distance.
 		double d = 
-		    SG_MAX2(sgdDistanceSquaredVec3(p->cart, n->bounds.center), 
+		    SG_MAX2(sgdDistanceSquaredVec3(p->cart, 
+						   n->bounds().center), 
 			    1.0);
 		double s = (double)n->range * (double)n->range / d;
 		if ((chosen == NULL) || (s < weakest)) {
@@ -1790,7 +1791,8 @@ static void __ILSsAsString(vector<NAV *> &navs, int x,
 		}
 	    } else if (n->navtype == NAV_DME) {
 		dme = n;
-		d = sgdDistanceVec3(p->cart, dme->bounds.center) - dme->magvar;
+		d = sgdDistanceVec3(p->cart, 
+				    dme->bounds().center) - dme->magvar;
 	    }
 	}
 	str.appendf(" (%s", id->c_str());
@@ -1850,7 +1852,7 @@ static void __NDBsAsString(vector<NAV *> &navs, int x,
 	// square of the distance.  But 'we' may be wrong.  To prevent
 	// divide-by-zero errors, we arbitrarily set 1 metre as the
 	// minimum distance.
-	double d = SG_MAX2(sgdDistanceSquaredVec3(p->cart, n->bounds.center),
+	double d = SG_MAX2(sgdDistanceSquaredVec3(p->cart, n->bounds().center),
 			   1.0);
 	double s = (double)n->range * (double)n->range / d;
 
@@ -2858,90 +2860,112 @@ RenderDialog::~RenderDialog()
 int RenderDialog::_createStrings(AtlasWindow *aw)
 {
     int i = 0;
+    _strings[0] = NULL;
 
-    // Figure out our "global" menu entries - these are ones
-    // that don't depend on what's under the mouse.
-    
-    // EYE - we should probably choose by default the most reasonable
-    // option: (1) When there are unrendered maps, choose "render all
-    // unrendered maps", (2) When there are no unrendered maps, choose
-    // "render all tile/chunk maps", depending on which one is the
-    // smallest.
+    // Figure out our "global" menu entries - these are ones that
+    // don't depend on what's under the mouse.
     TileManager *tm = aw->ac()->tileManager();
-    int count = tm->tileCount(TileManager::DOWNLOADED);
-    if (count > 0) {
-	_rerenderAllStr.printf("Rerender all maps (%d)", count);
-	i = _addString(_rerenderAllStr.str(), AtlasWindow::RENDER_ALL, true, i);
-    }
-    count = tm->tileCount(TileManager::UNMAPPED);
-    if (count > 0) {
-	_renderAllStr.printf("Render all unrendered maps (%d)", count);
-	i = _addString(_renderAllStr.str(), AtlasWindow::RENDER_ALL, false, i);
+    int downloaded = tm->tileCount(TileManager::DOWNLOADED);
+    int unmapped = tm->tileCount(TileManager::UNMAPPED);
+    if (downloaded > 0) {
+	if (unmapped == downloaded) {
+	    // All downloaded maps are unmapped, so just offer to map
+	    // everything.
+	    _renderAllStr.printf("Render all maps (%d)", unmapped);
+	    _addString(_renderAllStr.str(), AtlasWindow::RENDER_ALL, false, 
+		       i++);
+	} else {
+	    if (unmapped > 0) {
+		_renderAllStr.printf("Render all unrendered maps (%d)", 
+				     unmapped);
+		_addString(_renderAllStr.str(), AtlasWindow::RENDER_ALL, false, 
+			   i++);
+	    }
+	    _rerenderAllStr.printf("Rerender all maps (%d)", downloaded);
+	    _addString(_rerenderAllStr.str(), AtlasWindow::RENDER_ALL, true, 
+		       i++);
+	}
     }
 
-    // If the current location isn't on the earth, return.
+    // If the current location isn't on the earth, we don't need to
+    // bother with chunks and tiles.
     if (!_currentLoc.coord().valid()) {
-	_strings[i] = NULL;
 	return i;
     }
 
     // If the current location is an empty scenery chunk, return.
     GeoLocation loc(_currentLoc.lat(), _currentLoc.lon(), true);
     if (tm->chunk(loc) == NULL) {
-	_strings[i] = NULL;
 	return i;
     }
 
     // Now add the chunk-level entries to the menu.
     Chunk *c = tm->chunk(loc);
     if (!c) {
-	_strings[i] = NULL;
 	return i;
     }
 
-    count = c->tileCount(TileManager::DOWNLOADED);
-    if (count > 0) {
-	_rerender10Str.printf("Rerender %s chunk maps (%d)", 
-			      c->name(), count);
-	i = _addString(_rerender10Str.str(), AtlasWindow::RENDER_10, true, i);
-    }
-    count = c->tileCount(TileManager::UNMAPPED);
-    if (count > 0) {
-	_render10Str.printf("Render all unrendered %s chunk maps (%d)", 
-			    c->name(), count);
-	i = _addString(_render10Str.str(), AtlasWindow::RENDER_10, false, i);
+    downloaded = c->tileCount(TileManager::DOWNLOADED);
+    unmapped = c->tileCount(TileManager::UNMAPPED);
+    if (downloaded > 0) {
+	if (unmapped == downloaded) {
+	    _render10Str.printf("Render all %s chunk maps (%d)", 
+				c->name(), unmapped);
+	    _addString(_render10Str.str(), AtlasWindow::RENDER_10, false, i++);
+	} else {
+	    if (unmapped > 0) {
+		_render10Str.printf("Render all unrendered %s chunk maps (%d)", 
+				    c->name(), unmapped);
+		_addString(_render10Str.str(), AtlasWindow::RENDER_10, false, 
+			   i++);
+	    }
+	    _rerender10Str.printf("Rerender %s chunk maps (%d)", 
+				  c->name(), downloaded);
+	    _addString(_rerender10Str.str(), AtlasWindow::RENDER_10, true, i++);
+	}
     }
 
-    // Now look at tile information.
+    // Now look at tile information.  Like chunks, return immediately
+    // if there's no tile at the current location, or if the tile has
+    // no scenery.
     Tile *t = c->tile(loc);
     if (!t || !t->hasScenery()) {
-	_strings[i] = NULL;
 	return i;
     }
 
-    if (t->maps().any()) {
-	_rerender1Str.printf("Rerender %s tile maps", Tile::name(loc));
-	i = _addString(_rerender1Str.str(), AtlasWindow::RENDER_1, true, i);
+    // Okay, the number of map levels isn't really a count of
+    // downloaded maps, but I just want to be consistent.
+    downloaded = t->mapLevels().count();
+    unmapped = t->missingMaps().count();
+    if (downloaded > 0) {
+	if (unmapped == downloaded) {
+	    _render1Str.printf("Render all %s tile maps", t->name());
+	    _addString(_render1Str.str(), AtlasWindow::RENDER_1, false, i++);
+	} else {
+	    if (unmapped > 0) {
+		_render1Str.printf("Render all unrendered %s tile maps", 
+				   t->name());
+		_addString(_render1Str.str(), AtlasWindow::RENDER_1, false, 
+			   i++);
+	    }
+	    _rerender1Str.printf("Rerender %s tile maps", Tile::name(loc));
+	    _addString(_rerender1Str.str(), AtlasWindow::RENDER_1, true, i++);
+	}
     }
-    if (t->missingMaps().any()) {
-	_render1Str.printf("Render all unrendered %s tile maps", t->name());
-	i = _addString(_render1Str.str(), AtlasWindow::RENDER_1, false, i);
-    }
-    _strings[i] = NULL;
 
     return i;
 }
 
 // EYE - this all seems very ugly; there must be a cleaner way to do
 // this
-int RenderDialog::_addString(const char *str, AtlasWindow::RenderType t, 
-			     bool force, int i)
+void RenderDialog::_addString(const char *str, AtlasWindow::RenderType t, 
+			      bool force, int i)
 {
     _strings[i] = str;
     _types[i] = t;
     _forces[i] = force;
 
-    return i + 1;
+    _strings[i + 1] = NULL;
 }
 
 puOneShot *RenderDialog::_makeButton(const char *label, int val, 
@@ -2990,7 +3014,8 @@ void Route::addPoint(SGGeod &p)
 void Route::deleteLastPoint()
 {
     // You'd think pop_back() would be smart enough to check for an
-    // empty vector, but it's not.
+    // empty vector, but it's not.  You have to wonder about STL
+    // sometimes.
     if (!_points.empty()) {
 	_points.pop_back();
     }

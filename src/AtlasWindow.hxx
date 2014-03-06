@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2012 Brian Schack
+  Copyright (C) 2012 - 2014 Brian Schack
 
   This is the main Atlas window.  It can draw itself and react to user
   input.  It handles the main window UI, and subsidiary UI's on the
@@ -797,8 +797,8 @@ class RenderDialog: public puDialogBox {
 
   protected:
     int _createStrings(AtlasWindow *aw);
-    int _addString(const char *str, AtlasWindow::RenderType t, bool force, 
-		   int i);
+    void _addString(const char *str, AtlasWindow::RenderType t, bool force, 
+		    int i);
     puOneShot *_makeButton(const char *label, int val, 
 			   puCallback cb, void *data);
 
