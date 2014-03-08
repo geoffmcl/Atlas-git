@@ -151,18 +151,16 @@ bool Searcher::findMatches(const string& str, const sgdVec3 centre,
 	_isPartial = false;
 
 	istringstream stream(str);
-	stream >> _aToken;
-	while (stream) {
+	while (!stream.eof()) {
+	    stream >> _aToken;
 	    // To determine if the current token is complete or not, we
 	    // just see if we've gone to the end of the stream.  If we're
 	    // at the very end, then the current token is incomplete.
-	    unsigned int loc = stream.tellg();
-	    if (loc == str.length()) {
+	    if (stream.eof()) {
 		_partialSearchToken = _aToken;
 	    } else {
 		_completeSearchTokens.push_back(_aToken);
 	    }
-	    stream >> _aToken;
 	}
 
 	// Now grab a search token.  It doesn't really matter which
