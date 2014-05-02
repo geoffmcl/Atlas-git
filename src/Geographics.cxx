@@ -293,39 +293,46 @@ void GreatCircle::_Segment::_prune()
 // AtlasCoord
 //////////////////////////////////////////////////////////////////////
 
-AtlasCoord::AtlasCoord(): _geodValid(false), _cartValid(false)
+AtlasCoord::AtlasCoord()
 {
+    invalidate();
 }
 
-AtlasCoord::AtlasCoord(double lat, double lon, double elev): 
-    _cartValid(false)
+AtlasCoord::AtlasCoord(double lat, double lon, double elev)
 {
+    invalidate();
     set(lat, lon, elev);
 }
 
-AtlasCoord::AtlasCoord(SGGeod& geod): _cartValid(false)
+AtlasCoord::AtlasCoord(SGGeod& geod)
 {
+    invalidate();
     set(geod);
 }
 
-AtlasCoord::AtlasCoord(SGVec3<double>& cart): _geodValid(false)
+AtlasCoord::AtlasCoord(SGVec3<double>& cart)
 {
+    invalidate();
     set(cart);
 }
 
-AtlasCoord::AtlasCoord(sgdVec3 cart): _geodValid(false)
+AtlasCoord::AtlasCoord(sgdVec3 cart)
 {
+    invalidate();
     set(cart);
 }
 
 bool AtlasCoord::valid() const
 {
-    return (_geodValid || _cartValid);
+    return (_geodValid() || _cartValid());
 }
 
 void AtlasCoord::invalidate()
 {
-    _geodValid = _cartValid = false;
+    // Internally, an invalid geodetic coordinate has a NaN latitude,
+    // while an invalide cartesian coordinate has a NaN x value.
+    _geod.setLatitudeDeg(nan(0));
+    _cart.x() = nan(0);
 }
 
 const SGGeod& AtlasCoord::geod()
@@ -333,7 +340,7 @@ const SGGeod& AtlasCoord::geod()
     if (!valid()) {
 	throw std::runtime_error("invalid AtlasCoord");
     }
-    if (!_geodValid) {
+    if (!_geodValid()) {
 	_cartToGeod();
     }
     return _geod;
@@ -359,7 +366,7 @@ const SGVec3<double>& AtlasCoord::cart()
     if (!valid()) {
 	throw std::runtime_error("invalid AtlasCoord");
     }
-    if (!_cartValid) {
+    if (!_cartValid()) {
 	_geodToCart();
     }
     return _cart;
@@ -387,47 +394,52 @@ double AtlasCoord::z()
 
 void AtlasCoord::set(double lat, double lon, double elev)
 {
+    invalidate();
     _geod.setLatitudeDeg(lat);
     _geod.setLongitudeDeg(lon);
     _geod.setElevationM(elev);
-    _geodValid = true;
-    _cartValid = false;
 }
 
 void AtlasCoord::set(const SGGeod& geod)
 {
+    invalidate();
     _geod = geod;
-    _geodValid = true;
-    _cartValid = false;
 }
 
 void AtlasCoord::set(const SGVec3<double>& cart)
 {
+    invalidate();
     _cart = cart;
-    _cartValid = true;
-    _geodValid = false;
 }
 
 void AtlasCoord::set(const sgdVec3 cart)
 {
+    invalidate();
     _cart[0] = cart[0];
     _cart[1] = cart[1];
     _cart[2] = cart[2];
-    _cartValid = true;
-    _geodValid = false;
 }
 
 void AtlasCoord::_cartToGeod()
 {
-    assert(_cartValid && !_geodValid);
+    assert(_cartValid() && !_geodValid());
     SGGeodesy::SGCartToGeod(_cart, _geod);
-    _geodValid = true;
 }
 
 void AtlasCoord::_geodToCart()
 {
-    assert(_geodValid && !_cartValid);
+    assert(_geodValid() && !_cartValid());
     SGGeodesy::SGGeodToCart(_geod, _cart);
-    _cartValid = true;
 }
 
+bool AtlasCoord::_geodValid() const
+{
+    // Note: this has to agree with the value set in invalidate()!
+    return !isnan(_geod.getLatitudeDeg());
+}
+
+bool AtlasCoord::_cartValid() const
+{
+    // Note: this has to agree with the value set in invalidate()!
+    return !isnan(_cart.x());
+}

@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2012 Brian Schack
+  Copyright (C) 2009 - 2014 Brian Schack
 
   Some useful routines for scribbling on the earth.
 
@@ -225,11 +225,14 @@ class AtlasCoord {
     void _cartToGeod();
     void _geodToCart();
 
+    // These return true if the geodetic or the cartesian coordinates
+    // are valid, respectively.
+    bool _geodValid() const;
+    bool _cartValid() const;
+
     // Our data.
     SGGeod _geod;
-    bool _geodValid;
     SGVec3<double> _cart;
-    bool _cartValid;
 };
 
 #endif
