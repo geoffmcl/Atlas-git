@@ -44,7 +44,10 @@ bool Bucket::polygonEdges = false;
 
 // EYE - should we make this nan()/nanl()/nanf() and have an isNanE()
 // function (which is just isnan())?  Note that we can't do simple
-// comparisons with NaNs - the results are always false.
+// comparisons with NaNs - the results are always false.  Note as well
+// that instead of the C++ constants, we can use C constants (FLT_MAX,
+// DBL_MAX, ....  See 'man float' for a list.  See as well 'man 3
+// math' for a bunch of useful functions and constants).
 const float Bucket::NanE = -numeric_limits<float>::max();
 
 // EYE - chunk? tile? bucket?  In newbucket.hxx, it seems that a 1x1
