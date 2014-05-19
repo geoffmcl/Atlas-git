@@ -300,25 +300,21 @@ AtlasCoord::AtlasCoord()
 
 AtlasCoord::AtlasCoord(double lat, double lon, double elev)
 {
-    invalidate();
     set(lat, lon, elev);
 }
 
 AtlasCoord::AtlasCoord(SGGeod& geod)
 {
-    invalidate();
     set(geod);
 }
 
 AtlasCoord::AtlasCoord(SGVec3<double>& cart)
 {
-    invalidate();
     set(cart);
 }
 
 AtlasCoord::AtlasCoord(sgdVec3 cart)
 {
-    invalidate();
     set(cart);
 }
 
