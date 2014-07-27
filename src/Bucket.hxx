@@ -81,7 +81,6 @@ public:
     double maximumElevation() const { return _maxElevation; }
 
     void paletteChanged();
-    void discreteContoursChanged();
 
     void draw();
 

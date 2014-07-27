@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2013 Brian Schack
+  Copyright (C) 2009 - 2014 Brian Schack
 
   This file is part of Atlas.
 
@@ -30,22 +30,251 @@
 using namespace std;
 using namespace tr1;
 
+template <class T>
+const size_t VBO<T>::NaRS = std::numeric_limits<size_t>::max();
+
+template <class T>
+VBO<T>::VBO(): _name(0), _size(0)
+{
+}
+
+template <class T>
+VBO<T>::~VBO()
+{
+    if (_name != 0) {
+	glDeleteBuffers(1, &_name);
+	_name = 0;
+    }
+    _size = 0;
+}
+
+template <class T>
+// EYE - pass in usage hint?  Make it part of constructor?
+void VBO<T>::upload(GLenum target)
+{
+    _size = vector<T>::size();
+
+    if (_size == 0) {
+	// We refuse to create zero-length VBOs.  Note that this
+	// renders inaccessible any existing data on the GPU for this
+	// VBO (at least using the methods in this class).  If you
+	// want to erase the data on the GPU and locally, delete this
+	// object.
+	return;
+    }
+
+    if (_name == 0) {
+	glGenBuffers(1, &_name);
+    }
+
+    glBindBuffer(target, _name);
+    glBufferData(target, sizeof(T) * _size, vector<T>::data(), GL_STATIC_DRAW);
+
+    vector<T>::clear();
+}
+
+template <class T>
+void VBO<T>::download(GLenum target, size_t rawSize)
+{
+    if (!uploaded()) {
+	// Note that download() will not overwrite whatever's in the
+	// local vector if nothing's been uploaded.
+	return;
+    }
+
+    if ((rawSize == NaRS) || (rawSize > _size)) {
+	rawSize = _size;
+    }
+
+    T *ptr;
+    glBindBuffer(target, _name);
+    ptr = (T *)glMapBuffer(target, GL_READ_ONLY);
+    assert(ptr);
+    for (size_t i = 0; i < rawSize; i++) {
+	vector<T>::push_back(ptr[i]);
+    }
+    // EYE - check return value?
+    glUnmapBuffer(target);
+
+    // Indicate that we have been unloaded.
+    _size = 0;
+}
+
+template <class T>
+void VBO<T>::clear(bool deleteVBO)
+{
+    _size = 0;
+    vector<T>::clear();
+    if (deleteVBO && (_name != 0)) {
+	glDeleteBuffers(1, &_name);
+	_name = 0;
+    }
+}
+
+template <class T>
+bool VBO<T>::uploaded()
+{
+    return (_size > 0);
+}
+
+void AttributeVBO::enable(GLenum cap)
+{
+    glEnableClientState(cap);
+}
+
+void AttributeVBO::disable(GLenum cap)
+{
+    glDisableClientState(cap);
+}
+
+void AttributeVBO::stage()
+{
+    if (!uploaded()) {
+	if (size() == 0) {
+	    return;
+	}
+	upload(GL_ARRAY_BUFFER);
+    }
+    glBindBuffer(GL_ARRAY_BUFFER, _name);
+}
+
+void AttributeVBO::download(size_t rawSize)
+{
+    VBO<GLfloat>::download(GL_ARRAY_BUFFER, rawSize);
+}
+
+void VertexVBO::enable()
+{
+    AttributeVBO::enable(GL_VERTEX_ARRAY);
+}
+
+void VertexVBO::disable()
+{
+    AttributeVBO::disable(GL_VERTEX_ARRAY);
+}
+
+void VertexVBO::push_back(sgVec3 &v)
+{
+    vector<GLfloat>::push_back(v[0]);
+    vector<GLfloat>::push_back(v[1]);
+    vector<GLfloat>::push_back(v[2]);
+}
+
+void VertexVBO::stage()
+{
+    AttributeVBO::stage();
+    glVertexPointer(3, GL_FLOAT, 0, 0);
+    enable();
+}
+
+void NormalVBO::enable()
+{
+    AttributeVBO::enable(GL_NORMAL_ARRAY);
+}
+
+void NormalVBO::disable()
+{
+    AttributeVBO::disable(GL_NORMAL_ARRAY);
+}
+
+void NormalVBO::push_back(sgVec3 &v)
+{
+    vector<GLfloat>::push_back(v[0]);
+    vector<GLfloat>::push_back(v[1]);
+    vector<GLfloat>::push_back(v[2]);
+}
+
+void NormalVBO::stage()
+{
+    AttributeVBO::stage();
+    glNormalPointer(GL_FLOAT, 0, 0);
+    enable();
+}
+
+void ColourVBO::enable()
+{
+    AttributeVBO::enable(GL_COLOR_ARRAY);
+}
+
+void ColourVBO::disable()
+{
+    AttributeVBO::disable(GL_COLOR_ARRAY);
+}
+
+void ColourVBO::push_back(sgVec4 &v)
+{
+    vector<GLfloat>::push_back(v[0]);
+    vector<GLfloat>::push_back(v[1]);
+    vector<GLfloat>::push_back(v[2]);
+    vector<GLfloat>::push_back(v[3]);
+}
+
+void ColourVBO::stage()
+{
+    AttributeVBO::stage();
+    glColorPointer(4, GL_FLOAT, 0, 0);
+    enable();
+}
+
+void IndexVBO::draw(GLenum mode)
+{
+    if (!uploaded()) {
+	if (size() == 0) {
+	    return;
+	}
+	upload(GL_ELEMENT_ARRAY_BUFFER);
+    }
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _name);
+    glDrawElements(mode, _size, GL_UNSIGNED_INT, 0);
+}
+
+void IndexVBO::download(size_t rawSize)
+{
+    VBO<GLuint>::download(GL_ELEMENT_ARRAY_BUFFER, rawSize);
+}
+
+void TrianglesVBO::draw()
+{
+    IndexVBO::draw(GL_TRIANGLES);
+}
+
+void TrianglesVBO::push_back(GLuint i0, GLuint i1, GLuint i2)
+{
+    vector<GLuint>::push_back(i0);
+    vector<GLuint>::push_back(i1);
+    vector<GLuint>::push_back(i2);
+}
+
+void LinesVBO::draw()
+{
+    IndexVBO::draw(GL_LINES);
+}
+
+void LinesVBO::push_back(GLuint i0, GLuint i1)
+{
+    vector<GLuint>::push_back(i0);
+    vector<GLuint>::push_back(i1);
+}
+
 Subbucket::Subbucket(const SGPath &p): 
-    _path(p), _loaded(false), _palettized(false),
-    _materialsDL(0), _contoursDL(0), _contourLinesDL(0), 
-    _polygonEdgesDL(0), _size(0)
+    _path(p), _loaded(false), _palettized(false), _rawSize(0), _bytes(0)
 {
 }
 
 Subbucket::~Subbucket()
 {
-    unload();
 }
 
 bool Subbucket::load(Bucket::Projection projection)
 {
-    // Clear out whatever was there first.
-    unload();
+    // Start with a clean slate.
+    _vertices.clear();
+    _normals.clear();
+    _elevations.clear();
+    _triangles.clear();
+    _loaded = false;
+    _palettized = false;
 
     // A BTG file contains a bunch of points in 3D cartesian space,
     // where the origin is at the centre of the earth, the X axis goes
@@ -112,6 +341,7 @@ bool Subbucket::load(Bucket::Projection projection)
     SGBinObject btg;
     if (!btg.read_bin(_path.c_str())) {
 	// EYE - throw an error?
+	// EYE - will the cache continue to call load() then?
 	return false;
     }
 
@@ -209,6 +439,7 @@ bool Subbucket::load(Bucket::Projection projection)
     	// Now convert the point using the given projection.
 	if (projection == Bucket::CARTESIAN) {
 	    // This is a true 3D rendering.
+	    // EYE - we go from doubles back to floats.  Wise?
 	    _vertices[index] = node[0];
 	    _vertices[index + 1] = node[1];
 	    _vertices[index + 2] = node[2];
@@ -247,29 +478,26 @@ bool Subbucket::load(Bucket::Projection projection)
     // don't seem to be limited to any particular kind of feature
     // (water, railroad, etc).  They also occur in Scenery 1.0, but
     // very rarely, and only in airports.
-    _triangles.clear();
 
     // Triangles
     const string_list &tri_materials = btg.get_tri_materials();
     for (size_t i = 0; i < btg.get_tris_v().size(); i++) {
     	const int_list &oldTris = tris[i];
-    	vector<GLuint> &newTris = _triangles[tri_materials[i]];
+    	TrianglesVBO &newTris = _triangles[tri_materials[i]];
     	for (size_t j = 0; j < oldTris.size(); j += 3) {
     	    int i0 = oldTris[j], i1 = oldTris[j + 1], i2 = oldTris[j + 2];
 	    // Check for zero-area triangle.
     	    if ((i0 == i1) || (i1 == i2) || (i2 == i0)) {
     		continue;
     	    }
-    	    newTris.push_back(i0);
-    	    newTris.push_back(i1);
-    	    newTris.push_back(i2);
+    	    newTris.push_back(i0, i1, i2);
     	}
     }
     // Strips
     const string_list &strip_materials = btg.get_strip_materials();
     for (size_t i = 0; i < btg.get_strips_v().size(); i++) {
     	const int_list &oldStrips = strips[i];
-    	vector<GLuint> &newTris = _triangles[strip_materials[i]];
+    	TrianglesVBO &newTris = _triangles[strip_materials[i]];
     	for (size_t j = 0; j < oldStrips.size() - 2; j++) {
     	    int i0 = oldStrips[j], i1 = oldStrips[j + 1], i2 = oldStrips[j + 2];
 	    // Check for zero-area triangle.
@@ -277,13 +505,9 @@ bool Subbucket::load(Bucket::Projection projection)
     		continue;
     	    }
     	    if (j % 2 == 0) {
-    		newTris.push_back(i0);
-    		newTris.push_back(i1);
-    		newTris.push_back(i2);
+    		newTris.push_back(i0, i1, i2);
     	    } else {
-    		newTris.push_back(i1);
-    		newTris.push_back(i0);
-    		newTris.push_back(i2);
+    		newTris.push_back(i1, i0, i2);
     	    }
     	}
     }
@@ -291,7 +515,7 @@ bool Subbucket::load(Bucket::Projection projection)
     const string_list &fan_materials = btg.get_fan_materials();
     for (size_t i = 0; i < btg.get_fans_v().size(); i++) {
     	const int_list &oldFans = fans[i];
-    	vector<GLuint> &newTris = _triangles[fan_materials[i]];
+    	TrianglesVBO &newTris = _triangles[fan_materials[i]];
     	int i0 = oldFans[0];
     	for (size_t j = 1; j < oldFans.size() - 1; j++) {
     	    int i1 = oldFans[j], i2 = oldFans[j + 1];
@@ -299,15 +523,32 @@ bool Subbucket::load(Bucket::Projection projection)
     	    if ((i0 == i1) || (i1 == i2) || (i2 == i0)) {
     		continue;
     	    }
-    	    newTris.push_back(i0);
-    	    newTris.push_back(i1);
-    	    newTris.push_back(i2);
+    	    newTris.push_back(i0, i1, i2);
     	}
     }
     
     // Record the "base" size - the number of raw vertices.
-    _size = _vertices.size() / 3;
+    _rawSize = _vertices.size() / 3;
     
+    // Calculate our loaded size.  Note that this ignores the extra
+    // stuff created when we contour chop, so is merely an
+    // approximation.  First, vertices and normals.
+    _bytes = _rawSize * sizeof(sgVec3) * 2;
+
+    // Elevations.
+    _bytes += _rawSize * sizeof(float);
+
+    // Triangles (we ignore the string keys).
+    map<string, TrianglesVBO>::const_iterator i;
+    for (i = _triangles.begin(); i != _triangles.end(); i++) {
+	const TrianglesVBO &tris = i->second;
+	_bytes += tris.size() * sizeof(GLuint);
+    }
+
+    // Elevation indices and colours.
+    _bytes += _rawSize * sizeof(int);
+    _bytes += _rawSize * sizeof(float) * 4;
+
     _loaded = true;
 
     return true;
@@ -315,74 +556,70 @@ bool Subbucket::load(Bucket::Projection projection)
 
 void Subbucket::unload()
 {
-    _vertices.clear();
-    _normals.clear();
+    if (!_loaded) {
+	// Nothing to do;
+	assert(!_palettized);
+	return;
+    } 
+
+    // When we're asked to unload, we need to actually get rid of
+    // stuff - we're being asked to release resources.  So we shrink
+    // ourselves down as much as possible.  We also need to delete
+    // buffers on the GPU, so we clear the VBOs with the deleteVBO
+    // flag set to true (VBOs that are deleted when the _triangles map
+    // and _contours vector are cleared will also be deleted in their
+    // destructors).
+    _vertices.clear(true);
+    _normals.clear(true);
     _elevations.clear();
+
+    _triangles.clear();
+
     _elevationIndices.clear();
+    _colours.clear(true);
 
-    glDeleteLists(_materialsDL, 1);
-    _materialsDL = 0;
-    glDeleteLists(_contoursDL, 1);
-    _contoursDL = 0;
-    glDeleteLists(_contourLinesDL, 1);
-    _contourLinesDL = 0;
-    glDeleteLists(_polygonEdgesDL, 1);
-    _polygonEdgesDL = 0;
+    _materials.clear();
 
+    _contours.clear();
+    _contourLines.clear(true);
+
+    _palettized = false;
     _loaded = false;
 }
 
-// The (very) approximate size of the subbucket, in bytes.  Basically
-// we return the base size of the _vertices, _normals, _elevations,
-// _triangles, _elevationIndices, and _colours vectors, *ignoring* the
-// extra stuff created by contour chopping.
-unsigned int Subbucket::size()
-{
-    unsigned int result = 0;
-
-    // Vertices and normals.
-    result += _size * sizeof(sgVec3) * 2;
-
-    // Elevations.
-    result += _size * sizeof(float);
-
-    // Triangles (we ignore the string keys).
-    map<string, vector<GLuint> >::const_iterator i;
-    for (i = _triangles.begin(); i != _triangles.end(); i++) {
-	const vector<GLuint> &tris = i->second;
-	result += tris.size() * sizeof(GLuint);
-    }
-
-    // Elevation indices and colours.
-    result += _size * sizeof(int);
-    result += _size * sizeof(float) * 4;
-
-    return result;
-}
-
-// Called to notify us that the palette in Bucket::palette has
-// changed.  We need to delete the display lists that depend on the
-// palette (that's all of them except _polygonEdgesDL) and flag that
-// we need to re-palettize.
 void Subbucket::paletteChanged() 
 {
-    glDeleteLists(_materialsDL, 1);
-    _materialsDL = 0;
-    glDeleteLists(_contoursDL, 1);
-    _contoursDL = 0;
-    glDeleteLists(_contourLinesDL, 1);
-    _contourLinesDL = 0;
+    if (!_palettized) {
+	return;
+    }
 
+    // If we've palettized the scenery, then we'll have a bunch of
+    // vertex buffer objects that need to be deleted.  But some of
+    // this data (_vertices, _normals and _triangles) we'll need when
+    // we process the new palette, so we need to grab it back from the
+    // GPU before we delete it.
+
+    // Get the vertices, ignoring the extra ones creating by contour
+    // chopping.
+    _vertices.download(_rawSize * 3);
+
+    // Normals.
+    _normals.download(_rawSize * 3);
+
+    // Triangles.
+    for (map<string, TrianglesVBO>::iterator i = _triangles.begin(); 
+	 i != _triangles.end();
+	 i++) {
+	TrianglesVBO &indices = i->second;
+	indices.download();
+    }
+
+    // Resize the elevations vector to match the restored vertices and
+    // normals vectors.
+    _elevations.resize(_rawSize);
+
+    // We are now officially de-palettized.
     _palettized = false;
-}
-
-// Called to notify us that Bucket::discreteContours has changed.  We
-// need to delete the contours display list (but not the materials or
-// contour lines display lists).
-void Subbucket::discreteContoursChanged() 
-{
-    glDeleteLists(_contoursDL, 1);
-    _contoursDL = 0;
 }
 
 // This is a helper routine for the load() method.  For each unique
@@ -437,55 +674,53 @@ void Subbucket::_massageIndices(const group_list &vertices,
 // triangle has no material, and so is coloured according to its
 // elevation.  This routine does that colouring (or rather, does all
 // the calculations and sets up the arrays, which are then used by
-// draw() to do the actual drawing).
+// draw() to do the actual drawing).  There is one exception - it
+// doesn't fill the _colours vector/VBO.  We assume that most people
+// won't use smooth colouring; by not calculating colours we save some
+// time and a fair bit of space (20%).  We also assume that palette
+// changes will be rare.
 //
-// In the case of (2), we may need to subdivide the triangle if it
-// spans a contour line.  Thus, "palettizing" may result in extra
-// triangles (and therefore extra vertices, normals, and elevations).
+// Note that in the case of contour colouring, we may need to
+// subdivide the triangle if it spans a contour line.  Thus,
+// "palettizing" may result in extra triangles (and therefore extra
+// vertices, normals, and elevations).
+//
+// Whenever _palettize is called, we assume _vertices, _normals,
+// _elevations, and _triangles are correctly initialized with the
+// "base" data as loaded from the scenery file (before any
+// palettization has taken place).
 void Subbucket::_palettize()
 {
-    // Because we've loaded a new palette, we have to get rid of all
-    // the extra vertices (and their normals, elevations, ...) created
-    // by contour slicing.  The "base" data (directly loaded from the
-    // file) remains valid however.
-    _vertices.resize(_size * 3);
-    _normals.resize(_size * 3);
-    _elevations.resize(_size);
-
-    // Elevation indices and colours don't remain valid - they depend
-    // on the palette.
+    // Reset the data structures that palettization modifies.
     _elevationIndices.clear();
     _colours.clear();
-    for (unsigned int i = 0; i < _elevations.size(); i++) {
-	// Note that it isn't strictly necessary to calculate these
-	// for all vertices - we only need to do it for vertices that
-	// are parts of "contour" objects (objects coloured according
-	// to elevation).  But this is easier to write.
-	_elevationIndices.push_back(Bucket::palette->contourIndex(_elevations[i]));
-	sgVec4 colour;
-	Bucket::palette->smoothColour(_elevations[i], colour);
-	_colours.push_back(colour[0]);
-	_colours.push_back(colour[1]);
-	_colours.push_back(colour[2]);
-	_colours.push_back(colour[3]);
-    }
-
-    // Now start slicing and dicing.
     _materials.clear();
     _contours.clear();
-    _contours.resize(Bucket::palette->size());
     _contourLines.clear();
+
+    // Initialize our elevation indices (more will be added later as
+    // we contour chop).
+    for (unsigned int i = 0; i < _elevations.size(); i++) {
+    	// Note that it isn't strictly necessary to calculate these
+    	// for all vertices - we only need to do it for vertices that
+    	// are parts of "contour" objects (objects coloured according
+    	// to elevation).  But this is easier to write.
+    	_elevationIndices.push_back(Bucket::palette->contourIndex(_elevations[i]));
+    }
+
+    // Create a contour VBO for each contour interval.
+    _contours.resize(Bucket::palette->size());
 
     // Look at our triangles, material by material.  If the material
     // is listed in the palette (ie, those triangles are to be
     // coloured according to the material colour), then just record
     // the material.  If the triangles are to be coloured by
     // elevation, then we need to chop them up.
-    for (map<string, vector<GLuint> >::const_iterator i = _triangles.begin();
+    for (map<string, TrianglesVBO>::const_iterator i = _triangles.begin();
 	 i != _triangles.end();
 	 i++) {
 	const string &material = i->first;
-	const vector<GLuint> &tris = i->second;
+	const TrianglesVBO &tris = i->second;
 	if (Bucket::palette->colour(material.c_str()) != NULL) {
 	    _materials.insert(material);
 	} else {
@@ -498,8 +733,7 @@ void Subbucket::_palettize()
     // to the _contourLines vector.
     unordered_set<pair<int, int>, PairHash>::const_iterator i;
     for (i = _edgeContours.begin(); i != _edgeContours.end(); i++) {
-	_contourLines.push_back(i->first);
-	_contourLines.push_back(i->second);
+	_contourLines.push_back(i->first, i->second);
     }
     _edgeContours.clear();
 
@@ -517,157 +751,82 @@ void Subbucket::draw()
 	_palettize();
     }
 
-    // Tell OpenGL where our data is.
-    glVertexPointer(3, GL_FLOAT, 0, _vertices.data());
-    glNormalPointer(GL_FLOAT, 0, _normals.data());
-    glColorPointer(4, GL_FLOAT, 0, _colours.data());
+    glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT); {
+	// Tell OpenGL where our data is.
+	_vertices.stage();
+	_normals.stage();
 
-    // Now create the display lists.
-    // ---------- Materials ----------
-    if (_materialsDL == 0) {
-	_materialsDL = glGenLists(1);
-	assert(_materialsDL != 0);
+	// Just in case a colour array is still enabled, disable it
+	// explicitly.
+	ColourVBO::disable();
 
-	glNewList(_materialsDL, GL_COMPILE);
-	glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT); {
-	    glEnableClientState(GL_VERTEX_ARRAY);
-	    glEnableClientState(GL_NORMAL_ARRAY);
-	    glDisableClientState(GL_COLOR_ARRAY);
+	// ---------- Materials ----------
+	// Draw the "material" objects (ie, objects coloured based on
+	// their material, not elevation).  Note that we assume that
+	// glColorMaterial() has been called.
+	for (set<string>::const_iterator i = _materials.begin();
+	     i != _materials.end();
+	     i++) {
+	    const string &material = *i;
+	    TrianglesVBO &indices = _triangles[material];
 
-	    // Draw the "material" objects (ie, objects coloured based on
-	    // their material, not elevation).  Note that we assume that
-	    // glColorMaterial() has been called.
-	    for (set<string>::const_iterator i = _materials.begin();
-		 i != _materials.end();
-		 i++) {
-		const string &material = *i;
-		vector<GLuint> &triangles = _triangles[material];
-		if (!triangles.empty()) {
-		    glColor4fv(Bucket::palette->colour(material.c_str()));
-		    glDrawElements(GL_TRIANGLES, triangles.size(),
-				   GL_UNSIGNED_INT, triangles.data());
+	    glColor4fv(Bucket::palette->colour(material.c_str()));
+	    indices.draw();
+	}
+
+	// ---------- Contours ----------
+	if (!Bucket::discreteContours) {
+	    // We delay calculating smooth colour information as long
+	    // as possible.
+	    if (!_colours.uploaded()) {
+		for (unsigned int i = 0; i < _elevations.size(); i++) {
+		    // EYE - we should be able to do this in a shader
+		    sgVec4 colour;
+		    Bucket::palette->smoothColour(_elevations[i], colour);
+		    _colours.push_back(colour);
 		}
 	    }
+	    _colours.stage();
 	}
-	glPopClientAttrib();
-	glEndList();
-    }
-
-    // ---------- Contours ----------
-    if (_contoursDL == 0) {
-	_contoursDL = glGenLists(1);
-	assert(_contoursDL != 0);
-
-	glNewList(_contoursDL, GL_COMPILE);
-	glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT); {
-	    glEnableClientState(GL_VERTEX_ARRAY);
-	    glEnableClientState(GL_NORMAL_ARRAY);
-
-	    // Draw "contours" objects (ie, objects coloured based on
-	    // their elevation).
-
-	    // EYE - we could also generate two display lists - one
-	    // for discrete contours, the other for smoothed contours,
-	    // but this seems like overkill.
+	for (size_t i = 0; i < _contours.size(); i++) {
+	    TrianglesVBO &indices = _contours[i];
 	    if (Bucket::discreteContours) {
-		glDisableClientState(GL_COLOR_ARRAY);
-	    } else {
-		glEnableClientState(GL_COLOR_ARRAY);
+		glColor4fv(Bucket::palette->contourAtIndex(i).colour);
 	    }
-	    for (size_t i = 0; i < _contours.size(); i++) {
-		if (Bucket::discreteContours) {
-		    glColor4fv(Bucket::palette->contourAtIndex(i).colour);
-		}
-	
-		int_list& indices = _contours[i];
-		if (!indices.empty()) {
-		    glDrawElements(GL_TRIANGLES, indices.size(), 
-				   GL_UNSIGNED_INT, indices.data());
+	    indices.draw();
+	}
+
+	// ---------- Contour lines ----------
+	NormalVBO::disable();
+	ColourVBO::disable();
+	if (Bucket::contourLines) {
+	    glPushAttrib(GL_LINE_BIT | GL_CURRENT_BIT | GL_DEPTH_BUFFER_BIT); {
+		glDisable(GL_DEPTH_TEST);
+		glLineWidth(0.5);
+		glColor4f(0.0, 0.0, 0.0, 1.0);
+		_contourLines.draw();
+	    }
+	    glPopAttrib();
+	}
+
+        // ---------- Polygon edges ----------
+	if (Bucket::polygonEdges) {
+	    glPushAttrib(GL_LINE_BIT | GL_POLYGON_BIT | GL_CURRENT_BIT | 
+			 GL_DEPTH_BUFFER_BIT); {
+		glDisable(GL_DEPTH_TEST);
+		glPolygonMode(GL_FRONT, GL_LINE);
+		glLineWidth(0.5);
+		glColor4f(1.0, 0.0, 0.0, 1.0);
+		map<string, TrianglesVBO>::iterator i;
+		for (i = _triangles.begin(); i != _triangles.end(); i++) {
+		    TrianglesVBO &indices = i->second;
+		    indices.draw();
 		}
 	    }
+	    glPopAttrib();
 	}
-	glPopClientAttrib();
-	glEndList();
     }
-
-    // ---------- Contour lines ----------
-    // Contour lines and especially polygon edges are probably used
-    // rarely, so only create display lists for them if explicitly
-    // asked and we actually have some.
-    if ((_contourLinesDL == 0) && Bucket::contourLines && 
-    	!_contourLines.empty()) {
-	_contourLinesDL = glGenLists(1);
-	assert(_contourLinesDL != 0);
-
-	glNewList(_contourLinesDL, GL_COMPILE);
-	glPushAttrib(GL_LINE_BIT | GL_CURRENT_BIT);
-	glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT); {
-	    glEnableClientState(GL_VERTEX_ARRAY);
-	    glDisableClientState(GL_NORMAL_ARRAY);
-	    glDisableClientState(GL_COLOR_ARRAY);
-
-	    glLineWidth(0.5);
-	    glColor4f(0.0, 0.0, 0.0, 1.0);
-	    glDrawElements(GL_LINES, _contourLines.size(), GL_UNSIGNED_INT,
-	    		   _contourLines.data());
-	}
-	glPopClientAttrib();
-	glPopAttrib();
-	glEndList();
-    }
-
-    // ---------- Polygon edges ----------
-    if ((_polygonEdgesDL == 0) && Bucket::polygonEdges) {
-    	_polygonEdgesDL = glGenLists(1);
-    	assert(_polygonEdgesDL != 0);
-
-    	glNewList(_polygonEdgesDL, GL_COMPILE);
-    	glPushAttrib(GL_LINE_BIT | GL_POLYGON_BIT | GL_CURRENT_BIT);
-    	glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT); {
-    	    glEnableClientState(GL_VERTEX_ARRAY);
-    	    glDisableClientState(GL_NORMAL_ARRAY);
-    	    glDisableClientState(GL_COLOR_ARRAY);
-
-    	    glPolygonMode(GL_FRONT, GL_LINE);
-    	    glLineWidth(0.5);
-    	    glColor4f(1.0, 0.0, 0.0, 1.0);
-    	    map<string, vector<GLuint> >::const_iterator i;
-    	    for (i = _triangles.begin(); i != _triangles.end(); i++) {
-    		const vector<GLuint> &triangles = i->second;
-    		if (!triangles.empty()) {
-    		    glDrawElements(GL_TRIANGLES, triangles.size(),
-    				   GL_UNSIGNED_INT, triangles.data());
-    		}
-    	    }
-    	}
-    	glPopClientAttrib();
-    	glPopAttrib();
-    	glEndList();
-    }
-
-    // Materials
-    glCallList(_materialsDL);
-
-    // Contours
-    glCallList(_contoursDL);
-
-    // Contour lines
-    if (Bucket::contourLines && _contourLinesDL) {
-	glPushAttrib(GL_DEPTH_BUFFER_BIT); {
-	    glDisable(GL_DEPTH_TEST);
-	    glCallList(_contourLinesDL);
-	}
-	glPopAttrib();
-    }
-
-    // Polygon edges
-    if (Bucket::polygonEdges && _polygonEdgesDL) {
-	glPushAttrib(GL_DEPTH_BUFFER_BIT); {
-	    glDisable(GL_DEPTH_TEST);
-	    glCallList(_polygonEdgesDL);
-	}
-	glPopAttrib();
-    }
+    glPopClientAttrib();
 }
 
 // Takes a vector representing a series of triangles (ie, GL_TRIANGLES
@@ -680,10 +839,10 @@ void Subbucket::_chopTriangles(const vector<GLuint> &triangles)
 }
 
 // Chops up the given triangle along contour lines.  This will result
-// in new vertices, normals, colours, elevations, and elevation
-// indices being added to _vertices, _normals, _colours, _elevations,
-// and _elevationIndices, and triangles being added to _contours.
-// Also, we add contour line segments to _contourLines.
+// in new vertices, normals, elevations, and elevation indices being
+// added to _vertices, _normals, _elevations, and _elevationIndices,
+// and triangles being added to _contours.  Also, we add contour line
+// segments to _contourLines.
 void Subbucket::_chopTriangle(int i0, int i1, int i2)
 {
     // It's very important to keep the number of new vertices (and
@@ -776,8 +935,7 @@ void Subbucket::_chopTriangle(int i0, int i1, int i2)
     for (; i0i1.second > 0; i0i1.second--, i0i2.second--) {
 	// These two points cut through the triangle, creating a
 	// contour line.
-	_contourLines.push_back(i0i1.first);
-	_contourLines.push_back(i0i2.first);
+	_contourLines.push_back(i0i1.first, i0i2.first);
 
 	// Add the two points to the previously existing ones.  This
 	// will create a slice through the triangle at one contour
@@ -791,8 +949,7 @@ void Subbucket::_chopTriangle(int i0, int i1, int i2)
     // If i1 is on a contour and has an opposite along i0i2, add the
     // opposite.
     if ((i1i2.second + 1) == i0i2.second) {
-	_contourLines.push_back(i1);
-	_contourLines.push_back(i0i2.first);
+	_contourLines.push_back(i1, i0i2.first);
 
 	vs.push_back(i0i2.first++);
 	i0i2.second--;
@@ -801,8 +958,7 @@ void Subbucket::_chopTriangle(int i0, int i1, int i2)
 
     // Deal with the top half of the triangle (above i1).
     for (; i1i2.second > 0; i1i2.second--, i0i2.second--) {
-	_contourLines.push_back(i1i2.first);
-	_contourLines.push_back(i0i2.first);
+	_contourLines.push_back(i1i2.first, i0i2.first);
 
 	vs.push_back(i1i2.first++);
 	vs.push_back(i0i2.first++);
@@ -830,15 +986,12 @@ void Subbucket::_chopTriangle(int i0, int i1, int i2)
 // that the triangle will be rendered counterclockwise.
 void Subbucket::_createTriangle(int i0, int i1, int i2, bool cw, int e)
 {
-    int_list& indices = _contours[e];
+    TrianglesVBO &indices = _contours[e];
     if (cw) {
-	indices.push_back(i1);
-	indices.push_back(i0);
+	indices.push_back(i1, i0, i2);
     } else {
-	indices.push_back(i0);
-	indices.push_back(i1);
+	indices.push_back(i0, i1, i2);
     }
-    indices.push_back(i2);
 }
 
 // Given a single slice of a triangle, as given in vs, creates one,
@@ -933,8 +1086,7 @@ pair<int, int> Subbucket::_chopEdge(int i0, int i1)
 	// Check if it forms part of a contour line.  If so, record
 	// the contour.
     	if (Bucket::palette->contourAtIndex(e0).elevation == elev0) {
-	    _contourLines.push_back(i0);
-	    _contourLines.push_back(i1);
+	    _contourLines.push_back(i0, i1);
 	}
 
 	return result;
@@ -951,12 +1103,6 @@ pair<int, int> Subbucket::_chopEdge(int i0, int i1)
 	const Palette::Contour& contour = Bucket::palette->contourAtIndex(e);
 	_elevations.push_back(contour.elevation);
 	_elevationIndices.push_back(e);
-	sgVec4 colour;
-	Bucket::palette->smoothColour(contour.elevation, colour);
-	_colours.push_back(colour[0]);
-	_colours.push_back(colour[1]);
-	_colours.push_back(colour[2]);
-	_colours.push_back(colour[3]);
 
 	// Calculate a scale factor.  Strictly speaking, linear
 	// interpolation is not correct, because the earth is not
@@ -978,9 +1124,7 @@ pair<int, int> Subbucket::_chopEdge(int i0, int i1)
 	sgSubVec3(v, v1, v0);
 	sgScaleVec3(v, scaling);
 	sgAddVec3(v, v0);
-	_vertices.push_back(v[0]);
-	_vertices.push_back(v[1]);
-	_vertices.push_back(v[2]);
+	_vertices.push_back(v);
 
 	// Interpolate the normal.
 	sgVec3 n;
@@ -988,9 +1132,7 @@ pair<int, int> Subbucket::_chopEdge(int i0, int i1)
 	sgSubVec3(n, n1, n0);
 	sgScaleVec3(n, scaling);
 	sgAddVec3(n, n0);
-	_normals.push_back(n[0]);
-	_normals.push_back(n[1]);
-	_normals.push_back(n[2]);
+	_normals.push_back(n);
 
 	result.second++;
     }

@@ -425,10 +425,8 @@ SceneryTile::SceneryTile(Tile *ti, Scenery *s):
     }
     update();
 
-    // Subscribe to the discrete/smooth contour change and palette
-    // change notifications.  When we get either, we'll tell our
-    // buckets.
-    subscribe(Notification::DiscreteContours);
+    // Subscribe to thepalette change notifications.  When we get it,
+    // we'll tell our buckets.
     subscribe(Notification::Palette);
 }
 
@@ -639,14 +637,7 @@ void SceneryTile::drawBuckets()
 // Called when the lighting changes.
 void SceneryTile::notification(Notification::type n)
 {
-    if (n == Notification::DiscreteContours) {
-	// Switched between smooth and discrete contours.
-	if (_buckets) {
-	    for (unsigned int i = 0; i < _buckets->size(); i++) {
-		_buckets->at(i)->discreteContoursChanged();
-	    }
-	}
-    } else if (n == Notification::Palette) {
+    if (n == Notification::Palette) {
 	// Got a new palette.
 	if (_buckets) {
 	    for (unsigned int i = 0; i < _buckets->size(); i++) {

@@ -161,13 +161,6 @@ void Bucket::paletteChanged()
     }
 }
 
-void Bucket::discreteContoursChanged()
-{
-    for (size_t i = 0; i < _subbuckets.size(); i++) {
-	_subbuckets[i]->discreteContoursChanged();
-    }
-}
-
 void Bucket::draw()
 {
     if (!_loaded) {
