@@ -32,8 +32,8 @@
 
 // Draw text at the given latitude and longitude, with hdg pointing
 // up.
-void geodDrawText(LayoutManager& lm, const sgdVec3 cart, double lat, 
-		  double lon, double hdg, GeodTextFiddling fiddling)
+void geodDrawText(LayoutManager& lm, const sgdVec3 cart, float lat, 
+		  float lon, float hdg, GeodTextFiddling fiddling)
 {
     LayoutManager::Point anchor = lm.anchor();
 
@@ -94,7 +94,7 @@ void geodDrawText(LayoutManager& lm, const sgdVec3 cart, double lat,
     lm.setAnchor(anchor);
 }
 
-void geodDrawText(LayoutManager& lm, double lat, double lon, double hdg, 
+void geodDrawText(LayoutManager& lm, double lat, double lon, float hdg, 
 		  GeodTextFiddling fiddling)
 {
     sgdVec3 cart;
@@ -105,7 +105,7 @@ void geodDrawText(LayoutManager& lm, double lat, double lon, double hdg,
     geodDrawText(lm, cart, lat, lon, hdg, fiddling);
 }
 
-void geodDrawText(LayoutManager& lm, const sgdVec3 cart, double hdg, 
+void geodDrawText(LayoutManager& lm, const sgdVec3 cart, float hdg, 
 		  GeodTextFiddling fiddling)
 {
     double lat, lon, alt;
@@ -129,7 +129,7 @@ void geodVertex3f(double lat, double lon, bool normals)
     glVertex3f(cart[0], cart[1], cart[2]);
 }
 
-void geodPushMatrix(const sgdVec3 cart, double lat, double lon, double hdg)
+void geodPushMatrix(const sgdVec3 cart, float lat, float lon, float hdg)
 {
     glPushMatrix();
     glTranslated(cart[0], cart[1], cart[2]);
@@ -138,7 +138,7 @@ void geodPushMatrix(const sgdVec3 cart, double lat, double lon, double hdg)
     glRotatef(-hdg, 0.0, 0.0, 1.0);
 }
 
-void geodPushMatrix(double lat, double lon, double hdg, double elev)
+void geodPushMatrix(double lat, double lon, float hdg, float elev)
 {
     sgdVec3 cart;
     sgGeodToCart(lat * SGD_DEGREES_TO_RADIANS, 
@@ -148,7 +148,7 @@ void geodPushMatrix(double lat, double lon, double hdg, double elev)
     geodPushMatrix(cart, lat, lon, hdg);
 }
 
-void geodPushMatrix(const sgdVec3 cart, double hdg)
+void geodPushMatrix(const sgdVec3 cart, float hdg)
 {
     double lat, lon, alt;
     sgCartToGeod(cart, &lat, &lon, &alt);

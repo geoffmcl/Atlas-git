@@ -66,13 +66,13 @@ class SGGeod;
 // belong here.
 enum GeodTextFiddling {NO_FIDDLING, FIDDLE_TEXT, FIDDLE_ALL};
 void geodDrawText(LayoutManager& lm, 
-		  const sgdVec3 cart, double lat, double lon, double hdg = 0.0,
+		  const sgdVec3 cart, float lat, float lon, float hdg = 0.0,
 		  GeodTextFiddling fiddling = FIDDLE_TEXT);
 void geodDrawText(LayoutManager& lm, 
-		  double lat, double lon, double hdg = 0.0, 
+		  double lat, double lon, float hdg = 0.0, 
 		  GeodTextFiddling fiddling = FIDDLE_TEXT);
 void geodDrawText(LayoutManager& lm, 
-		  const sgdVec3 cart, double hdg = 0.0,
+		  const sgdVec3 cart, float hdg = 0.0,
 		  GeodTextFiddling fiddling = FIDDLE_TEXT);
 
 // Draws a vertex at the given lat/lon, given in degrees.  Also
@@ -96,11 +96,11 @@ void geodVertex3f(double lat, double lon, bool normals = true);
 // do no checking to ensure this (although you should get OpenGL
 // errors, because they translate into glPushMatrix() and
 // glPopMatrix() calls).
-void geodPushMatrix(const sgdVec3 cart, double lat, double lon, 
-		    double hdg = 0.0);
-void geodPushMatrix(double lat, double lon, double hdg = 0.0, 
-		    double elev = 0.0);
-void geodPushMatrix(const sgdVec3 cart, double hdg = 0.0);
+void geodPushMatrix(const sgdVec3 cart, float lat, float lon, 
+		    float hdg = 0.0);
+void geodPushMatrix(double lat, double lon, float hdg = 0.0, 
+		    float elev = 0.0);
+void geodPushMatrix(const sgdVec3 cart, float hdg = 0.0);
 void geodPopMatrix();
 
 // This class represents a great circle route between two points.  In
