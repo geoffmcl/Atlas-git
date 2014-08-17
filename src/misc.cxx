@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2012 Brian Schack
+  Copyright (C) 2009 - 2014 Brian Schack
 
   This file is part of Atlas.
 
@@ -265,7 +265,6 @@ bool gzGetLine(const gzFile& f, char **linePtr)
     unsigned int toRead = length;
 
     // First read as much of the line as we can.
-    // EYE - check return code, use gzerror() to report error.
     if (gzgets(f, readPoint, toRead) == Z_NULL) {
 	int errnum;
 	fprintf(stderr, "gzGetLine error: %s\n", gzerror(f, &errnum));
