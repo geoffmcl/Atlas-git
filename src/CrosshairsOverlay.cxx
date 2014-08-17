@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2012 Brian Schack
+  Copyright (C) 2009 - 2014 Brian Schack
 
   This file is part of Atlas.
 
@@ -26,7 +26,7 @@
 
 // Other libraries' include files
 #if defined( __APPLE__)
-#  include <GL/glu.h>		// Needed for gluOrtho2D(), ...
+#  include <OpenGL/glu.h>	// Needed for gluOrtho2D(), ...
 #else
 #  ifdef WIN32
 #    include <windows.h>
