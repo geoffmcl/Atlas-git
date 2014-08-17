@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2012 Brian Schack
+  Copyright (C) 2012 - 2014 Brian Schack
 
   This file is part of Atlas.
 
@@ -23,6 +23,9 @@
 
 // Our include file
 #include "GLUTWindow.hxx"
+
+// C system files
+#include <stdlib.h>
 
 // C++ system files
 #include <assert.h>
