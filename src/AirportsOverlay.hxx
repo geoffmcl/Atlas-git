@@ -37,8 +37,8 @@
 // Forward class declarations
 class Overlays;
 class NavData;
-struct ARP;
-struct RWY;
+class ARP;
+class RWY;
 
 // Determines how airports are drawn.
 // EYE - add colours, runway label stuff, fonts?

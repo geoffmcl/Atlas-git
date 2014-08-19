@@ -1,3 +1,32 @@
+New in 0.5.0
+== Atlas ==
+* Atlas can read v1000 airport files
+* Preferences have changed slightly; serial connections are specified
+  by a single <device, baud rate> pair, rather than by two separate
+  command-line options, which means the --baud option is gone.
+* Maps can now be rendered from Atlas.  Atlas shows the status of
+  scenery (downloaded or not) and maps (rendered or not).
+* Anti-aliasing is now always enabled, both for live scenery and for
+  map generationg (via OpenGL multisampling).  The --aafactor option
+  has been removed.
+* Lighting can be set for live scenery, and these settings are used
+  when rendering maps in Atlas.  New 'lighting' options include
+  contour lines.
+* Distances and headings can be measured with a ruler function.  This
+  feature can also be used to create crude routes.
+* Instead of an airplane stick figure, an image can be used instead
+  (and is now the default).
+* The background image (generally a picture of the globe) can be
+  turned off.  This is nice for those who have a complete set of
+  FlightGear scenery.
+* The code has undergone significant rewriting, the hope being that it
+  will be easier to maintain and expand.
+
+== Map == 
+* Map uses OpenGL framebuffer objects (FBOs) to do its rendering (as
+  does Atlas, which uses the same code).  As a consequence, maps are
+  not constrained by window sizes.
+
 New in 0.4.0
 == Atlas ==
 * The world is now rendered as a sphere, rather than a flat map.

@@ -3,7 +3,7 @@ dnl working configure script.
 dnl
 dnl $Id$
 
-AC_INIT([Atlas], [0.4.9])
+AC_INIT([Atlas], [0.5.0])
 AC_CONFIG_SRCDIR([src/Atlas.cxx])
 
 dnl Initialize the automake stuff
@@ -314,7 +314,7 @@ int main() {
 AC_LANG_PUSH(C++)
 
 dnl Check for "plib" without which we cannot go on
-AC_CHECK_HEADER(plib/pu.h)
+AC_CHECK_HEADERS(plib/pu.h)
 if test "x$ac_cv_header_plib_pu_h" != "xyes"; then
     echo
     echo "You *must* have the plib library installed on your system to build"

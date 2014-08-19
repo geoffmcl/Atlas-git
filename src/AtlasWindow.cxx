@@ -3461,15 +3461,67 @@ AtlasWindow::~AtlasWindow()
 
 // #include "MPAircraft.hxx"
 // map<string, MPAircraft *> MPAircraftMap;
+// #define DEBUG_FRAME_RATE
+#ifdef DEBUG_FRAME_RATE
+#include <simgear/timing/timestamp.hxx>
+#endif
 void AtlasWindow::_display()
 {
     assert(glutGetWindow() == id());
   
+    // EYE - get rid of this and use OpenGL Profiler instead?  Wrap in
+    // #ifdef DEBUG?
+
     // Check errors before...
     GLenum error = glGetError();
     if (error != GL_NO_ERROR) {
     	printf("AtlasWindow::_display (before): %s\n", gluErrorString(error));
     }
+
+#ifdef DEBUG_FRAME_RATE
+    const int sampleFrames = 25;
+    static int frameCount = 0;
+    static float fps = 0.0;
+    static SGTimeStamp t1;
+    static AtlasString fpsStr("0.0");
+
+    if (frameCount == sampleFrames) {
+    	SGTimeStamp t2;
+    	t2 = SGTimeStamp::now() - t1;
+    	fps = (float)frameCount / t2.toSecs();
+    	fpsStr.printf("%.1f frames/s", fps);
+    	frameCount = 0;
+    }
+    if (frameCount == 0) {
+    	t1.stamp();
+    } 
+    
+    frameCount++;
+
+    // static deque<float> times;
+    // SGTimeStamp t1;
+
+    // t1.stamp();
+
+    // Vertex arrays and display lists (all at 12.5 m/pixel zoom,
+    // without any UI elements displayed):
+    //
+    //   default startup position: 91 f/s
+    //   RCSS: 100 f/s
+    //   VNLK: 118 f/s
+    //   LFHC: 58 f/s
+    //   FPST: 132 f/s
+    //
+    // Note: LFLG has a particularly large number of vertices.
+    //
+    // Vertex arrays and VBOs:
+    //
+    //   default startup position: 89 f/s
+    //   RCSS: 100 f/s
+    //   VNLK: 116 f/s
+    //   LFHC: 54 f/s
+    //   FPST: 130 f/s
+#endif
 
     // Clear all pixels and depth buffer.
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -3511,6 +3563,48 @@ void AtlasWindow::_display()
 
     // Render the widgets.
     puDisplay();
+
+#ifdef DEBUG_FRAME_RATE
+    // SGTimeStamp t2 = SGTimeStamp::now() - t1;
+    // times.push_back(t2.toSecs());
+    // // const size_t sampleFrames = 25;
+    // const size_t sampleFrames = 100;
+    // while (times.size() > sampleFrames) {
+    // 	times.pop_front();
+    // }
+    // float t = 0.0;
+    // for (size_t i = 0; i < times.size(); i++) {
+    // 	t += times[i];
+    // }
+    // globals.str.printf("%.0f frames/s", (float)times.size() / t);
+
+    // EYE - create a "write text on screen" method in AtlasWindow?
+    glPushAttrib(GL_CURRENT_BIT | GL_DEPTH_BUFFER_BIT | GL_TRANSFORM_BIT); {
+	glMatrixMode(GL_PROJECTION);
+	glPushMatrix();
+	glLoadIdentity();
+	gluOrtho2D(0.0, width(), 0.0, height());
+	glMatrixMode(GL_MODELVIEW);
+	glPushMatrix();
+	glLoadIdentity();
+
+	glColor4f(0.0, 0.0, 0.0, 1.0);
+	glDisable(GL_DEPTH_TEST);
+	glRasterPos2i(10, height() - 25);
+	for (const char *c = fpsStr.str(); *c; c++) {
+	// for (const char *c = globals.str.str(); *c; c++) {
+	    glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *c);
+	}
+	glMatrixMode(GL_MODELVIEW);
+	glPopMatrix();
+	glMatrixMode(GL_PROJECTION);
+	glPopMatrix();
+    }
+    glPopAttrib();
+
+    // Force an immediate redraw.
+    postRedisplay();
+#endif
 
     glutSwapBuffers();
 
@@ -4452,7 +4546,7 @@ char *AtlasWindow::matchAtIndex(int i)
 
     // The search interface owns the strings we give it, so make a
     // copy.
-    return strdup(searchable->asString().c_str());
+    return strdup(searchable->asString());
 }
 
 void AtlasWindow::render(ScreenLocation& sLoc, RenderType type, bool force)

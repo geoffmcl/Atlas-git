@@ -46,7 +46,7 @@ double NAV::distanceSquared(const sgdVec3 from) const
 }
 
 // Returns our tokens, generating them if they haven't been already.
-const std::vector<std::string>& NAV::tokens()
+const std::vector<std::string> &NAV::tokens()
 {
     if (_tokens.empty()) {
 	bool isNDB = (navtype == NAV_NDB);
@@ -108,47 +108,42 @@ const std::vector<std::string>& NAV::tokens()
     return _tokens;
 }
 
-// Returns our pretty string, generating it if it hasn't been already.
-const std::string& NAV::asString()
+// Returns our pretty string.
+const char *NAV::asString()
 {
-    if (_str.empty()) {
-	// Initialize our pretty string.
-	switch (navtype) {
-	  case NAV_VOR:
-	    globals.str.printf("VOR: %s %s (%.2f)", 
-				id.c_str(), name.c_str(), freq / 1000.0);
-	    break;
-	  case NAV_DME:
-	    globals.str.printf("DME: %s %s (%.2f)", 
-				id.c_str(), name.c_str(), freq / 1000.0);
-	    break;
-	  case NAV_NDB:
-	    globals.str.printf("NDB: %s %s (%d)", 
-				id.c_str(), name.c_str(), freq);
-	    break;
-	  case NAV_ILS:
-	  case NAV_GS:
-	    globals.str.printf("ILS: %s %s (%.2f)", 
-				id.c_str(), name.c_str(), freq / 1000.0);
-	    break;
-	  case NAV_OM:
-	    globals.str.printf("MKR: OM: %s", name.c_str());
-	    break;
-	  case NAV_MM:
-	    globals.str.printf("MKR: MM: %s", name.c_str());
-	    break;
-	  case NAV_IM:
-	    globals.str.printf("MKR: IM: %s", name.c_str());
-	    break;
-	  default:
-	    assert(false);
-	    break;
-	}
-
-	_str = globals.str.str();
+    switch (navtype) {
+      case NAV_VOR:
+	globals.str.printf("VOR: %s %s (%.2f)", 
+			   id.c_str(), name.c_str(), freq / 1000.0);
+	break;
+      case NAV_DME:
+	globals.str.printf("DME: %s %s (%.2f)", 
+			   id.c_str(), name.c_str(), freq / 1000.0);
+	break;
+      case NAV_NDB:
+	globals.str.printf("NDB: %s %s (%d)", 
+			   id.c_str(), name.c_str(), freq);
+	break;
+      case NAV_ILS:
+      case NAV_GS:
+	globals.str.printf("ILS: %s %s (%.2f)", 
+			   id.c_str(), name.c_str(), freq / 1000.0);
+	break;
+      case NAV_OM:
+	globals.str.printf("MKR: OM: %s", name.c_str());
+	break;
+      case NAV_MM:
+	globals.str.printf("MKR: MM: %s", name.c_str());
+	break;
+      case NAV_IM:
+	globals.str.printf("MKR: IM: %s", name.c_str());
+	break;
+      default:
+	assert(false);
+	break;
     }
 
-    return _str;
+    return globals.str.str();
 }
 
 double FIX::distanceSquared(const sgdVec3 from) const
@@ -157,7 +152,7 @@ double FIX::distanceSquared(const sgdVec3 from) const
 }
 
 // Returns our tokens, generating them if they haven't been already.
-const std::vector<std::string>& FIX::tokens()
+const std::vector<std::string> &FIX::tokens()
 {
     if (_tokens.empty()) {
 	// The name/id is a token.
@@ -170,16 +165,187 @@ const std::vector<std::string>& FIX::tokens()
     return _tokens;
 }
 
-// Returns our pretty string, generating it if it hasn't been already.
-const std::string& FIX::asString()
+// Returns our pretty string.
+const char *FIX::asString()
 {
-    if (_str.empty()) {
-	// Initialize our pretty string.
-	globals.str.printf("FIX: %s", name);
-	_str = globals.str.str();
+    globals.str.printf("FIX: %s", name);
+    return globals.str.str();
+}
+
+RWY::RWY(char *label, double lat, double lon, float hdg, float len, float wid,
+	 ARP *ap):
+    _lat(lat), _lon(lon), _hdg(hdg), _length(len), _width(wid)
+{
+    assert(strlen(label) <= 3);
+    snprintf(_label, sizeof(_label), "%s", label);
+    // Initialize _otherLabel to an empty string for now.  If
+    // otherLabel() is called, it will fill it in with the correct
+    // label.
+    _otherLabel[0] = '\0';
+
+    // Find out our bounds, and tell our owning airport.
+    _setBounds(lat, lon, ap->elevation());
+    ap->extend(bounds());
+}
+
+RWY::RWY(char *lbl1, double lat1, double lon1, 
+	 char *lbl2, double lat2, double lon2, 
+	 float width, ARP *ap): _width(width)
+{
+    assert(strlen(lbl1) <= 3);
+    snprintf(_label, sizeof(_label), "%s", lbl1);
+    assert(strlen(lbl2) <= 3);
+    snprintf(_otherLabel, sizeof(_otherLabel), "%s", lbl2);
+
+    // Convert the two ends to a centre and a heading.  This,
+    // unfortunately, takes a bit of effort.  Why not just store the
+    // two <lat,lon> pairs?  Two <lat, lon> pairs take more space than
+    // a single <lat,lon> pair (two doubles) with a length and a
+    // heading (two floats).  Also, the calculations required when
+    // drawing the runway are a bit more difficult with two endpoints
+    // than a single centre point.
+
+    // EYE - if we cached airport/runway/navaid data, all these
+    // calculations would only need to be done once, rather than every
+    // time Atlas starts.
+    SGGeod p1 = SGGeod::fromDeg(lon1, lat1), p2 = SGGeod::fromDeg(lon2, lat2);
+
+    // First, calculate the distance between the two endpoints, and
+    // the heading from p1 to p2 (and p2 to p1, but we don't care
+    // about that).
+    double hdg12, length, hdg21;
+    SGGeodesy::inverse(p1, p2, hdg12, hdg21, length);
+
+    // Now figure out where the centre is.
+    SGGeod centre = SGGeodesy::direct(p1, hdg12, length / 2.0);
+
+    // Finally, figure out the heading at the centre (ie, the heading
+    // from the centre to the second endpoint).  In most cases, this
+    // is the same as hdg12, but in extreme cases (ie, at the poles,
+    // or for very very long runways), it can be quite different.
+    double hdgc2, hdg2c, tmpLen;
+    SGGeodesy::inverse(centre, p2, hdgc2, hdg2c, tmpLen);
+
+    _hdg = hdgc2;
+    _length = length;
+    _lat = centre.getLatitudeDeg();
+    _lon = centre.getLongitudeDeg();
+
+    // Find out our bounds, and tell our owning airport.
+    _setBounds(centre.getLatitudeDeg(), centre.getLongitudeDeg(), 
+	       ap->elevation());
+    ap->extend(bounds());
+}
+
+// In airport data files before version 1000, we are only given the
+// label of one end of the runway, and need to calculate the name of
+// the other end.  This method will do that if _otherLabel is
+// uninitialized.
+//
+// So, if we can calculate the name of one end of a runway from the
+// other, why bother saving both?  Because you actually *can't* always
+// calculate the name of one end of a runway from the other.  There
+// are runways that curve (eg, Elk City Airport, S90), which has a
+// runway 14/35.  In old versions of apt.dat, these would have been
+// labelled incorrectly (14/32).  In newer versions of apt.dat, we are
+// explicitly given the names of both ends, so we can label them
+// properly (of course, we still don't *draw* curved runways
+// correctly, as we are only given the two endpoints).
+const char *RWY::otherLabel()
+{
+    if (_otherLabel[0] == '\0') {
+	int hdg;
+	unsigned int length;
+	sscanf(_label, "%d%n", &hdg, &length);
+	assert((length == strlen(_label)) || (length = strlen(_label) - 1));
+	hdg = (hdg + 18) % 36;
+	if (hdg == 0) {
+	    hdg = 36;
+	}
+
+	// Handle trailing character (if it exists).  If the character
+	// is 'L' or 'R', swap it for 'R' and 'L' respectively.
+	// Otherwise assume that we should leave it alone.  If it
+	// doesn't exist, set it to '\0'.
+	char lr = '\0';
+	if (length < strlen(_label)) {
+	    if (_label[length] == 'R') {
+		lr = 'L';
+	    } else if (_label[length] == 'L') {
+		lr = 'R';
+	    } else {
+		// EYE - warn if not a standard suffix?  'C' is the
+		// most common, but many northern airports have 'T'
+		// suffixes (eg, CYTE).  There are several with 'S'
+		// sufixes (eg, HEBA), and KHOP in 1000 has a runway
+		// "23H/05H".
+		lr = _label[length];
+	    }
+	}
+	sprintf(_otherLabel, "%02d%c", hdg, lr);
+	assert(_otherLabel[0] != '\0');
     }
 
-    return _str;
+    return _otherLabel;
+}
+
+// EYE - setBounds, along with the RWY constructor, are pretty
+// expensive (but necessary), so we should take advantage of the
+// chance to pre-calculate some drawing data (eg, the runway quad).
+void RWY::_setBounds(double lat, double lon, float elev)
+{
+    atlasGeodToCart(lat, lon, elev, _bounds.center);
+    _bounds.setRadius(sqrt((_width * _width) + (_length * _length)));
+}
+
+// ARP::_lat and _beaconLat are initialized to __invalidLat.  If _lat
+// or _lon are accessed before being initialized, we calculate them
+// from _bounds (this assumes that _bounds has been set to its final
+// value, which is true once the entry for the airport - including its
+// runways - has been read from apt.dat).
+//
+// An invalid _beaconLat indicates that this airport has no beacon (a
+// fact used in the beacon() method).
+const double __invalidLat = 100.0;
+
+ARP::ARP(char *name, char *code, float elev):
+    _elev(elev), _controlled(false), _lighting(false), _lat(__invalidLat), 
+    _beaconLat(__invalidLat)
+{
+    _name = strdup(name);
+    assert(strlen(code) <= 4);
+    // Why use snprintf() instead of strncpy()?  Because strncpy() is
+    // very tricky to use correctly.  A better substitute is
+    // strlcpy(), but I don't think it's very portable.
+    snprintf(_code, sizeof(_code), "%s", code);
+}
+
+ARP::~ARP()
+{
+    free(_name);
+    for (size_t i = 0; i < _rwys.size(); i++) {
+	delete _rwys[i];
+    }
+}
+
+void ARP::addFreq(ATCCodeType t, int freq, char *label)
+{
+    set<int> &freqs = _freqs[t][label];
+    if ((freq % 10 == 2) || (freq % 10 == 7)) {
+	freqs.insert(freq * 10 + 5);
+    } else {
+	freqs.insert(freq * 10);
+    }
+}
+
+const double *ARP::location() const 
+{ 
+    return _bounds.center; 
+}
+
+const atlasSphere &ARP::bounds() 
+{ 
+    return _bounds; 
 }
 
 double ARP::distanceSquared(const sgdVec3 from) const
@@ -188,14 +354,14 @@ double ARP::distanceSquared(const sgdVec3 from) const
 }
 
 // Returns our tokens, generating them if they haven't been already.
-const std::vector<std::string>& ARP::tokens()
+const std::vector<std::string> &ARP::tokens()
 {
     if (_tokens.empty()) {
 	// The id is a token.
-	_tokens.push_back(id);
+	_tokens.push_back(_code);
 
 	// Tokenize the name.
-	Searchable::tokenize(name, _tokens);
+	Searchable::tokenize(_name, _tokens);
 
 	// Add an "AIR:" token.
 	_tokens.push_back("AIR:");
@@ -204,17 +370,59 @@ const std::vector<std::string>& ARP::tokens()
     return _tokens;
 }
 
-// Returns our pretty string, generating it if it hasn't been already.
-const std::string& ARP::asString()
+// Returns our pretty string.
+const char *ARP::asString()
 {
-    if (_str.empty()) {
-	// Initialize our pretty string.
-	globals.str.printf("AIR: %s %s", id.c_str(), name.c_str());
-	_str = globals.str.str();
-    }
-
-    return _str;
+    globals.str.printf("AIR: %s %s", _code, _name);
+    return globals.str.str();
 }
+
+// We derive the airport's latitude and longitude lazily.
+double ARP::latitude()
+{
+    if (_lat == __invalidLat) {
+	_calcLatLon();
+    }
+    assert(_lat != __invalidLat);
+    return _lat;
+}
+
+double ARP::longitude()
+{
+    if (_lat == __invalidLat) {
+	_calcLatLon();
+    }
+    assert(_lat != __invalidLat);
+    return _lon;
+}
+
+void ARP::setBeaconLoc(double lat, double lon)
+{
+    _beaconLat = lat;
+    _beaconLon = lon;
+}
+
+bool ARP::beacon()
+{
+    return (_beaconLat != __invalidLat);
+}
+
+// Calculates the airport's center in lat, lon from its bounds.
+void ARP::_calcLatLon()
+{
+    double alt;
+    sgdVec3 c;
+    sgdSetVec3(c,
+	       _bounds.center[0], 
+	       _bounds.center[1], 
+	       _bounds.center[2]);
+    sgCartToGeod(c, &_lat, &_lon, &alt);
+    _lat *= SGD_RADIANS_TO_DEGREES;
+    _lon *= SGD_RADIANS_TO_DEGREES;
+}
+
+// // EYE - just needed for SGTimeStamp
+// #include <simgear/timing/timestamp.hxx>
 
 NavData::NavData(const char *fgRoot, Searcher *searcher): _searcher(searcher)
 {
@@ -231,12 +439,26 @@ NavData::NavData(const char *fgRoot, Searcher *searcher): _searcher(searcher)
 
     // Load the data.
 
-    // EYE - they're all very similar - can we abstract most of it
-    // out?
+    // EYE - the load functions are all very similar - can we abstract
+    // most of it out?
+
+    // SGTimeStamp t1, t2;
+    // t1.stamp();
     _loadNavaids(fgRoot);
+    // t2 = SGTimeStamp::now() - t1;
+    // printf("\t%.4f s\n", t2.toSecs());
+    // t1.stamp();
     _loadFixes(fgRoot);
+    // t2 = SGTimeStamp::now() - t1;
+    // printf("\t%.4f s\n", t2.toSecs());
+    // t1.stamp();
     _loadAirways(fgRoot);
+    // t2 = SGTimeStamp::now() - t1;
+    // printf("\t%.4f s\n", t2.toSecs());
+    // t1.stamp();
     _loadAirports(fgRoot);
+    // t2 = SGTimeStamp::now() - t1;
+    // printf("\t%.4f s\n", t2.toSecs());
 }
 
 NavData::~NavData()
@@ -266,9 +488,8 @@ NavData::~NavData()
     _fixes.clear();
     for (size_t i = 0; i < _airports.size(); i++) {
 	ARP *ap = _airports[i];
-	for (size_t j = 0; j < ap->rwys.size(); j++) {
-	    delete ap->rwys[j];
-	}
+	// EYE - need to test ARP destructor (and others) for memory
+	// leaks.
 	_searcher->remove(ap);
 	delete ap;
     }
@@ -279,7 +500,7 @@ NavData::~NavData()
     _segments.clear();
 }
 
-const vector<Cullable *>& NavData::getNavaids(sgdVec3 p)
+const vector<Cullable *> &NavData::getNavaids(sgdVec3 p)
 {
     static vector<Cullable *> results;
 
@@ -292,7 +513,7 @@ const vector<Cullable *>& NavData::getNavaids(sgdVec3 p)
     return results;
 }
 
-const vector<Cullable *>& NavData::getNavaids(FlightData *p)
+const vector<Cullable *> &NavData::getNavaids(FlightData *p)
 {
     static vector<Cullable *> results;
 
@@ -312,7 +533,7 @@ const vector<Cullable *>& NavData::getNavaids(FlightData *p)
 	return results;
     }
 
-    const vector<Cullable *>& navaids = getNavaids(p->cart);
+    const vector<Cullable *> &navaids = getNavaids(p->cart);
 	
     for (unsigned int i = 0; i < navaids.size(); i++) {
 	NAV *n = dynamic_cast<NAV *>(navaids[i]);
@@ -336,7 +557,7 @@ void NavData::move(const sgdMat4 modelViewMatrix)
     }
 }
 
-void NavData::zoom(const sgdFrustum& frustum)
+void NavData::zoom(const sgdFrustum &frustum)
 {
     for (int i = 0; i < _COUNT; i++) {
 	_frustumCullers[i]->zoom(frustum.getLeft(),
@@ -405,7 +626,7 @@ void NavData::_loadNavaids(const char *fgRoot)
     printf("  ... done\n");
 }
 
-void NavData::_loadNavaids810(float cycle, const gzFile& arp)
+void NavData::_loadNavaids810(float cycle, const gzFile &arp)
 {
     char *line;
     NAV *n;
@@ -708,7 +929,7 @@ void NavData::_loadNavaids810(float cycle, const gzFile& arp)
 	_NAVPOINT foo;
 	foo.isNavaid = true;
 	foo.n = (void *)n;
-	_navPoints.insert(pair<string, _NAVPOINT>(n->id, foo));
+	_navPoints.insert(make_pair(n->id, foo));
     }
 }
 
@@ -745,7 +966,7 @@ void NavData::_loadFixes(const char *fgRoot)
     printf("  ... done\n");
 }
 
-void NavData::_loadFixes600(const gzFile& arp)
+void NavData::_loadFixes600(const gzFile &arp)
 {
     char *line;
 
@@ -800,7 +1021,7 @@ void NavData::_loadFixes600(const gzFile& arp)
 	_NAVPOINT foo;
 	foo.isNavaid = false;
 	foo.n = (void *)f;
-	_navPoints.insert(pair<string, _NAVPOINT>(f->name, foo));
+	_navPoints.insert(make_pair(f->name, foo));
     }
 }
 
@@ -837,7 +1058,7 @@ void NavData::_loadAirways(const char *fgRoot)
     printf("  ... done\n");
 }
 
-void NavData::_loadAirways640(const gzFile& arp)
+void NavData::_loadAirways640(const gzFile &arp)
 {
     char *line;
 
@@ -1013,11 +1234,14 @@ void NavData::_loadAirports(const char *fgRoot)
     gzGetLine(arp, &line);	// Windows/Mac header
     gzGetLine(arp, &line);	// Version
     sscanf(line, "%d", &version);
+    // EYE - In 810 airports, we use 85% of the data loaded, while in
+    // 1000 airports, we only use 7%.  This seems like another
+    // argument for caching..
     if (version == 810) {
-	// It looks like we have a valid file.
 	_loadAirports810(arp);
+    } else if (version == 1000) {
+	_loadAirports1000(arp);
     } else {
-	// EYE - throw an error?
 	fprintf(stderr, "AirportsOverlay::load: \"%s\": unknown version %d.\n", 
 		f.c_str(), version);
 	throw runtime_error("unknown airports file version");
@@ -1027,100 +1251,7 @@ void NavData::_loadAirports(const char *fgRoot)
     printf("  ... done\n");
 }
 
-// Calculates the airport's center in lat, lon from its bounds.
-static void __airportLatLon(ARP *ap)
-{
-    double lat, lon, alt;
-    sgdVec3 c;
-    sgdSetVec3(c,
-	       ap->_bounds.center[0], 
-	       ap->_bounds.center[1], 
-	       ap->_bounds.center[2]);
-    sgCartToGeod(c, &lat, &lon, &alt);
-    ap->lat = lat * SGD_RADIANS_TO_DEGREES;
-    ap->lon = lon * SGD_RADIANS_TO_DEGREES;
-}
-
-// Given a runway with a valid lat, lon, and heading (in degrees), and
-// a valid length and width (in metres), sets its bounds, "ahead"
-// vector (a normalized vector pointing along the runway in the given
-// heading), "aside" vector (a normalized vector pointing across the
-// runway, 90 degrees clockwise from the ahead vector), and its
-// "above" vector (its normal vector).
-void __runwayExtents(RWY *rwy, float elev)
-{
-    // In PLIB, "up" (the direction of our normal) is along the
-    // positive y-axis.  What we call "ahead" (looking along our
-    // heading, where the runway points), is along the positive
-    // z-axis), and what we call "aside" (looking across the runway,
-    // 90 degrees from our heading), is along the negative x-axis.
-
-    // EYE - am I thinking about this right?  Is it what PLIB
-    // "thinks", or what I think?
-    sgdSetVec3(rwy->ahead, 0.0, 0.0, 1.0);
-    sgdSetVec3(rwy->aside, -1.0, 0.0, 0.0);
-    sgdSetVec3(rwy->above, 0.0, 1.0, 0.0);
-
-    sgdMat4 rot;
-    double heading = rwy->lon - 90.0;
-    double pitch = rwy->lat;
-    double roll = -rwy->hdg;
-
-    // This version has us in our standard orientation, which means 0
-    // lat, 0 lon, and a heading of 0 (north).
-    // EYE - untested
-//     sgdSetVec3(rwy->ahead, 0.0, 0.0, 1.0);
-//     sgdSetVec3(rwy->aside, 0.0, 1.0, 0.0);
-//     sgdSetVec3(rwy->above, 1.0, 0.0, 0.0);
-
-//     sgdMat4 rot;
-//     double heading = rwy->lon;
-//     double pitch = -rwy->hdg;
-//     double roll = -rwy->lat;
-
-    // This version is in the standard PLIB orientation, facing out
-    // along the y axis, the x axis right, and the z axis up.
-    // EYE - untested
-//     sgdSetVec3(rwy->ahead, 0.0, 0.0, 1.0);
-//     sgdSetVec3(rwy->aside, 1.0, 0.0, 0.0);
-//     sgdSetVec3(rwy->above, 0.0, 1.0, 0.0);
-
-//     sgdMat4 rot;
-//     double heading = 90.0 - rwy->lon;
-//     double pitch = rwy->lat;
-//     double roll = rwy->hdg;
-
-    sgdMakeRotMat4(rot, heading, pitch, roll);
-
-    sgdXformVec3(rwy->ahead, rot);
-    sgdXformVec3(rwy->aside, rot);
-    sgdXformVec3(rwy->above, rot);
-
-    // Calculate our bounding sphere.
-    sgdVec3 center;
-    atlasGeodToCart(rwy->lat, rwy->lon, elev, center);
-    sgdCopyVec3(rwy->_bounds.center, center);
-
-    sgdMat4 mat;
-    sgdMakeTransMat4(mat, rwy->_bounds.center);
-    sgdPreMultMat4(mat, rot);
-
-    sgdVec3 ll = {rwy->width / 2,  0.0, -rwy->length / 2};
-    sgdVec3 lr = {-rwy->width / 2, 0.0, -rwy->length / 2};
-    sgdVec3 ul = {rwy->width / 2, 0.0, rwy->length / 2};
-    sgdVec3 ur = {-rwy->width / 2, 0.0, rwy->length / 2};
-
-    sgdXformPnt3(ul, mat);
-    sgdXformPnt3(lr, mat);
-    sgdXformPnt3(ll, mat);
-    sgdXformPnt3(ur, mat);
-    rwy->_bounds.extend(ul);
-    rwy->_bounds.extend(ll);
-    rwy->_bounds.extend(ll);
-    rwy->_bounds.extend(ur);
-}
-
-void NavData::_loadAirports810(const gzFile& arp)
+void NavData::_loadAirports810(const gzFile &arp)
 {
     char *line;
     ARP *ap = NULL;
@@ -1149,10 +1280,6 @@ void NavData::_loadAirports810(const gzFile& arp)
 		// new airport/seaport/heliport, and therefore ending an
 		// old one.  Deal with the old airport first.
 		if (ap != NULL) {
-		    // Calculate the airport's center in lat, lon.
-		    __airportLatLon(ap);
-		    // Add it to our airports vector.
-		    _airports.push_back(ap);
 		    // Add our airport text to the searcher object.
 		    _searcher->add(ap);
 		    // Add to our culler.
@@ -1171,27 +1298,21 @@ void NavData::_loadAirports810(const gzFile& arp)
 		    break;
 		}
 
-		// Create a new airport record.
-		ap = new ARP;
-
 		float elevation;
 		int controlled;
-		char code[5];	// EYE - safe?
+		char code[100];
 
-		sscanf(line, "%f %d %*d %s %n", 
+		sscanf(line, "%f %d %*d %99s %n", 
 		       &elevation, &controlled, code, &offset);
 		line += offset;
+		assert(strlen(code) <= 4);
 
-		ap->elev = elevation * SG_FEET_TO_METER;
-		ap->controlled = (controlled == 1);
-		ap->id = code;
-		ap->name = line;
-		// This will be set to true if we find a runway with
-		// any kind of runway lighting.
-		ap->lighting = false;
-		// If set to true, then beaconLat and beaconLon
-		// contain the location of the beacon.
-		ap->beacon = false;
+		// Create a new airport record and add it to our
+		// airports vector.
+		ap = new ARP(line, code, elevation * SG_FEET_TO_METER);
+		_airports.push_back(ap);
+
+		ap->setControlled(controlled == 1);
 	    }
 
 	    break;
@@ -1209,11 +1330,8 @@ void NavData::_loadAirports810(const gzFile& arp)
 		sscanf(line, "%lf %lf %s %n", &lat, &lon, rwyid, &offset);
 		line += offset;
 
-		// We ignore taxiways and helipads.
+		// We ignore taxiways completely.
 		if (strcmp(rwyid, "xxx") == 0) {
-		    break;
-		}
-		if (strncmp(rwyid, "H", 1) == 0) {
 		    break;
 		}
 
@@ -1224,9 +1342,6 @@ void NavData::_loadAirports810(const gzFile& arp)
 		}
 		assert(strlen(rwyid) <= 3);
 
-		// Runway!
-		RWY *rwy = new RWY;
-
 		float heading, length, width;
 		char *lighting;
 
@@ -1234,16 +1349,24 @@ void NavData::_loadAirports810(const gzFile& arp)
 		       &heading, &length, &width, &offset);
 		lighting = line + offset;
 
-		rwy->lat = lat;
-		rwy->lon = lon;
-		rwy->hdg = heading;
-		rwy->length = length * SG_FEET_TO_METER;
-		rwy->width  = width * SG_FEET_TO_METER;
-		rwy->id = rwyid;
-		ap->rwys.push_back(rwy);
+		// Runway!
+		RWY *rwy = new RWY(rwyid, lat, lon, heading, 
+				   length * SG_FEET_TO_METER, 
+				   width * SG_FEET_TO_METER, ap);
 
-		__runwayExtents(rwy, ap->elev);
-		ap->_bounds.extend(&(rwy->_bounds));
+		// Atlas doesn't display helipads.  However, there is
+		// at least one airport with only helipads - MO06,
+		// "Lamar Barton Co Mem Hospital".  In this case we
+		// have to use the helipad to establish the airport
+		// bounds.  Once we've done that, though, we can throw
+		// it away.
+		if (strncmp(rwyid, "H", 1) == 0) {
+		    // It's a helipad, so just delete it without
+		    // adding it to the airport's runway vector.
+		    delete rwy;
+		} else {
+		    ap->addRwy(rwy);
+		}
 
 		// According to the FAA's "VFR Aeronautical Chart
 		// Symbols", lighting codes on VFR maps refer to
@@ -1259,7 +1382,7 @@ void NavData::_loadAirports810(const gzFile& arp)
 		// about lighting limitations, nor whether the
 		// lighting is pilot-controlled.
 		if ((lighting[1] != '1') || (lighting[4] != '1')) {
-		    ap->lighting = true;
+		    ap->setLighting(true);
 		}
 	    }
 
@@ -1272,9 +1395,7 @@ void NavData::_loadAirports810(const gzFile& arp)
 
 		sscanf(line, "%lf %lf %d", &lat, &lon, &beaconType);
 		if (beaconType != 0) {
-		    ap->beacon = true;
-		    ap->beaconLat = lat;
-		    ap->beaconLon = lon;
+		    ap->setBeaconLoc(lat, lon);
 		}
 	    }
 	    break;
@@ -1373,13 +1494,7 @@ void NavData::_loadAirports810(const gzFile& arp)
 		      sscanf(line, "%d %n", &freq, &offset);
 		      line += offset;
 
-		      FrequencyMap& f = ap->freqs[(ATCCodeType)lineCode];
-		      set<int>& freqs = f[line];
-		      if ((freq % 10 == 2) || (freq % 10 == 7)) {
-			  freqs.insert(freq * 10 + 5);
-		      } else {
-			  freqs.insert(freq * 10);
-		      }
+		      ap->addFreq((ATCCodeType)lineCode, freq, line);
 		  }
 	      }
 	    break;
@@ -1387,10 +1502,208 @@ void NavData::_loadAirports810(const gzFile& arp)
     }
 
     if (ap != NULL) {
-	// Calculate the airport's center in lat, lon.
-	__airportLatLon(ap);
-	// Add it to our airports vector.
-	_airports.push_back(ap);
+	// Add our airport text to the searcher object.
+	_searcher->add(ap);
+	// Add to our culler.
+	_frustumCullers[AIRPORTS]->culler().addObject(ap);
+    }
+}
+
+// EYE - combine with _loadAirports810 so there's less duplicate code?
+
+// EYE - I think it would be a good idea to do some data verification.
+// Items we might want to check and report on:
+//
+// - valid runway ids
+// - in-range latitudes and longitudes
+// - runway ids that don't correspond (eg, the other end of runway 05
+//   should be 23, although there are a few valid exceptions to this
+//   rule).
+void NavData::_loadAirports1000(const gzFile &arp)
+{
+    char *line;
+    ARP *ap = NULL;
+
+    while (gzGetLine(arp, &line)) {
+	int lineCode, offset;
+
+	if (strcmp(line, "") == 0) {
+	    // Blank line.
+	    continue;
+	} 
+
+	if (strcmp(line, "99") == 0) {
+	    // Last line.
+	    break;
+	}
+
+	sscanf(line, "%d%n", &lineCode, &offset);
+	line += offset;
+	switch (lineCode) {
+	  case 1:
+	  case 16:
+	  case 17:
+	    {
+		// The presence of a 1/16/17 means that we're starting a
+		// new airport/seaport/heliport, and therefore ending an
+		// old one.  Deal with the old airport first.
+		if (ap != NULL) {
+		    // Add our airport text to the searcher object.
+		    _searcher->add(ap);
+		    // Add to our culler.
+		    _frustumCullers[AIRPORTS]->culler().addObject(ap);
+
+		    ap = NULL;
+		}
+
+		// EYE - add seaports and heliports!  (Note: the
+		// classification of seaports is iffy - Pearl Harbor
+		// is called an airport, even though it's in the
+		// ocean, and Courchevel is called a seaport, even
+		// though it's on top of a mountain).
+		if (lineCode != 1) {
+		    // We only handle airports (16 = seaport, 17 = heliport)
+		    break;
+		}
+
+		float elevation;
+		char code[100];
+
+		sscanf(line, "%f %*d %*d %99s %n", &elevation, code, &offset);
+		line += offset;
+
+		// Create a new airport record and add it to our
+		// airports vector.
+		ap = new ARP(line, code, elevation * SG_FEET_TO_METER);
+		_airports.push_back(ap);
+	    }
+
+	    break;
+	  case 14:		// Is controlled (sort of)
+	    // Line code 14 actually defines a viewpoint (of which an
+	    // airport can only have 1).  Although the specification
+	    // doesn't actually say it, I'm taking this to mean that
+	    // it's a tower, and therefore that the airport is
+	    // controlled.  Perhaps this is a bit of a stretch.
+	    if (ap) {
+		// EYE - record (and indicate) position too?
+		ap->setControlled(true);
+	    }
+	    break;
+	  case 18: 
+	    if (ap != NULL) {
+		// Beacon
+		double lat, lon;
+		int beaconType;
+
+		sscanf(line, "%lf %lf %d", &lat, &lon, &beaconType);
+		if (beaconType != 0) {
+		    ap->setBeaconLoc(lat, lon);
+		}
+	    }
+	    break;
+	  case WEATHER:		// AWOS, ASOS, ATIS
+	  case UNICOM:		// Unicom/CTAF (US), radio (UK)
+	  case DEL:		// Clearance delivery
+	  case GND:		// Ground
+	  case TWR:		// Tower
+	  case APP:		// Approach
+	  case DEP:		// Departure
+	      {
+		  // See _loadAirports810 for extensive documentation
+		  // of how we deal with ATC frequences, and issues
+		  // that haven't been resolved.
+		  if (ap != NULL) {
+		      int freq;
+
+		      sscanf(line, "%d %n", &freq, &offset);
+		      line += offset;
+
+		      ap->addFreq((ATCCodeType)lineCode, freq, line);
+		  }
+	      }
+	    break;
+	  case 100: // Land runway - EYE - add water runways (101) and
+		    // helipads (102)
+	    {
+		if (ap == NULL) {
+		    // If we're not working on an airport (ie, if this
+		    // is a seaport or heliport), just continue.  Note
+		    // that airports, seaports and helipads all have
+		    // the potential to have runways, water runways,
+		    // and helipads.
+		    break;
+		}
+
+		// First, deal with the data common to both ends of
+		// the runway.
+		float width;
+		int centre, edge; // Runway lighting
+		sscanf(line, "%f %*d %*d %*f %d %d %*d %n", 
+		       &width, &centre, &edge, &offset);
+		line += offset;
+
+		// According to the FAA's "VFR Aeronautical Chart
+		// Symbols", lighting codes on VFR maps refer to
+		// runway lights (not approach lights).
+		//
+		// In apt.dat, we say a runway is lit if it has
+		// centre-line lines or edge lighting (although it may
+		// be that if it has edge lighting, it automatically
+		// has centre-line lighting, but I haven't checked).
+		//
+		// Note that the apt.dat database does not tell us
+		// about lighting limitations, nor whether the
+		// lighting is pilot-controlled.
+		if ((centre != 0) || (edge != 0)) {
+		    ap->setLighting(true);
+		}
+
+		// Now deal with each end.  At the moment, we only
+		// care about the position and id of the ends.
+		double lat1, lon1, lat2, lon2;
+		char rwyid1[4], rwyid2[4]; // EYE - safe?
+
+		// EYE - get (and indicate) displaced thresholds?
+		// Stopways/overrun/blast pads?  See
+		// faa-h-8083-15-2.pdf (pg 26), or 7th_IAP_Symbols.pdf
+		// (pg 7) for more info.
+		//
+		// EYE - show surface (hard vs "other than hard")?
+		sscanf(line, "%3s %lf %lf %*f %*f %*d %*d %*d %*d %n", 
+		       rwyid1, &lat1, &lon1, &offset);
+		line += offset;
+		assert(strlen(rwyid1) <= 3);
+
+		// EYE - there's an error in v1000 or apt.dat.gz -
+		// NZSP (SOUTH POLE STATION) has a runway with a
+		// latitude of -90.000357, which is impossible.  More
+		// importantly, it screws up our calculations - we end
+		// up with a runway that's 65,622,343 feet long
+		// (10,800 nautical miles) long!  This is clearly
+		// unsatisfactory, so we just clamp all values less
+		// than -90 to -90.
+		lat1 = max(lat1, -90.0);
+
+		sscanf(line, "%3s %lf %lf %*f %*f %*d %*d %*d %*d %n", 
+		       rwyid2, &lat2, &lon2, &offset);
+		line += offset;
+		assert(strlen(rwyid2) <= 3);
+		lat2 = max(lat2, -90.0); // EYE - hack (see above)
+
+		// Runway!
+		RWY *rwy = new RWY(rwyid1, lat1, lon1, rwyid2, lat2, lon2, 
+				   width, ap);
+
+		// EYE - check if it's a helipad or not (see 810 code)?
+		ap->addRwy(rwy);
+	    }
+
+	    break;
+	}
+    }
+
+    if (ap != NULL) {
 	// Add our airport text to the searcher object.
 	_searcher->add(ap);
 	// Add to our culler.

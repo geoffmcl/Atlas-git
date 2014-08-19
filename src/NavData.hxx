@@ -51,12 +51,12 @@ struct NAV: public Searchable, Cullable {
   public:
     // Searchable interface.
     const double *location() const { return _bounds.center; }
-    virtual double distanceSquared(const sgdVec3 from) const;
-    virtual const std::vector<std::string>& tokens();
-    virtual const std::string& asString();
+    double distanceSquared(const sgdVec3 from) const;
+    const std::vector<std::string> &tokens();
+    const char *asString();
 
     // Cullable interface.
-    const atlasSphere& bounds() { return _bounds; }
+    const atlasSphere &bounds() { return _bounds; }
     double latitude() { return lat; }
     double longitude() { return lon; }
 
@@ -81,19 +81,18 @@ struct NAV: public Searchable, Cullable {
 
   protected:
     std::vector<std::string> _tokens;
-    std::string _str;
 };
 
 struct FIX: public Searchable, Cullable {
   public:
     // Searchable interface.
     const double *location() const { return _bounds.center; }
-    virtual double distanceSquared(const sgdVec3 from) const;
-    virtual const std::vector<std::string>& tokens();
-    virtual const std::string& asString();
+    double distanceSquared(const sgdVec3 from) const;
+    const std::vector<std::string> &tokens();
+    const char *asString();
 
     // Cullable interface.
-    const atlasSphere& bounds() { return _bounds; }
+    const atlasSphere &bounds() { return _bounds; }
     double latitude() { return lat; }
     double longitude() { return lon; }
 
@@ -104,7 +103,6 @@ struct FIX: public Searchable, Cullable {
 
   protected:
     std::vector<std::string> _tokens;
-    std::string _str;
 };
 
 // AwyLabel - one end of an airway.  It has a name, a location, and a
@@ -120,7 +118,7 @@ struct AwyLabel {
 // AWY - a single airway segment, perhaps shared by several airways.
 struct AWY: public Cullable {
     // Cullable interface.
-    const atlasSphere& bounds() { return _bounds; }
+    const atlasSphere &bounds() { return _bounds; }
     // EYE - an approximation - use centre?
     double latitude() { return start.lat; }
     double longitude() { return start.lon; }
@@ -133,14 +131,57 @@ struct AWY: public Cullable {
     double length;		// Length of segment in metres
 };
 
-struct RWY {
-    std::string id;
-    double lat, lon;		// centre of runway
-    float hdg;			// true heading, in degrees
-    float length, width;	// metres
+// RWY - a runway.  Runways are represented by a centre point, a
+// heading, a length, and a width.  Note that this can't deal with
+// crooked runways (yes, they do exist).  Should they ever be
+// introduced, we'll have to change it.
+class ARP;
+class RWY {
+  public:
+    // Initialize a runway given its id, centre, heading, length,
+    // widht, and owning airport.  The id should be for the end
+    // corresponding to the heading.  For example, if the heading is
+    // 52 degrees, then the id should be "05" (or "05R", "05L", ...).
+    RWY(char *id, double lat, double lon, float hdg, float len, float wid, 
+    	ARP *ap);
+    // Initialize a runway given the two runway ends, its width, and
+    // its owning airport.
+    RWY(char *id1, double lat1, double lon1, 
+	char *id2, double lat2, double lon2, 
+	float width, ARP *ap);
 
+    // The label of the runway (eg, "09", "12R", ...).  This is the
+    // end that is aligned with the runway heading given by hdg().
+    const char *label() { return _label; }
+    // The label at the other end of the runway (opposite hdg()).
+    const char *otherLabel();
+    float lat() { return _lat; }
+    float lon() { return _lon; }
+    float hdg() { return _hdg; }
+    float length() { return _length; }
+    float width() { return _width; }
+
+    const atlasSphere &bounds() { return _bounds; }
+    const sgdVec3 &centre() { return _bounds.center; }
+
+  protected:
+    // Set the bounding sphere of the runway.  This method assumes
+    // that _length, and _width are already initialized.  Since runway
+    // data doesn't include elevation, we need to have an elevation
+    // explicitly passed in (generally we use the airport elevation).
+    // Note as well that we don't use _lat and _lon - they are floats
+    // and we need doubles for sufficient accuracy.
+    void _setBounds(double lat, double lon, float elev);
+
+    // Runway end labels - we assume they are 3 chars or less.
+    char _label[4], _otherLabel[4];
+    float _lat, _lon;		// Centre of runway
+    float _hdg;			// True heading, in degrees
+    float _length, _width;	// Metres
+
+    // Our bounding sphere.  Importantly, it includes the exact
+    // cartesian coordinates of the runway centre.
     atlasSphere _bounds;
-    sgdVec3 ahead, aside, above;
 };
 
 enum ATCCodeType {WEATHER = 50, UNICOM, DEL, GND, TWR, APP, DEP};
@@ -149,36 +190,81 @@ enum ATCCodeType {WEATHER = 50, UNICOM, DEL, GND, TWR, APP, DEP};
 // associated with them.
 typedef std::map<std::string, std::set<int> > FrequencyMap;
 
-struct ARP: public Searchable, Cullable {
+class ARP: public Searchable, public Cullable {
   public:
+    ARP(char *name, char *code, float elev);
+    ~ARP();
+
+    const char *name() { return _name; }
+    const char *code() { return _code; }
+    float elevation() { return _elev; }
+
+    void setControlled(bool b) { _controlled = b; }
+    bool controlled() { return _controlled; }
+    void setLighting(bool b) { _lighting = b; }
+    bool lighting() { return _lighting; }
+    void setBeaconLoc(double lat, double lon);
+    // EYE - beaconLatitude(), beaconLongitude() to be consistent with
+    // latitude(), longitude()?  Or vice-versa?
+    double beaconLat() { return _beaconLat; }
+    double beaconLon() { return _beaconLon; }
+    bool beacon();
+
+    const std::vector<RWY *> &rwys() { return _rwys; }
+    void addRwy(RWY *rwy) { _rwys.push_back(rwy); }
+    const std::map<ATCCodeType, FrequencyMap> &freqs() { return _freqs; }
+    // Note: this assumes that 'freq' will be in the format found in
+    // the apt.dat file (eg, 12192 for 121.925 MHz).  It will be
+    // converted here to our own standard representation (121925 kHz),
+    // suitable for use in the formatFrequency() function.
+    void addFreq(ATCCodeType t, int freq, char *label);
+
     // Searchable interface.
-    const double *location() const { return _bounds.center; }
-    virtual double distanceSquared(const sgdVec3 from) const;
-    virtual const std::vector<std::string>& tokens();
-    virtual const std::string& asString();
+    // const double *location() const { return _bounds.center; }
+    const double *location() const;
+    double distanceSquared(const sgdVec3 from) const;
+    const std::vector<std::string> &tokens();
+    const char *asString();
 
     // Cullable interface.
-    const atlasSphere& bounds() { return _bounds; }
-    double latitude() { return lat; }
-    double longitude() { return lon; }
+    // const atlasSphere& bounds() { return _bounds; }
+    const atlasSphere &bounds();
+    double latitude();
+    double longitude();
 
-    std::string name, id;
-    double lat, lon;
-    float elev;
-    bool controlled;
-    bool lighting;		// True if any runway has any kind of
-				// runway lighting.
-    bool beacon;
-    // EYE - change this lat, lon stuff to a structure.  Use SGGeod?
-    double beaconLat, beaconLon;
-    std::vector<RWY *> rwys;
-    std::map<ATCCodeType, FrequencyMap> freqs;
+    // Extend our bounding sphere by the given sphere.
 
-    atlasSphere _bounds;
+    // EYE - note that this is only called when loading.  All this
+    // loading stuff should really be made an ARP method ('load()'),
+    // or maybe a series of methods ('parseAirport()',
+    // 'parseRunway()', ..., or perhaps 'ARP(float, int, char *)',
+    // 'addRunway()', 'addFrequency()', ...).
+    void extend(const sgdSphere &s) { _bounds.extend(&s); }
 
   protected:
+    // Calculates the airport's center in lat, lon from its bounds.
+    void _calcLatLon();
+
+    char *_name;
+    char _code[5];		// We assume airport codes are 4
+				// characters or less.  This is
+				// explicitly guaranteed in version
+				// 1000.
+    float _elev;
+    bool _controlled;
+    bool _lighting;		// True if any runway has any kind of
+				// runway lighting.
+
     std::vector<std::string> _tokens;
-    std::string _str;
+
+    atlasSphere _bounds;
+    // EYE - change this lat, lon stuff to a structure.  Use SGGeod?
+    // sgdVec2?  AtlasCoord?
+    double _lat, _lon;
+    double _beaconLat, _beaconLon;
+
+    std::vector<RWY *> _rwys;
+    std::map<ATCCodeType, FrequencyMap> _freqs;
 };
 
 class NavData {
@@ -189,7 +275,7 @@ class NavData {
     // NavData's hits() method returns the objects within our current
     // view.  Whenever the view changes, call these methods.
     void move(const sgdMat4 modelViewMatrix);
-    void zoom(const sgdFrustum& frustum);
+    void zoom(const sgdFrustum &frustum);
 
     // Returns all objects of the specified type within the view
     // specified by move() and zoom().
@@ -198,13 +284,13 @@ class NavData {
       { return _frustumCullers.at(t)->intersections(); }
 
     // Returns navaids within radio range.
-    const std::vector<Cullable *>& getNavaids(sgdVec3 p);
+    const std::vector<Cullable *> &getNavaids(sgdVec3 p);
     // Returns navaids within radio range and which are tuned in (as
     // given by 'p').
-    const std::vector<Cullable *>& getNavaids(FlightData *p);
+    const std::vector<Cullable *> &getNavaids(FlightData *p);
 
     // A vector of all individual airway segments.
-    const std::vector<AWY *>& segments() const { return _segments; }
+    const std::vector<AWY *> &segments() const { return _segments; }
 
   protected:
     // These load the given data, throwing an error if they fail.
@@ -214,11 +300,12 @@ class NavData {
     void _loadAirports(const char *fgRoot);
 
     // These are subsidiary methods used by the above.
-    void _loadNavaids810(float cycle, const gzFile& arp);
-    void _loadFixes600(const gzFile& arp);
-    void _loadAirways640(const gzFile& arp);
+    void _loadNavaids810(float cycle, const gzFile &arp);
+    void _loadFixes600(const gzFile &arp);
+    void _loadAirways640(const gzFile &arp);
     void _checkEnd(AwyLabel &end, bool isLow);
-    void _loadAirports810(const gzFile& arp);
+    void _loadAirports810(const gzFile &arp);
+    void _loadAirports1000(const gzFile &arp);
 
     Searcher *_searcher;
 

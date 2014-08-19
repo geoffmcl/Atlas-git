@@ -45,7 +45,11 @@
 
 using namespace std;
 
-void drawRunway(RWY *rwy, float border = 0.0);
+// Draw a runway.  If sideBorder and/or endBorder are > 0.0, then the
+// runway will be drawn bigger by that amount (both are in metres).
+void drawRunway(RWY *rwy, 
+		const float sideBorder = 0.0, 
+		const float endBorder = 0.0);
 
 // EYE - move to policy?
 // Border (magenta)
@@ -238,7 +242,8 @@ void AirportsOverlay::setDirty()
 //     glStencilFunc(GL_ALWAYS, 0x1, 0x1);
 //     glStencilOp(GL_REPLACE, GL_REPLACE, GL_REPLACE);
 //     glColor4f(0.0, 0.0, 0.0, 0.0);
-//     drawIcon(ap->lat, ap->lon, ap->elev, rI / _metresPerPixel);
+//     drawIcon(ap->latitude(), ap->longitude(), ap->elevation(), 
+// 	        rI / _metresPerPixel);
 //     glDisable(GL_BLEND);
 //
 // (4) Draw the circle.  The hole will remain undrawn.
@@ -246,7 +251,8 @@ void AirportsOverlay::setDirty()
 //     glStencilFunc(GL_NOTEQUAL, 0x1, 0x1);
 //     glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
 //     glColor4fv(arp_uncontrolled_colour);
-//     drawIcon(ap->lat, ap->lon, ap->elev, rO / _metresPerPixel);
+//     drawIcon(ap->latitude(), ap->longitude(), ap->elev, 
+//              rO / _metresPerPixel);
 //
 // (5) At the end of the draw routine, turn off the stencil test.
 //
@@ -293,17 +299,17 @@ void AirportsOverlay::drawBackgrounds(NavData *navData)
 	    assert(ap);
 
 	    const float *colour;
-	    if (ap->controlled) {
+	    if (ap->controlled()) {
 		colour = arp_controlled_colour;
 	    } else {
 		colour = arp_uncontrolled_colour;
 	    }
 
-	    rA = ap->_bounds.radius / _metresPerPixel; // pixels
+	    rA = ap->bounds().radius / _metresPerPixel; // pixels
 	    if (rA > rI) {
 		glColor4fv(colour);
-		for (unsigned int j = 0; j < ap->rwys.size(); j++) {
-		    drawRunway(ap->rwys[j], border);
+		for (unsigned int j = 0; j < ap->rwys().size(); j++) {
+		    drawRunway(ap->rwys()[j], border, border);
 		}
 	    } else if (rA > rMin) {
 		glColor4fv(colour);
@@ -350,26 +356,22 @@ void AirportsOverlay::drawForegrounds(NavData *navData)
 		continue;
 	    }
 
-	    rA = ap->_bounds.radius / _metresPerPixel; // pixels
+	    rA = ap->bounds().radius / _metresPerPixel; // pixels
 	    if (rA > rAMin) {
 
-		for (unsigned int j = 0; j < ap->rwys.size(); j++) {
-		    RWY *rwy = ap->rwys[j];
+		for (unsigned int j = 0; j < ap->rwys().size(); j++) {
+		    RWY *rwy = ap->rwys()[j];
 
-		    // This is a bit of a hack to ensure that runways
-		    // are never too skinny to show up clearly.  If
-		    // the runway width is less than the airport
-		    // minimum, we just set the width (temporarily) to
-		    // the airport minimum, draw the runway, then set
-		    // it back.
-		    float width = rwy->width;
-		    if (width < (rAMin * _metresPerPixel)) {
-			rwy->width = (rAMin * _metresPerPixel);
+		    // This is to ensure that runways are never too
+		    // skinny to show up clearly - runways are never
+		    // drawn skinnier than rAMin.
+		    float border = 
+		    	((rAMin * _metresPerPixel) - rwy->width()) / 2.0;
+		    if (border < 0.0) {
+		    	border = 0.0;
 		    }
 
-		    drawRunway(rwy);
-
-		    rwy->width = width;
+		    drawRunway(rwy, border);
 		}
 	    }
 	}
@@ -380,19 +382,19 @@ void AirportsOverlay::drawForegrounds(NavData *navData)
 	    if (!ap) {
 		continue;
 	    }
-	    rA = ap->_bounds.radius / _metresPerPixel; // pixels
+	    rA = ap->bounds().radius / _metresPerPixel; // pixels
 
 	    // Only draw the beacon if it has one and if the airport
 	    // is being drawn as an airport (outlined runways).
-	    if ((ap->beacon) && (rA > rI)) {
-		if (ap->controlled) {
+	    if ((ap->beacon()) && (rA > rI)) {
+		if (ap->controlled()) {
 		    glColor4fv(arp_controlled_colour);
 		} else {
 		    glColor4fv(arp_uncontrolled_colour);
 		}
 
 		// EYE - precompute this?
-		geodPushMatrix(ap->beaconLat, ap->beaconLon); {
+		geodPushMatrix(ap->beaconLat(), ap->beaconLon()); {
 		    // EYE - magic number.  Probably we should scale
 		    // this somewhat (start by drawing it small, then
 		    // draw it larger as we zoom in, up to a maximum).
@@ -446,10 +448,10 @@ void AirportsOverlay::drawLabels(NavData *navData)
 		continue;
 	    }
 
-	    rA = ap->_bounds.radius / _metresPerPixel; // pixels
+	    rA = ap->bounds().radius / _metresPerPixel; // pixels
 	    if (rA > rI) {
-		for (unsigned int j = 0; j < ap->rwys.size(); j++) {
-		    RWY *rwy = ap->rwys[j];
+		for (unsigned int j = 0; j < ap->rwys().size(); j++) {
+		    RWY *rwy = ap->rwys()[j];
 
 		    _labelRunway(rwy);
 		}
@@ -466,7 +468,7 @@ void AirportsOverlay::drawLabels(NavData *navData)
 
 	    // We don't label airports unless they're at least the
 	    // minimum size.
-	    rA = ap->_bounds.radius / _metresPerPixel;
+	    rA = ap->bounds().radius / _metresPerPixel;
 	    if (rA > rMin) {
 		_labelAirport(ap, rA);
 	    }
@@ -482,67 +484,31 @@ void AirportsOverlay::drawLabels(NavData *navData)
 // EYE - makes no allowance for the curvature of the earth; assumes
 // that we're ignoring depth buffer; ignores great circleness; assumes
 // colour has been set.
-void drawRunway(RWY *rwy, const float border)
+void drawRunway(RWY *rwy, const float sideBorder, const float endBorder)
 {
-    // Here's how to do the same thing via OpenGL calls.
-//     SGVec3<double> center;
-//     SGGeodesy::SGGeodToCart(SGGeod::fromDegM(lon, lat, elev), center);
+    // EYE - create an AtlasCoord version of geodPushMatrix?
+    geodPushMatrix(rwy->centre(), rwy->lat(), rwy->lon(), rwy->hdg()); {
+	glBegin(GL_QUADS); {
+	    // Normal always points straight up.
+	    glNormal3f(1.0, 0.0, 0.0);
 
-//     glPushMatrix(); {
-// 	glTranslated(center.x(), center.y(), center.z());
-// 	glRotatef(lon, 0.0, 0.0, 1.0);
-// 	glRotatef(-lat, 0.0, 1.0, 0.0);
-// 	glRotatef(-heading, 1.0, 0.0, 0.0);
-
-// 	// Normal always points straight up.
-// 	float normal[3];
-// 	normal[0] = 1.0;
-// 	normal[1] = 0.0;
-// 	normal[2] = 0.0;
-
-// 	glBegin(GL_QUADS); {
-// 	    glNormal3fv(normal);
-// 	    glVertex3fv(ll);
-// 	    glVertex3fv(lr);
-// 	    glVertex3fv(ur);
-// 	    glVertex3fv(ul);
-// 	}
-// 	glEnd();
-//     }
-//     glPopMatrix();
-
-    glBegin(GL_QUADS); {
-	sgdVec3 ahead, aside;
-	sgdScaleVec3(ahead, rwy->ahead, (rwy->length / 2.0) + border);
-	sgdScaleVec3(aside, rwy->aside, (rwy->width / 2.0) + border);
-
-	sgdVec3 location;
-	sgGeodToCart(rwy->lat * SGD_DEGREES_TO_RADIANS, 
-		     rwy->lon * SGD_DEGREES_TO_RADIANS, 
-		     0.0, location);
-	sgdVec3 l, u;
-	sgdVec3 ll, lr, ur, ul;
-	sgdSubVec3(l, location, ahead);
-	sgdSubVec3(ll, l, aside);
-	sgdAddVec3(lr, l, aside);
-	sgdAddVec3(u, location, ahead);
-	sgdSubVec3(ul, u, aside);
-	sgdAddVec3(ur, u, aside);
-
-	glNormal3dv(rwy->above);
-	glVertex3dv(ll);
-	glVertex3dv(lr);
-	glVertex3dv(ur);
-	glVertex3dv(ul);
+	    float w = rwy->width() / 2.0 + sideBorder;
+	    float l = rwy->length() / 2.0 + endBorder;
+	    glVertex2f(-w, -l); // ll
+	    glVertex2f(w, -l);	// lr
+	    glVertex2f(w, l);	// ur
+	    glVertex2f(-w, l);	// ul
+	}
+	glEnd();
     }
-    glEnd();
+    geodPopMatrix();
 }
 
 void AirportsOverlay::_drawIcon(ARP *ap, float radius)
 {
     // Radius is passed in in pixels; we convert it to metres
     radius = radius * _metresPerPixel;
-    geodPushMatrix(ap->_bounds.center, ap->lat, ap->lon); {
+    geodPushMatrix(ap->bounds().center, ap->latitude(), ap->longitude()); {
 	glScalef(radius, radius, radius);
 	glCallList(_airportIconDL);
     }
@@ -581,7 +547,7 @@ void AirportsOverlay::_labelAirport(ARP *ap, int rA)
     }
 
     const float *colour;
-    if (ap->controlled) {
+    if (ap->controlled()) {
 	colour = arp_controlled_colour;
     } else {
 	colour = arp_uncontrolled_colour;
@@ -593,7 +559,7 @@ void AirportsOverlay::_labelAirport(ARP *ap, int rA)
     lm.begin();
     lm.setFont(_overlays.regularFont(), pointSize);
 
-    globals.str.printf("%s (%s)", ap->name.c_str(), ap->id.c_str());
+    globals.str.printf("%s (%s)", ap->name(), ap->code());
     lm.addText(globals.str.str());
 
     // Frequencies
@@ -602,17 +568,17 @@ void AirportsOverlay::_labelAirport(ARP *ap, int rA)
     // Only do frequencies if we're very close.
     // EYE - magic number
     if (_metresPerPixel < 20.0) {
-	map<ATCCodeType, FrequencyMap>::iterator fMap;
-	for (fMap = ap->freqs.begin(); fMap != ap->freqs.end(); fMap++) {
-	    FrequencyMap& bar = fMap->second;
+	map<ATCCodeType, FrequencyMap>::const_iterator fMap;
+	for (fMap = ap->freqs().begin(); fMap != ap->freqs().end(); fMap++) {
+	    const FrequencyMap& bar = fMap->second;
 
 	    // The frequency map is a map from strings (like, "ATLANTA
 	    // APP") to a set of frequencies (118350, 126900, 127250,
 	    // 127900).  All of the name/frequency set pairs are
 	    // members of the same ATCCodeType (eg, APP).
-	    FrequencyMap::iterator freq;
+	    FrequencyMap::const_iterator freq;
 	    for (freq = bar.begin(); freq != bar.end(); freq++) {
-		set<int>& freqs = freq->second;
+		const set<int>& freqs = freq->second;
 
 		// Separate named groups of frequencies with two spaces.
 		if (freq != bar.begin()) {
@@ -644,12 +610,12 @@ void AirportsOverlay::_labelAirport(ARP *ap, int rA)
 	lm.setFont(_overlays.regularFont(), mediumFontSize, 0.25);
 	// We need to ensure that the number is at least 2 digits
 	// long (ie, '6' must be written '06').
-	globals.str.printf("%02.0f  ", ap->elev * SG_METER_TO_FEET);
+	globals.str.printf("%02.0f  ", ap->elevation() * SG_METER_TO_FEET);
 	lm.addText(globals.str.str());
 	lm.setItalics(0.0);
 
 	// Runway lighting.
-	if (ap->lighting) {
+	if (ap->lighting()) {
 	    lm.addText("L  ");
 	} else {
 	    lm.addText("-  ");
@@ -657,9 +623,9 @@ void AirportsOverlay::_labelAirport(ARP *ap, int rA)
 
 	// Runway length
 	float maxRwy = 0;
-	for (unsigned int i = 0; i < ap->rwys.size(); i++) {
-	    if (ap->rwys[i]->length > maxRwy) {
-		maxRwy = ap->rwys[i]->length;
+	for (unsigned int i = 0; i < ap->rwys().size(); i++) {
+	    if (ap->rwys()[i]->length() > maxRwy) {
+		maxRwy = ap->rwys()[i]->length();
 	    }
 	}
 	// According to the FAA's "IFR Aeronautical Chart Symbols"
@@ -696,38 +662,7 @@ void AirportsOverlay::_labelAirport(ARP *ap, int rA)
     lm.moveTo(x, y);
 
     // Finally - draw the text.
-    geodDrawText(lm, ap->lat, ap->lon);
-}
-
-// Given the label for one end of a runway, generates the label for
-// the other end.  The otherEnd variable must be at least 4 characters
-// long.
-void otherEnd(const char *thisEnd, char *otherEnd)
-{
-    int hdg;
-    unsigned int length;
-    sscanf(thisEnd, "%d%n", &hdg, &length);
-    assert((length == strlen(thisEnd)) || (length = strlen(thisEnd) - 1));
-    hdg = (hdg + 18) % 36;
-    if (hdg == 0) {
-	hdg = 36;
-    }
-
-    // Handle trailing character (if it exists).  If the character is
-    // 'L' or 'R', swap it for 'R' and 'L' respectively.  Otherwise
-    // leave it alone (presumably it's 'C').  If it doesn't exist, set
-    // it to '\0'.
-    char lr = '\0';
-    if (length < strlen(thisEnd)) {
-	if (thisEnd[length] == 'R') {
-	    lr = 'L';
-	} else if (thisEnd[length] == 'L') {
-	    lr = 'R';
-	} else {
-	    lr = thisEnd[length];
-	}
-    }
-    sprintf(otherEnd, "%02d%c", hdg, lr);
+    geodDrawText(lm, ap->bounds().center, ap->latitude(), ap->longitude());
 }
 
 // Labels a single runway (at both ends).  Because we only label a
@@ -743,10 +678,10 @@ void AirportsOverlay::_labelRunway(RWY *rwy)
 
     // Calculate size (in metres) of text.
     float pointSize;
-    if ((rwy->width * multiple) < (maxHeight * _metresPerPixel)) {
-	pointSize = rwy->width * multiple;
-    } else if (rwy->width > (maxHeight * _metresPerPixel)) {
-	pointSize = rwy->width;
+    if ((rwy->width() * multiple) < (maxHeight * _metresPerPixel)) {
+	pointSize = rwy->width() * multiple;
+    } else if (rwy->width() > (maxHeight * _metresPerPixel)) {
+	pointSize = rwy->width();
     } else {
 	pointSize = maxHeight * _metresPerPixel;
     }
@@ -757,14 +692,10 @@ void AirportsOverlay::_labelRunway(RWY *rwy)
     }
 
     // Label "main" end.
-    _labelRunwayEnd(rwy->id.c_str(), pointSize, 0.0, rwy);
+    _labelRunwayEnd(rwy->label(), pointSize, 0.0, rwy);
 
     // Label "other" end.
-    // EYE - precompute this, and precompute it more elegantly!
-    // EYE - use a string?
-    char label[4];
-    otherEnd(rwy->id.c_str(), label);
-    _labelRunwayEnd(label, pointSize, 180.0, rwy);
+    _labelRunwayEnd(rwy->otherLabel(), pointSize, 180.0, rwy);
 
     // Add runway length and width.  According to Canadian rules,
     // width is indicated only if different than 200', the standard
@@ -779,31 +710,31 @@ void AirportsOverlay::_labelRunway(RWY *rwy)
 
     // Calculate point size (in metres) of text.  We make the text fit
     // the runway width until it gets to maxHeight * 0.5.
-    pointSize = rwy->width;
+    pointSize = rwy->width();
     if (pointSize > (maxHeight * 0.5 * _metresPerPixel)) {
 	pointSize = maxHeight * 0.5 * _metresPerPixel;
     }
 
     // Create the label.
     globals.str.printf("%.0f' x %.0f'", 
-			rwy->length * SG_METER_TO_FEET,
-			rwy->width * SG_METER_TO_FEET);
+		       rwy->length() * SG_METER_TO_FEET,
+		       rwy->width() * SG_METER_TO_FEET);
     LayoutManager lm(globals.str.str(), _overlays.regularFont(), pointSize);
 
     // Now draw it.
-    geodDrawText(lm, rwy->lat, rwy->lon, rwy->hdg - 90.0);
+    geodDrawText(lm, rwy->centre(), rwy->lat(), rwy->lon(), rwy->hdg() - 90.0);
 }
 
 // Writes the given label at the end of the given rwy, where 'end' is
-// defined by the given heading.  The only reasonable values are 0.0
-// (the "main" end), and 180.0 (the "other" end).
+// defined by the given heading.  The only reasonable values for hdg
+// are 0.0 (the "main" end), and 180.0 (the "other" end).
 void AirportsOverlay::_labelRunwayEnd(const char *str, float pointSize,
 				      float hdg, RWY *rwy)
 {
     LayoutManager lm(str, _overlays.regularFont(), pointSize);
-    lm.moveTo(0.0, -rwy->length / 2.0, LayoutManager::UC);
+    lm.moveTo(0.0, -rwy->length() / 2.0, LayoutManager::UC);
 
-    geodPushMatrix(rwy->lat, rwy->lon, rwy->hdg + hdg); {
+    geodPushMatrix(rwy->centre(), rwy->lat(), rwy->lon(), rwy->hdg() + hdg); {
     	// EYE - magic number
     	glScalef(0.5, 1.0, 1.0); // Squish characters together
 	lm.drawText();

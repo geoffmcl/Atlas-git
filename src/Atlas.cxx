@@ -4,7 +4,7 @@
 
   Written by Per Liedman, started February 2000.
   Copyright (C) 2000 Per Liedman, liedman@home.se
-  Copyright (C) 2009 - 2012 Brian Schack
+  Copyright (C) 2009 - 2014 Brian Schack
 
   This file is part of Atlas.
 
@@ -234,7 +234,7 @@ int main(int argc, char **argv)
 		Searchable *s = _ac->searcher()->getMatch(i);
 		ARP *ap;
 		if ((ap = dynamic_cast<ARP *>(s))) {
-		    globals.aw->movePosition(ap->lat, ap->lon);
+		    globals.aw->movePosition(ap->latitude(), ap->longitude());
 		    break;
 		}
 	    }
