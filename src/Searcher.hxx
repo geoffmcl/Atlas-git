@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2012 Brian Schack
+  Copyright (C) 2009 - 2014 Brian Schack
 
   A Searchable is anything that can be added to and used by a
   Searcher.  It is capable of representing itself as a
@@ -58,9 +58,13 @@ class Searchable {
 			 std::vector<std::string>& tokens);
 
     // All of our tokens.
+    // EYE - we make a copy of these, which is a waste.  We should
+    // really manage pointers to strings, rather than strings.
     virtual const std::vector<std::string>& tokens() = 0;
-    // A nicely printed representation of ourselves.
-    virtual const std::string& asString() = 0;
+    // A nicely printed representation of ourselves.  Callers should
+    // copy this if they need a permanent copy, as subclasses aren't
+    // required to maintain a local copy.
+    virtual const char *asString() = 0;
 
     // Cartesian coordinate (sgdVec3).
     virtual const double *location() const = 0;
@@ -73,7 +77,7 @@ class Searchable {
 // a caseless comparison.
 class CaseFreeLessThan {
   public:
-    bool operator()(const std::string& left, const std::string& right) {
+    bool operator()(const std::string& left, const std::string& right) const {
 	return (strcasecmp(left.c_str(), right.c_str()) < 0);
     }
 };
