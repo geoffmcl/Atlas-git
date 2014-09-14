@@ -44,8 +44,8 @@ class FlightData;
 enum NavType {NAV_VOR, NAV_DME, NAV_NDB, NAV_ILS, NAV_GS, 
 	      NAV_OM, NAV_MM, NAV_IM};
 enum NavSubType {DME, DME_ILS, GS, IGS, ILS_cat_I, ILS_cat_II, ILS_cat_III, 
-		 IM, LDA, LDA_GS, LOC, LOM, MM, NDB, NDB_DME, OM, SDF, TACAN, 
-		 VOR, VOR_DME, VORTAC, UNKNOWN};
+		 IM, LDA, LDA_GS, LOC, LOC_GS, LOM, MM, NDB, NDB_DME, OM, SDF, 
+		 TACAN, VOR, VOR_DME, VORTAC, UNKNOWN};
 
 struct NAV: public Searchable, Cullable {
   public:

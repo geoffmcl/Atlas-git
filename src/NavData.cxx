@@ -720,6 +720,8 @@ void NavData::_loadNavaids810(float cycle, const gzFile &arp)
 		navsubtype = ILS_cat_III;
 	    } else if (strcmp(subType, "LDA-GS") == 0) {
 		navsubtype = LDA_GS;
+	    } else if (strcmp(subType, "LOC-GS") == 0) {
+		navsubtype = LOC_GS;
 	    } else {
 		navsubtype = UNKNOWN;
 	    }

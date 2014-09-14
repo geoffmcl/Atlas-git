@@ -1292,6 +1292,7 @@ void NavaidsOverlay::_renderILS(const NAV *n)
 	      case ILS_cat_II:
 	      case ILS_cat_III:
 	      case LDA_GS:
+	      case LOC_GS:
 		if (live) {
 // 		    // We draw two triangles: one for the front course
 // 		    // and one for the back course.
@@ -1696,6 +1697,9 @@ Label *NavaidsOverlay::_makeLabel(const char *fmt, const NAV *n,
 		    break;
 		  case LDA_GS:
 		    line.appendf(" LDA-GS");
+		    break;
+		  case LOC_GS:
+		    line.appendf(" LOC-GS");
 		    break;
 		  case LDA:
 		    line.appendf(" LDA");
