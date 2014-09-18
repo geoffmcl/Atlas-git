@@ -21,6 +21,13 @@
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
 ---------------------------------------------------------------------------*/
 
+// We include glew to get some function definitions that Linux doesn't
+// automatically define (eg, glBindBuffer()).  Normally, a library
+// include file would come after our own include file (Subbucket.hxx).
+// However, glew insists on being included before gl.h, and something
+// in Subbucket.hxx includes gl.h.
+#include <GL/glew.h>
+
 // Our include file
 #include "Subbucket.hxx"
 
