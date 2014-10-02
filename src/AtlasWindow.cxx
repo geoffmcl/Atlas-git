@@ -3165,9 +3165,7 @@ void Route::_draw(GreatCircle &gc, float distance, double metresPerPixel,
 		  const sgdFrustum &frustum, const sgdMat4 &m, 
 		  atlasFntTexFont *fnt, bool magTrue)
 {
-    glPushAttrib(GL_DEPTH_BUFFER_BIT | GL_POINT_BIT); {
-	glDisable(GL_DEPTH_TEST);
-
+    glPushAttrib(GL_POINT_BIT); {
 	if (active) {
 	    glColor3f(1.0, 0.0, 0.0);
 	} else {
@@ -3248,8 +3246,8 @@ Route route;
 // // EYE - make into an overlay?  Combine with flight tracks?
 // vector<Route> routes;
 
-ScreenLocation::ScreenLocation(Scenery *scenery): 
-    _scenery(scenery), _valid(false), _validElevation(false)
+ScreenLocation::ScreenLocation(GLUTWindow *win): 
+    _win(win), _valid(false), _validElevation(false)
 {
 }
 
@@ -3270,14 +3268,8 @@ AtlasCoord &ScreenLocation::coord()
 {
     if (!_valid) {
     	SGVec3<double> cart;
-	// EYE - Should scenery be an overlay?
-    	_valid = _scenery->intersection(_x, _y, &cart, &_validElevation);
-    	if (_valid) {
-    	    _loc.set(cart);
-    	} else {
-    	    // We don't throw an error - the user needs to check _loc
-    	    _loc.invalidate();
-    	}
+    	_valid = _intersection(_x, _y, &cart, &_validElevation);
+	_loc.set(cart);
     }
 
     return _loc;
@@ -3296,6 +3288,168 @@ void ScreenLocation::invalidate()
     _valid = _validElevation = false;
 }
 
+// Returns the cartesian coordinates of the world at the screen x, y
+// point.  Returns true if there is an intersection, false otherwise.
+// If we have an elevation value for the intersection then
+// validElevation will be set to true (live scenery provides us with
+// elevation information, but scenery textures do not).  
+//
+// If we return true, then c contains the coordinates of the surface
+// of the earth at <x, y>.  If we have lives scenery, the elevation of
+// those coordinates is valid.  If we return false, then c contains
+// the coordinates of a point in space.  That point is on a plane
+// going through the centre of the earth and parallel to the screen.
+//
+// We calculate the intersection in three different ways, depending on
+// if we have live scenery or not, and whether we intersect the earth
+// or not.  With live scenery, we find out where the ray intersects
+// the scenery, returning the cartesian coordinates of that point.
+// With textures, we intersect with an idealized earth ellipsoid.
+// When the ray doesn't intersect the earth, we just calculate the
+// cartesian coordinates of the point at <x, y, 1.0> (where z = 1.0 is
+// the far depth plane, presumed to run through the centre of the
+// earth).
+//
+// x and y are window coordinates which represent a point, not a
+// pixel.  For example, if a window is 100 pixels wide and 50 pixels
+// high, the lower right *pixel* is (99, 49).  However, the *point*
+// (99.0, 49.0) is the top left corner of that pixel.  The lower right
+// corner of the entire window is (100.0, 50.0).  If you are calling
+// this with a mouse coordinate, you probably should add 0.5 to both
+// the x and y coordinates, which is the centre of the pixel the mouse
+// is on.
+bool ScreenLocation::_intersection(float x, float y, SGVec3<double> *c, 
+				   bool *validElevation)
+{
+    GLint viewport[4];
+    GLdouble mvmatrix[16], projmatrix[16];
+    GLdouble wx, wy, wz;	// World x, y, z coords.
+
+    // Make sure we're the active window.
+    int oldWindow = _win->set();
+
+    // Our line is given by two points: the intersection of our
+    // viewing "ray" with the near depth plane and far depth planes.
+    // This assumes that we're using an orthogonal projection - in a
+    // perspective projection, we'd use our eyepoint as one of the
+    // points and the near depth plane as the other.
+    glGetIntegerv(GL_VIEWPORT, viewport);
+    glGetDoublev(GL_MODELVIEW_MATRIX, mvmatrix);
+    glGetDoublev(GL_PROJECTION_MATRIX, projmatrix);
+
+    // We need to convert from window coordinates, where y increases
+    // down, to viewport coordinates, where y increases up.
+    y = _win->height() - y;
+
+    // Near depth plane intersection.
+    gluUnProject (x, y, 0.0, mvmatrix, projmatrix, viewport, &wx, &wy, &wz);
+    SGVec3<double> nnear(wx, wy, wz);
+
+    // Far depth plane intersection.
+    gluUnProject (x, y, 1.0, mvmatrix, projmatrix, viewport, &wx, &wy, &wz);
+    SGVec3<double> ffar(wx, wy, wz);
+    
+    // If validElevation is not NULL, that means the caller is
+    // interested in a valid elevation result, which means we must
+    // query our depth buffer.
+    if (validElevation != NULL) {
+	// For now, assume that no buckets intersect.
+	*validElevation = false;
+
+	// Make sure the screen coordinates are valid - glReadPixels
+	// doesn't report errors if they're out of range.
+	if ((x >= 0) && (x < _win->width()) && 
+	    (y >= 0) && (y < _win->height())) {
+	    GLfloat z;
+	    glReadPixels(x, y, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &z);
+	    // EYE - this really should be a global constant.
+	    GLfloat clearValue = 1.0;
+	    // EYE - calling this causes significant slowdown
+	    // glGetFloatv(GL_DEPTH_CLEAR_VALUE, &clearValue);
+	    if (z < clearValue) {
+		*validElevation = true;
+
+		gluUnProject(x, y, z, 
+			     mvmatrix, projmatrix, viewport, 
+			     &wx, &wy, &wz);
+		c->x() = wx;
+		c->y() = wy;
+		c->z() = wz;
+	    }
+	}
+    }
+    // EYE - check and copy any useful documentation from Scenery,
+    // Bucket, ... intersection() methods.  Also make sure that we
+    // always get called when the window is active.
+
+    // Beyond this point, we don't do any OpenGL stuff, so we can
+    // restore the old active window.
+    _win->set(oldWindow);
+
+    // If the user was interested in getting an elevation and we
+    // actually got one, we can return now.
+    if ((validElevation != NULL) && *validElevation) {
+	return true;
+    }
+
+    // If we got here, that means no tiles intersected or the user
+    // isn't interested in an elevation.  So, we'll just use a simple
+    // earth/ray intersection with a standard earth ellipsoid.  This
+    // will give us the lat/lon, but the elevation will always be 0
+    // (sea level).
+    //
+    // We stretch the universe along the earth's axis so that the
+    // earth is a sphere.  This code assumes that the earth is centred
+    // at the origin, and that the earth's axis is aligned with the z
+    // axis, north positive.
+    //
+    // This website:
+    //
+    // http://mysite.du.edu/~jcalvert/math/ellipse.htm
+    //
+    // has a good explanation of ellipses, including the statement "The
+    // ellipse is just this auxiliary circle with its ordinates shrunk in the
+    // ratio b/a", where a is the major axis (equatorial plane), and b is
+    // the minor axis (axis of rotation).
+    assert((validElevation == NULL) || (*validElevation == false));
+    SGVec3<double> centre(0.0, 0.0, 0.0);
+    double mu1, mu2;
+    nnear[2] *= SGGeodesy::STRETCH;
+    ffar[2] *= SGGeodesy::STRETCH;
+    if (RaySphere(nnear, ffar, centre, SGGeodesy::EQURAD, &mu1, &mu2)) {
+	SGVec3<double> s1, s2;
+	s1 = nnear + mu1 * (ffar - nnear);
+	s2 = nnear + mu2 * (ffar - nnear);
+
+	// Take the nearest intersection (the other is on the other
+	// side of the world).
+	if (dist(nnear, s1) < dist(nnear, s2)) {
+	    // Unstretch the world.
+	    s1[2] /= SGGeodesy::STRETCH;
+	    *c = s1;
+	} else {
+	    // Unstretch the world.
+	    s2[2] /= SGGeodesy::STRETCH;
+	    *c = s2;
+	}
+
+	return true;
+    } else {
+	// We don't intersect the earth at all, so just report the
+	// cartesian coordinates of the point <x, y, 1.0>.  Note -
+	// this assumes the centre of the earth lies on the far depth
+	// plane, which lies at z = 1.0.
+	GLfloat z = 1.0;
+	gluUnProject(x, y, z, 
+		     mvmatrix, projmatrix, viewport, 
+		     &wx, &wy, &wz);
+	c->x() = wx;
+	c->y() = wy;
+	c->z() = wz;
+	return false;
+    }
+}
+
 AtlasWindow::AtlasWindow(const char *name, 
 			 const char *regularFontFile,
 			 const char *boldFontFile,
@@ -3306,10 +3460,11 @@ AtlasWindow::AtlasWindow(const char *name,
     _renderDialog(NULL), _renderConfirmDialog(NULL),
     _dispatcher(NULL), _searchTimerScheduled(false)
 {
-    // Initialize OpenGL, starting with clearing (background) color
-    // and enabling depth testing.
+    // EYE - check which of these are defaults already?  For example,
+    // by default the clearing colour is (0.0, 0.0, 0.0, 0.0).
+
+    // Initialize OpenGL, starting with clearing (background) colour.
     glClearColor(0.0, 0.0, 0.0, 0.0);
-    glEnable(GL_DEPTH_TEST);
 
     // Turn on backface culling.  We use the OpenGL standard of
     // counterclockwise winding for front faces.
@@ -3361,8 +3516,8 @@ AtlasWindow::AtlasWindow(const char *name,
     // Create our screen location objects.  They track the lat/lon
     // (and elevation, if available) of what's beneath the cursor and
     // the centre of the screen, respectively.
-    _cursor = new ScreenLocation(_scenery);
-    _centre = new ScreenLocation(_scenery);
+    _cursor = new ScreenLocation(this);
+    _centre = new ScreenLocation(this);
 
     // Create our overlays and initialize them.
     _overlays = new Overlays(this);
@@ -3579,7 +3734,7 @@ void AtlasWindow::_display()
     // globals.str.printf("%.0f frames/s", (float)times.size() / t);
 
     // EYE - create a "write text on screen" method in AtlasWindow?
-    glPushAttrib(GL_CURRENT_BIT | GL_DEPTH_BUFFER_BIT | GL_TRANSFORM_BIT); {
+    glPushAttrib(GL_CURRENT_BIT | GL_TRANSFORM_BIT); {
 	glMatrixMode(GL_PROJECTION);
 	glPushMatrix();
 	glLoadIdentity();
@@ -3589,7 +3744,6 @@ void AtlasWindow::_display()
 	glLoadIdentity();
 
 	glColor4f(0.0, 0.0, 0.0, 1.0);
-	glDisable(GL_DEPTH_TEST);
 	glRasterPos2i(10, height() - 25);
 	for (const char *c = fpsStr.str(); *c; c++) {
 	// for (const char *c = globals.str.str(); *c; c++) {
@@ -3653,11 +3807,10 @@ void AtlasWindow::_mouse(int button, int state, int x, int y)
 	switch (button) {
 	  case GLUT_LEFT_BUTTON:
 	    if (state == GLUT_DOWN) {
-		if (_scenery->intersection(x, y, &_oldC)) {
-		    // EYE - do we need to set _dragging here, or
-		    // should we wait until mouseMotion gets called?
-		    _dragging = true;
-		}
+		_oldC = cursor()->cart();
+		// EYE - do we need to set _dragging here, or
+		// should we wait until mouseMotion gets called?
+		_dragging = true;
 	    } else {
 		_dragging = false;
 	    }
@@ -3695,29 +3848,27 @@ void AtlasWindow::_motion(int x, int y)
 
     if (_dragging) {
 	SGVec3<double> newC;
-	if (_scenery->intersection(x, y, &newC)) {
-	    // The two vectors, _oldC and newC, define the plane and
-	    // angle of rotation.  A line perpendicular to this plane,
-	    // passing through the origin, is our axis of rotation.
-	    // However, if the two vectors are the same, there is no
-	    // motion (nor do they define a plane), so we just return
-	    // immediately.
-	    if (_oldC == newC) {
-		return;
-	    }
-
-	    sgdVec3 axis;
-	    sgdMat4 rot;
-
-	    sgdVectorProductVec3(axis, newC.data(), _oldC.data());
-	    double theta = SGD_RADIANS_TO_DEGREES *
-		atan2(sgdLengthVec3(axis), 
-		      sgdScalarProductVec3(_oldC.data(), newC.data()));
-	    sgdMakeRotMat4(rot, theta, axis);
-	    
-	    // Transform the eye point and the camera up vector.
-	    rotatePosition(rot);
+	newC = cursor()->cart();
+	// The two vectors, _oldC and newC, define the plane and angle
+	// of rotation.  A line perpendicular to this plane, passing
+	// through the origin, is our axis of rotation.  However, if
+	// the two vectors are the same, there is no motion (nor do
+	// they define a plane), so we just return immediately.
+	if (_oldC == newC) {
+	    return;
 	}
+
+	sgdVec3 axis;
+	sgdMat4 rot;
+
+	sgdVectorProductVec3(axis, newC.data(), _oldC.data());
+	double theta = SGD_RADIANS_TO_DEGREES *
+	    atan2(sgdLengthVec3(axis), 
+		  sgdScalarProductVec3(_oldC.data(), newC.data()));
+	sgdMakeRotMat4(rot, theta, axis);
+	    
+	// Transform the eye point and the camera up vector.
+	rotatePosition(rot);
     } else if (puMouse(x, y)) {
 	postRedisplay();
     }
@@ -4698,6 +4849,13 @@ void AtlasWindow::zoomTo(double scale)
 {
     _metresPerPixel = scale;
 
+    // A note about the use of the far clip plane: We set the far clip
+    // plane to the centre of the earth.  This gives us a cheap and
+    // reliable way to do hidden surface removal, since everything
+    // beyond a plane parallel to the screen passing through the
+    // earth's centre is on the other side of the earth and therefore
+    // not visible.
+
     // Calculate clip planes.  Why 'nnear' and 'ffar', not 'near' and
     // 'far'?  Windows.
     double left, right, bottom, top, nnear, ffar;
@@ -4956,9 +5114,7 @@ void AtlasWindow::_debugPrefixKeypressed(unsigned char key, int x, int y)
 
 	    SGGeod centreGeod;
 	    SGVec3<double> centreCart;
-	    bool foo;
- 	    _scenery->intersection(_centre->x(), _centre->y(), &centreCart,
-				   &foo);
+	    centreCart = centre()->cart();
  	    SGGeodesy::SGCartToGeod(centreCart, centreGeod);
  
  	    printf("%.8f, %.8f, %f (%f metres)\n",
@@ -4982,8 +5138,7 @@ void AtlasWindow::_debugPrefixKeypressed(unsigned char key, int x, int y)
 		      lookAtCart[0], lookAtCart[1], lookAtCart[2],
 		      eyeUp()[0], eyeUp()[1], eyeUp()[2]);
 
-	    _scenery->intersection(_centre->x(), _centre->y(), &centreCart, 
-				   &foo);
+	    centreCart = centre()->cart();
 	    SGGeodesy::SGCartToGeod(centreCart, centreGeod);
 
 	    printf("\t%.8f, %.8f, %f (%f metres)\n",

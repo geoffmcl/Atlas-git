@@ -95,16 +95,17 @@ class Route {
 //////////////////////////////////////////////////////////////////////
 //
 // ScreenLocation maintains a window x, y coordinate, and its
-// corresponding location on the earth (which it determines using a
-// Scenery object).  ScreenLocation does not track changes to the
-// view, so it must be told when to recalculate its location, via the
+// corresponding location on the earth (which it determines using the
+// depth buffer of the map window, which should be passed in the
+// constructor).  ScreenLocation does not track changes to the view,
+// so it must be told when to recalculate its location, via the
 // invalidate() call.
 //
 //////////////////////////////////////////////////////////////////////
 class ScreenLocation {
   public:
-    ScreenLocation(Scenery *scenery);
-    // ScreenLocation(ScreenLocation &loc);
+    ScreenLocation(GLUTWindow *win);
+    // ScreenLocation(ScreenLocation &loc): 
 
     // Set x, y.  This also causes us to be invalidated.
     void set(float x, float y);
@@ -134,17 +135,32 @@ class ScreenLocation {
     void invalidate();
 
   protected:
-    // We use this to figure out what's beneath our given screen
-    // coordinates.
-    Scenery *_scenery;
+    // Calculates the intersection of the viewing ray that goes
+    // through the window at <x, y> with the earth, returning true if
+    // the ray intersects the earth (in which case c contains the
+    // point of intersection).  If it returns false, c represents the
+    // point in world space at <x, y, 1.0>, which is on the plane
+    // going through the earth's centre (the far clip plane).  If it
+    // intersects with live scenery, then validElevation (if it is
+    // non-null) is set to true, and the elevation in c is the actual
+    // elevation at that point.  If validElevation is false, then the
+    // elevation in c is the elevation with the earth ellipsoid.  x
+    // and y use window coordinates, with <0.0, 0.0> at the top left
+    // corner, and <w, h> at the bottom right corner (where w and h
+    // are the window width and height respectively).
+    bool _intersection(float x, float y, SGVec3<double> *c, 
+		       bool *validElevation);
 
-    // Note that both ScreenLocation and AtlasCoord have notions of
-    // validity.  When the ScreenLocation is valid (_valid = true),
-    // that means we've called intersection() with the current x, y
-    // coordinates.  When the AtlasCoord is valid (_loc.valid() =
-    // true), that means the intersection hit the earth.  Finally,
-    // _validElevation tells us if the intersection was with live
-    // scenery.
+    // We use the depth buffer of the map window to figure out the
+    // geographic coordinates of what's beneath our given screen
+    // coordinates.
+    GLUTWindow *_win;
+
+    // Note that we have two notions of validity.  When the
+    // ScreenLocation is valid (_valid = true), that means we've
+    // called intersection() with the current x, y coordinates.  When
+    // _validElevation is true, the intersection was with live
+    // scenery, and so the elevation is usable.
     bool _valid, _validElevation;
     float _x, _y;
     AtlasCoord _loc;

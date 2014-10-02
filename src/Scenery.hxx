@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2008 - 2012 Brian Schack
+  Copyright (C) 2008 - 2014 Brian Schack
 
   The scenery object is responsible for loading and displaying
   scenery, whether that scenery comes in the form of pre-rendered maps
@@ -116,23 +116,6 @@ class Scenery {
 
     // Tells us that the tile's status has changed.
     void update(Tile *t);
-
-    // Calculates the intersection of the viewing ray that goes
-    // through the window at <x, y> with the earth, returning true if
-    // the ray intersects the earth (in which case c contains the
-    // point of intersection).  If it intersects with live scenery,
-    // then validElevation (if it is non-null) is set to true, and the
-    // elevation in c is the actual elevation at that point.  If
-    // validElevation is false, then the elevation in c is the
-    // elevation with the earth ellipsoid.  x and y use window
-    // coordinates, with <0.0, 0.0> at the top left corner, and <w, h>
-    // at the bottom right corner (where w and h are the window width
-    // and height respectively).
-
-    // EYE - we should also return the bucket id so that we can
-    // quickly get map information.
-    bool intersection(double x, double y, SGVec3<double> *c, 
-		      bool *validElevation = NULL);
 
   protected:
     // Draws MEF labels on the scenery.

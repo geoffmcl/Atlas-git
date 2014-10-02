@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2012 - 2013 Brian Schack
+  Copyright (C) 2012 - 2014 Brian Schack
 
   This file is part of Atlas.
 
@@ -255,12 +255,7 @@ void Background::draw()
 		glBindTexture(GL_TEXTURE_2D, _statusTexture);
 
     		////////////////////////////////////////////////////////////
-    		// Stitch the texture to the globe.  We move the
-    		// background world back slightly so that the scenery,
-    		// when draped over the world, is not obscured by this
-    		// texture map.
-    	    	glEnable(GL_POLYGON_OFFSET_FILL);
-    	    	glPolygonOffset(1.0, 1.0);
+    		// Stitch the texture to the globe.
 
 		// Specify the vertices.
     	    	glEnableClientState(GL_VERTEX_ARRAY);
@@ -324,8 +319,6 @@ void Background::drawOutlines()
     if (currentLoc->coord().valid()) {
 	glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT);
 	glPushAttrib(GL_ENABLE_BIT | GL_LINE_BIT); {
-	    // EYE - get rid of depth test everywhere?
-	    glDisable(GL_DEPTH_TEST);
 	    glLineWidth(2.0);
 
 	    // Tell OpenGL where the vertex data is and enable

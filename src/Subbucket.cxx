@@ -442,7 +442,7 @@ bool Subbucket::load(Bucket::Projection projection)
 	// _vertices[i * 3 + 1], and _vertices[i * 3 + 2] (ditto for
 	// the ith normal).
 	index *= 3;
-	v *= 3;
+
     	// Now convert the point using the given projection.
 	if (projection == Bucket::CARTESIAN) {
 	    // This is a true 3D rendering.
@@ -803,12 +803,18 @@ void Subbucket::draw()
 	    indices.draw();
 	}
 
+	// EYE - To reduce the number of times we turn the depth test
+	// on and off (assuming that slows things down), we might want
+	// to have separate draw() methods, one for materials and
+	// contours (which use the depth buffer), another for contour
+	// lines and polygon edges (which don't).
+
 	// ---------- Contour lines ----------
 	NormalVBO::disable();
 	ColourVBO::disable();
 	if (Bucket::contourLines) {
 	    glPushAttrib(GL_LINE_BIT | GL_CURRENT_BIT | GL_DEPTH_BUFFER_BIT); {
-		glDisable(GL_DEPTH_TEST);
+	    	glDisable(GL_DEPTH_TEST);
 		glLineWidth(0.5);
 		glColor4f(0.0, 0.0, 0.0, 1.0);
 		_contourLines.draw();
@@ -819,8 +825,8 @@ void Subbucket::draw()
         // ---------- Polygon edges ----------
 	if (Bucket::polygonEdges) {
 	    glPushAttrib(GL_LINE_BIT | GL_POLYGON_BIT | GL_CURRENT_BIT | 
-			 GL_DEPTH_BUFFER_BIT); {
-		glDisable(GL_DEPTH_TEST);
+	    		 GL_DEPTH_BUFFER_BIT); {
+	    	glDisable(GL_DEPTH_TEST);
 		glPolygonMode(GL_FRONT, GL_LINE);
 		glLineWidth(0.5);
 		glColor4f(1.0, 0.0, 0.0, 1.0);

@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2012 Brian Schack
+  Copyright (C) 2009 - 2014 Brian Schack
 
   This file is part of Atlas.
 
@@ -99,55 +99,48 @@ AtlasController *Overlays::ac()
 // Draws all the overlays.
 void Overlays::draw(NavData *navData)
 {
-    // We assume that when called, the depth test is on, and lighting
-    // is off.
-    assert(glIsEnabled(GL_DEPTH_TEST) && !glIsEnabled(GL_LIGHTING));
+    // We assume that when called, the depth test and lighting are
+    // off.
+    assert(!glIsEnabled(GL_DEPTH_TEST) && !glIsEnabled(GL_LIGHTING));
 
-    // Overlays must be written on top of whatever scenery is there,
-    // so we ignore depth values.
-    glPushAttrib(GL_DEPTH_BUFFER_BIT); {
-	glDisable(GL_DEPTH_TEST);
-
-	if (_overlays[AIRPORTS]) {
-	    _airports->drawBackgrounds(navData);
-	}
-	// We sandwich ILSs between runway backgrounds and the runways.
-	if (_overlays[NAVAIDS] && _overlays[ILS]) {
-	    _navaids->drawILSs(navData);
-	}
-	if (_overlays[AIRPORTS]) {
-	    _airports->drawForegrounds(navData);
-	    if (_overlays[LABELS]) {
-		_airports->drawLabels(navData);
-	    }
-	}
-	if (_overlays[AIRWAYS]) {
-	    _airways->draw(_overlays[HIGH], _overlays[LOW], _overlays[LABELS],
-			   navData);
-	}
-	if (_overlays[NAVAIDS] && _overlays[FIXES]) {
-	    _fixes->draw(navData);
-	}
-	if (_overlays[NAVAIDS] && _overlays[NDB]) {
-	    _navaids->drawNDBs(navData);
-	}
-	if (_overlays[NAVAIDS] && _overlays[VOR]) {
-	    _navaids->drawVORs(navData);
-	}
-	if (_overlays[NAVAIDS] && _overlays[DME]) {
-	    _navaids->drawDMEs(navData);
-	}
-	if (_overlays[CROSSHAIRS]) {
-	    _crosshairs->draw();
-	}
-	if (_overlays[RANGE_RINGS]) {
-	    _rangeRings->draw();
-	}
-	if (_overlays[TRACKS]) {
-	    _tracks->draw();
+    if (_overlays[AIRPORTS]) {
+	_airports->drawBackgrounds(navData);
+    }
+    // We sandwich ILSs between runway backgrounds and the runways.
+    if (_overlays[NAVAIDS] && _overlays[ILS]) {
+	_navaids->drawILSs(navData);
+    }
+    if (_overlays[AIRPORTS]) {
+	_airports->drawForegrounds(navData);
+	if (_overlays[LABELS]) {
+	    _airports->drawLabels(navData);
 	}
     }
-    glPopAttrib();
+    if (_overlays[AIRWAYS]) {
+	_airways->draw(_overlays[HIGH], _overlays[LOW], _overlays[LABELS],
+		       navData);
+    }
+    if (_overlays[NAVAIDS] && _overlays[FIXES]) {
+	_fixes->draw(navData);
+    }
+    if (_overlays[NAVAIDS] && _overlays[NDB]) {
+	_navaids->drawNDBs(navData);
+    }
+    if (_overlays[NAVAIDS] && _overlays[VOR]) {
+	_navaids->drawVORs(navData);
+    }
+    if (_overlays[NAVAIDS] && _overlays[DME]) {
+	_navaids->drawDMEs(navData);
+    }
+    if (_overlays[CROSSHAIRS]) {
+	_crosshairs->draw();
+    }
+    if (_overlays[RANGE_RINGS]) {
+	_rangeRings->draw();
+    }
+    if (_overlays[TRACKS]) {
+	_tracks->draw();
+    }
 }
 
 void Overlays::setVisibility(OverlayType type, bool value)

@@ -727,25 +727,6 @@ void SceneryTile::label(double metresPerPixel, bool live)
     }
 }
 
-// Returns true if the ray given by a and b intersects a bucket in
-// this tile.  The point of intersection is given in c.  Note that if
-// no buckets are loaded, we just return false.
-bool SceneryTile::intersection(SGVec3<double> a, SGVec3<double> b, 
-			       SGVec3<double> *c)
-{
-    if (_buckets == NULL) {
-	return false;
-    }
-
-    for (unsigned int i = 0; i < _buckets->size(); i++) {
-	if ((*_buckets)[i]->intersection(a, b, c)) {
-	    return true;
-	}
-    }
-
-    return false;
-}
-
 // This requests that we fill our _buckets array.  If we've done so
 // already, we just return immediately.  Otherwise we search the
 // scenery directory for the buckets that compose this tile, adding
@@ -917,9 +898,9 @@ void Scenery::zoom(const sgdFrustum& frustum, double metresPerPixel)
 
 void Scenery::draw(bool lightingOn)
 {
-    // We assume that when called, the depth test is on and lighting
-    // is off.
-    assert(glIsEnabled(GL_DEPTH_TEST) && !glIsEnabled(GL_LIGHTING));
+    // We assume that when called, the depth test and lighting are
+    // off.
+    assert(!glIsEnabled(GL_DEPTH_TEST) && !glIsEnabled(GL_LIGHTING));
 
     // Has our view of the world changed?
     if (_dirty) {
@@ -974,15 +955,12 @@ void Scenery::draw(bool lightingOn)
 	    glEnable(GL_LIGHTING);
 	}
 
-	// Clear depth buffer.  Generally scenery tiles will be in
-	// front of textures, because textures are drawn at sea level
-	// and scenery is above sea level, so this usually isn't
-	// necessary.  However, in some places, like the Dead Sea, the
-	// scenery is below sea level.  By clearing the depth buffer,
-	// we ensure that the scenery will be drawn over anything
-	// that's already there.
-	glClear(GL_DEPTH_BUFFER_BIT);
-
+	// We enable the depth test, mostly to gather information on
+	// scenery elevations.  I suppose there's a chance that some
+	// bits of the scenery might be occluded by other bits, but I
+	// think that's actually unlikely (does FlightGear have
+	// caves?).
+	glEnable(GL_DEPTH_TEST);
 	for (unsigned int i = 0; i < intersections.size(); i++) {
 	    SceneryTile *t = dynamic_cast<SceneryTile *>(intersections[i]);
 	    if (!t) {
@@ -990,6 +968,7 @@ void Scenery::draw(bool lightingOn)
 	    }
 	    t->drawBuckets();
 	}
+	glDisable(GL_DEPTH_TEST);
 
 	glDisable(GL_LIGHTING);
     }
@@ -1026,185 +1005,17 @@ void Scenery::_label(bool live)
     // This should have been taken care of in draw().
     assert(!_dirty);
 
-    // We assume that when called, the depth test is on, and lighting
-    // is off.
-    assert(glIsEnabled(GL_DEPTH_TEST) && !glIsEnabled(GL_LIGHTING));
+    // We assume that when called, the depth test and lighting are
+    // off.
+    assert(!glIsEnabled(GL_DEPTH_TEST) && !glIsEnabled(GL_LIGHTING));
 
-    // Labels must be written on top of whatever scenery is there, so
-    // we ignore depth values.
-    glPushAttrib(GL_DEPTH_BUFFER_BIT); {
-	glDisable(GL_DEPTH_TEST);
-
-	// Draw elevation figures.
-	const vector<Cullable *>& intersections = _frustum->intersections();
-	for (unsigned int i = 0; i < intersections.size(); i++) {
-	    SceneryTile *t = dynamic_cast<SceneryTile *>(intersections[i]);
-	    if (!t) {
-		continue;
-	    }
-	    t->label(_metresPerPixel, live);
+    // Draw elevation figures.
+    const vector<Cullable *>& intersections = _frustum->intersections();
+    for (unsigned int i = 0; i < intersections.size(); i++) {
+	SceneryTile *t = dynamic_cast<SceneryTile *>(intersections[i]);
+	if (!t) {
+	    continue;
 	}
-    }
-    glPopAttrib();
-}
-
-// Returns the cartesian coordinates of the world at the screen x, y
-// point.  Returns true if there is an intersection (in which case c
-// contains the intersection coordinates), false otherwise.  If we
-// have an elevation value for the intersection then validElevation
-// will be set to true (live scenery provides us with elevation
-// information, but scenery textures do not).
-//
-// We calculate the intersection in two different ways, depending on
-// if we have live scenery or not.  With live scenery, we find out
-// where the ray intersects the scenery, returning the cartesian
-// coordinates of that point.  With textures, we intersect with an
-// idealized earth ellipsoid.
-//
-// x and y are window coordinates which represent a point, not a
-// pixel.  For example, if a window is 100 pixels wide and 50 pixels
-// high, the lower right *pixel* is (99, 49).  However, the *point*
-// (99.0, 49.0) is the top left corner of that pixel.  The lower right
-// corner of the entire window is (100.0, 50.0).  If you are calling
-// this with a mouse coordinate, you probably should add 0.5 to both
-// the x and y coordinates, which is the centre of the pixel the mouse
-// is on.
-//
-// Note as well that if we intersect with live scenery, the elevation
-// value will be the maximum value in the 1x1 pixel area centred on
-// (x, y).
-bool Scenery::intersection(double x, double y, 
-			   SGVec3<double> *c, bool *validElevation)
-{
-    // EYE - we should set the window ourselves (which means saving it
-    // in the constructor).  Then this method could be called safely
-    // from anywhere.
-    GLint viewport[4];
-    GLdouble mvmatrix[16], projmatrix[16];
-    GLdouble wx, wy, wz;	// World x, y, z coords.
-
-    // Make sure we're the active window.
-    int oldWindow = _aw->set();
-
-    // Our line is given by two points: the intersection of our
-    // viewing "ray" with the near depth plane and far depth planes.
-    // This assumes that we're using an orthogonal projection - in a
-    // perspective projection, we'd use our eyepoint as one of the
-    // points and the near depth plane as the other.
-    glGetIntegerv(GL_VIEWPORT, viewport);
-    glGetDoublev(GL_MODELVIEW_MATRIX, mvmatrix);
-    glGetDoublev(GL_PROJECTION_MATRIX, projmatrix);
-    // viewport[3] is height of window in pixels.  We need to convert
-    // from window coordinates, where y increases down, to viewport
-    // coordinates, where y increases up.
-    y = viewport[3] - y;
-
-    // Near depth plane intersection.
-    gluUnProject (x, y, 0.0, mvmatrix, projmatrix, viewport, &wx, &wy, &wz);
-    SGVec3<double> nnear(wx, wy, wz);
-
-    // Far depth plane intersection.
-    gluUnProject (x, y, 1.0, mvmatrix, projmatrix, viewport, &wx, &wy, &wz);
-    SGVec3<double> ffar(wx, wy, wz);
-    
-    // If validElevation is not NULL, that means the caller is
-    // interested in a valid elevation result, which means we must
-    // query our live scenery.
-    if (validElevation != NULL) {
-	// For now, assume that no buckets intersect.
-	*validElevation = false;
-
-	// Later, we'll ask candidate buckets will redraw themselves
-	// in select mode to see if there are any intersections.  We
-	// define a new projection matrix containing the pick region,
-	// which we define to be 1 pixel square.  When the buckets
-	// draw themselves, they will only get results for this small
-	// region.
-	glMatrixMode(GL_PROJECTION);
-	glPushMatrix(); {
-	    glLoadIdentity();
-	    gluPickMatrix(x, y, 1.0, 1.0, viewport);
-	    glMultMatrixd(projmatrix);
-
-	    // Now that we have our viewing ray (although, technically
-	    // speaking, it should actually be a very narrow viewing
-	    // frustum, but a ray is good enough), get the
-	    // intersection.  We first ask each visible tile in turn
-	    // if the ray intersects their live scenery, and, if it
-	    // does, the elevation at that point.
-	    const vector<Cullable *>& intersections = _frustum->intersections();
-	    for (unsigned int i = 0; i < intersections.size(); i++) {
-		SceneryTile *t = dynamic_cast<SceneryTile *>(intersections[i]);
-		if (!t) {
-		    continue;
-		}
-		if (t->intersection(nnear, ffar, c)) {
-		    // Found one!  Since the tile found the
-		    // intersection using one of its buckets (ie, live
-		    // scenery), we know that the elevation value is
-		    // valid.  We can also short-circuit our search.
-		    *validElevation = true;
-		    break;
-		}
-	    }
-	    glMatrixMode(GL_PROJECTION);
-	}
-	glPopMatrix();
-	glMatrixMode(GL_MODELVIEW);
-    }
-    // Beyond this point, we don't do any OpenGL stuff, so we can
-    // restore the old active window.
-    _aw->set(oldWindow);
-
-    // If the user was interested in getting an elevation and we
-    // actually got one, we can return now.
-    if ((validElevation != NULL) && *validElevation) {
-	return true;
-    }
-
-    // If we got here, that means no tiles intersected or the user
-    // isn't interested in an elevation.  So, we'll just use a simple
-    // earth/ray intersection with a standard earth ellipsoid.  This
-    // will give us the lat/lon, but the elevation will always be 0
-    // (sea level).
-    //
-    // We stretch the universe along the earth's axis so that the
-    // earth is a sphere.  This code assumes that the earth is centred
-    // at the origin, and that the earth's axis is aligned with the z
-    // axis, north positive.
-    //
-    // This website:
-    //
-    // http://mysite.du.edu/~jcalvert/math/ellipse.htm
-    //
-    // has a good explanation of ellipses, including the statement "The
-    // ellipse is just this auxiliary circle with its ordinates shrunk in the
-    // ratio b/a", where a is the major axis (equatorial plane), and b is
-    // the minor axis (axis of rotation).
-    assert((validElevation == NULL) || (*validElevation == false));
-    SGVec3<double> centre(0.0, 0.0, 0.0);
-    double mu1, mu2;
-    nnear[2] *= SGGeodesy::STRETCH;
-    ffar[2] *= SGGeodesy::STRETCH;
-    if (RaySphere(nnear, ffar, centre, SGGeodesy::EQURAD, &mu1, &mu2)) {
-	SGVec3<double> s1, s2;
-	s1 = nnear + mu1 * (ffar - nnear);
-	s2 = nnear + mu2 * (ffar - nnear);
-
-	// Take the nearest intersection (the other is on the other
-	// side of the world).
-	if (dist(nnear, s1) < dist(nnear, s2)) {
-	    // Unstretch the world.
-	    s1[2] /= SGGeodesy::STRETCH;
-	    *c = s1;
-	} else {
-	    // Unstretch the world.
-	    s2[2] /= SGGeodesy::STRETCH;
-	    *c = s2;
-	}
-
-	return true;
-    } else {
-	return false;
+	t->label(_metresPerPixel, live);
     }
 }

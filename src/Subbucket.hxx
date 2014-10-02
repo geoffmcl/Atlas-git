@@ -248,7 +248,6 @@ class Subbucket {
     bool loaded() const { return _loaded; }
     void unload();
     // The (very) approximate size of the subbucket, in bytes.
-    // unsigned int size();
     unsigned int size() const { return _bytes; }
     double maximumElevation() const { return _maxElevation; }
 

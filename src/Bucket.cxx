@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2012 Brian Schack
+  Copyright (C) 2009 - 2014 Brian Schack
 
   This file is part of Atlas.
 
@@ -171,74 +171,4 @@ void Bucket::draw()
     for (unsigned int i = 0; i < _subbuckets.size(); i++) {
 	_subbuckets[i]->draw();
     }
-}
-
-// Checks if the ray defined by points near and far intersect this
-// bucket.  If it does, then the intersection is placed into c.
-
-// EYE - still not good enough!  Need to mention the viewing frustum,
-// and why we need to pass near and far and how they should be
-// defined.  Should the RaySphere test be moved out?  (Because it may
-// not be 100% reliable, and/or because it belongs higher up).
-bool Bucket::intersection(SGVec3<double> nnear, SGVec3<double> ffar,
-			  SGVec3<double> *c)
-{
-    // We don't try to do a "live" intersection unless we've actually
-    // loaded the scenery.
-    if (!_loaded) {
-	return false;
-    }
-
-    // As a first quick check, we see if it intersects our bounding
-    // sphere.  If it does, we need to do a more detailed check.
-    double mu1, mu2;
-    // EYE - is this doing a cast or a copy?  And check this elsewhere.
-
-    // EYE - is it possible to *not* intersect the bounding sphere but
-    // to intersect the bucket?  We should check carefully how the
-    // bounding sphere is defined.
-    if (!RaySphere(nnear, ffar, SGVec3<double>(_bounds.center), _bounds.radius, 
-		  &mu1, &mu2)) {
-	// Doesn't intersect our bounding sphere, so return false
-	// immediately.
-	return false;
-    }
-
-    // It intersects our bounding sphere - we need to draw the scene
-    // in select mode and see if we get any hits.  We don't care about
-    // the identities of anything that intersects - just the minimum
-    // depth value recorded, which is placed in selectBuf[1].
-    GLuint selectBuf[3];
-    glSelectBuffer(3, selectBuf);
-    glRenderMode(GL_SELECT);
-
-    // Now "draw" the bucket.
-    glMatrixMode(GL_MODELVIEW);
-    draw();
-
-    // Any hits?
-    int hits = glRenderMode(GL_RENDER);
-    assert(hits <= 1);
-    if (hits == 0) {
-	// Nope.
-	return false;
-    }
-
-    // We got a hit, meaning our picking frustum intersects some part
-    // of our bucket.  We want the highest point in that intersection.
-    // To make our life easy, we make two simplifying assumptions: (1)
-    // We are looking straight down on the bucket (not exactly true,
-    // but close enough), and (2) The bucket is not curved (also not
-    // exactly true, but close enough).
-    //
-    // Given these assumptions, the highest point is the nearest z
-    // value, which is given in the hit record at offset 1.  Note that
-    // OpenGL applies a scaling factor of 2^32-1 to z values, where z
-    // = 0 at the near plane, and 2^32-1 at the far plane.
-    const double scale = (double)numeric_limits<GLuint>::max();
-    double minZ = selectBuf[1] / scale;
-
-    *c = (ffar - nnear) * minZ + nnear;
-
-    return true;
 }

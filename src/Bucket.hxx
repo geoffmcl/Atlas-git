@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2012 Brian Schack
+  Copyright (C) 2009 - 2014 Brian Schack
 
   A bucket object can load and draw a bucket, which is a basic unit of
   FlightGear scenery.  Buckets are 1/8 degree high, and anywhere from
@@ -83,9 +83,6 @@ public:
     void paletteChanged();
 
     void draw();
-
-    bool intersection(SGVec3<double> near, SGVec3<double> far, 
-		      SGVec3<double> *c);
 
   protected:
     SGPath _p;			// Our scenery directory.
