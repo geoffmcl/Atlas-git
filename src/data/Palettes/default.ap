@@ -109,6 +109,13 @@ Material Reservoir		water
 Material IntermittentReservoir	water 
 Material Stream			water
 Material Ocean			water
+Material Littoral               water
+Material Estuary                water
+Material Pond                   water
+Material Canal                  water
+Material Lagoon                 water
+Material Watercourse            water
+Material Saline                 water
 
 Material Urban			city
 Material Town			city
