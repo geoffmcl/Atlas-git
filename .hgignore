@@ -1,0 +1,31 @@
+# Use glob syntax (default is regexp)
+syntax: glob
+
+# Config files
+aclocal.m4
+autom4te.cache
+compile
+configure
+config.guess
+config.log
+config.status
+config.sub
+depcomp
+missing
+
+# Makefile files
+Makefile
+Makefile.in
+.deps
+config.h
+config.h.in
+stamp-h1
+
+# Executables
+Atlas
+Map
+GetMap
+
+# Compilation and editing cruft
+*.o
+*~
