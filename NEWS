@@ -1,3 +1,7 @@
+New in 0.5.1
+* The Atlas project has migrated from CVS to Mercurial.  All
+  subsequent development will take place in the Mercurial repository.
+
 New in 0.5.0
 == Atlas ==
 * Atlas can read v1000 airport files
