@@ -396,13 +396,12 @@ char *lastToken(char *str, char *from)
 
 double magneticVariation(double lat, double lon, double elev)
 {
+    SGGeod loc = SGGeod::fromDegFt(lon, lat, elev);
+
     SGTime t1;
+    t1.update(loc, 0, 0);
 
-    lon *= SGD_DEGREES_TO_RADIANS;
-    lat *= SGD_DEGREES_TO_RADIANS;
-    t1.update(lon, lat, 0, 0);
-
-    return sgGetMagVar(lon, lat, elev, t1.getJD()) * SGD_RADIANS_TO_DEGREES;
+    return sgGetMagVar(loc, t1.getJD()) * SGD_RADIANS_TO_DEGREES;
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -688,13 +687,16 @@ AtlasDialog::AtlasDialog(const char *msg, const char *leftLabel,
 	// check if the strings are NULL - strcmp() seems to be smart
 	// enough to handle that.
 	if (strcmp(rightLabel, "") != 0) {
-	    puOneShot *right = _makeButton(rightLabel, RIGHT, data);
+	    // Right button.
+	    _makeButton(rightLabel, RIGHT, data);
 	}
 	if (strcmp(middleLabel, "") != 0) {
-	    puOneShot *middle = _makeButton(middleLabel, MIDDLE, data);
+	    // Middle button
+	    _makeButton(middleLabel, MIDDLE, data);
 	}
 	if (strcmp(leftLabel, "") != 0) {
-	    puOneShot *left = _makeButton(leftLabel, LEFT, data);
+	    // Left button
+	    _makeButton(leftLabel, LEFT, data);
 	}
     }
     close();
