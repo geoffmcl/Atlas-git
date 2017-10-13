@@ -29,10 +29,21 @@
 
 // Other libraries' include files
 #include <png.h>
-#include <jpeglib.h>
 
 // Our project's include files
 #include "misc.hxx"
+
+// Normally this would be included with "Other libraries' include
+// files".  However, recent versions of the JPEG library (version 9?)
+// have defined TRUE and FALSE as an enumerated type.  PLIB (included
+// from misc.hxx) defines TRUE and FALSE as preprocessor constants.
+// When we use TRUE and FALSE in this file, then, the preprocessor
+// converts them to integers.  When we call a JPEG function, C++
+// complains about passing integers to functions that expect booleans.
+// The solution is to place this include statement after PLIB - PLIB
+// still defines TRUE and FALSE, but JPEG is smart enough not to
+// declare the enumerated boolean type when it sees that.
+#include <jpeglib.h>
 
 // This is a constant representing "Not an Elevation" - it is
 // guaranteed to be less than any possible real elevation value.
