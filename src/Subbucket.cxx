@@ -346,7 +346,7 @@ bool Subbucket::load(Bucket::Projection projection)
     // http://wiki.flightgear.org/index.php/BTG_File_Format
 
     SGBinObject btg;
-    if (!btg.read_bin(_path.c_str())) {
+    if (!btg.read_bin(_path)) {
 	// EYE - throw an error?
 	// EYE - will the cache continue to call load() then?
 	return false;
