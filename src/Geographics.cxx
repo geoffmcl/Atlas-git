@@ -431,11 +431,11 @@ void AtlasCoord::_geodToCart()
 bool AtlasCoord::_geodValid() const
 {
     // Note: this has to agree with the value set in invalidate()!
-    return !isnan(_geod.getLatitudeDeg());
+    return !std::isnan(_geod.getLatitudeDeg());
 }
 
 bool AtlasCoord::_cartValid() const
 {
     // Note: this has to agree with the value set in invalidate()!
-    return !isnan(_cart.x());
+    return !std::isnan(_cart.x());
 }
