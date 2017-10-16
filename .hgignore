@@ -3,6 +3,7 @@ syntax: glob
 
 # Config files
 aclocal.m4
+ar-lib
 autom4te.cache
 compile
 configure
@@ -11,6 +12,7 @@ config.log
 config.status
 config.sub
 depcomp
+install-sh
 missing
 
 # Makefile files
