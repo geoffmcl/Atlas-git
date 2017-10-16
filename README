@@ -17,7 +17,7 @@ FlightGear base directory.
 
 To build under Unix, follow these steps:
 
-	./autogen.sh
+	autoreconf --install
 	./configure
 	make
 	make install
@@ -35,12 +35,6 @@ The `configure' shell script accepts a few Atlas-specific options:
    If you use this option, `configure' expects to find two
    subdirectories here: `include/plib' (containing header files) and
    `lib' (containing libraries).
-
-`--with-simgear=prefix'   specify the prefix path to simgear
-
-   Similar to plib, if you use this option, `configure' expects to
-   find two subdirectories here: `include/simgear' (containing header
-   files) and `lib' (containing libraries).
 
 `--with-libcurl=prefix'   specify the prefix path to libcurl
 
