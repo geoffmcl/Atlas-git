@@ -14,7 +14,7 @@ AC_CONFIG_SRCDIR([simgear/compiler.h])
 
 dnl Create a configuration head file, simgear_config.h (from
 dnl simgear_config.in).
-AC_CONFIG_HEADER([simgear/simgear_config.h])
+AC_CONFIG_HEADERS([simgear/simgear_config.h])
 
 dnl Put macros (particularly ones generated for libtool) into the m4
 dnl directory.
