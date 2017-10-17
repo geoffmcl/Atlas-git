@@ -1,3 +1,14 @@
+New in 0.6.0
+
+* A stripped-down version of SimGear ("SlimGear") has been
+  incorporated into the Atlas source tree.  Atlas only uses a very
+  small part of SimGear, a part that doesn't change.  By removing the
+  full SimGear library, we no longer need to deal with frequent
+  SimGear changes, and with its gigantic dependencies (think Boost and
+  OpenSceneGraph).
+* The build system is now more up-to-date, reflecting changes to the
+  GNU Autotools collection.
+
 New in 0.5.1
 * The Atlas project has migrated from CVS to Mercurial.  All
   subsequent development will take place in the Mercurial repository.
