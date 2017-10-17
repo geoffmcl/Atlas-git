@@ -44,8 +44,13 @@ Atlas_SOURCES = \
 ##	PreferencesWindow.cxx PreferencesWindow.hxx
 ##	MPAircraft.cxx MPAircraft.hxx
 
+# EYE - $(top_srcdir) is the source code directory for the package.  I
+# don't know if this is considered good coding practice, but it works.
+AM_CPPFLAGS = -I$(top_srcdir)/slimgear
+
+# EYE - specify these in configure.ac?
 Atlas_LDADD = \
-	$(simgear_LIBS) \
+	$(top_builddir)/slimgear/simgear/libslimgear.la \
 	 -lplibsg -lplibpuaux -lplibpu -lplibfnt -lplibnet \
 	$(opengl_LIBS) \
 	-lpng -lz -ljpeg
@@ -61,7 +66,7 @@ Map_SOURCES = \
 	misc.cxx misc.hxx
 
 Map_LDADD = \
-	$(simgear_LIBS) \
+	$(top_builddir)/slimgear/simgear/libslimgear.la \
 	-lplibpu -lplibfnt -lplibsg \
 	$(opengl_LIBS) \
 	-lpng -lz -ljpeg
