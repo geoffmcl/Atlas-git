@@ -45,15 +45,20 @@ Atlas_SOURCES = \
 ##	MPAircraft.cxx MPAircraft.hxx
 
 # EYE - $(top_srcdir) is the source code directory for the package.  I
-# don't know if this is considered good coding practice, but it works.
+# don't know if referring to it this way is considered good coding
+# practice, but it works.
 AM_CPPFLAGS = -I$(top_srcdir)/slimgear
 
-# EYE - specify these in configure.ac?
+# EYE - Ideally (I guess), all of the libraries would be discovered in
+# configure and automatically added to the LIBS variable.  However,
+# it's not always easy to do so (eg, PLIB is C++, and autoconf doesn't
+# work well with C++).  Also, we have three executables Atlas, Map,
+# and GetMap, which don't use the same libraries.  So we specify some
+# "manually" here.
 Atlas_LDADD = \
 	$(top_builddir)/slimgear/simgear/libslimgear.la \
 	 -lplibsg -lplibpuaux -lplibpu -lplibfnt -lplibnet \
-	$(opengl_LIBS) \
-	-lpng -lz -ljpeg
+	$(opengl_LIBS)
 
 Map_SOURCES = \
 	Map.cxx \
@@ -68,11 +73,14 @@ Map_SOURCES = \
 Map_LDADD = \
 	$(top_builddir)/slimgear/simgear/libslimgear.la \
 	-lplibpu -lplibfnt -lplibsg \
-	$(opengl_LIBS) \
-	-lpng -lz -ljpeg
+	$(opengl_LIBS)
 
 GetMap_SOURCES = \
 	GetMap.cxx
 
+# EYE - You'll note that when GetMap is linked, it is linked with all
+# sorts of irrelevant libraries (GLEW, plibul, ...).  This is because
+# they are detected and added to LIBS in configure.  Should this be
+# changed?
 GetMap_LDADD = \
 	-lcurl
