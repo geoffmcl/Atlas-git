@@ -641,6 +641,10 @@ void atlasCartToGeod(double *cart, double *lat, double *lon, double *alt)
 // AtlasDialog
 //////////////////////////////////////////////////////////////////////
 
+// EYE - since this involves UI, perhaps this should be moved to a
+// separate file.  Map uses stuff in misc.cxx, but it has no need for
+// this (and more importantly, the libraries needed to compile it).
+
 // Create a generic dialog box, with the given buttons.  The dialog
 // will have the given text, and call 'cb' when done.  The left
 // button's default integer value is set to LEFT, the middle's to
