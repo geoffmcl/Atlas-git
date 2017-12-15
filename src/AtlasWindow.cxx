@@ -3795,6 +3795,12 @@ void AtlasWindow::_reshape(int width, int height)
     _mappingUI->setPosition(20, height - h - 20);
 }
 
+// A general note about mouse positions in GLUT - the only way we can
+// discover the mouse position is when the user moves the mouse or
+// clicks a mouse button.  That means that immediately after getting
+// window focus, we don't know where the mouse cursor is.  We can try
+// to catch some cases, but I don't think there's a general way to
+// solve this problem under GLUT.
 void AtlasWindow::_mouse(int button, int state, int x, int y) 
 {
     assert(glutGetWindow() == id());
@@ -3807,6 +3813,10 @@ void AtlasWindow::_mouse(int button, int state, int x, int y)
 	switch (button) {
 	  case GLUT_LEFT_BUTTON:
 	    if (state == GLUT_DOWN) {
+		if (!cursor()->coord().valid()) {
+		    // EYE - is calling the callback directly wise?
+		    _passiveMotion(x, y);
+		}
 		_oldC = cursor()->cart();
 		// EYE - do we need to set _dragging here, or
 		// should we wait until mouseMotion gets called?
@@ -4056,7 +4066,7 @@ void AtlasWindow::_keyboard(unsigned char key, int x, int y)
 	    toggleOverlay(Overlays::AIRPORTS);
 	    break;
 
-	  case 'c': 
+	  case 'c':
 	    if (_cursor->coord().valid()) {
 	    	movePosition(_cursor->data());
 	    }
