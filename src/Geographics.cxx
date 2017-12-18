@@ -326,7 +326,7 @@ bool AtlasCoord::valid() const
 void AtlasCoord::invalidate()
 {
     // Internally, an invalid geodetic coordinate has a NaN latitude,
-    // while an invalide cartesian coordinate has a NaN x value.
+    // while an invalid cartesian coordinate has a NaN x value.
     _geod.setLatitudeDeg(nan(""));
     _cart.x() = nan("");
 }
