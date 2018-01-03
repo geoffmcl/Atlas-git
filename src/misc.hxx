@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2012 Brian Schack
+  Copyright (C) 2009 - 2017 Brian Schack
 
   As the name suggests, miscellaneous classes an functions that don't
   really belong anywhere else.
@@ -248,10 +248,10 @@ class AtlasString {
 // printing nothing after the decimal, in which case a zero is added
 // (ie, 126.0, 126.1, 126.05, 126.775).
 //
-// This routine takes a frequency in *kHz* (eg, 126,000), and returns
-// a properly formatted string.  Note - the string is static and will
-// be changed on the next call to this function, so you should copy it
-// if you need to save it.
+// This routine takes a frequency in *Hz* (eg, 126,000,000), and
+// returns a properly formatted string (eg, "126.0").  Note - the
+// string is static and will be changed on the next call to this
+// function, so you should copy it if you need to save it.
 //
 // This function can be used for printing LF/MF (ie, NDB) frequencies
 // as well.

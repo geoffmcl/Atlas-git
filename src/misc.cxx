@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2014 Brian Schack
+  Copyright (C) 2009 - 2017 Brian Schack
 
   This file is part of Atlas.
 
@@ -572,16 +572,21 @@ const char *AtlasString::_appendf(const char *fmt, va_list ap)
 
 const char *formatFrequency(int frequency)
 {
+    const unsigned int kHz = 1000;
+    const unsigned int MHz = 1000000;
+
     // The maximum allowable NDB frequency is 1750 kHz (according to
     // Wikipedia).
-    const int maxNDBFrequency = 1750;
+    const int maxNDBFrequency = 1750 * kHz;
+
     static AtlasString str;
     if (frequency < maxNDBFrequency) {
-	str.printf("%d", frequency);
-    } else if ((frequency % 1000) == 0) {
-	str.printf("%.1f", frequency / 1000.0);
+	str.printf("%g", frequency / (float)kHz);
+    } else if ((frequency % MHz) == 0) {
+	// Force a ".0" on the end.
+	str.printf("%.1f", frequency / (float)MHz);
     } else {
-	str.printf("%g", frequency / 1000.0);
+	str.printf("%g", frequency / (float)MHz);
     }
     return str.str();
 }
