@@ -69,8 +69,8 @@ class Searchable {
     // required to maintain a local copy.
     virtual const char *asString() = 0;
 
-    // Cartesian coordinate (sgdVec3).
-    virtual const double *location() = 0;
+    // Our closest point to 'from'.  Returns a sgdVec3.
+    virtual const double *location(const sgdVec3 from) = 0;
     // Distance to our location from 'from' (squared, to make it
     // faster to compute).
     virtual double distanceSquared(const sgdVec3 from) = 0;
