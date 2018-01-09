@@ -4,7 +4,7 @@
   Written by Per Liedman, started July 2000.
 
   Copyright (C) 2000 Per Liedman, liedman@home.se
-  Copyright (C) 2009 - 2014 Brian Schack
+  Copyright (C) 2009 - 2017 Brian Schack
 
   A flight track contains the data for a FlightGear session.  It
   includes things like the aircraft's position, speed, altitude, etc.
@@ -30,16 +30,20 @@
 #ifndef _FLIGHTTRACK_H_
 #define _FLIGHTTRACK_H_
 
+// C++ system include files
 #include <string>
 #include <vector>
 #include <deque>
+
+// Other libraries' include files
 #include <simgear/misc/sg_path.hxx> // SGPath
 
+// Our project's include files
 #include "misc.hxx"		// AtlasString, ...
 
 // Forward class declarations
 class NavData;
-struct NAV;
+class Navaid;
 class SGIOChannel;
 
 // EYE - it's wasteful to have the radio stuff in a FlightData struct,
@@ -57,10 +61,10 @@ class FlightData {
     // nmea: hdg = true track (degrees), spd = GS
     float alt, hdg, spd;	// alt = altitude (in feet)
     float nav1_rad, nav2_rad;	// VOR radial (in degrees)
-    // Frequencies are stored as integer kHz.  This means, for
-    // example, that a VOR frequency of 110.90 is stored as the
-    // integer 110900.
-    int nav1_freq, nav2_freq, adf_freq;
+    // Frequencies are stored as integer Hz.  This means, for example,
+    // that a VOR frequency of 110.90 is stored as the integer
+    // 110,900,000.
+    unsigned int nav1_freq, nav2_freq, adf_freq;
 
     // Derived values (ie, not passed explicitly from FlightGear)
     float est_t_offset;		// Estimated time offset from first
@@ -69,12 +73,13 @@ class FlightData {
     float dist;			// Cumulative distance from start of
 				// flight (in metres)
 
-    const std::vector<NAV *>& navaids();
+    const std::vector<Navaid *>& navaids();
 
   protected:
+    // EYE - all of this stuff really belongs in the FlightTrack.
     NavData *_navData;
     bool _navaidsLoaded;
-    std::vector<NAV *> _navaids;	// In-range tuned navaids.
+    std::vector<Navaid *> _navaids;	// In-range tuned navaids.
 };
 
 class FlightTrack {

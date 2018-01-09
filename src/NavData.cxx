@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2012 - 2014 Brian Schack
+  Copyright (C) 2012 - 2017 Brian Schack
 
   This file is part of Atlas.
 
@@ -38,139 +38,1421 @@
 using namespace std;
 
 //////////////////////////////////////////////////////////////////////
-// Searchable interfaces.
+// Waypoints, Fixes, ...
 //////////////////////////////////////////////////////////////////////
-double NAV::distanceSquared(const sgdVec3 from) const
+
+// Our class variable.  Whenever a navaid (ie, a Waypoint or any of
+// its subclasses) is created, it adds itself into __waypoints.
+// Likewise, they remove themselves from __waypoints when they are
+// deleted.
+multimap<string, Waypoint *> Waypoint::__waypoints;
+
+// EYE - we should rename waypoint to something else, as waypoints
+// have another meaning (an RNAV procedure lat/lon).
+Waypoint::Waypoint(const char *id, double lat, double lon):
+    _id(id), _lat(lat), _lon(lon)
 {
+    // Add ourselves to the __waypoints map.
+    __waypoints.insert(make_pair(id, this));
+}
+
+Waypoint::~Waypoint()
+{
+    // Remove ourselves from __waypoints.  Since __waypoints is keyed
+    // by name, and several navaids can have the same name, we need to
+    // check carefully before removing ourselves.  First, find all
+    // navaids with the same name.
+    pair<multimap<string, Waypoint *>::iterator, 
+	multimap<string, Waypoint *>::iterator> ret;
+    ret = __waypoints.equal_range(_id);
+
+    // Now iterate through them.  When we find ourselves, remove
+    // ourselves.
+    multimap<string, Waypoint *>::iterator it;
+    for (it = ret.first; it != ret.second; it++) {
+	Waypoint *p = (*it).second;
+	if (p == this) {
+	    __waypoints.erase(it);
+	    return;
+	}
+    }
+}
+
+ostream& operator<<(ostream& os, const Waypoint& n)
+{
+    return n._put(os);
+}
+
+const double *Waypoint::location(const sgdVec3 from) 
+{
+    if (_bounds.isEmpty()) {
+	_calcBounds();
+	// EYE - remove this?
+	assert(!_bounds.isEmpty());
+    }
+
+    return _bounds.center; 
+}
+
+double Waypoint::distanceSquared(const sgdVec3 from)
+{
+    if (_bounds.isEmpty()) {
+	_calcBounds();
+	// EYE - remove this?
+	assert(!_bounds.isEmpty());
+    }
     return sgdDistanceSquaredVec3(_bounds.center, from);
 }
 
-// Returns our tokens, generating them if they haven't been already.
-const std::vector<std::string> &NAV::tokens()
+const vector<string>& Waypoint::tokens()
 {
     if (_tokens.empty()) {
-	bool isNDB = (navtype == NAV_NDB);
-	bool isMarker = ((navtype == NAV_OM) ||
-			 (navtype == NAV_MM) ||
-			 (navtype == NAV_IM));
-    
-	// The id, if it has one, is a token.
-	if (!isMarker) {
-	    _tokens.push_back(id);
-	}
-
-	// Tokenize the name.
-	Searchable::tokenize(name, _tokens);
-
-	// Add a frequency too, if it has one.
-	if (!isMarker) {
-	    if (isNDB) {
-		globals.str.printf("%d", freq);
-	    } else {
-		globals.str.printf("%.2f", freq / 1000.0);
-	    }
-	    _tokens.push_back(globals.str.str());
-	}
-
-	// Add a navaid type token.
-	switch (navtype) {
-	  case NAV_VOR:
-	    _tokens.push_back("VOR:");
-	    break;
-	  case NAV_DME:
-	    _tokens.push_back("DME:");
-	    break;
-	  case NAV_NDB:
-	    _tokens.push_back("NDB:");
-	    break;
-	  case NAV_ILS:
-	  case NAV_GS:
-	    _tokens.push_back("ILS:");
-	    break;
-	  case NAV_OM:
-	    _tokens.push_back("MKR:");
-	    _tokens.push_back("OM:");
-	    break;
-	  case NAV_MM:
-	    _tokens.push_back("MKR:");
-	    _tokens.push_back("MM:");
-	    break;
-	  case NAV_IM:
-	    _tokens.push_back("MKR:");
-	    _tokens.push_back("IM:");
-	    break;
-	  default:
-	    assert(false);
-	    break;
-	}
+	_tokens.push_back(_id);
+	_tokens.push_back("WPT:");
     }
 
     return _tokens;
 }
 
-// Returns our pretty string.
-const char *NAV::asString()
+const char *Waypoint::asString()
 {
-    switch (navtype) {
-      case NAV_VOR:
-	globals.str.printf("VOR: %s %s (%.2f)", 
-			   id.c_str(), name.c_str(), freq / 1000.0);
-	break;
-      case NAV_DME:
-	globals.str.printf("DME: %s %s (%.2f)", 
-			   id.c_str(), name.c_str(), freq / 1000.0);
-	break;
-      case NAV_NDB:
-	globals.str.printf("NDB: %s %s (%d)", 
-			   id.c_str(), name.c_str(), freq);
-	break;
-      case NAV_ILS:
-      case NAV_GS:
-	globals.str.printf("ILS: %s %s (%.2f)", 
-			   id.c_str(), name.c_str(), freq / 1000.0);
-	break;
-      case NAV_OM:
-	globals.str.printf("MKR: OM: %s", name.c_str());
-	break;
-      case NAV_MM:
-	globals.str.printf("MKR: MM: %s", name.c_str());
-	break;
-      case NAV_IM:
-	globals.str.printf("MKR: IM: %s", name.c_str());
-	break;
-      default:
-	assert(false);
-	break;
-    }
+    // EYE - use our own AtlasString?
+    globals.str.printf("WPT: %s", _id.c_str());
 
     return globals.str.str();
 }
 
-double FIX::distanceSquared(const sgdVec3 from) const
+const atlasSphere& Waypoint::bounds() 
 {
-    return sgdDistanceSquaredVec3(_bounds.center, from);
+    if (_bounds.isEmpty()) {
+	_calcBounds();
+	// EYE - remove this?
+	assert(!_bounds.isEmpty());
+    }
+
+    return _bounds; 
 }
 
-// Returns our tokens, generating them if they haven't been already.
-const std::vector<std::string> &FIX::tokens()
+void Waypoint::_calcBounds()
+{
+    // Calculate our bounds.  For waypoints, we assume that our
+    // elevation is 0.0 and that we have no radius.
+    assert(_bounds.isEmpty());	// EYE - remove this!
+    atlasGeodToCart(_lat, _lon, 0.0, _bounds.center);
+    _bounds.setRadius(0.0);
+}
+
+// EYE - move this to the front eventually
+#include <iomanip>
+ostream& Waypoint::_put(ostream& os) const
+{
+    int p = os.precision();
+
+    os << "Waypoint: " << _id
+       << fixed << setprecision(2) 
+       << " <" << _lat << ", " << _lon << ">";
+
+    os.precision(p);
+    return os;
+}
+
+Fix::Fix(const char *id, double lat, double lon):
+    Waypoint(id, lat, lon), _isTerminal(true)
+{
+    // EYE - create a _calcBounds()?  Previously we gave fixes a
+    // radius of 1000m.
+}
+
+const vector<string>& Fix::tokens()
 {
     if (_tokens.empty()) {
-	// The name/id is a token.
-	_tokens.push_back(name);
-
-	// Add a "FIX:" token.
+	_tokens.push_back(_id);
 	_tokens.push_back("FIX:");
     }
 
     return _tokens;
 }
 
-// Returns our pretty string.
-const char *FIX::asString()
+// EYE - find a way to chain these calls together from subclasses?
+const char *Fix::asString()
 {
-    globals.str.printf("FIX: %s", name);
+    globals.str.printf("FIX: %s", _id.c_str());
+
     return globals.str.str();
 }
+
+ostream& Fix::_put(ostream& os) const
+{
+    int p = os.precision();
+
+    os << "Fix: " << _id << " (";
+    // These aren't especially clear, but they are compact and easy to
+    // program.
+    if (_isTerminal) {
+	os << "T";
+    } else {
+	os << "E";
+    }
+    os << ") ";
+    os << fixed << setprecision(2) 
+       << "<" << _lat << ", " << _lon << ">";
+
+    os.precision(p);
+    return os;
+}
+
+//////////////////////////////////////////////////////////////////////
+// Navaid classes
+//////////////////////////////////////////////////////////////////////
+
+Navaid::Navaid(const char *id, double lat, double lon, int elev,
+	       const char *name, unsigned int freq, unsigned int range):
+    Waypoint(id, lat, lon), _name(name), _elev(elev), _freq(freq), 
+    _range(range)
+{
+}
+
+double Navaid::signalStrength(const sgdVec3 from)
+{
+    if (_bounds.isEmpty()) {
+	_calcBounds();
+	// EYE - temporary
+	assert(_bounds.isEmpty());
+    }
+    double d = sgdDistanceSquaredVec3(from, _bounds.center);
+    if (d > 0) {
+	// EYE - this could overflow the double if d is very very
+	// tiny.
+	return (_range * _range) / d;
+    } else {
+	return numeric_limits<double>::max();
+    }
+}
+
+// Frequency routines
+//
+// These are used to check navaid frequencies.  Information about
+// ranges and intervals is taken from ICAO Annex 10, FAA AIM, and
+// Wikipedia.
+bool Navaid::validNDBFrequency(unsigned int freq)
+{
+    // According to Wikipedia, NDBs are allowed to vary between 190
+    // and 1750 kHz, although in North America they only operate
+    // between 190 and 535 kHz.
+    if ((freq < (190 * kHz)) || (freq > (1750 * kHz))) {
+	return false;
+    }
+
+    // In North America, they use 1 kHz steps, but in Europe they can
+    // use 0.5 kHz steps.
+    if (freq % 500 != 0) {
+	return false;
+    }
+
+    return true;
+}
+
+// Used by various VOR, ILS, GS and DME classes.
+bool Navaid::validVHFFrequency(unsigned int freq)
+{
+    // VORs and DMEs are between 108.00 and 117.975 MHz.
+    if ((freq < (108 * MHz)) || (freq > (117.975 * MHz))) {
+	return false;
+    }
+
+    // Furthermore, they must be multiples of 50 kHz.
+    if (freq % (50 * kHz) != 0) {
+	return false;
+    }
+
+    return true;
+}
+
+// Used by VORs only.
+bool Navaid::validVORFrequency(unsigned int freq)
+{
+    // A VOR must have a valid VHF frequency.
+    if (!validVHFFrequency(freq)) {
+	return false;
+    }
+
+    // VOR frequencies in the ILS range must be even 'tenths' - the
+    // hundreds of kHz value must be an even number (eg, 110.20 is
+    // okay, but 111.30 is not).
+    if (freq < (112 * MHz)) {
+	int hundreds = freq % MHz / (100 * kHz);
+	if (hundreds & 0x1) {
+	    return false;
+	}
+    }
+
+    return true;
+}
+
+// Used for localizers and glideslopes.
+bool Navaid::validILSFrequency(unsigned int freq)
+{
+    // ILS frequencies are like other VHF systems ...
+    if (!validVHFFrequency(freq)) {
+	return false;
+    }
+
+    // ... except that they also must be less than 112 MHz.
+    if (freq >= (112 * MHz)) {
+	return false;
+    }
+
+    // Finally, ILS frequencies must be odd 'tenths' - the hundreds of
+    // kHz value must be an odd number (eg, 110.35 is okay, but 110.45
+    // is not).
+    int hundreds = freq % MHz / (100 * kHz);
+    return (hundreds & 0x1);
+}
+
+void Navaid::_calcBounds()
+{
+    // Calculate our bounds.  We override Waypoint's _calcBounds
+    // because we have an elevation and range.
+    atlasGeodToCart(_lat, _lon, _elev, _bounds.center);
+    _bounds.setRadius(_range);
+}
+
+NDB::NDB(const char *id, double lat, double lon, int elev,
+	 const char *name, unsigned int freq, unsigned int range):
+    Navaid(id, lat, lon, elev, name, freq, range)
+{
+}
+
+bool NDB::validFrequency() const
+{
+    return validNDBFrequency(_freq);
+}
+
+const vector<string>& NDB::tokens()
+{
+    if (_tokens.empty()) {
+	// EYE - here we should say Navaid::tokens(), which would add
+	// the _id and the _name?
+	_tokens.push_back(_id);
+	Searchable::tokenize(_name, _tokens);
+	if ((_freq % 1000) == 0) {
+	    globals.str.printf("%d", _freq / kHz);
+	} else {
+	    globals.str.printf("%.1f", _freq / (float)kHz);
+	}
+	_tokens.push_back(globals.str.str());
+	_tokens.push_back("NDB:");
+    }
+
+    return _tokens;
+}
+
+const char *NDB::asString()
+{
+    globals.str.printf("NDB: %s %s ", _id.c_str(), _name.c_str());
+    if ((_freq % 1000) == 0) {
+	globals.str.appendf("(%d)", _freq / kHz);
+    } else {
+	globals.str.appendf("(%.1f)", _freq / (float)kHz);
+    }
+
+    return globals.str.str();
+}
+
+ostream& NDB::_put(ostream& os) const
+{
+    int p = os.precision();
+
+    os << "NDB: ";
+    os << fixed << setprecision(2)
+       << _id << " (" << _name << "): " << "<" << _lat << ", " << _lon << ", " 
+       << _elev << " m>, " << setprecision(1) << _freq / (float)kHz 
+       << " kHz, " << _range << " m";
+
+    os.precision(p);
+    return os;
+}
+
+VOR::VOR(const char *id, double lat, double lon, int elev, 
+	 const char *name, unsigned int freq, unsigned int range, 
+	 float slavedVariation):
+    Navaid(id, lat, lon, elev, name, freq, range), _variation(slavedVariation)
+{
+}
+
+bool VOR::validFrequency() const
+{
+    return validVORFrequency(_freq);
+}
+
+const vector<string>& VOR::tokens()
+{
+    if (_tokens.empty()) {
+	_tokens.push_back(_id);
+	Searchable::tokenize(_name, _tokens);
+	globals.str.printf("%.2f", _freq / (float)MHz);
+	_tokens.push_back(globals.str.str());
+	_tokens.push_back("VOR:");
+    }
+
+    return _tokens;
+}
+
+const char *VOR::asString()
+{
+    // EYE - use our own AtlasString?
+    globals.str.printf("VOR: %s %s (%.2f)", 
+		       _id.c_str(), _name.c_str(), _freq / (float)MHz);
+
+    return globals.str.str();
+}
+
+ostream& VOR::_put(ostream& os) const
+{
+    int p = os.precision();
+    os << fixed << setprecision(2);
+
+    os << "VOR: ";
+    os << _id << " (" << _name << "): " 
+       << "<" << _lat << ", " << _lon << ", " << _elev << " m>, " 
+       << _freq / (float)MHz << " MHz, " << _range << " m, " 
+       << _variation << " deg variation";
+
+    os.precision(p);
+    return os;
+}
+
+DME::DME(const char *id, double lat, double lon, int elev, 
+	 const char *name, unsigned int freq, unsigned int range, float bias):
+    Navaid(id, lat, lon, elev, name, freq, range), _bias(bias)
+{
+}
+
+bool DME::validFrequency() const
+{
+    // DME frequencies in reality are in the range 962 MHz to 1213
+    // MHz.  However, they are paired with VOR frequencies, and the
+    // radios in an airplane automatically choose the correct DME
+    // frequency when a VOR frequency is selected.  More importantly,
+    // the navaid database only lists the paired VOR frequency.  So,
+    // we just make sure the DME frequency is in the VHF range.  Note
+    // that DMEs can be paired with VORs and with ILSs, so there's no
+    // odd/even check.
+
+    return validVHFFrequency(_freq);
+}
+
+const vector<string>& DME::tokens()
+{
+    if (_tokens.empty()) {
+	// EYE - here we should say Navaid::tokens(), which would add
+	// the _id and the _name?
+	_tokens.push_back(_id);
+	Searchable::tokenize(_name, _tokens);
+	globals.str.printf("%.2f", _freq / (float)MHz);
+	_tokens.push_back(globals.str.str());
+	_tokens.push_back("DME:");
+    }
+
+    return _tokens;
+}
+
+const char *DME::asString()
+{
+    // EYE - use our own AtlasString?
+    globals.str.printf("DME: %s %s (%.2f)", 
+		       _id.c_str(), _name.c_str(), _freq / (float)MHz);
+
+    return globals.str.str();
+}
+
+ostream& DME::_put(ostream& os) const
+{
+    int p = os.precision();
+    os << fixed << setprecision(2);
+
+    os << "DME: ";
+    os << _id << " (" << _name << "): " << "<" << _lat << ", " << _lon 
+       << ", " << _elev << " m>, " << _freq / (float)MHz << " MHz, " 
+       << _range << " m, " << _bias << " m bias";
+
+    os.precision(p);
+    return os;
+}
+
+TACAN::TACAN(const char *id, double lat, double lon, int elev, 
+	     const char *name, unsigned int freq, unsigned int range, 
+	     float slavedVariation, float bias):
+    DME(id, lat, lon, elev, name, freq, range, bias), 
+    _variation(slavedVariation)
+{
+    // EYE - look more closely into TACAN channels to specify
+    // frequencies
+    //
+    // From "From the Ground Up":
+    //
+    // To convert from TACAN "X" channels from 17X to 59X to a VHF
+    // frequency:
+    //
+    // VHF Frequency (MHz) = (channel - 17) / 10.0 + 108.0
+    //
+    // eg, 38X -> (38 - 17) / 10.0 + 108.0 = 110.1
+    // 
+    // Channels 70X to 126X:
+    //
+    // VHF Frequency (MHz) = (channel - 70) / 10.0 + 112.3
+    //
+    // eg, 109X -> (109 - 70) / 10.0 + 112.3 = 116.2
+    // 
+    // For "Y" channels, add 0.05 to the result.
+    //
+    // eg, 38Y = 38X + 0.05 = 110.1 + 0.05 = 110.15
+    //     109Y = 109X + 0.05 = 116.2 + 0.05 = 116.25
+    //
+    // From http://www.casa.gov.au/wcmswr/_assets/main/pilots/download/dme.pdf
+    //
+    // Channels 1X to 16X:
+    //
+    // VHF Frequency (MHz) = (channel - 1) / 10.0 + 134.4
+    //
+    // eg, 10X -> (10 - 1) / 10.0 + 134.4 = 135.3
+    // 
+    // Channels 60X to 69X:
+    //
+    // VHF Frequency (MHz) = (channel - 60) / 10.0 + 133.3:
+    //
+    // eg, 66X -> (66 - 60) / 10.0 + 133.3 = 133.9
+    // 
+    // This document doesn't mention the mapping from "Y" channels to
+    // VHF frequencies.
+    //
+    // From http://www.flightsim.com/main/howto/tacan.htm
+    //
+    // It basically restates the From the Ground Up says, and
+    // explicitly mentions that 1X - 16Y and 60X - 69Y are not paired
+    // up.
+}
+
+bool TACAN::validFrequency() const
+{
+    // This only covers the DME part of the TACAN, but that's okay
+    // because that's all we're given in the navaids database.
+    return validVHFFrequency(_freq);
+}
+
+const vector<string>& TACAN::tokens()
+{
+    if (_tokens.empty()) {
+	// EYE - here we should say Navaid::tokens(), which would add
+	// the _id and the _name?
+	_tokens.push_back(_id);
+	Searchable::tokenize(_name, _tokens);
+	globals.str.printf("%.2f", _freq / (float)MHz);
+	_tokens.push_back(globals.str.str());
+	_tokens.push_back("TACAN:");
+    }
+
+    return _tokens;
+}
+
+const char *TACAN::asString()
+{
+    // EYE - use our own AtlasString?
+    globals.str.printf("TACAN: %s %s (%.2f)", 
+		       _id.c_str(), _name.c_str(), _freq / (float)MHz);
+
+    return globals.str.str();
+}
+
+ostream& TACAN::_put(ostream& os) const
+{
+    int p = os.precision();
+    os << fixed << setprecision(2);
+
+    os << "TACAN: ";
+    os << _id << " (" << _name << "): " 
+       << "<" << _lat << ", " << _lon << ", " << _elev << " m>, " 
+       << _freq / (float)MHz << " MHz, " 
+       << _range << " m, " 
+       << _variation << " deg variation, "
+       << _bias << " m bias";
+
+    os.precision(p);
+    return os;
+}
+
+LOC::LOC(const char *id, double lat, double lon, int elev, 
+	 const char *name, unsigned int freq, unsigned int range, 
+	 float heading):
+    Navaid(id, lat, lon, elev, name, freq, range), _heading(heading)
+{
+}
+
+bool LOC::validFrequency() const
+{
+    return validILSFrequency(_freq);
+}
+
+const vector<string>& LOC::tokens()
+{
+    if (_tokens.empty()) {
+	_tokens.push_back(_id);
+	Searchable::tokenize(_name, _tokens);
+	globals.str.printf("%.2f", _freq / (float)MHz);
+	_tokens.push_back(globals.str.str());
+	_tokens.push_back("LOC:");
+    }
+
+    return _tokens;
+}
+
+const char *LOC::asString()
+{
+    // EYE - use our own AtlasString?
+    globals.str.printf("LOC: %s %s (%.2f)", 
+		       _id.c_str(), _name.c_str(), _freq / (float)MHz);
+
+    return globals.str.str();
+}
+
+ostream& LOC::_put(ostream& os) const
+{
+    int p = os.precision();
+    os << fixed << setprecision(2);
+
+    os << "LOC: ";
+    os << _id << " (" << _name << "): " << "<" << _lat << ", " << _lon 
+       << ", " << _elev << " m>, " << _freq / (float)MHz << " MHz, " 
+       << _range << " m, " << _heading << " deg";
+
+    os.precision(p);
+    return os;
+}
+
+GS::GS(const char *id, double lat, double lon, int elev, 
+       const char *name, unsigned int freq, unsigned int range, 
+       float heading, float slope):
+    Navaid(id, lat, lon, elev, name, freq, range), _heading(heading),
+    _slope(slope)
+{
+}
+
+// Glideslope frequencies follow the same rules as localizer frequencies.
+bool GS::validFrequency() const
+{
+    return validILSFrequency(_freq);
+}
+
+const vector<string>& GS::tokens()
+{
+    if (_tokens.empty()) {
+	_tokens.push_back(_id);
+	Searchable::tokenize(_name, _tokens);
+	globals.str.printf("%.2f", _freq / (float)MHz);
+	_tokens.push_back(globals.str.str());
+	_tokens.push_back("GS:");
+    }
+
+    return _tokens;
+}
+
+const char *GS::asString()
+{
+    // EYE - use our own AtlasString?
+    globals.str.printf("GS: %s %s (%.2f)", 
+		       _id.c_str(), _name.c_str(), _freq / (float)MHz);
+
+    return globals.str.str();
+}
+
+ostream& GS::_put(ostream& os) const
+{
+    int p = os.precision();
+    os << fixed << setprecision(2);
+
+    os << "GS: " << _id << " (" << _name << "): " 
+       << "<" << _lat << ", " << _lon << ", " << _elev << " m>, " 
+       << _freq / (float)MHz << " MHz, " << _range << " m, " 
+       << _heading << "@" << _slope << " deg";
+
+    os.precision(p);
+    return os;
+}
+
+Marker::Marker(double lat, double lon, int elev, const char *name, 
+	       float heading, Type type):
+    // Markers transmit at 75 MHz, but because they're all the same,
+    // we generally ignore the value.
+    Navaid("", lat, lon, elev, name, 75 * MHz, 0), _heading(heading), 
+    _type(type)
+{
+}
+
+const vector<string>& Marker::tokens()
+{
+    if (_tokens.empty()) {
+	Searchable::tokenize(_name, _tokens);
+	_tokens.push_back("MKR:");
+	if (_type == OUTER) {
+	    _tokens.push_back("OM:");
+	} else if (_type == MIDDLE) {
+	    _tokens.push_back("MM:");
+	} else {
+	    _tokens.push_back("IM:");
+	}
+    }
+
+    return _tokens;
+}
+
+const char *Marker::asString()
+{
+    // EYE - use our own AtlasString?
+    globals.str.printf("MKR: ");
+    if (_type == OUTER) {
+	globals.str.appendf("OM: ");
+    } else if (_type == MIDDLE) {
+	globals.str.appendf("MM: ");
+    } else {
+	globals.str.appendf("IM: ");
+    }
+    globals.str.appendf("%s", _name.c_str());
+
+    return globals.str.str();
+}
+
+ostream& Marker::_put(ostream& os) const
+{
+    int p = os.precision();
+    os << fixed << setprecision(2);
+
+    if (_type == OUTER) {
+	os << "Marker (outer): ";
+    } else if (_type == MIDDLE) {
+	os << "Marker (middle): ";
+    } else {
+	os << "Marker (inner): ";
+    }
+
+    os << _name << ": " << "<" << _lat << ", " << _lon << ", " 
+       << _elev << " m>, " << _heading << " deg";
+
+    os.precision(p);
+    return os;
+}
+
+//////////////////////////////////////////////////////////////////////
+// NavaidSystem
+//////////////////////////////////////////////////////////////////////
+
+// Our class variables.
+set<NavaidSystem *> NavaidSystem::__systems;
+map<Navaid *, NavaidSystem *> NavaidSystem::__owners;
+
+NavaidSystem::NavaidSystem()
+{
+    __systems.insert(this);
+}
+
+NavaidSystem::~NavaidSystem()
+{
+    __systems.erase(this);
+}
+
+void NavaidSystem::add(Navaid *n)
+{
+    // EYE - check if there's already an entry for n for a different
+    // system?
+    __owners[n] = this;
+}
+
+void NavaidSystem::remove(Navaid *n)
+{
+    __owners.erase(n);
+}
+
+NavaidSystem *NavaidSystem::owner(Navaid *n)
+{
+    NavaidSystem *result = NULL;
+
+    map<Navaid *, NavaidSystem *>::iterator it = __owners.find(n);
+    if (it != __owners.end()) {
+	result = it->second;
+    }
+
+    return result;
+}
+
+PairedNavaidSystem::PairedNavaidSystem(Navaid *n1, Navaid *n2): 
+    NavaidSystem(), _n1(n1), _n2(n2)
+{
+    assert(_n1 != NULL);
+    assert(_n2 != NULL);
+    add(_n1);
+    add(_n2);
+}
+
+PairedNavaidSystem::~PairedNavaidSystem()
+{
+    remove(_n1);
+    remove(_n2);
+}
+
+Navaid *PairedNavaidSystem::other(const Navaid *n)
+{
+    if (n == _n1) {
+	return _n2;
+    } else if (n == _n2) {
+	return _n1;
+    } else {
+	return NULL;
+    }
+}
+
+VOR_DME::VOR_DME(VOR *vor, DME *dme): PairedNavaidSystem(vor, dme)
+{
+}
+
+// EYE - needed?
+VOR_DME::~VOR_DME()
+{
+}
+
+VOR *VOR_DME::vor()
+{
+    return dynamic_cast<VOR *>(n1());
+}
+
+DME *VOR_DME::dme()
+{
+    return dynamic_cast<DME *>(n2());
+}
+
+VOR *VOR_DME::other(DME *dme)
+{
+    if (dme == VOR_DME::dme()) {
+	return vor();
+    } else {
+	return NULL;
+    }
+}
+
+DME *VOR_DME::other(VOR *vor)
+{
+    if (vor == VOR_DME::vor()) {
+	return dme();
+    } else {
+	return NULL;
+    }
+}
+
+VORTAC::VORTAC(VOR *vor, TACAN *tacan): PairedNavaidSystem(vor, tacan)
+{
+}
+
+// EYE - needed?
+VORTAC::~VORTAC()
+{
+}
+
+VOR *VORTAC::vor()
+{
+    return dynamic_cast<VOR *>(n1());
+}
+
+TACAN *VORTAC::tacan()
+{
+    return dynamic_cast<TACAN *>(n2());
+}
+
+VOR *VORTAC::other(TACAN *tacan)
+{
+    if (tacan == VORTAC::tacan()) {
+	return vor();
+    } else {
+	return NULL;
+    }
+}
+
+TACAN *VORTAC::other(VOR *vor)
+{
+    if (vor == VORTAC::vor()) {
+	return tacan();
+    } else {
+	return NULL;
+    }
+}
+
+NDB_DME::NDB_DME(NDB *ndb, DME *dme): PairedNavaidSystem(ndb, dme)
+{
+}
+
+// EYE - needed?
+NDB_DME::~NDB_DME()
+{
+}
+
+NDB *NDB_DME::ndb()
+{
+    return dynamic_cast<NDB *>(n1());
+}
+
+DME *NDB_DME::dme()
+{
+    return dynamic_cast<DME *>(n2());
+}
+
+NDB *NDB_DME::other(DME *dme)
+{
+    if (dme == NDB_DME::dme()) {
+	return ndb();
+    } else {
+	return NULL;
+    }
+}
+
+DME *NDB_DME::other(NDB *ndb)
+{
+    if (ndb == NDB_DME::ndb()) {
+	return dme();
+    } else {
+	return NULL;
+    }
+}
+
+//////////////////////////////////////////////////////////////////////
+// ILS
+//////////////////////////////////////////////////////////////////////
+
+ILS::ILS(LOC *loc, Type type): 
+    NavaidSystem(), _type(type), _loc(loc), _gs(NULL), _dme(NULL)
+{
+    add(loc);
+}
+
+ILS::~ILS()
+{
+    remove(_loc);
+    remove(_gs);
+    remove(_dme);
+
+    set<Marker *>::iterator it;
+    for (it = _markers.begin(); it != _markers.end(); it++) {
+	remove(*it);
+    }
+    _markers.clear();
+}
+
+void ILS::setGS(GS *gs)
+{
+    // Make sure GS hasn't been set already.
+    // EYE - return silently?  Overwrite the old one? Throw an error?
+    // (ditto for setDME)
+    assert(_gs == NULL);
+
+    // Make sure its id, name, and frequency match the localizer's.
+    // EYE - return silently without setting _gs?  Throw an error?
+    assert(gs->id() == loc()->id());
+    assert(gs->name() == loc()->name());
+    assert(gs->frequency() == loc()->frequency());
+
+    _gs = gs;
+    add(_gs);
+}
+
+void ILS::setDME(DME *dme)
+{
+    // Make sure DME hasn't been set already.
+    assert(_dme == NULL);
+
+    // Make sure its id, name, and frequency match the localizer's.
+    assert(dme->id() == loc()->id());
+    assert(dme->name() == loc()->name());
+    assert(dme->frequency() == loc()->frequency());
+
+    _dme = dme;
+    add(_dme);
+}
+
+void ILS::addMarker(Marker *m)
+{
+    // Make sure its name matches the localizer's.
+    assert(m->name() == loc()->name());
+
+    _markers.insert(m);
+    add(m);
+}
+
+ostream& operator<<(ostream& os, const ILS& ils)
+{
+    os << "ILS (" ;
+    if (ils.type() == ILS::ILS_CAT_I) {
+	os << "CAT I";
+    } else if (ils.type() == ILS::ILS_CAT_II) {
+	os << "CAT II";
+    } else if (ils.type() == ILS::ILS_CAT_III) {
+	os << "CAT III";
+    } else if (ils.type() == ILS::LDA) {
+	os << "LDA";
+    } else if (ils.type() == ILS::IGS) {
+	os << "IGS";
+    } else if (ils.type() == ILS::Localizer) {
+	os << "LOC";
+    } else if (ils.type() == ILS::SDF) {
+	os << "SDF";
+    }
+    os << "): " << ils.id() << " (" << ils.name() << ")" << endl;
+    os << "\t" << *(ils._loc) << endl;
+    if (ils.gs() != NULL) {
+	os << "\t" << *(ils.gs()) << endl;
+    }
+    if (ils.dme() != NULL) {
+	os << "\t" << *(ils.dme()) << endl;
+    }
+    
+    set<Marker *>::const_iterator i = ils._markers.begin();
+    for (; i != ils._markers.end(); i++) {
+	os << "\t" << *(*i) << endl;
+    }
+    
+    return os;
+}
+
+//////////////////////////////////////////////////////////////////////
+// Airways
+//////////////////////////////////////////////////////////////////////
+
+#include <iostream>
+
+// Our class variable.  Every time we create a new segment, it adds
+// itself to this vector.  Similarly, each time the destructor is
+// called, it removes itself from this vector.
+set<Segment *> Segment::__segments;
+
+Segment::Segment(const string& name, Waypoint *start, Waypoint *end, 
+		 int base, int top, bool isLow):
+    _name(name), _start(start), _end(end), _base(base), _top(top), _isLow(isLow)
+{
+    assert(_base <= _top);
+
+    // The airway bounds are given by its two endpoints.
+    // EYE - save these two points?
+    sgdVec3 point;
+    atlasGeodToCart(start->lat(), start->lon(), 0.0, point);
+    _bounds.extend(point);
+    atlasGeodToCart(end->lat(), end->lon(), 0.0, point);
+    _bounds.extend(point);
+
+    // Calculate our length.
+    double az1, az2;
+    geo_inverse_wgs_84(0.0, start->lat(), start->lon(), 
+		       end->lat(), end->lon(),
+		       &az1, &az2, &_length);
+
+    __segments.insert(this);
+}
+
+// Note that we don't delete the airways in the _airways set.  It's
+// best not to delete segments until after you delete the airways of
+// which they are members.
+Segment::~Segment()
+{
+    // A segment should not be deleted if it's part of an airway.
+    assert(_airways.size() == 0);
+
+    // Now remove ourselves from __segments.
+
+    // EYE - see note with ILS::~ILS
+    __segments.erase(this);
+}
+
+ostream& operator<<(ostream& os, const Segment& seg)
+{
+    os << "SEG: " << seg.name() << " <" << seg.start()->id() << " - "
+       << seg.base() << ", " << seg.top() << " - " << seg.end()->id() << ">";
+    if (seg.isLow()) {
+	os << " (low), ";
+    } else {
+	os << " (high), ";
+    }
+    os << seg.airways().size() << " airways";
+
+    return os;
+}
+
+// This routine checks if the airway name follows the ICAO standard.
+//
+// According to ICAO Annex 11, Appendix 1, Section 2, an airway name:
+//
+// - consists of at most 6 uppercase characters and ciphers
+//
+// - starts with one or two uppercase characters and is followed by a
+//   number between 1 and 999 without leading zeros and may end with
+//   an additional character
+//
+// - of the three possible characters the first one is optional and
+//   may be 'K', 'U', or 'S'
+//
+// - of the three possible characters the second one is mandatory and
+//   may be 'A', 'B', 'G', 'H', 'J', 'L', 'M', 'N', 'P', 'Q', 'R',
+//   'T', 'V', 'W', 'Y', or 'Z'
+//
+// - of the three possible characters the third one (after the number)
+//   is optional and may be 'F', 'G', 'Y', or 'Z'.
+//
+// - the following characters are not allowed in any position: 'C',
+//   'D', 'E', 'I', 'O', and 'X'
+//
+// Or, as a regular expression:
+//
+// [KUS]?[ABGHJLMNPQRTVWYZ][1-9][0-9]{0,2}[FGYZ]?
+
+/* Generated by re2c 0.13.5 on Fri Jul 31 10:24:58 2009 */
+static bool __awyNameMatch(const char *p)
+{
+    const char *YYMARKER;
+    {
+	char yych;
+
+	yych = (const char)*p;
+	switch (yych) {
+	  case 'A':
+	  case 'B':
+	  case 'G':
+	  case 'H':
+	  case 'J':
+	  case 'L':
+	  case 'M':
+	  case 'N':
+	  case 'P':
+	  case 'Q':
+	  case 'R':
+	  case 'T':
+	  case 'V':
+	  case 'W':
+	  case 'Y':
+	  case 'Z':	goto yy4;
+	  case 'K':
+	  case 'S':
+	  case 'U':	goto yy2;
+	  default:	goto yy5;
+	}
+    yy2:
+	yych = (const char)*(YYMARKER = ++p);
+	switch (yych) {
+	  case 'A':
+	  case 'B':
+	  case 'G':
+	  case 'H':
+	  case 'J':
+	  case 'L':
+	  case 'M':
+	  case 'N':
+	  case 'P':
+	  case 'Q':
+	  case 'R':
+	  case 'T':
+	  case 'V':
+	  case 'W':
+	  case 'Y':
+	  case 'Z':	goto yy11;
+	  default:	goto yy3;
+	}
+    yy3:
+	{ return false; }
+    yy4:
+	yych = (const char)*++p;
+	switch (yych) {
+	  case '1':
+	  case '2':
+	  case '3':
+	  case '4':
+	  case '5':
+	  case '6':
+	  case '7':
+	  case '8':
+	  case '9':	goto yy6;
+	  default:	goto yy3;
+	}
+    yy5:
+	yych = (const char)*++p;
+	goto yy3;
+    yy6:
+	++p;
+	switch ((yych = (const char)*p)) {
+	  case '0':
+	  case '1':
+	  case '2':
+	  case '3':
+	  case '4':
+	  case '5':
+	  case '6':
+	  case '7':
+	  case '8':
+	  case '9':	goto yy8;
+	  case 'F':
+	  case 'G':
+	  case 'Y':
+	  case 'Z':	goto yy9;
+	  default:	goto yy7;
+	}
+    yy7:
+	{ return p; }
+    yy8:
+	yych = (const char)*++p;
+	switch (yych) {
+	  case '0':
+	  case '1':
+	  case '2':
+	  case '3':
+	  case '4':
+	  case '5':
+	  case '6':
+	  case '7':
+	  case '8':
+	  case '9':	goto yy10;
+	  case 'F':
+	  case 'G':
+	  case 'Y':
+	  case 'Z':	goto yy9;
+	  default:	goto yy7;
+	}
+    yy9:
+	yych = (const char)*++p;
+	goto yy7;
+    yy10:
+	yych = (const char)*++p;
+	switch (yych) {
+	  case 'F':
+	  case 'G':
+	  case 'Y':
+	  case 'Z':	goto yy9;
+	  default:	goto yy7;
+	}
+    yy11:
+	yych = (const char)*++p;
+	switch (yych) {
+	  case '1':
+	  case '2':
+	  case '3':
+	  case '4':
+	  case '5':
+	  case '6':
+	  case '7':
+	  case '8':
+	  case '9':	goto yy6;
+	  default:	goto yy12;
+	}
+    yy12:
+	p = YYMARKER;
+	goto yy3;
+    }
+}
+
+// Our class variable.  When an airway is constructed, it adds itself
+// to __airways.  Similarly when its destructor is called, it removes
+// itself from __airways.
+set<Airway *> Airway::__airways;
+
+Airway::Airway(const string& name, bool isLow, Segment *segment):
+    _name(name), _isLow(isLow)
+{
+    prepend(segment);
+
+    // Issue a warning if the airway name doesn't follow the ICAO
+    // standard.
+    if (!__awyNameMatch(name.c_str())) {
+	// EYE - we need a logging facility
+    	// fprintf(stderr, "Invalid airway name: '%s'\n", name.c_str());
+    }
+    __airways.insert(this);
+}
+
+Airway::~Airway()
+{
+    // Remove ourselves from our component segments first.
+    deque<Segment *>::iterator i;
+    for (i = _segments.begin(); i != _segments.end(); i++) {
+	(*i)->removeAirway(this);
+    }
+
+    // Now remove ourselves from the __airways set.
+
+    // EYE - see note with ILS::~ILS
+    __airways.erase(this);
+}
+
+void Airway::prepend(Segment *segment) 
+{
+    _segments.push_front(segment);
+    segment->addAirway(this);
+
+    // Expand our bounds to encompass the new segment.
+    _bounds.extend(segment->start()->bounds().center);
+    _bounds.extend(segment->end()->bounds().center);
+}
+
+void Airway::append(Segment *segment) 
+{
+    _segments.push_back(segment);
+    segment->addAirway(this);
+
+    // Expand our bounds to encompass the new segment.
+    _bounds.extend(segment->start()->bounds().center);
+    _bounds.extend(segment->end()->bounds().center);
+}
+
+const Waypoint *Airway::nthWaypoint(size_t i) const
+{
+    // Special cases.
+    if (_segments.size() == 0) {
+	return NULL;
+    }
+    if (i > _segments.size()) {
+	return NULL;
+    }
+    if (_segments.size() == 1) {
+	if (i == 0) {
+	    return _segments[0]->start();
+	} else {
+	    return _segments[0]->end();
+	}
+    }
+
+    if (i == 0) {
+	// Check which point doesn't match a following point.
+	if ((_segments[0]->start() != _segments[1]->start()) &&
+	    (_segments[0]->start() != _segments[1]->end())) {
+	    return _segments[0]->start();
+	} else {
+	    return _segments[0]->end();
+	}
+    } else if (i == _segments.size()) {
+	// Check which point doesn't match a preceding point.
+	if ((_segments[i - 1]->start() != _segments[i - 2]->start()) &&
+	    (_segments[i - 1]->start() != _segments[i - 2]->end())) {
+	    return _segments[i - 1]->start();
+	} else {
+	    return _segments[i - 1]->end();
+	}
+    } else {
+	// Check which point matches a preceding point.
+	if ((_segments[i]->start() == _segments[i - 1]->start()) ||
+	    (_segments[i]->start() == _segments[i - 1]->end())) {
+	    return _segments[i]->start();
+	} else {
+	    return _segments[i]->end();
+	}
+    }
+}
+
+ostream& operator<<(ostream& os, const Airway& awy)
+{
+    os << "AWY: " << awy.name();
+    if (awy.isLow()) {
+	os << " (low)";
+    } else {
+	os << " (high)";
+    }
+    os << ": ";
+    for (size_t i = 0; i < awy.noOfWaypoints(); i++) {
+	os << awy.nthWaypoint(i)->id() << " ";
+    }
+
+    return os;
+}
+
+// Calculates the nearest point on line AB to point P, placing it in
+// 'where'.  It returns the distance squared between 'where' and P.
+static double _nearestPoint(const sgdVec3 P, const sgdVec3 A, const sgdVec3 B,
+			    sgdVec3& where)
+{
+    sgdVec3 AtoP, AtoB;
+
+    sgdSubVec3(AtoP, P, A);
+    sgdSubVec3(AtoB, B, A);
+
+    double magnitudeAtoB = sgdScalarProductVec3(AtoB, AtoB);
+    double ABAproduct = sgdScalarProductVec3(AtoP, AtoB);
+    double distance = ABAproduct / magnitudeAtoB;
+
+    if (distance < 0.0) {
+	sgdCopyVec3(where, A);
+    } else if (distance > 1.0) {
+	sgdCopyVec3(where, B);
+    } else {
+	sgdScaleVec3(AtoB, distance);
+	sgdAddVec3(where, A, AtoB);
+    }
+
+    return sgdDistanceSquaredVec3(P, where);
+}
+
+const double *Airway::location(const sgdVec3 from)
+{
+    static sgdVec3 result;
+    double nearest = numeric_limits<double>::max();
+    deque<Segment *>::const_iterator it;
+    for (it = _segments.begin(); it != _segments.end(); it++) {
+	Segment *s = *it;
+
+	// Create parameters that will make PLIB happy.
+	sgdVec3 A, B, t;
+	sgdCopyVec3(A, s->start()->bounds().center);
+	sgdCopyVec3(B, s->end()->bounds().center);
+	double d = _nearestPoint(from, A, B, t);
+	if (d < nearest) {
+	    nearest = d;
+	    sgdCopyVec3(result, t);
+	}
+    }
+
+    return result;
+}
+
+// We return the distance (squared) to the nearest point on the
+// airway.
+double Airway::distanceSquared(const sgdVec3 from)
+{
+    double result = numeric_limits<double>::max();
+    deque<Segment *>::const_iterator it;
+    for (it = _segments.begin(); it != _segments.end(); it++) {
+	Segment *s = *it;
+
+	// Create parameters that will make PLIB happy.
+	sgdLineSegment3 line;
+	sgdCopyVec3(line.a, s->start()->bounds().center);
+	sgdCopyVec3(line.b, s->end()->bounds().center);
+	double d = sgdDistSquaredToLineSegmentVec3(line, from);
+	if (d < result) {
+	    result = d;
+	}
+    }
+
+    return result;
+}
+
+const vector<string>& Airway::tokens()
+{
+    if (_tokens.empty()) {
+	_tokens.push_back("AWY:");
+	// EYE - change to _id for consistency?
+	_tokens.push_back(_name);
+    }
+
+    return _tokens;
+}
+
+const char *Airway::asString()
+{
+    // EYE - use our own AtlasString?
+    globals.str.printf("AWY: %s", _name.c_str());
+    return globals.str.str();
+}
+
+//////////////////////////////////////////////////////////////////////
+// Airports and runways
+//////////////////////////////////////////////////////////////////////
 
 RWY::RWY(char *label, double lat, double lon, float hdg, float len, float wid,
 	 ARP *ap):
@@ -330,31 +1612,21 @@ ARP::~ARP()
 
 void ARP::addFreq(ATCCodeType t, int freq, char *label)
 {
-    set<int> &freqs = _freqs[t][label];
+    set<int>& freqs = _freqs[t][label];
     if ((freq % 10 == 2) || (freq % 10 == 7)) {
-	freqs.insert(freq * 10 + 5);
+	freqs.insert((freq * 10 + 5) * 1000);
     } else {
-	freqs.insert(freq * 10);
+	freqs.insert((freq * 10) * 1000);
     }
 }
 
-const double *ARP::location() const 
-{ 
-    return _bounds.center; 
-}
-
-const atlasSphere &ARP::bounds() 
-{ 
-    return _bounds; 
-}
-
-double ARP::distanceSquared(const sgdVec3 from) const
+double ARP::distanceSquared(const sgdVec3 from)
 {
     return sgdDistanceSquaredVec3(_bounds.center, from);
 }
 
 // Returns our tokens, generating them if they haven't been already.
-const std::vector<std::string> &ARP::tokens()
+const vector<string>& ARP::tokens()
 {
     if (_tokens.empty()) {
 	// The id is a token.
@@ -472,20 +1744,6 @@ NavData::~NavData()
 	delete _cullers[i];
     }
     _cullers.clear();
-    _navPoints.clear();
-
-    for (size_t i = 0; i < _navaids.size(); i++) {
-	NAV *n = _navaids[i];
-	_searcher->remove(n);
-	delete n;
-    }
-    _navaids.clear();
-    for (size_t i = 0; i < _fixes.size(); i++) {
-	FIX *f = _fixes[i];
-	_searcher->remove(f);
-	delete f;
-    }
-    _fixes.clear();
     for (size_t i = 0; i < _airports.size(); i++) {
 	ARP *ap = _airports[i];
 	// EYE - need to test ARP destructor (and others) for memory
@@ -494,61 +1752,89 @@ NavData::~NavData()
 	delete ap;
     }
     _airports.clear();
-    for (size_t i = 0; i < _segments.size(); i++) {
-	delete _segments[i];
+
+    // EYE - not particularly efficient.  Should we really have these
+    // static class variables at all?  Or should we provide another
+    // static method to efficiently delete all objects?  Also, should
+    // deleting an airway delete its segments (assuming they aren't
+    // shared by any other airways)?
+    while (Airway::airways().size() > 0) {
+	Airway *awy = *(Airway::airways().begin());
+	_searcher->remove(awy);
+	delete awy;
     }
-    _segments.clear();
+    while (Segment::segments().size() > 0) {
+	delete *(Segment::segments().begin());
+    }
 }
 
-const vector<Cullable *> &NavData::getNavaids(sgdVec3 p)
+// const vector<Cullable *>& NavData::getNavaids(sgdVec3 p)
+// {
+//     // EYE - either document this, or force the caller to pass in a
+//     // vector that we fill.
+//     static vector<Cullable *> results;
+
+//     results.clear();
+
+//     // EYE - should we do this?
+//     _navaidsPointCuller->move(p);
+//     results = _navaidsPointCuller->intersections();
+
+//     return results;
+// }
+void NavData::getNavaids(sgdVec3 p, vector<Cullable *>& navaids)
 {
-    static vector<Cullable *> results;
+    navaids.clear();
 
-    results.clear();
-
-    // EYE - should we do this?
+    // EYE - should we do this?  Will this void other search results?
+    // We should at least warn callers in the documentation.
     _navaidsPointCuller->move(p);
-    results = _navaidsPointCuller->intersections();
-
-    return results;
+    navaids = _navaidsPointCuller->intersections();
 }
 
-const vector<Cullable *> &NavData::getNavaids(FlightData *p)
-{
-    static vector<Cullable *> results;
+// // EYE - instead of taking a FlightData structure, pass in the
+// // location and frequency/frequencies?  That way we remove our
+// // dependence on another class.  Or just provide the previous
+// // getNavaids() and get the caller to match with frequencies?
+// const vector<Cullable *>& NavData::getNavaids(FlightData *p)
+// {
+//     // EYE - either document this, or force the caller to pass in a
+//     // vector that we fill.
+//     static vector<Cullable *> results;
 
-    results.clear();
+//     results.clear();
 
-    if (p == NULL) {
-	return results;
-    }
+//     if (p == NULL) {
+// 	return results;
+//     }
 
-    // We don't do anything if this is from an NMEA track.
-    // Unfortunately, there's no explicit marker in a FlightData
-    // structure that tells us what kind of track it is.  However,
-    // NMEA tracks have their frequencies and radials set to 0, so we
-    // just check for that (and in any case, if frequencies are 0, we
-    // won't match any navaids anyway).
-    if ((p->nav1_freq == 0) && (p->nav2_freq == 0) && (p->adf_freq == 0)) {
-	return results;
-    }
+//     // We don't do anything if this is from an NMEA track.
+//     // Unfortunately, there's no explicit marker in a FlightData
+//     // structure that tells us what kind of track it is.  However,
+//     // NMEA tracks have their frequencies and radials set to 0, so we
+//     // just check for that (and in any case, if frequencies are 0, we
+//     // won't match any navaids anyway).
+//     if ((p->nav1_freq == 0) && (p->nav2_freq == 0) && (p->adf_freq == 0)) {
+// 	return results;
+//     }
 
-    const vector<Cullable *> &navaids = getNavaids(p->cart);
+//     const vector<Cullable *>& navaids = getNavaids(p->cart);
 	
-    for (unsigned int i = 0; i < navaids.size(); i++) {
-	NAV *n = dynamic_cast<NAV *>(navaids[i]);
-	assert(n);
-	if (p->nav1_freq == n->freq) {
-	    results.push_back(n);
-	} else if (p->nav2_freq == n->freq) {
-	    results.push_back(n);
-	} else if (p->adf_freq == n->freq) {
-	    results.push_back(n);
-	}
-    }
+//     for (unsigned int i = 0; i < navaids.size(); i++) {
+// 	Navaid *n = dynamic_cast<Navaid *>(navaids[i]);
+// 	if (n) {
+// 	    if (p->nav1_freq == (n->frequency() / Navaid::kHz)) {
+// 		results.push_back(n);
+// 	    } else if (p->nav2_freq == (n->frequency() / Navaid::kHz)) {
+// 		results.push_back(n);
+// 	    } else if (p->adf_freq == (n->frequency() / Navaid::kHz)) {
+// 		results.push_back(n);
+// 	    }
+// 	}
+//     }
 
-    return results;
-}
+//     return results;
+// }
 
 void NavData::move(const sgdMat4 modelViewMatrix)
 {
@@ -557,7 +1843,7 @@ void NavData::move(const sgdMat4 modelViewMatrix)
     }
 }
 
-void NavData::zoom(const sgdFrustum &frustum)
+void NavData::zoom(const sgdFrustum& frustum)
 {
     for (int i = 0; i < _COUNT; i++) {
 	_frustumCullers[i]->zoom(frustum.getLeft(),
@@ -626,20 +1912,95 @@ void NavData::_loadNavaids(const char *fgRoot)
     printf("  ... done\n");
 }
 
-void NavData::_loadNavaids810(float cycle, const gzFile &arp)
+// Convenience routine.  Checks if the given navaid matches an ILS in
+// the given multimap.  The multimap is a mapping from a name (like
+// "ZWWW 07") to one or more ILS systems.  Returns the matching ILS if
+// found, NULL otherwise.  To match, a glideslope or DME must have the
+// same name, id, and frequency as the ILS; a marker must have the
+// same name (markers have no ids or frequencies).
+ILS *__matches(const multimap<string, ILS *>& lmap, const Navaid *n)
 {
-    char *line;
-    NAV *n;
+    pair<multimap<string, ILS *>::const_iterator,
+	multimap<string, ILS *>::const_iterator> range = 
+	lmap.equal_range(n->name());
+    multimap<string, ILS *>::const_iterator i;
+    for (i = range.first; i != range.second; i++) {
+	if (dynamic_cast<const Marker *>(n)) {
+	    // If a marker matches the name, that's good enough -
+	    // markers have no ids or frequencies.
+	    return i->second;
+	}
 
+	// If it's not a marker, then we check the id and frequency as
+	// well (although the frequency check is probably not needed).
+	ILS *ils = i->second;
+	if (n->id() != ils->loc()->id()) {
+	    // This one doesn't match.  See if another with the same
+	    // name does.
+	    continue;
+	}
+	if (n->frequency() != ils->loc()->frequency()) {
+	    // This one doesn't match.  See if another with the same
+	    // name does.
+	    continue;
+	}
+
+	// Same name, id, and frequency.  It's a match!
+	return ils;
+    }
+
+    return NULL;
+}
+
+// Used to see if paired navaids match.
+
+// EYE - we used to check the type as well, but we don't have types
+// any more.  Is this strict enough?  We can't use frequencies, as
+// NDBs can be paired with DMEs.  Locations won't be exactly the same,
+// although they should be close.
+struct __NavaidLessThan {
+    bool operator()(Navaid *left, Navaid* right) const {
+	if (left->id() != right->id()) {
+	    return (left->id() < right->id());
+	}
+	return (left->name() < right->name());
+    };
+};
+
+void NavData::_loadNavaids810(float cycle, const gzFile& arp)
+{
+    // Type codes - these are the numbers at the start of each line in
+    // the nav data file.  Most are self-explanatory; 'dme_sub' means
+    // 'subsidiary DME', which is a DME where X-Plane suppresses
+    // display of frequency information.
+    enum {ndb = 2, vor = 3, ils = 4, loc = 5, gs = 6,
+	  om = 7, mm = 8, im = 9, dme_sub = 12, dme = 13,
+	  last_line = 99};
+
+    // This is used for creating paired navaids.  We use the navaids'
+    // ids and names to compare them.
+    set<Navaid *, __NavaidLessThan> navaidSet;
+
+    // This is used for constructing ILS systems.  We use the
+    // localizer name as a key, so that we can match them with
+    // markers, glideslopes, and DMEs.  Markers have no ids or
+    // frequencies, so we can only match them with localizers based on
+    // name.  Localizer names are not guaranteed to be unique (eg,
+    // LOWI 26), so we must use a multimap.
+    multimap<string, ILS *> ILSMap;
+
+    // We keep track of the line number for reporting errors.  When
+    // we're called, the first two lines have already been read.
+    int lineNumber = 2;
+    char *line;
     while (gzGetLine(arp, &line)) {
-	NavType navtype;
-	NavSubType navsubtype;
 	int lineCode, offset;
 	double lat, lon;
 	int elev, freq, range;
-	float magvar;
+	double magvar;
 	char id[5];
 
+	lineNumber++;
 	if (strcmp(line, "") == 0) {
 	    // Blank line.
 	    continue;
@@ -661,278 +2022,394 @@ void NavData::_loadNavaids810(float cycle, const gzFile &arp)
 	// absolutely count on it.  On the other hand, every file I've
 	// checked consistently has it, and it's useful, so we'll use
 	// it.
-	if (sscanf(line, "%d %lf %lf %d %d %d %f %s %n", &lineCode, 
+	//
+	// Note that 'magvar' really represents many things, depending
+	// on the specific navaid: slaved variation for VORs, bearing
+	// for localizers and markers, bearing *and* slope for
+	// glideslopes, and bias for DMEs.
+	if (sscanf(line, "%d %lf %lf %d %d %d %lf %s %n", &lineCode, 
 		   &lat, &lon, &elev, &freq, &range, &magvar, id, &offset)
 	    != 8) {
+	    cerr << lineNumber << ": parse error:" << endl;
+	    cerr << line << endl;
 	    continue;
 	}
-	line += offset;
-	assert(lineCode != 99);
+	assert(lineCode != last_line);
+
+	// Set 'name'.  Note that it will contain more than the name,
+	// so we'll need to insert a few strategically-located nulls
+	// to get the correct name.
+	char *name = line + offset;
 
 	// Find the "type", which is the last space-delimited string.
-	char *subType = lastToken(line);
-	assert(subType != NULL);
+	char *type = lastToken(name);
+	assert(type != NULL);
+
+	// Convert some of the values to our internal units.  Other
+	// conversions need to be made, but they depend on the navaid.
+	elev *= SG_FEET_TO_METER; // feet to metres
+	range *= SG_NM_TO_METER;  // nautical miles to metres
 
 	// We slightly alter the representation of frequencies.  In
 	// the navaid database, NDB frequencies are given in kHz,
 	// whereas VOR/ILS/DME/... frequencies are given in 10s of
-	// kHz.  We adjust the latter so that they are kHz as well.
-	if (lineCode != 2) {
-	    freq *= 10;
+	// kHz.  We adjust them to Hz.
+	if (lineCode == ndb) {
+	    freq *= 1000;
+	} else {
+	    freq *= 10000;
 	}
 
-	// EYE - is having navtype and navsubtype a good idea, or
-	// should we just stick to one or the other (presumably the
-	// latter would be better)?
-	switch (lineCode) {
-	  case 2: 
-	    navtype = NAV_NDB;
-	    if (strcmp(subType, "NDB") == 0) {
-		navsubtype = NDB;
-	    } else if (strcmp(subType, "NDB-DME") == 0) {
-		navsubtype = NDB_DME;
-	    } else if (strcmp(subType, "LOM") == 0) {
-		navsubtype = LOM;
-	    } else {
-		navsubtype = UNKNOWN;
+	// Due to the "great DME shift" of 2007.09, we might need to
+	// do extra processing to handle DMEs.
+	//
+	// Here's the picture:
+	//
+	// Before 2007.09:		After:
+	// Foo Bar DME-ILS		Foo Bar DME-ILS
+	// Foo Bar DME			Foo Bar DME
+	// Foo Bar NDB-DME		Foo Bar NDB-DME DME
+	// Foo Bar TACAN		Foo Bar TACAN DME
+	// Foo Bar VORTAC		Foo Bar VORTAC DME
+	// Foo Bar VOR-DME		Foo Bar VOR-DME DME
+	//
+	// The type is now less useful, only telling us about
+	// DME-ILSs.  To find out the real subtype, we need to back
+	// one more token and look at that.  However, that doesn't
+	// work for "pure" DMEs (ie, "Foo Bar DME").  So, if the next
+	// token isn't NDB-DME, TACAN, VORTAC, or VOR-DME, then we
+	// must be looking at a pure DME.
+	if (((lineCode == dme_sub) || (lineCode == dme)) && 
+	    (cycle > 2007.09) && 
+	    (strcmp(type, "DME-ILS") != 0)) {
+	    // New format.  Yuck.  We need to find the "real" type by
+	    // looking back one token.
+	    char *subType = lastToken(name, type);
+	    if ((strncmp(subType, "NDB-DME", 7) == 0) ||
+		(strncmp(subType, "TACAN", 5) == 0) ||
+		(strncmp(subType, "VORTAC", 6) == 0) ||
+		(strncmp(subType, "VOR-DME", 7) == 0)) {
+		// The subtype is the real type (getting confused?).
+		// Terminate the string, and make type point to
+		// subType.
+		char *tmp = type;
+		while (*--tmp == ' ')
+		    ;
+		*++tmp = '\0';
+		type = subType;
 	    }
-	    break; 
-	  case 3: 
-	    navtype = NAV_VOR; 
-	    if (strcmp(subType, "VOR") == 0) {
-		navsubtype = VOR;
-	    } else if (strcmp(subType, "VOR-DME") == 0) {
-		navsubtype = VOR_DME;
-	    } else if (strcmp(subType, "VORTAC") == 0) {
-		navsubtype = VORTAC;
-	    } else {
-		navsubtype = UNKNOWN;
-	    }
-	    break; 
-	  case 4: 
-	    if (strcmp(subType, "IGS") == 0) {
-		navsubtype = IGS;
-	    } else if (strcmp(subType, "ILS-cat-I") == 0) {
-		navsubtype = ILS_cat_I;
-	    } else if (strcmp(subType, "ILS-cat-II") == 0) {
-		navsubtype = ILS_cat_II;
-	    } else if (strcmp(subType, "ILS-cat-III") == 0) {
-		navsubtype = ILS_cat_III;
-	    } else if (strcmp(subType, "LDA-GS") == 0) {
-		navsubtype = LDA_GS;
-	    } else if (strcmp(subType, "LOC-GS") == 0) {
-		navsubtype = LOC_GS;
-	    } else {
-		navsubtype = UNKNOWN;
-	    }
-	    // EYE - have a NAV_ILS and NAV_LOC?
-	    navtype = NAV_ILS; 
-	    break; 
-	  case 5: 
-	    if (strcmp(subType, "LDA") == 0) {
-		navsubtype = LDA;
-	    } else if (strcmp(subType, "LOC") == 0) {
-		navsubtype = LOC;
-	    } else if (strcmp(subType, "SDF") == 0) {
-		navsubtype = SDF;
-	    } else {
-		navsubtype = UNKNOWN;
-	    }
-	    navtype = NAV_ILS; 
-	    break; 
-	  case 6: 
-	    // EYE - if we only have one subtype, forget the whole
-	    // subtype business?
-	    if (strcmp(subType, "GS") == 0) {
-		navsubtype = GS;
-	    } else {
-		navsubtype = UNKNOWN;
-	    }
-	    navtype = NAV_GS; 
-	    break;  
-	  case 7: 
-	    if (strcmp(subType, "OM") == 0) {
-		// Since the navaid database specifies no range for
-		// markers, we set our own, such that it is bigger
-		// than the marker's rendered size.
-		range = __markerRange;
-		navsubtype = OM;
-	    } else {
-		navsubtype = UNKNOWN;
-	    }
-	    navtype = NAV_OM; 
-	    break;  
-	  case 8: 
-	    if (strcmp(subType, "MM") == 0) {
-		range = __markerRange;
-		navsubtype = MM;
-	    } else {
-		navsubtype = UNKNOWN;
-	    }
-	    navtype = NAV_MM; 
-	    break;  
-	  case 9: 
-	    if (strcmp(subType, "IM") == 0) {
-		range = __markerRange;
-		navsubtype = IM;
-	    } else {
-		navsubtype = UNKNOWN;
-	    }
-	    navtype = NAV_IM; 
-	    break;  
-	  case 12: 
-	  case 13: 
-	    // Due to the "great DME shift" of 2007.09, we need to do
-	    // extra processing to handle DMEs.  Here's the picture:
-	    //
-	    // Before:			After:
-	    // Foo Bar DME-ILS		Foo Bar DME-ILS
-	    // Foo Bar DME		Foo Bar DME
-	    // Foo Bar NDB-DME		Foo Bar NDB-DME DME
-	    // Foo Bar TACAN		Foo Bar TACAN DME
-	    // Foo Bar VORTAC		Foo Bar VORTAC DME
-	    // Foo Bar VOR-DME		Foo Bar VOR-DME DME
-	    //
-	    // The subType is now less useful, only telling us about
-	    // DME-ILSs.  To find out the real subtype, we need to
-	    // back one more token and look at that.  However, that
-	    // doesn't work for "pure" DMEs (ie, "Foo Bar DME").  So,
-	    // if the next token isn't NDB-DME, TACAN, VORTAC, or
-	    // VOR-DME, then we must be looking at a pure DME.
+	}
 
-	    if ((cycle > 2007.09) && (strcmp(subType, "DME-ILS") != 0)) {
-		// New format.  Yuck.  We need to find the "real"
-		// subType by looking back one token.
-		char *subSubType = lastToken(line, subType);
-		if ((strncmp(subSubType, "NDB-DME", 7) == 0) ||
-		    (strncmp(subSubType, "TACAN", 5) == 0) ||
-		    (strncmp(subSubType, "VORTAC", 6) == 0) ||
-		    (strncmp(subSubType, "VOR-DME", 7) == 0)) {
-		    // The sub-subtype is the real subtype (getting
-		    // confused?).  Terminate the string, and make
-		    // subType point to subSubType.
-		    subType--;
-		    *subType = '\0';
-		    subType = subSubType;
+	// Get the real navaid name.  At the moment, 'name' points to
+	// the start of the name, but the end also includes the type.
+	// So, starting where the type pointer points, we back up past
+	// any whitespace, then set the following character to null.
+	char *tmp = type;
+	while (*--tmp == ' ')
+	    ;
+	*++tmp = '\0';
+
+	Navaid *n = NULL;
+	switch (lineCode) {
+	  case ndb:
+	    {
+		if ((strcmp(type, "NDB") != 0) &&
+		    (strcmp(type, "NDB-DME") != 0) &&
+		    (strcmp(type, "LOM") != 0)) {
+		    fprintf(stderr, "%d: unknown NDB type: '%s'\n",
+			    lineNumber, type);
+		}
+		n = new NDB(id, lat, lon, elev, name, freq, range);
+
+		if (strcmp(type, "NDB-DME") == 0) {
+		    // This NDB is paired with a DME.  Record the fact -
+		    // we'll do the pairing when we read DMEs.  Note that
+		    // this code assumes that we read all NDBs (and VORs)
+		    // before we read DMEs
+		    navaidSet.insert(n);
 		}
 	    }
+	    break; 
 
-	    // Because DMEs are often paired with another navaid, we
-	    // tend to ignore them, assuming that we've already
-	    // created a navaid for them already.  The ones ignored
-	    // are: VOR-DME, VORTAC, and NDB-DME.  We don't ignore
-	    // DME-ILSs because, although paired with an ILS, their
-	    // location is usually different.
-	    if (strcmp(subType, "DME-ILS") == 0) {
-		navsubtype = DME_ILS;
-	    } else if (strcmp(subType, "TACAN") == 0) {
-		// TACANs are drawn like VOR-DMEs, but with the lobes
-		// not filled in.  They can provide directional
-		// guidance, so they should have a compass rose.
-		// Unfortunately, the nav.dat file doesn't tell us the
-		// magnetic variation for the TACAN, so it can't be
-		// used.
-		navsubtype = TACAN;
-	    } else if (strcmp(subType, "VOR-DME") == 0) {
-		navsubtype = VOR_DME;
-		continue;
-	    } else if (strcmp(subType, "VORTAC") == 0) {
-		navsubtype = VORTAC;
-		continue;
-	    } else if (strcmp(subType, "DME") == 0) {
-		// EYE - For a real stand-alone DME, check lo1.pdf,
-		// Bonnyville Y3, 109.8 (N54.31, W110.74, near Cold
-		// Lake, east of Edmonton).  It is drawn as a simple
-		// DME square (grey, as is standard on Canadian maps
-		// it seems, although lo1.pdf is not a VFR map).
-		navsubtype = DME;
-	    } else if (strcmp(subType, "NDB-DME") == 0) {
-		// We ignore NDB-DMEs, in the sense that we don't
-		// create a navaid entry for them.  However, we do add
-		// their frequency to the corresponding NDB.
-		navsubtype = NDB_DME;
-		// EYE - very crude
-		unsigned int i;
-		for (i = 0; i < _navaids.size(); i++) {
-		    NAV *o = _navaids[i];
-		    // EYE - look at name too
-		    if ((o->navtype == NAV_NDB) && 
-			(o->navsubtype == NDB_DME) && 
-			(o->id == id)) {
-			o->freq2 = freq;
-			break;
+	  case vor:
+	    {
+		if ((strcmp(type, "VOR") != 0) &&
+		    (strcmp(type, "VOR-DME") != 0) &&
+		    (strcmp(type, "VORTAC") != 0)) {
+		    fprintf(stderr, "%d: unknown VOR type: '%s'\n",
+			    lineNumber, type);
+		}
+		n = new VOR(id, lat, lon, elev, name, freq, range, 
+			    magvar);
+
+                if ((strcmp(type, "VOR-DME") == 0) ||
+		    (strcmp(type, "VORTAC") == 0)) {
+		    // VOR is paired with a DME or TACAN.  We'll pair
+		    // it later when loading DMEs.
+		    navaidSet.insert(n);
+		}
+	    }
+	    break; 
+
+	  case ils:
+	  case loc: 
+	    {
+		// EYE - use a map (from string to Navaid::Type) to do
+		// this?
+		ILS::Type t;
+		if (strcmp(type, "ILS-cat-I") == 0) {
+		    t = ILS::ILS_CAT_I;
+		} else if (strcmp(type, "ILS-cat-II") == 0) {
+		    t = ILS::ILS_CAT_II;
+		} else if (strcmp(type, "ILS-cat-III") == 0) {
+		    t = ILS::ILS_CAT_III;
+		} else if ((strcmp(type, "LDA-GS") == 0) ||
+			   (strcmp(type, "LDA") == 0)) {
+		    t = ILS::LDA;
+		} else if (strcmp(type, "IGS") == 0) {
+		    t = ILS::IGS;
+		} else if (strcmp(type, "LOC") == 0) {
+		    t = ILS::Localizer;
+		} else if (strcmp(type, "SDF") == 0) {
+		    t = ILS::SDF;
+		} else {
+		    fprintf(stderr, "%d: unknown LOC type: '%s'\n",
+			    lineNumber, type);
+		}
+
+		LOC *loc = new LOC(id, lat, lon, elev, name, freq, range, 
+				   magvar);
+		n = loc;
+
+		// Create an ILS consisting of the localizer.
+		// Creating it adds it to the NavaidSystem class set.
+		ILS *i = new ILS(loc, t);
+
+		// EYE - this is where an internal map (within
+		// NavaidSystem?) might help (and with creating
+		// VORTACs, VOR/DMEs, and NDB/DMEs).
+
+		// Put the ILS in a map under its name.  We use this
+		// map to match it with other components of the ILS
+		// Its name might not be unique - however, using the
+		// name allows us to match markers.  Note that we
+		// assume that we read all the localizers first,
+		// before any glideslopes, DMEs, or markers.
+		ILSMap.insert(make_pair(i->name(), i));
+	    }
+	    break; 
+
+	  case gs:
+	    {
+		if (strcmp(type, "GS") != 0) {
+		    fprintf(stderr, "%d: unknown GS type: '%s'\n", 
+			    lineNumber, type);
+		}
+
+		// In the input file, the field represented here by
+		// 'magvar' contains both the heading and the slope of
+		// the glideslope.
+		float heading, slope;
+		heading = fmod(magvar, 1000.0);
+		slope = (magvar - heading) / 100000.0;
+
+		GS *gs = new GS(id, lat, lon, elev, name, freq, range, 
+				heading, slope);
+		n = gs;
+
+		// A glideslope must match a localizer.
+		ILS *i = __matches(ILSMap, gs);
+
+		if (i != NULL) {
+		    i->setGS(gs);
+		} else {
+		    // EYE - log this!
+		    // fprintf(stderr,
+		    // 	    "%d: no localizer found for GS %s (%.2f MHz)\n",
+		    // 	    lineNumber, gs->name().c_str(), 
+		    // 	    gs->frequency() / 1e6);
+		}
+	    }
+	    break;  
+
+	  case om:
+	  case mm:
+	  case im:
+	    {
+		// EYE - there are duplicate marker entries, for markers
+		// that serve multiple runways.  We should really only
+		// have one marker object, and somehow indicate (maybe)
+		// that it is shared.  Its alignment should be an average
+		// of the 2 runways.
+		Marker::Type t;
+		if (lineCode == om) {
+		    t = Marker::OUTER;
+		} else if (lineCode == mm) {
+		    t = Marker::MIDDLE;
+		} else {
+		    t = Marker::INNER;
+		}
+		Marker *m = new Marker(lat, lon, elev, name, magvar, t);
+		n = m;
+
+		// A marker must be part of an ILS system.  We assume
+		// that the ILS map has been primed by this point.
+		ILS *i = __matches(ILSMap, m);
+		if (i != NULL) {
+		    i->addMarker(m);
+		} else {
+		    // EYE - log this!
+		    // fprintf(stderr, "%d: no localizer found for marker %s\n", 
+		    // 	    lineNumber, name);
+		}
+	    }
+	    break;  
+
+	  case dme_sub:
+	  case dme:
+	    {
+		// What is called 'magvar' in the input file is, for a
+		// DME, a bias in nautical miles.  We represent the
+		// bias in metres, so convert it here.
+		float bias = magvar * SG_NM_TO_METER;
+
+		// The navaids database lumps TACANs (and VORTACs) in
+		// with DMEs, but we distinguish them.
+		if ((strcmp(type, "TACAN") == 0) ||
+		    (strcmp(type, "VORTAC") == 0)) {
+		    TACAN *tacan = new TACAN(id, lat, lon, elev, name, freq, 
+					     range, 0.0, bias);
+		    n = tacan;
+
+		    if (strcmp(type, "VORTAC") == 0) {
+			// A VORTAC is a TACAN paired with a VOR.
+			// There should be an matching VOR in the
+			// navaid set.  If there isn't, complain.
+			set<Navaid *, __NavaidLessThan>::iterator other = 
+			    navaidSet.find(tacan);
+			if (other == navaidSet.end()) {
+			    // No match.
+			    // EYE - log this!
+			    // cerr << lineNumber << ": no match for " << *tacan 
+			    // 	 << endl;
+			} else {
+			    // Found a match.  Make sure it has the correct
+			    // type.
+			    VOR *vor = dynamic_cast<VOR *>(*other);
+			    // EYE - don't use asserts
+			    assert(vor);
+
+			    // Create a navaid system.  It looks odd
+			    // to not save the created object, but the
+			    // NavaidSystem class keeps track of all
+			    // created objects.
+			    new VORTAC(vor, tacan);
+
+			    // Remove the matching navaid.
+			    navaidSet.erase(other);
+			}
+		    }
+		} else {
+		    // A real DME.
+		    if ((strcmp(type, "DME") != 0) &&
+			(strcmp(type, "NDB-DME") != 0) &&
+			(strcmp(type, "DME-ILS") != 0) &&
+			(strcmp(type, "VOR-DME") != 0)) {
+			fprintf(stderr, "%d: unknown DME type: '%s'\n",
+				lineNumber, type);
+		    }
+		    DME *dme = new DME(id, lat, lon, elev, name, freq, range, 
+				       bias);
+		    n = dme;
+
+		    if (strcmp(type, "DME-ILS") == 0) {
+			// A DME-ILS must match a localizer.
+			ILS *i = __matches(ILSMap, dme);
+			if (i != NULL) {
+			    i->setDME(dme);
+			} else {
+			    // EYE - log this!
+			    // fprintf(stderr, 
+			    // 	    "%d: no localizer found for DME-ILS %s '%s' (%.2f MHz)\n",
+			    // 	    lineNumber, dme->id().c_str(), 
+			    // 	    dme->name().c_str(), 
+			    // 	    dme->frequency() / 1e6);
+			}
+		    } else if ((strcmp(type, "NDB-DME") == 0) ||
+			       (strcmp(type, "VOR-DME") == 0)) {
+			// DME pair.  This DME is paired with an NDB
+			// or VOR.  There should be an entry in the
+			// navaid set matching this navaid.  If there
+			// isn't, complain.
+			set<Navaid *, __NavaidLessThan>::iterator other = 
+			    navaidSet.find(dme);
+			if (other == navaidSet.end()) {
+			    // No match.
+			    // EYE - log this!
+			    // cerr << lineNumber << ": no match for " << *dme 
+			    // 	 << endl;
+			} else {
+			    // Found a match.  Make sure it has the correct
+			    // type.
+			    if (strcmp(type, "NDB-DME") == 0) {
+				NDB *ndb = dynamic_cast<NDB *>(*other);
+				// EYE - don't use asserts
+				assert(ndb);
+				// Create a navaid system.  It looks
+				// odd to not save the created object,
+				// but the NavaidSystem class keeps
+				// track of all created objects.
+				new NDB_DME(ndb, dme);
+			    } else { 
+				VOR *vor = dynamic_cast<VOR *>(*other);
+				// EYE - don't use asserts
+				assert(vor);
+				// Create a navaid system.  It looks
+				// odd to not save the created object,
+				// but the NavaidSystem class keeps
+				// track of all created objects.
+				new VOR_DME(vor, dme);
+			    }
+			    // Remove the matching navaid.
+			    navaidSet.erase(other);
+			}
 		    }
 		}
-		if (i == _navaids.size()) {
-		    printf("No matching NDB for NDB-DME %s (%s)\n", id, line);
-		}
-		continue;
-	    } else {
-		navsubtype = UNKNOWN;
 	    }
-	    navtype = NAV_DME; 
-	    // For DMEs, magvar represents the DME bias, in nautical
-	    // miles (which we convert to metres).
-	    magvar *= SG_NM_TO_METER;
-	    break;
+	    break;  
 	  default:
 	    assert(false);
 	    break;
 	}
-	if (navsubtype == UNKNOWN) {
-	    printf("UNKNOWN: %s\n", line);
-	}
+	assert(n != NULL);
 
-	if (navtype == NAV_ILS) {
-	    // For ILS elements, the name is <airport> <runway>.  I
-	    // don't care about the airport, so skip it.
-	    // EYE - check return?
-	    sscanf(line, "%*s %n", &offset);
-	    line += offset;
-	}
-
-	// Create a record and fill it in.
-	n = new NAV;
-	n->navtype = navtype;
-	n->navsubtype = navsubtype;
-
-	n->lat = lat;
-	n->lon = lon;
-	// EYE - in flight tracks, we save elevations (altitudes?) in
-	// feet, but here we use metres.  Should we change one?
-	n->elev = elev * SG_FEET_TO_METER;
-	n->freq = freq;
-	n->range = range * SG_NM_TO_METER;
-	n->magvar = magvar;
-
-	n->id = id;
-	n->name = line;
-	// EYE - this seems rather hacky and unreliable.
-	n->name.erase(subType - line - 1);
-
-	// Add to the culler.  The navaid bounds are given by its
-	// center and range.
-	sgdVec3 center;
-	atlasGeodToCart(lat, lon, elev * SG_FEET_TO_METER, center);
-
-	n->_bounds.setCenter(center);
-	n->_bounds.setRadius(n->range);
+	// EYE - we need a logging facility
+	// if (!n->validFrequency()) {
+	//     printf("%d: invalid frequency for %s '%s' ", 
+	//     	   lineNumber, n->id().c_str(), n->name().c_str());
+	//     if (dynamic_cast<NDB *>(n)) {
+	//     	printf("(%.1f kHz)\n", n->frequency() / 1000.0);
+	//     } else {
+	//     	printf("(%.2f MHz)\n", n->frequency() / 1000000.0);
+	//     }
+	// }
 
 	// Add to our culler.
 	_frustumCullers[NAVAIDS]->culler().addObject(n);
 
-	// Add to the _navaids vector.
-	_navaids.push_back(n);
-
 	// Create search tokens for it.
 	_searcher->add(n);
-
-	// Add to the _navPoints map.
-	_NAVPOINT foo;
-	foo.isNavaid = true;
-	foo.n = (void *)n;
-	_navPoints.insert(make_pair(n->id, foo));
     }
+
+    // Check for orphaned paired navaids.
+    // EYE - log this!
+    // if (!navaidSet.empty()) {
+    // 	printf("\nNo siblings found for the following paired navaids:\n");
+    // 	set<Navaid *, __NavaidLessThan>::iterator i;
+    // 	for (i = navaidSet.begin(); i != navaidSet.end(); i++) {
+    // 	    cout << "\t" << *(*i) << "\n";
+    // 	}
+    // }
 }
 
 void NavData::_loadFixes(const char *fgRoot)
@@ -968,12 +2445,9 @@ void NavData::_loadFixes(const char *fgRoot)
     printf("  ... done\n");
 }
 
-void NavData::_loadFixes600(const gzFile &arp)
+void NavData::_loadFixes600(const gzFile& arp)
 {
     char *line;
-
-    FIX *f;
-
     while (gzGetLine(arp, &line)) {
 	if (strcmp(line, "") == 0) {
 	    // Blank line.
@@ -985,45 +2459,30 @@ void NavData::_loadFixes600(const gzFile &arp)
 	    break;
 	}
 
-	// Create a record and fill it in.
-	f = new FIX;
-
 	// A line looks like this:
 	//
 	// <lat> <lon> <name>
 	//
-	if (sscanf(line, "%lf %lf %s", &f->lat, &f->lon, f->name) != 3) {
-	    fprintf(stderr, "FixesOverlay::_load600(): bad line in file:\n");
-	    fprintf(stderr, "\t'%s'\n", line);
-	    continue;
-	}
+	double lat, lon;
+	int n;
+	char *id;
+	assert(sscanf(line, "%lf %lf %n", &lat, &lon, &n) == 2);
+	id = line + n;
 
-	// Add to the culler.
-	sgdVec3 point;
-	atlasGeodToCart(f->lat, f->lon, 0.0, point);
-
-	// We arbitrarily say fixes have a radius of 1000m.
-	f->_bounds.radius = 1000.0;
-	f->_bounds.setCenter(point);
-
-	// Until determined otherwise, fixes are not assumed to be
-	// part of any low or high altitude airways.
-	f->low = f->high = false;
+	// Create a record and fill it in.
+	Fix *f = new Fix(id, lat, lon);
 
 	// Add to our culler.
 	_frustumCullers[FIXES]->culler().addObject(f);
 
-	// Add to the fixes vector.
-	_fixes.push_back(f);
-
 	// Create search tokens for it.
 	_searcher->add(f);
 
-	// Add to the _navPoints map.
-	_NAVPOINT foo;
-	foo.isNavaid = false;
-	foo.n = (void *)f;
-	_navPoints.insert(make_pair(f->name, foo));
+	// // Add to the _navPoints map.
+	// _NAVPOINT foo;
+	// foo.isNavaid = false;
+	// foo.n = (void *)f;
+	// _navPoints.insert(make_pair(f->name, foo));
     }
 }
 
@@ -1060,12 +2519,79 @@ void NavData::_loadAirways(const char *fgRoot)
     printf("  ... done\n");
 }
 
-void NavData::_loadAirways640(const gzFile &arp)
+// This is a temporary type used to construct airways.  It represents
+// a segment, but only for one airway, and only in one direction.  For
+// example, consider the low-level segment between ARNEB and KIRAS,
+// shared by airways P161, UW411, and W411.  We will create 6
+// sub-segments: ARNEB:P161, KIRAS:P161, ARNEB:UW411, KIRAS:UW411,
+// ARNEB:W411, and KIRAS:W411.
+struct Subsegment {
+  public:
+    Subsegment(const Waypoint *start, const char *airwayName, bool isLow);
+    ~Subsegment();
+
+    const Waypoint *start() const { return _start; }
+    const string& name() const { return _name; }
+    bool isLow() { return _isLow; }
+    Segment *segment() const { return _seg; }
+    const set<Subsegment>::const_iterator& end() const { return _end; }
+
+    void setStart(const Waypoint *wpt) { _start = wpt; }
+    void setName(const string& name) { _name = name; }
+    void setSegment(Segment* segment) { _seg = segment; }
+    void setEnd(set<Subsegment>::iterator& i) { _end = i; }
+
+    bool operator<(const Subsegment& right) const;
+
+    friend std::ostream& operator<<(std::ostream& os, const Subsegment& seg);
+    
+  protected:
+    const Waypoint *_start;		// eg, ARNEB
+    string _name;			// eg, "P161"
+    bool _isLow;
+    Segment *_seg;
+    set<Subsegment>::iterator _end; // eg, KIRAS:P161
+};
+
+Subsegment::Subsegment(const Waypoint *start, const char *airwayName, 
+		       bool isLow): 
+    _start(start), _name(airwayName), _isLow(isLow)
 {
+}
+
+Subsegment::~Subsegment()
+{
+}
+
+bool Subsegment::operator<(const Subsegment& right) const
+{
+    if (_start != right._start) {
+	return (_start < right._start);
+    }
+    if (_name != right._name) {
+	return (_name < right._name);
+    }
+
+    return (_isLow < right._isLow);
+}
+
+// EYE - since we have asString, do we want this?
+ostream& operator<<(ostream& os, const Subsegment& seg)
+{
+    os << seg.name() << ": " << seg.start()->id() << " <" 
+       << seg.start()->lat() << ", " << seg.start()->lon() 
+       << ">";
+
+    return os;
+}
+
+void NavData::_loadAirways640(const gzFile& arp)
+{
+    // As we read segments, we create and add subsegments to this map.
+    // It will be used to construct our airways.
+    multiset<Subsegment> subsegments;
+
     char *line;
-
-    AWY *a;
-
     while (gzGetLine(arp, &line)) {
 	if (strcmp(line, "") == 0) {
 	    // Blank line.
@@ -1077,53 +2603,163 @@ void NavData::_loadAirways640(const gzFile &arp)
 	    break;
 	}
 
-	// Create a record and fill it in.
-	a = new AWY;
-	istringstream str(line);
-
 	// A line looks like this:
 	//
 	// <id> <lat> <lon> <id> <lat> <lon> <high/low> <base> <top> <name>
 	//
 	// 
-	int lowHigh;
-	str >> a->start.id >> a->start.lat >> a->start.lon
-	    >> a->end.id >> a->end.lat >> a->end.lon
-	    >> lowHigh >> a->base >> a->top >> a->name;
-	// EYE - check for errors
-	if (lowHigh == 1) {
-	    a->isLow = true;
-	} else if (lowHigh == 2) {
-	    a->isLow = false;
-	} else {
-	    assert(false);
+	char startID[6], endID[6];
+	double startLat, startLon, endLat, endLon;
+	int lowHigh, base, top, nameOffset;
+
+	sscanf(line, "%s %lf %lf %s %lf %lf %d %d %d %n", 
+	       startID, &startLat, &startLon, endID, &endLat, &endLon,
+	       &lowHigh, &base, &top, &nameOffset);
+	assert((lowHigh == 1) || (lowHigh == 2));
+	// Check that the first id is alphabetically less than the
+	// second.  We use this assumption in other parts of the code.
+	assert(strcmp(startID, endID) < 0);
+
+	Waypoint *start, *end;
+	start = _findEnd(startID, startLat, startLon);
+	end = _findEnd(endID, endLat, endLon);
+
+	// Create the segment.  It is automatically added to the
+	// Segment class's vector.
+	char *name = line + nameOffset;
+	Segment *seg = new Segment(name, start, end, base, top, lowHigh == 1);
+
+	// We use the airways to help us guess what our fixes are used
+	// for.  If a fix appears in an airway, we tag it as en route
+	// (otherwise it is considered a terminal fix).
+	Fix *f;
+	if ((f = dynamic_cast<Fix *>(start))) {
+	    f->setEnRoute();
+	}
+	if ((f = dynamic_cast<Fix *>(end))) {
+	    f->setEnRoute();
 	}
 
-	// Add to the culler.  The airway bounds are given by its two
-	// endpoints.
-	// EYE - save these two points
-	sgdVec3 point;
-	atlasGeodToCart(a->start.lat, a->start.lon, 0.0, point);
-	a->_bounds.extend(point);
-	atlasGeodToCart(a->end.lat, a->end.lon, 0.0, point);
-	a->_bounds.extend(point);
-	double az1, az2, s;
-	geo_inverse_wgs_84(0.0, a->start.lat, a->start.lon, 
-			   a->end.lat, a->end.lon,
-			   &az1, &az2, &s);
-	a->length = s;				       
+	// Add the airway segment to the culler.
+	_frustumCullers[AIRWAYS]->culler().addObject(seg);
 
-	// Add to our culler.
-	_frustumCullers[AIRWAYS]->culler().addObject(a);
+	// Add to subsegments set.  We add the subsegment twice per
+	// airway name.  Note that a segment may be shared among
+	// several airways - this is indicated by a hyphenated name
+	// (eg, "A240-B143B-W16")
+	char *awy;
+	for (awy = strtok(name, "-"); awy; awy = strtok(NULL, "-")) {
+	    // Each segment is added twice, once per endpoint.
+	    Subsegment s1(start, awy, seg->isLow()), s2(end, awy, seg->isLow());
+	    s1.setSegment(seg);
+	    s2.setSegment(seg);
 
-	// Add to the segments vector.
-	_segments.push_back(a);
-	
-	// Look for the two endpoints in the _navPoints map.  For
-	// those that are fixes, update their high/low status.
-	_checkEnd(a->start, a->isLow);
-	_checkEnd(a->end, a->isLow);
+	    // EYE - check for duplicates?
+	    multiset<Subsegment>::iterator i1 = subsegments.insert(s1);
+	    s2.setEnd(i1);
+	    multiset<Subsegment>::iterator i2 = subsegments.insert(s2);
+	    // Sometimes C++ can be such a pain - I want to set the
+	    // neighbour element of the subsegment we first inserted.
+	    // But C++ won't let us do that, because it figures (I
+	    // guess) that changing the object might change the sort
+	    // order of the multiset (the compiler says '*i1' is a
+	    // 'const subsegment&').  I know that setting the
+	    // neighbour won't change the ordering, so I'm ramming
+	    // this one through with a cast.
+	    Subsegment& n = (Subsegment&)(*i1);
+	    n.setEnd(i2);
+
+// 	    cout << s1 << endl << s2 << endl;
+// 	    assert(subsegments.find(s1) == i1);
+// 	    assert(subsegments.find(s2) == i2);
+// 	    assert((*i1).end() == i2);
+// 	    assert((*i2).end() == i1);
+	}
     }
+
+    // Now construct our airways.
+    while (subsegments.size() > 0) {
+	// Grab a point and build an airway from it.
+	multiset<Subsegment>::iterator s1 = subsegments.begin();
+	multiset<Subsegment>::iterator s2 = (*s1).end();
+
+	// Create the airway.  It will be added to the __airways
+	// vector.
+	Airway *awy = 
+	    new Airway((*s1).name(), (*s1).segment()->isLow(), (*s1).segment());
+	subsegments.erase(s1);
+	subsegments.erase(s2);
+
+	// Add to the front ...
+	Subsegment s(awy->nthWaypoint(0), awy->name().c_str(), awy->isLow());
+	while ((s1 = subsegments.find(s)) != subsegments.end()) {
+	    s2 = (*s1).end();
+	    awy->prepend((*s1).segment());
+
+	    subsegments.erase(s1);
+	    subsegments.erase(s2);
+
+	    s.setStart(awy->nthWaypoint(0));
+	}
+
+	// And add to the back ...
+	s.setStart(awy->nthWaypoint(awy->noOfWaypoints() - 1));
+	while ((s1 = subsegments.find(s)) != subsegments.end()) {
+	    s2 = (*s1).end();
+	    awy->append((*s1).segment());
+
+	    subsegments.erase(s1);
+	    subsegments.erase(s2);
+
+	    s.setStart(awy->nthWaypoint(awy->noOfWaypoints() - 1));
+	}
+
+	// Create search tokens for it.
+	_searcher->add(awy);
+    }
+
+    // const set<Airway *>& airways = Airway::airways();
+    // set<Airway *>::iterator it;
+    // Airway *shortest;
+    // size_t noOfWaypoints = 1000000;
+    // for (it = airways.begin(); it != airways.end(); it++) {
+    // 	Airway *awy = *it;
+    // 	if (awy->noOfWaypoints() < noOfWaypoints) {
+    // 	    noOfWaypoints = awy->noOfWaypoints();
+    // 	    shortest = awy;
+    // 	}
+    // }
+    // printf("Shortest airway: %s (%lu)\n", 
+    // 	   shortest->name().c_str(), noOfWaypoints);
+    // exit(0);
+
+    // const set<Airway *>& airways = Airway::airways();
+    // set<Airway *>::iterator it;
+    // for (it = airways.begin(); it != airways.end(); it++) {
+    // 	Airway *awy = *it;
+    // 	printf("%s: %lu points\n", awy->name().c_str(), awy->noOfWaypoints());
+    // }
+    // exit(0);
+
+    // const set<Segment *>& segments = Segment::segments();
+    // set<Segment *>::iterator it;
+    // double length = 0.0;
+    // Segment *longest = NULL;
+    // for (it = segments.begin(); it != segments.end(); it++) {
+    // 	Segment *seg = *it;
+    // 	double d = sgdDistanceVec3(seg->start()->location(),
+    // 				   seg->end()->location());
+    // 	if (d > length) {
+    // 	    length = d;
+    // 	    longest = seg;
+    // 	}
+    // }
+    // printf("%s (%s.%s): %.0f metres\n", 
+    // 	   longest->name().c_str(), 
+    // 	   longest->start()->id().c_str(),
+    // 	   longest->end()->id().c_str(),
+    // 	   length);
+    // exit(0);
 }
 
 // Each airway segment has two endpoints, which should be fixes and/or
@@ -1131,88 +2767,42 @@ void NavData::_loadAirways640(const gzFile &arp)
 // heuristic to decide whether that fix is a high or low fix.  Note
 // that the navaid, fix, and airways databases are not perfect, so we
 // need to handle cases where no or partial matches are made.
-void NavData::_checkEnd(AwyLabel &end, bool isLow)
+Waypoint *NavData::_findEnd(const string& id, double lat, double lon)
 {
     // EYE - clear as mud!
-    multimap<string, _NAVPOINT>::iterator it;
-    pair<multimap<string, _NAVPOINT>::iterator, 
-	multimap<string, _NAVPOINT>::iterator> ret;
+    multimap<string, Waypoint *>::const_iterator it;
+    pair<multimap<string, Waypoint *>::const_iterator, 
+	multimap<string, Waypoint *>::const_iterator> ret;
     
-    // Search for a navaid or fix with the same name and same location
-    // as 'end'.
-    ret = _navPoints.equal_range(end.id);
+    // Find the closest navaid with the given name.
+    const multimap<string, Waypoint *>& waypoints = Waypoint::waypoints();
+    ret = waypoints.equal_range(id);
     for (it = ret.first; it != ret.second; it++) {
-	_NAVPOINT p = (*it).second;
-	double lat, lon;
-	if (p.isNavaid) {
-	    NAV *n = (NAV *)p.n;
-	    lat = n->lat;
-	    lon = n->lon;
-	} else {
-	    FIX *f = (FIX *)p.n;
-	    lat = f->lat;
-	    lon = f->lon;
-	}
+	Waypoint *p = (*it).second;
 
-	if ((lat == end.lat) && (lon == end.lon)) {
-	    // Bingo!
-	    if (!p.isNavaid) {
-		// If the end is a fix, make sure we tag it as high/low.
-		FIX *f = (FIX *)p.n;
-		if (isLow) {
-		    f->low = true;
-		} else {
-		    f->high = true;
-		}
-	    }
-
-	    // EYE - put a _NAVPOINT structure in AwyLabel?
-	    end.isNavaid = p.isNavaid;
-	    end.n = p.n;
-
+	if ((p->lat() == lat) && (p->lon() == lon)) {
 	    // We've found an exact match, so bail out early.
-	    return;
+	    return p;
 	}
     }
 
-    // Couldn't find an exact match.  Find the closest navaid or fix
-    // with the same name.
-    double distance = 1e12;
-    double latitude, longitude;
-    for (it = ret.first; it != ret.second; it++) {
-	_NAVPOINT p = (*it).second;
-	FIX *f;
-	NAV *n;
-	double lat, lon;
-	if (p.isNavaid) {
-	    n = (NAV *)p.n;
-	    lat = n->lat;
-	    lon = n->lon;
-	} else {
-	    f = (FIX *)p.n;
-	    lat = f->lat;
-	    lon = f->lon;
-	}
-
-	double d, junk;
-	geo_inverse_wgs_84(lat, lon, end.lat, end.lon, &junk, &junk, &d);
-	if (d < distance) {
-	    distance = d;
-	    latitude = lat;
-	    longitude = lon;
-	}
-    }
-
-    // EYE - we need some kind of logging facility.
-//     if (distance == 1e12) {
-// 	fprintf(stderr, "_findEnd: can't find any match for '%s' <%lf, %lf>\n",
-// 		end.id.c_str(), end.lat, end.lon);
-//     } else {
-// 	fprintf(stderr, "_findEnd: closest match for '%s' <%lf, %lf> is\n",
-// 		end.id.c_str(), end.lat, end.lon);
-// 	fprintf(stderr, "\t%.0f metres away <%lf, %lf>\n",
-// 		distance, latitude, longitude);
-//     }
+    // EYE - we need some kind of logging facility.  We should complain if:
+    //
+    // (a) There is no match at any distance
+    // (b) There is a match, but far away
+    // (c) There is a close, but not exact, match
+    //
+    // Of course, we need to define what "near" is.
+    
+    // Since we didn't get an exact match, we need to do something.
+    // But what?  For the lack of a better alternative, we create a
+    // new fix with the same name, at the location where we expected
+    // to find it.  This will probably result in lots of fixes with
+    // identical names close to each other.  So sue me.
+    Fix *fix = new Fix(id.c_str(), lat, lon);
+    _frustumCullers[FIXES]->culler().addObject(fix);
+    _searcher->add(fix);
+    return fix;
 }
 
 void NavData::_loadAirports(const char *fgRoot)
@@ -1253,7 +2843,7 @@ void NavData::_loadAirports(const char *fgRoot)
     printf("  ... done\n");
 }
 
-void NavData::_loadAirports810(const gzFile &arp)
+void NavData::_loadAirports810(const gzFile& arp)
 {
     char *line;
     ARP *ap = NULL;
@@ -1521,7 +3111,7 @@ void NavData::_loadAirports810(const gzFile &arp)
 // - runway ids that don't correspond (eg, the other end of runway 05
 //   should be 23, although there are a few valid exceptions to this
 //   rule).
-void NavData::_loadAirports1000(const gzFile &arp)
+void NavData::_loadAirports1000(const gzFile& arp)
 {
     char *line;
     ARP *ap = NULL;
@@ -1712,3 +3302,4 @@ void NavData::_loadAirports1000(const gzFile &arp)
 	_frustumCullers[AIRPORTS]->culler().addObject(ap);
     }
 }
+

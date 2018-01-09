@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2007 - 2014 Brian Schack
+  Copyright (C) 2007 - 2017 Brian Schack
 
   The graphs object draws graphs for a flight track in a window.
 
@@ -37,7 +37,7 @@
 // Forward class declarations
 class AtlasController;
 class FlightTrack;
-struct NAV;
+class GS;
 
 class GraphsUI;
 class GraphsWindow: public AtlasBaseWindow, Subscriber {
@@ -257,8 +257,7 @@ class GraphsWindow: public AtlasBaseWindow, Subscriber {
 	std::vector<_GSSection *> _GSs;
 
 	void _drawGSs(Values& xVals);
-	void _extractHeadingSlope(NAV *n, double *heading, double *slope);
-	void _createPlanes(NAV *n, _Planes *planes);
+	void _createPlanes(GS *gs, _Planes *planes);
     };
 
     class RatesOfClimb: public Values {

@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2014 Brian Schack
+  Copyright (C) 2009 - 2017 Brian Schack
 
   This file is part of Atlas.
 
@@ -24,6 +24,9 @@
 // Our include file
 #include "FixesOverlay.hxx"
 
+// C++ system include files
+#include <map>
+
 // Our project's include files
 #include "AtlasWindow.hxx"
 #include "LayoutManager.hxx"
@@ -33,16 +36,12 @@ using namespace std;
 
 // Above this level, no fixes are drawn.
 const float noLevel = 1250.0;
-// Above this level, but below noLevel, high-level fixes are drawn.
-const float highLevel = 250.0;
-// Above this level, but below highLevel, low-level fixes are drawn.
-const float lowLevel = 100.0;
-// Below lowLevel, only approach fixes are drawn.
+// Above this level, but below noLevel, enroute fixes are drawn.
+const float enrouteLevel = 250.0;
+// Below enRouteLevel, only approach fixes are drawn.
 
 // Bright yellow.
-// const float fix_colour[4] = {1.0, 1.0, 0.0, 0.7};
-const float high_fix_colour[4] = {1.0, 1.0, 0.0, 0.7};
-const float low_fix_colour[4] = {0.0, 1.0, 1.0, 0.7};
+const float enroute_fix_colour[4] = {1.0, 1.0, 0.0, 0.7};
 const float terminal_fix_colour[4] = {1.0, 0.0, 1.0, 0.7};
 
 const float fix_label_colour[4] = {0.2, 0.2, 0.2, 0.7};
@@ -96,23 +95,21 @@ void FixesOverlay::draw(NavData *navData)
 	glNewList(_DL, GL_COMPILE); {
 	    const vector<Cullable *>& intersections = 
 		navData->hits(NavData::FIXES);
+
 	    // Fixes (points)
 	    glPushAttrib(GL_POINT_BIT); {
 		// We use a non-standard point size, so we need to
 		// wrap this in a glPushAttrib().
 		glPointSize(fixSize);
 		for (unsigned int i = 0; i < intersections.size(); i++) {
-		    FIX *f = dynamic_cast<FIX *>(intersections[i]);
+		    Fix *f = dynamic_cast<Fix *>(intersections[i]);
 		    assert(f);
 
-		    if (f->high && _metresPerPixel < noLevel) {
-			glColor4fv(high_fix_colour);
+		    if (!f->isTerminal() && (_metresPerPixel < noLevel)) {
+			glColor4fv(enroute_fix_colour);
 			_render(f);
-		    } else if (f->low && (_metresPerPixel < highLevel)) {
-			glColor4fv(low_fix_colour);
-			_render(f);
-		    } else if (!f->high && !f->low && 
-			       (_metresPerPixel < lowLevel)) {
+		    } else if (f->isTerminal() && 
+			       (_metresPerPixel < enrouteLevel)) {
 			glColor4fv(terminal_fix_colour);
 			_render(f);
 		    }
@@ -127,15 +124,13 @@ void FixesOverlay::draw(NavData *navData)
 
 	    if (_overlays.isVisible(Overlays::LABELS)) {
 		for (unsigned int i = 0; i < intersections.size(); i++) {
-		    FIX *f = dynamic_cast<FIX *>(intersections[i]);
+		    Fix *f = dynamic_cast<Fix *>(intersections[i]);
 		    assert(f);
 
-		    if (f->high && _metresPerPixel < noLevel) {
+		    if (!f->isTerminal() && (_metresPerPixel < noLevel)) {
 			_label(f, lm);
-		    } else if (f->low && (_metresPerPixel < highLevel)) {
-			_label(f, lm);
-		    } else if (!f->high && !f->low && 
-			       (_metresPerPixel < lowLevel)) {
+		    } else if (f->isTerminal() &&
+			       (_metresPerPixel < enrouteLevel)) {
 			_label(f, lm);
 		    }
 		}
@@ -150,9 +145,9 @@ void FixesOverlay::draw(NavData *navData)
 }
 
 // Renders the given fix.
-void FixesOverlay::_render(const FIX *f)
+void FixesOverlay::_render(Fix *f)
 {
-    geodPushMatrix(f->_bounds.center, f->lat, f->lon); {
+    geodPushMatrix(f->bounds().center, f->lat(), f->lon()); {
 	glBegin(GL_POINTS); {
 	    glVertex2f(0.0, 0.0);
 	}
@@ -163,17 +158,17 @@ void FixesOverlay::_render(const FIX *f)
 
 // Labels the given fix using the given layout manager (which is
 // assumed to have been set up with the desired font and point size).
-void FixesOverlay::_label(const FIX *f, LayoutManager& lm)
+void FixesOverlay::_label(Fix *f, LayoutManager& lm)
 {
     // EYE - magic number
     const float labelOffset = _metresPerPixel * 5.0;
 
     // Draw a label labelOffset pixels to the left of the fix.
     glColor4fv(fix_label_colour);
-    lm.setText(f->name);
+    lm.setText(f->id());
     lm.moveTo(-labelOffset, 0.0, LayoutManager::CR);
 
-    geodDrawText(lm, f->_bounds.center, f->lat, f->lon);
+    geodDrawText(lm, f->bounds().center, f->lat(), f->lon());
 }
 
 // Called when somebody posts a notification that we've subscribed to.

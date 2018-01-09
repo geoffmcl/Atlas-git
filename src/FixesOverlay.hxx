@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2014 Brian Schack
+  Copyright (C) 2009 - 2017 Brian Schack
 
   The fixes overlay manages the loading and display of navigational
   fixes.
@@ -38,7 +38,7 @@
 // Forward class declarations
 class Overlays;
 class NavData;
-struct FIX;
+class Fix;
 class LayoutManager;
 
 class FixesOverlay: public Subscriber {
@@ -56,8 +56,8 @@ class FixesOverlay: public Subscriber {
   protected:
     double _metresPerPixel;
 
-    void _render(const FIX *f);
-    void _label(const FIX *f, LayoutManager& lm);
+    void _render(Fix *f);
+    void _label(Fix *f, LayoutManager& lm);
 
     Overlays& _overlays;
 

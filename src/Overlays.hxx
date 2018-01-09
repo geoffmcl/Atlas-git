@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2012 Brian Schack
+  Copyright (C) 2009 - 2017 Brian Schack
 
   The overlays object manages a bunch of other overlays.  It creates
   them, and knows which ones should be displayed.

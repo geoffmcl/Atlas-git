@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2008 - 2012 Brian Schack
+  Copyright (C) 2008 - 2017 Brian Schack
 
   This file is part of Atlas.
 
@@ -139,7 +139,8 @@ void AirwaysOverlay::draw(bool drawHigh, bool drawLow, bool label,
     // turn them on and off as required.  If, for some reasons, we
     // wanted to render airways differently depending on our zoom, for
     // example, then we couldn't do this.
-    const vector<AWY *>& segments = navData->segments();
+    const set<Segment *>& segments = Segment::segments();
+    set<Segment *>::const_iterator it;
     if (drawLow) {
 	if (_lowDL == 0) {
 	    _lowDL = glGenLists(1);
@@ -148,10 +149,10 @@ void AirwaysOverlay::draw(bool drawHigh, bool drawLow, bool label,
 		glColor4fv(awy_low_colour);
 		glPushAttrib(GL_LINE_BIT); {
 		    glLineWidth(2.0);
-		    for (unsigned int i = 0; i < segments.size(); i++) {
-			AWY *a = segments[i];
-			if (a->isLow) {
-			    _render(a);
+		    for (it = segments.begin(); it != segments.end(); it++) {
+			Segment *seg = *it;
+			if (seg->isLow()) {
+			    _render(seg);
 			}
 		    }
 		}
@@ -169,10 +170,10 @@ void AirwaysOverlay::draw(bool drawHigh, bool drawLow, bool label,
 	    assert(_highDL != 0);
 	    glNewList(_highDL, GL_COMPILE); {
 		glColor4fv(awy_high_colour);
-		for (unsigned int i = 0; i < segments.size(); i++) {
-		    AWY *a = segments[i];
-		    if (!a->isLow) {
-			_render(a);
+		for (it = segments.begin(); it != segments.end(); it++) {
+		    Segment *seg = *it;
+		    if (!seg->isLow()) {
+			_render(seg);
 		    }
 		}
 	    }
@@ -189,13 +190,13 @@ void AirwaysOverlay::draw(bool drawHigh, bool drawLow, bool label,
 	const vector<Cullable *>& intersections = 
 	    navData->hits(NavData::AIRWAYS);
 	for (unsigned int i = 0; i < intersections.size(); i++) {
-	    AWY *a = dynamic_cast<AWY *>(intersections[i]);
-	    assert(a);
-	    if (a->isLow && drawLow) {
-		_label(a);
+	    Segment *seg = dynamic_cast<Segment *>(intersections[i]);
+	    assert(seg);
+	    if (seg->isLow() && drawLow) {
+		_label(seg);
 	    } 
-	    if (!a->isLow && drawHigh) {
-		_label(a);
+	    if (!seg->isLow() && drawHigh) {
+		_label(seg);
 	    }
 	}
     }
@@ -210,7 +211,7 @@ void AirwaysOverlay::draw(bool drawHigh, bool drawLow, bool label,
 // (3) draw airways/labels in different styles depending on type (eg,
 //     LF, high vs low, ...)
 // (4) add directions at edge of VOR roses
-void AirwaysOverlay::_render(const AWY *a) const
+void AirwaysOverlay::_render(const Segment *seg) const
 {
 //     bool isVOR = false, isNDB = false;
 //     if (a->start.isNavaid) {
@@ -246,9 +247,9 @@ void AirwaysOverlay::_render(const AWY *a) const
 //     }
     glBegin(GL_LINES); {
 	sgdVec3 point;
-	atlasGeodToCart(a->start.lat, a->start.lon, 0.0, point);
+	atlasGeodToCart(seg->start()->lat(), seg->start()->lon(), 0.0, point);
 	glVertex3dv(point);
-	atlasGeodToCart(a->end.lat, a->end.lon, 0.0, point);
+	atlasGeodToCart(seg->end()->lat(), seg->end()->lon(), 0.0, point);
 	glVertex3dv(point);
     }
     glEnd();
@@ -256,11 +257,11 @@ void AirwaysOverlay::_render(const AWY *a) const
 
 // Labels the given airway.  Does nothing if there isn't enough room
 // to label the segment.
-bool AirwaysOverlay::_label(const AWY *a) const
+bool AirwaysOverlay::_label(const Segment *seg) const
 {
     // We need at least minDist pixels of space to write any labels.
     const double minDist = 50.0;
-    if ((a->length / _metresPerPixel) < minDist) {
+    if ((seg->length() / _metresPerPixel) < minDist) {
 	return false;
     }
 
@@ -268,8 +269,8 @@ bool AirwaysOverlay::_label(const AWY *a) const
     // labels are placed in the middle of the segment, oriented along
     // the segment.
     sgdVec3 start, end, middle;
-    atlasGeodToCart(a->start.lat, a->start.lon, 0.0, start);
-    atlasGeodToCart(a->end.lat, a->end.lon, 0.0, end);
+    atlasGeodToCart(seg->start()->lat(), seg->start()->lon(), 0.0, start);
+    atlasGeodToCart(seg->end()->lat(), seg->end()->lon(), 0.0, end);
     sgdAddVec3(middle, start, end);
     sgdScaleVec3(middle, 0.5);
 
@@ -282,7 +283,7 @@ bool AirwaysOverlay::_label(const AWY *a) const
 
     // Strategy - point size ranges from a minimum of minPointSize to
     // a maximum of maxPointSize.  We set it based on scale.
-    if (a->isLow) {
+    if (seg->isLow()) {
 	// Start labelling at maxLowAirway, stop labelling at
 	// minLowAirway.  Maximum point size is reached at 2 *
 	// minLowAirway.  Cheesy, yes.
@@ -303,9 +304,9 @@ bool AirwaysOverlay::_label(const AWY *a) const
     pointSize *= _metresPerPixel;
 
     // Airway name label
-    LayoutManager lmName(a->name, _overlays.regularFont(), pointSize);
+    LayoutManager lmName(seg->name(), _overlays.regularFont(), pointSize);
     lmName.setBoxed(true);
-    if (lmName.width() + (space * 2.0) > a->length) {
+    if (lmName.width() + (space * 2.0) > seg->length()) {
 	return false;
     }
 
@@ -320,16 +321,16 @@ bool AirwaysOverlay::_label(const AWY *a) const
     lmElev.setFont(_overlays.regularFont(), pointSize * 0.75);
 
     lmElev.begin(); {
-	globals.str.printf("%d", a->isLow ? a->top * 100 : a->top);
+	globals.str.printf("%d", seg->isLow() ? seg->top() * 100 : seg->top());
 	lmElev.addText(globals.str.str());
 	lmElev.newline();
-	globals.str.printf("%d", a->isLow ? a->base * 100 : a->base);
+	globals.str.printf("%d", seg->isLow() ? seg->base() * 100 : seg->base());
 	lmElev.addText(globals.str.str());
     }
     lmElev.end();
 
     // Airway length label
-    globals.str.printf("%.0f", a->length * SG_METER_TO_NM);
+    globals.str.printf("%.0f", seg->length() * SG_METER_TO_NM);
     // EYE - magic number
     LayoutManager lmDist(globals.str.str(), _overlays.regularFont(), 
 			 pointSize * 0.75);
@@ -390,7 +391,7 @@ bool AirwaysOverlay::_label(const AWY *a) const
 
     // EYE - is this overkill?  Can we use a simpler calculation
     // to get the heading?  Just use geodDrawText()?
-    geo_inverse_wgs_84(lat, lon, a->end.lat, a->end.lon, 
+    geo_inverse_wgs_84(lat, lon, seg->end()->lat(), seg->end()->lon(), 
 		       &hdg, &junk, &junk);
     if (hdg > 180.0) {
 	hdg -= 180.0;
@@ -406,7 +407,7 @@ bool AirwaysOverlay::_label(const AWY *a) const
 	// Draw the base and top elevations (if we have room) on the
 	// left.
 	if ((lmElev.width() + lmName.width() / 2.0 + (space * 2.0)) <
-	    (a->length / 2.0)) {
+	    (seg->length() / 2.0)) {
 	    float xOffset = lmElev.width() / 2.0 + space + lmName.width() / 2.0;
 	    glColor4fv(elevationColour);
 	    lmElev.moveTo(-xOffset, 0.0);
@@ -415,7 +416,7 @@ bool AirwaysOverlay::_label(const AWY *a) const
 
 	// Draw the length (if we have room) on the right.
 	if ((lmDist.width() + lmName.width() / 2.0 + (space * 2.0)) <
-	    (a->length / 2.0)) {
+	    (seg->length() / 2.0)) {
 	    float xOffset = lmDist.width() / 2.0 + space + lmName.width() / 2.0;
 	    glColor4fv(distanceColour);
 	    lmDist.moveTo(xOffset, 0.0);

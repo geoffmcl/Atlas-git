@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2014 Brian Schack
+  Copyright (C) 2009 - 2017 Brian Schack
 
   This file is part of Atlas.
 
@@ -120,17 +120,19 @@ void Overlays::draw(NavData *navData)
 	_airways->draw(_overlays[HIGH], _overlays[LOW], _overlays[LABELS],
 		       navData);
     }
-    if (_overlays[NAVAIDS] && _overlays[FIXES]) {
-	_fixes->draw(navData);
-    }
-    if (_overlays[NAVAIDS] && _overlays[NDB]) {
-	_navaids->drawNDBs(navData);
-    }
-    if (_overlays[NAVAIDS] && _overlays[VOR]) {
-	_navaids->drawVORs(navData);
-    }
-    if (_overlays[NAVAIDS] && _overlays[DME]) {
-	_navaids->drawDMEs(navData);
+    if (_overlays[NAVAIDS]) {
+	if (_overlays[FIXES]) {
+	    _fixes->draw(navData);
+	}
+	if (_overlays[NDB]) {
+	    _navaids->drawNDBs(navData);
+	}
+	if (_overlays[VOR]) {
+	    _navaids->drawVORs(navData);
+	}
+	if (_overlays[DME]) {
+	    _navaids->drawDMEs(navData);
+	}
     }
     if (_overlays[CROSSHAIRS]) {
 	_crosshairs->draw();

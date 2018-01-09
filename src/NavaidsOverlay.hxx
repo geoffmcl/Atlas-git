@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2014 Brian Schack
+  Copyright (C) 2009 - 2017 Brian Schack
 
   Loads and draws navaids (VORs, NDBs, ILS systems, and DMEs).
 
@@ -32,7 +32,12 @@
 // Forward class declarations
 class Overlays;
 class NavData;
-struct NAV;
+class Navaid;
+class VOR;
+class NDB;
+class Marker;
+class ILS;
+class DME;
 class FlightData;
 
 // Used for drawing labels on navaids.
@@ -68,18 +73,17 @@ class NavaidsOverlay: public Subscriber {
     void _createILSSymbols();
     void _createILSSymbol(GLuint dl, const float *colour);
 
-    void _renderVOR(const NAV *n);
-    void _renderNDB(const NAV *n);
-    void _renderMarker(const NAV *n);
-    void _renderILS(const NAV *n);
-    void _renderDME(const NAV *n);
-    void _renderDMEILS(const NAV *n);
+    void _renderVOR(VOR *vor);
+    void _renderNDB(NDB *ndb);
+    void _renderMarker(Marker *marker);
+    void _renderILS(ILS *ils);
+    void _renderDME(DME *dme);
 
-    Label *_makeLabel(const char *fmt, const NAV *n,
+    Label *_makeLabel(const char *fmt, Navaid *n,
 		      float labelPointSize,
 		      float x, float y, 
 		      LayoutManager::Point p = LayoutManager::CC);
-    void _drawLabel(const char *fmt, const NAV *n,
+    void _drawLabel(const char *fmt, Navaid *n,
 		    float labelPointSize,
 		    float x, float y,
 		    LayoutManager::Point p = LayoutManager::CC);
@@ -90,8 +94,9 @@ class NavaidsOverlay: public Subscriber {
 
     GLuint _VORRoseDL, _VORSymbolDL, _VORTACSymbolDL, _VORDMESymbolDL;
     GLuint _NDBSymbolDL, _NDBDMESymbolDL;
+    // EYE - can we make _ILSMarkerDLs indexed by Marker::Type?
     GLuint _ILSSymbolDL, _LOCSymbolDL, _ILSMarkerDLs[3];
-    GLuint _TACANSymbolDL, _DMESymbolDL;
+    GLuint _TACANSymbolDL, _DMESymbolDL, _DMEILSSymbolDL;
     GLuint _VORDisplayList, _NDBDisplayList, _ILSDisplayList, _DMEDisplayList;
     bool _VORDirty, _NDBDirty, _ILSDirty, _DMEDirty;
 
@@ -102,7 +107,7 @@ class NavaidsOverlay: public Subscriber {
 
     // EYE - in the future we should accomodate more radios, and in a
     // more general way.
-    int _radios[3];
+    unsigned int _radios[3];
     int _radials[2];
     // We assume that if _p is not NULL there's valid flight data.
     FlightData *_p;

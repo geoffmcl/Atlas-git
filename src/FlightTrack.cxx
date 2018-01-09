@@ -4,7 +4,7 @@
   Written by Per Liedman, started July 2000.
 
   Copyright (C) 2000 Per Liedman, liedman@home.se
-  Copyright (C) 2009 - 2012 Brian Schack
+  Copyright (C) 2009 - 2017 Brian Schack
 
   This file is part of Atlas.
 
@@ -32,9 +32,11 @@
 // Other libraries' include files
 #include <simgear/io/sg_socket.hxx>
 #include <simgear/io/sg_serial.hxx>
+#include <simgear/misc/sg_path.hxx>
 #include <simgear/timing/sg_time.hxx>
 
 // Our project's include files
+#include "misc.hxx"
 #include "NavData.hxx"
 
 using namespace std;
@@ -52,19 +54,43 @@ FlightData::~FlightData()
 // we want to avoid searching for navaids if we can.  The alternative
 // is searching for navaids for the entire flight track when we load
 // it in, which can be prohibitively slow.
-const vector<NAV *>& FlightData::navaids()
+
+// EYE - Have an Atlas/NMEA tag in FlightData?  Or change the way we
+// record radio data so that it isn't in each FlightData record?
+const vector<Navaid *>& FlightData::navaids()
 {
     if (!_navaidsLoaded) {
-	// Look up the navaids we're tuned into.  Note that we must
-	// have a valid cartesian location for the call to getNavaids.
-	const vector<Cullable *>& results = _navData->getNavaids(this);
-	for (unsigned int i = 0; i < results.size(); i++) {
-	    NAV *n = dynamic_cast<NAV *>(results[i]);
-	    assert(n);
-	    _navaids.push_back(n);
-	}
-	
 	_navaidsLoaded = true;
+
+	// We don't do anything if this is from an NMEA track.
+	// Unfortunately, there's no explicit marker in a FlightData
+	// structure that tells us what kind of track it is.  However,
+	// NMEA tracks have their frequencies and radials set to 0, so we
+	// just check for that (and in any case, if frequencies are 0, we
+	// won't match any navaids anyway).
+	if ((nav1_freq == 0) && (nav2_freq == 0) && (adf_freq == 0)) {
+	    return _navaids;
+	}
+
+	// Look up the navaids in range.  Note that we must have a
+	// valid cartesian location for the call to getNavaids.
+	vector<Cullable *> results;
+	_navData->getNavaids(cart, results);
+
+	// See if any of the navaids are tuned by any of our radios.
+	for (unsigned int i = 0; i < results.size(); i++) {
+	    Navaid *n = dynamic_cast<Navaid *>(results[i]);
+	    if (n) {
+		unsigned int freq = n->frequency();
+		if (nav1_freq == freq) {
+		    _navaids.push_back(n);
+		} else if (nav2_freq == freq) {
+		    _navaids.push_back(n);
+		} else if (adf_freq == freq) {
+		    _navaids.push_back(n);
+		}
+	    }
+	}
     }
 
     return _navaids;
@@ -468,12 +494,16 @@ void FlightTrack::save()
 
 	    // $PATLA
 	    if (isAtlasProtocol()) {
+		// Note that this format cannot handle NDB frequencies
+		// with 0.5 kHz steps.  However, neither can
+		// FlightGear's nav.dat file (as of 2017), so that's
+		// no problem (yet).
 		buf.printf("PATLA,%.2f,%.1f,%.2f,%.1f,%d",
-			   d->nav1_freq / 1000.0, 
+			   d->nav1_freq / 1e6, 
 			   d->nav1_rad, 
-			   d->nav2_freq / 1000.0, 
+			   d->nav2_freq / 1e6, 
 			   d->nav2_rad, 
-			   d->adf_freq);
+			   d->adf_freq / 1e3);
 	    } else {
 		buf.printf("GPGSA,A,3,01,02,03,,05,,07,,09,,11,12,0.9,0.9,2.0");
 	    }
@@ -765,15 +795,22 @@ bool FlightTrack::_parse_message(char *buf, FlightData *d)
 	} else if ((strcmp(tokens[0], "$PATLA") == 0) && (tokenCount == 6)) {
 	    // NAV1, NAV2 and ADF
 	    float nav1_freq, nav2_freq;
+	    int adf_freq;
 	    sscanf(tokens[1], "%f", &nav1_freq);
 	    sscanf(tokens[2], "%f", &d->nav1_rad);
 	    sscanf(tokens[3], "%f", &nav2_freq);
 	    sscanf(tokens[4], "%f", &d->nav2_rad);
-	    sscanf(tokens[5], "%d", &d->adf_freq);
+	    sscanf(tokens[5], "%d", &adf_freq);
 	    // VOR frequencies are transmitted in the PATLA line as
-	    // floats (eg, 112.30), but we store them as ints (112300).
-	    d->nav1_freq = (int)(nav1_freq * 1000);
-	    d->nav2_freq = (int)(nav2_freq * 1000);
+	    // MHz floats (eg, 112.30), but we store them as Hz ints
+	    // (112,300,000).  Similary, ADF frequencies are stored as
+	    // integer kHz (eg, 331), but we store them as integer Hz
+	    // (331,000).  Because of rounding issues, we have to be
+	    // careful about how we scale the VOR frequencies, lest
+	    // 112.3 become something like 112,299,998.
+	    d->nav1_freq = (int)(nav1_freq * 100) * 10000;
+	    d->nav2_freq = (int)(nav2_freq * 100) * 10000;
+	    d->adf_freq = adf_freq * 1000;
 
 	    // This identifies this record (and track) as atlas-based.
 	    _isAtlasProtocol = true;

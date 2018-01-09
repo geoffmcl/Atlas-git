@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2007 - 2014 Brian Schack
+  Copyright (C) 2007 - 2017 Brian Schack
 
   This file is part of Atlas.
 
@@ -1656,13 +1656,13 @@ void GraphsWindow::Altitudes::load()
 	// Check each active navaid to see if: (a) it's a glideslope,
 	// (b) it's in our "cone of interest" (as defined by
 	// 'maxRange').  If it is, then we need to graph it.
-	const vector<NAV *>& navaids = p->navaids();
+	const vector<Navaid *>& navaids = p->navaids();
 	for (size_t j = 0; j < navaids.size(); j++) {
-	    NAV *n = navaids[j];
+	    GS *gs = dynamic_cast<GS *>(navaids[j]);
 
 	    //////////////////////////////////////////////////
 	    // (a) Is it a glideslope?
-	    if (n->navtype != NAV_GS) {
+	    if (!gs) {
 		// Nope.  Go on to the next navaid.
 		continue;
 	    }
@@ -1672,10 +1672,10 @@ void GraphsWindow::Altitudes::load()
 	    double gsHeading, heading, junk, distance;
 
 	    // First get the navaid's heading.
-	    _extractHeadingSlope(n, &gsHeading, &junk);
+	    gsHeading = gs->heading();
 
 	    // Calculate the heading from the navaid to the aircraft.
-	    geo_inverse_wgs_84(n->lat, n->lon, p->lat, p->lon,
+	    geo_inverse_wgs_84(gs->lat(), gs->lon(), p->lat, p->lon,
 			       &heading, &junk, &distance);
 	    heading -= 180.0;
 
@@ -1689,9 +1689,9 @@ void GraphsWindow::Altitudes::load()
 	    //////////////////////////////////////////////////
 	    // We need to do something.  What radio is it?
 	    Radio radio;
-	    if (p->nav1_freq == n->freq) {
+	    if (p->nav1_freq == gs->frequency()) {
 		radio = NAV1;
-	    } else if (p->nav2_freq == n->freq) {
+	    } else if (p->nav2_freq == gs->frequency()) {
 		radio = NAV2;
 	    }
 
@@ -1701,18 +1701,18 @@ void GraphsWindow::Altitudes::load()
 		active[radio] = new _GSSection;
 		active[radio]->radio = radio;
 		_GSs.push_back(active[radio]);
-		_createPlanes(n, &(planes[radio]));
+		_createPlanes(gs, &(planes[radio]));
 	    }
 
 	    // At this point, 'active[radio]' points to our currently
 	    // active section and 'planes[radio]' are the planes
 	    // defining the glideslope.  Now fill in the data for our
 	    // new glideslope point.
-	    _GSValue gs;
+	    _GSValue gsv;
 
 	    // Data point index and glide slope opacity.
-	    gs.x = i;
-	    gs.opacity = 1.0 - distance / n->range;
+	    gsv.x = i;
+	    gsv.opacity = 1.0 - distance / gs->range();
 
 	    // Calculate the intersection of the planes with the line
 	    // going straight up through the aircraft.  We specify the
@@ -1731,22 +1731,22 @@ void GraphsWindow::Altitudes::load()
 				 planes[radio].bottom);
 	    double iLat, iLon, alt;
 	    sgCartToGeod(intersection, &iLat, &iLon, &alt);
-	    gs.bottom = alt * SG_METER_TO_FEET;
+	    gsv.bottom = alt * SG_METER_TO_FEET;
 
 	    // Middle plane of glideslope.
 	    sgdIsectInfLinePlane(intersection, p->cart, pNorm, 
 				 planes[radio].middle);
 	    sgCartToGeod(intersection, &iLat, &iLon, &alt);
-	    gs.middle = alt * SG_METER_TO_FEET;
+	    gsv.middle = alt * SG_METER_TO_FEET;
 
 	    // Top plane of glideslope.
 	    sgdIsectInfLinePlane(intersection, p->cart, pNorm, 
 				 planes[radio].top);
 	    sgCartToGeod(intersection, &iLat, &iLon, &alt);
-	    gs.top = alt * SG_METER_TO_FEET;
+	    gsv.top = alt * SG_METER_TO_FEET;
 	    
 	    // Add the point to our vector.
-	    active[radio]->vals.push_back(gs);
+	    active[radio]->vals.push_back(gsv);
 	}
 
 	// After processing all the navaids for this point, check to
@@ -1831,19 +1831,8 @@ void GraphsWindow::Altitudes::_drawGSs(Values& xVals)
     }
 }
 
-// Extracts the heading and slope from a glideslope.
-void GraphsWindow::Altitudes::_extractHeadingSlope(NAV *n, double *heading, 
-					     double *slope)
-{
-    // The glideslope's heading is given by the lower 3 digits of the
-    // magvar variable.  The thousands and above give slope:
-    // ssshhh.hhh.
-    *heading = fmod((double)n->magvar, 1000.0);
-    *slope = (n->magvar - *heading) / 1e5;
-}
-
 // Calculates the planes for the given glideslope.
-void GraphsWindow::Altitudes::_createPlanes(NAV *n, _Planes *planes)
+void GraphsWindow::Altitudes::_createPlanes(GS *gs, _Planes *planes)
 {
     // Glideslopes have a vertical angular width of 0.7 degrees above
     // and below the centre of the glideslope (FAA AIM).
@@ -1852,15 +1841,14 @@ void GraphsWindow::Altitudes::_createPlanes(NAV *n, _Planes *planes)
     // The glideslope can be thought of as a plane tilted to the
     // earth's surface.  The top and bottom are given by planes tilted
     // 0.7 degrees more and less than the glideslope, respectively.
-    double gsHeading, gsSlope;
-    _extractHeadingSlope(n, &gsHeading, &gsSlope);
+    double gsHeading = gs->heading(), gsSlope = gs->slope();
 
     // The 'rot' matrix will rotate from a standard orientation (up =
     // positive y-axis, ahead = positive z-axis, and right = negative
     // x-axis) to the navaid's actual orientation.
     sgdMat4 rot, mat;
-    sgdMakeRotMat4(rot, n->lon - 90.0, n->lat, -gsHeading + 180.0);
-    sgdMakeTransMat4(mat, n->_bounds.center);
+    sgdMakeRotMat4(rot, gs->lon() - 90.0, gs->lat(), -gsHeading + 180.0);
+    sgdMakeTransMat4(mat, gs->bounds().center);
     sgdPreMultMat4(mat, rot);
 
     ////////////
