@@ -73,6 +73,7 @@ class FlightData {
     float dist;			// Cumulative distance from start of
 				// flight (in metres)
 
+    // List of tuned-in navaids at this point in the flight.
     const std::vector<Navaid *>& navaids();
 
   protected:
