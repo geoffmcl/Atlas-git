@@ -129,8 +129,7 @@ AirwaysOverlay::~AirwaysOverlay()
 // Therefore, we need to do all the low-altitude airways first
 // (they'll all have the same line width), and all the high-alitude
 // airways last.
-void AirwaysOverlay::draw(bool drawHigh, bool drawLow, bool label, 
-			  NavData *navData)
+void AirwaysOverlay::draw(bool drawHigh, bool drawLow, NavData *navData)
 {
     // I used to add individual airway segments to the culler and draw
     // them based on whether they were visible.  This turned out to be
@@ -186,7 +185,7 @@ void AirwaysOverlay::draw(bool drawHigh, bool drawLow, bool label,
     // Now label them.
     // EYE - we should create a display list, combine this with the
     // previous bit, blah blah blah
-    if (label) {
+    if (_overlays.isVisible(Overlays::LABELS)) {
 	const vector<Cullable *>& intersections = 
 	    navData->hits(NavData::AIRWAYS);
 	for (unsigned int i = 0; i < intersections.size(); i++) {

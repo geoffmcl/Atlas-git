@@ -46,9 +46,7 @@ class AirwaysOverlay: public Subscriber {
     AirwaysOverlay(Overlays& overlays);
     ~AirwaysOverlay();
 
-    void draw(bool drawHigh, bool drawLow, bool label, NavData *navData);
-
-    void toggle(bool forward = true);
+    void draw(bool drawHigh, bool drawLow, NavData *navData);
 
     // Subscriber interface.
     void notification(Notification::type n);
