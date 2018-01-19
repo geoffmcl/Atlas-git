@@ -108,7 +108,7 @@ void Overlays::draw(NavData *navData)
     }
     // We sandwich ILSs between runway backgrounds and the runways.
     if (_overlays[NAVAIDS] && _overlays[ILS]) {
-	_navaids->drawILSs(navData);
+	_navaids->drawILS(navData, true);
     }
     if (_overlays[AIRPORTS]) {
 	_airports->drawForegrounds(navData);
@@ -116,26 +116,32 @@ void Overlays::draw(NavData *navData)
 	    _airports->drawLabels(navData);
 	}
     }
+    // EYE - we need to be more consistent about who checks overlay
+    // visibility.  I wonder if we should just move it all into the
+    // various overlay subclasses?  It would certainly make for neater
+    // code here.
+    if (_overlays[NAVAIDS] && _overlays[ILS]) {
+	_navaids->drawILS(navData, false);
+    }
     if (_overlays[AIRWAYS]) {
-	_airways->draw(_overlays[HIGH], _overlays[LOW], _overlays[LABELS],
-		       navData);
+	_airways->draw(_overlays[HIGH], _overlays[LOW], navData);
     }
     if (_overlays[NAVAIDS]) {
+	if (_overlays[VOR]) {
+	    _navaids->draw(navData, VOR);
+	}
+	if (_overlays[NDB]) {
+	    _navaids->draw(navData, NDB);
+	}
+	if (_overlays[DME]) {
+	    _navaids->draw(navData, DME);
+	}
 	if (_overlays[FIXES]) {
 	    _fixes->draw(navData);
 	}
-	if (_overlays[NDB]) {
-	    _navaids->drawNDBs(navData);
-	}
-	if (_overlays[VOR]) {
-	    _navaids->drawVORs(navData);
-	}
-	if (_overlays[DME]) {
-	    _navaids->drawDMEs(navData);
-	}
     }
     if (_overlays[CROSSHAIRS]) {
-	_crosshairs->draw();
+    	_crosshairs->draw();
     }
     if (_overlays[RANGE_RINGS]) {
 	_rangeRings->draw();
