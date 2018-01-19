@@ -114,8 +114,8 @@ float __iconSize = 10.0;
 float __VORScale = 1.0, __NDBScale = 2.5, __DMEScale = 1.0, __DMEILSScale = 0.5;
 
 NavaidsOverlay::NavaidsOverlay(Overlays& overlays):
-    _overlays(overlays),
-    _VORDirty(false), _NDBDirty(false), _ILSDirty(false), _DMEDirty(false),
+    _overlays(overlays), _hitsDirty(false),
+    _VORDirty(false), _NDBDirty(false), _DMEDirty(false), _ILSDirty(false),
     _p(NULL)
 {
     // Create all the display list indices.  Note that we must have a
@@ -138,10 +138,11 @@ NavaidsOverlay::NavaidsOverlay(Overlays& overlays):
     _DMESymbolDL = glGenLists(1);
     _DMEILSSymbolDL = glGenLists(1);
 
-    _VORDisplayList = glGenLists(1);
-    _NDBDisplayList = glGenLists(1);
-    _ILSDisplayList = glGenLists(1);
-    _DMEDisplayList = glGenLists(1);
+    _VORsDL = glGenLists(1);
+    _NDBsDL = glGenLists(1);
+    _DMEsDL = glGenLists(1);
+    _ILSBackgroundDL = glGenLists(1);
+    _ILSForegroundDL = glGenLists(1);
 
     // EYE - these should all have standard sizes (eg, 1.0), but I
     // know for sure that the DME symbols don't.  This should be
@@ -164,15 +165,17 @@ NavaidsOverlay::NavaidsOverlay(Overlays& overlays):
     subscribe(Notification::MagTrue);
 
     _radios[0] = _radios[1] = _radios[2] = 0;
-    _radials[0] = _radials[1] = 0;
+    _radials[0] = _radials[1] = 0.0;
 }
 
 NavaidsOverlay::~NavaidsOverlay()
 {
-    glDeleteLists(_VORDisplayList, 1);
-    glDeleteLists(_NDBDisplayList, 1);
-    glDeleteLists(_ILSDisplayList, 1);
-    glDeleteLists(_DMEDisplayList, 1);
+    // EYE - make sure we have all the display lists here
+    glDeleteLists(_VORsDL, 1);
+    glDeleteLists(_NDBsDL, 1);
+    glDeleteLists(_DMEsDL, 1);
+    glDeleteLists(_ILSBackgroundDL, 1);
+    glDeleteLists(_ILSForegroundDL, 1);
 
     glDeleteLists(_VORRoseDL, 1);
     glDeleteLists(_VORSymbolDL, 1);
@@ -340,7 +343,6 @@ void NavaidsOverlay::_createVORSymbols()
     glNewList(_VORTACSymbolDL, GL_COMPILE); {
 	glCallList(_VORSymbolDL);
     
-	glColor4fv(dme_colour);
 	for (int i = 0; i < 360; i += 120) {
 	    glPushMatrix(); {
 		glRotatef(-(i + 60.0), 0.0, 0.0, 1.0);
@@ -368,11 +370,8 @@ void NavaidsOverlay::_createVORSymbols()
 
     assert(_VORDMESymbolDL != 0);
     glNewList(_VORDMESymbolDL, GL_COMPILE); {
-	// EYE - if I make the DME a different colour, I render the VOR
-	// symbol on top.
-	//     glCallList(_VORSymbolDL);
+	glCallList(_VORSymbolDL);
 
-	glColor4fv(dme_colour);
 	glBegin(GL_LINE_LOOP); {
 	    glVertex2f(-longSide, -shortSide);
 	    glVertex2f(-longSide, shortSide);
@@ -380,8 +379,6 @@ void NavaidsOverlay::_createVORSymbols()
 	    glVertex2f(longSide, -shortSide);
 	}
 	glEnd();
-
-	glCallList(_VORSymbolDL);
     }
     glEndList();
 }
@@ -487,7 +484,7 @@ void NavaidsOverlay::_createNDBSymbols()
 	glCallList(_NDBSymbolDL);
 
 	// DME square
-	glColor4fv(dme_colour);
+	glColor4fv(vor_colour);	// On US charts.
 	glBegin(GL_LINE_LOOP); {
 	    glVertex2f(-0.5, -0.5);
 	    glVertex2f(0.5, -0.5);
@@ -809,86 +806,56 @@ static void _createTriangle(float width,
 
 void NavaidsOverlay::setDirty()
 {
-    _VORDirty = true;
-    _NDBDirty = true;
-    _ILSDirty = true;
-    _DMEDirty = true;
+    _hitsDirty = true;
 }
 
-void NavaidsOverlay::drawVORs(NavData *navData)
+void NavaidsOverlay::draw(NavData *navData, Overlays::OverlayType t)
 {
-    if (_VORDirty) {
-	// Something's changed, so we need to regenerate the VOR
-	// display list.
-	assert(_VORDisplayList != 0);
-	glNewList(_VORDisplayList, GL_COMPILE); {
-	    const vector<Cullable *>& intersections = 
-		navData->hits(NavData::NAVAIDS);
-	    for (unsigned int i = 0; i < intersections.size(); i++) {
-		VOR *vor = dynamic_cast<VOR *>(intersections[i]);
-		if (vor) {
-		    _renderVOR(vor);
-		}
-	    }
-	}
-	glEndList();
-	
-	_VORDirty = false;
+    // EYE - VORs/VORS/VOR?  FIXES/FIX/Fixes/Fix?  Overlays.hxx should
+    // be a bit more consistent.
+
+    // EYE - what, in general, should we pass in, and what should be
+    // part of the class?  For example, should we maintain a pointer
+    // to NavData, or pass it in?  Should the parameters to the
+    // drawing routine (labels on/off, default font, ...) be be in the
+    // class (directly or indirectly, via a pointer to Globals or
+    // Overlays) or passed in?  Is the goal to make access as direct
+    // as possible, or as central and consistent as possible?
+
+    if (_hitsDirty) {
+	_resetHits(navData);
     }
 
-    glCallList(_VORDisplayList);
+    if (t == Overlays::VOR) {
+    	_draw(_VORs, _VORDirty, _VORsDL);
+    } else if (t == Overlays::NDB) {
+    	_draw(_NDBs, _NDBDirty, _NDBsDL);
+    } else if (t == Overlays::DME) {
+    	_draw(_DMEs, _DMEDirty, _DMEsDL);
+    }
 }
 
-void NavaidsOverlay::drawNDBs(NavData *navData)
+// Draw ILS backgrounds or foregrounds.  If 'background' is true, it
+// draws markers and localizers.  This should be done after airport
+// backgrounds are drawn and before airport foregrounds are drawn.  If
+// 'background' is false, it draws ILS DMEs.  This should be done
+// after airport foregrounds are drawn.
+void NavaidsOverlay::drawILS(NavData *navData, bool background)
 {
-    if (_NDBDirty) {
-	// Something's changed, so we need to regenerate the NDB
-	// display list.
-	assert(_NDBDisplayList != 0);
-	glNewList(_NDBDisplayList, GL_COMPILE); {
-	    const vector<Cullable *>& intersections = 
-		navData->hits(NavData::NAVAIDS);
-	    for (unsigned int i = 0; i < intersections.size(); i++) {
-		NDB *ndb = dynamic_cast<NDB *>(intersections[i]);
-		if (ndb) {
-		    _renderNDB(ndb);
-		}
-	    }
-	}
-	glEndList();
-
-	_NDBDirty = false;
+    if (_hitsDirty) {
+	_resetHits(navData);
     }
 
-    glCallList(_NDBDisplayList);
-}
-
-void NavaidsOverlay::drawILSs(NavData *navData)
-{
     if (_ILSDirty) {
-	// Something's changed, so we need to regenerate the ILS
-	// display list.
-	assert(_ILSDisplayList != 0);
-	glNewList(_ILSDisplayList, GL_COMPILE); {
-	    // Since all ILS must have a localizer, we just look for
-	    // localizers in range.  If we find one, we render the
-	    // whole ILS (which really is just the localizer, plus
-	    // markers).
-	    const vector<Cullable *>& intersections = 
-		navData->hits(NavData::NAVAIDS);
-
+	// Something's changed, so we need to regenerate both ILS
+	// display lists.
+	assert(_ILSBackgroundDL != 0);
+	glNewList(_ILSBackgroundDL, GL_COMPILE); {
 	    // First draw *all* the markers.  We do this because we
 	    // don't want markers drawn on top of ILS paths (including
 	    // nearby paths, eg KSFO 28R and 28L).
-	    for (unsigned int i = 0; i < intersections.size(); i++) {
-		LOC *loc = dynamic_cast<LOC *>(intersections[i]);
-		if (!loc) {
-		    continue;
-		}
-
-		// Get the ILS of which this localizer is a member.
-		ILS *ils = dynamic_cast<ILS *>(NavaidSystem::owner(loc));
-		assert(ils);
+	    for (unsigned int i = 0; i < _ILSs.size(); i++) {
+		ILS *ils = _ILSs[i];
 
 		// Render whatever markers the ILS has.
 		const set<Marker *>& markers = ils->markers();
@@ -900,17 +867,22 @@ void NavaidsOverlay::drawILSs(NavData *navData)
 	    }
 
 	    // Now draw the ILSs proper.
-	    for (unsigned int i = 0; i < intersections.size(); i++) {
-		LOC *loc = dynamic_cast<LOC *>(intersections[i]);
-		if (!loc) {
-		    continue;
-		}
+	    for (unsigned int i = 0; i < _ILSs.size(); i++) {
+		_renderILS(_ILSs[i]);
+	    }
+	}
+	glEndList();
 
-		// Get the ILS of which this localizer is a member
-		// (again), and render it.
-		ILS *ils = dynamic_cast<ILS *>(NavaidSystem::owner(loc));
-		assert(ils);
-		_renderILS(ils);
+	assert(_ILSForegroundDL != 0);
+	glNewList(_ILSForegroundDL, GL_COMPILE); {
+	    for (unsigned int i = 0; i < _ILSs.size(); i++) {
+		DME *dme = _ILSs[i]->dme();
+		if (dme) {
+		    // EYE - by calling _draw(DME *), we're making the
+		    // ILS DMEs have the same zoom policy as DMEs - we
+		    // really want them to follow the ILS zoom policy.
+		    _draw(dme);
+		}
 	    }
 	}
 	glEndList();
@@ -918,31 +890,69 @@ void NavaidsOverlay::drawILSs(NavData *navData)
 	_ILSDirty = false;
     }
 
-    glCallList(_ILSDisplayList);
+    if (background) {
+	glCallList(_ILSBackgroundDL);
+    } else {
+	glCallList(_ILSForegroundDL);
+    }
 }
 
-void NavaidsOverlay::drawDMEs(NavData *navData)
+void NavaidsOverlay::_resetHits(NavData *navData)
 {
-    if (_DMEDirty) {
-	// Something's changed, so we need to regenerate the DME
-	// display list.
-	assert(_DMEDisplayList != 0);
-	glNewList(_DMEDisplayList, GL_COMPILE); {
-	    const vector<Cullable *>& intersections = 
-		navData->hits(NavData::NAVAIDS);
-	    for (unsigned int i = 0; i < intersections.size(); i++) {
-		DME *dme = dynamic_cast<DME *>(intersections[i]);
-		if (dme) {
-		    _renderDME(dme);
-		}
+    // Our list of hits is suspect.  Regenerate them.
+    _VORs.clear();
+    _NDBs.clear();
+    _DMEs.clear();
+    _ILSs.clear();
+
+    const vector<Cullable *>& intersections = 
+	navData->hits(NavData::NAVAIDS);
+    for (unsigned int i = 0; i < intersections.size(); i++) {
+	Navaid *n = dynamic_cast<Navaid *>(intersections[i]);
+	assert(n);
+	if (VOR *vor = dynamic_cast<VOR *>(n)) {
+	    _VORs.push_back(vor);
+	} else if (NDB *ndb = dynamic_cast<NDB *>(n)) {
+	    _NDBs.push_back(ndb);
+	} else if (DME *dme = dynamic_cast<DME *>(n)) {
+	    // DMEs are special, in that we only want to render
+	    // ones that are standalone.  If they occur as part of
+	    // a navaid system (VOR-DME, VORTAC, NDB-DME, or ILS),
+	    // then they will be rendered elsewhere.
+	    if (NavaidSystem::owner(dme) == NULL) {
+		_DMEs.push_back(dme);
+	    }
+	} else if (LOC *loc = dynamic_cast<LOC *>(n)) {
+	    // We're more interested in the ILS system, not the
+	    // localizer component.
+	    ILS *ils = dynamic_cast<ILS *>(NavaidSystem::owner(loc));
+	    assert(ils);
+	    _ILSs.push_back(ils);
+	}
+    }
+
+    _hitsDirty = false;
+    _VORDirty = _NDBDirty = _DMEDirty = _ILSDirty = true;
+}
+
+template<class T>
+void NavaidsOverlay::_draw(vector<T *> navaids, bool& dirty, GLuint dl)
+{
+    if (dirty) {
+	// Something's changed, so we need to regenerate the display
+	// list.
+	assert(dl != 0);
+	glNewList(dl, GL_COMPILE); {
+	    for (unsigned int i = 0; i < navaids.size(); i++) {
+		_draw(navaids[i]);
 	    }
 	}
 	glEndList();
 
-	_DMEDirty = false;
+	dirty = false;
     }
 
-    glCallList(_DMEDisplayList);
+    glCallList(dl);
 }
 
 // Drawing strategy:
@@ -968,7 +978,7 @@ void NavaidsOverlay::drawDMEs(NavData *navData)
 enum VORScaling {pixel, nm, range};
 
 // Renders the given VOR.
-void NavaidsOverlay::_renderVOR(VOR *vor)
+void NavaidsOverlay::_draw(VOR *vor)
 {
     // Make its radius 100 pixels.
 // 	VORScaling scaleType = pixel;
@@ -1137,7 +1147,7 @@ void NavaidsOverlay::_renderVOR(VOR *vor)
     geodPopMatrix();
 }
 
-void NavaidsOverlay::_renderNDB(NDB *ndb)
+void NavaidsOverlay::_draw(NDB *ndb)
 {
     const float iconSize = __NDBScale * __iconSize; // Icon size, in pixels.
     float dotSize;		// Size of an individual dot
@@ -1209,7 +1219,6 @@ void NavaidsOverlay::_renderNDB(NDB *ndb)
 	////////////////////
 	// NDB 'radial'
 	////////////////////
-	// EYE - different frequency representations?
 	if (_p && (ndb->frequency() == _p->adf_freq)) {
 	    glPushMatrix(); {
 		// EYE - this seems like overkill.  Is there a simpler
@@ -1263,6 +1272,114 @@ void NavaidsOverlay::_renderNDB(NDB *ndb)
 		}
 	    } else {
 		_drawLabel("%I", ndb, pointSize, 0, labelOffset, p);
+	    }
+	}
+    }
+    geodPopMatrix();
+}
+
+// Renders a stand-alone DME.
+// EYE - should it do ILS DMEs?
+void NavaidsOverlay::_draw(DME *dme)
+{
+    // We draw DMEs in 3 different ways here, depending on whether
+    // they are standalone DMEs, TACANs, or ILS DMEs.
+    bool isTACAN, isILS;
+    isTACAN = (dynamic_cast<TACAN *>(dme) != NULL);
+    NavaidSystem *sys = NavaidSystem::owner(dme);
+    if (sys) {
+	isILS = (dynamic_cast<ILS *>(sys) != NULL);
+    }
+
+    float iconSize;
+    if (isILS) {
+	iconSize = __DMEILSScale * __iconSize;
+    } else {
+	iconSize = __DMEScale * __iconSize;
+    }
+
+    // Scaled size of DME, in pixels.  We try to draw the DME at this
+    // radius, as long as it won't be too small or too big.
+    float radius = dme->range() * 0.1 / _metresPerPixel;
+    const float minDMESize = 1.0;
+    const float maxDMESize = iconSize;
+    const float labelPointSize = 10.0; // Pixels
+    
+    if (radius < minDMESize) {
+	return;
+    }
+
+    if (radius > maxDMESize) {
+	radius = maxDMESize;
+    }
+
+    geodPushMatrix(dme->bounds().center, dme->lat(), dme->lon()); {
+	////////////////////
+	// DME icon
+	////////////////////
+	glPushMatrix();
+	glPushAttrib(GL_LINE_BIT); {
+	    // A line width of 1 makes it too hard to pick out, at
+	    // least when drawn in grey.
+	    glLineWidth(2.0);
+
+	    float scale = radius * _metresPerPixel;
+	    glScalef(scale, scale, scale);
+	
+	    if (isTACAN) {
+		glCallList(_TACANSymbolDL);
+	    } else if (isILS) {
+		glCallList(_DMEILSSymbolDL);
+	    } else {
+		glCallList(_DMESymbolDL);
+	    }
+	}
+	glPopAttrib();
+	glPopMatrix();
+
+	////////////////////
+	// DME label
+	////////////////////
+	if (_overlays.isVisible(Overlays::LABELS) && 
+	    (radius > iconSize / 5.0)) {
+	    // Put the DME name, frequency, id, and morse code in a
+	    // box above the icon (separated by a bit of space).  The
+	    // box has a translucent white background with a solid
+	    // border to make it easier to read.
+	    float pointSize = labelPointSize * _metresPerPixel;
+	    float offset = radius * 1.5 * _metresPerPixel;
+	    LayoutManager::Point p = LayoutManager::LC;
+
+	    // This is a bit byzantine, but the idea is that we only
+	    // draw ILS DME labels when zoomed in pretty close; and
+	    // TACANs have an explicit "DME" in their labels (unless
+	    // we've zoomed out too far).
+
+	    // EYE - we really should make the labels match what
+	    // happens with VOR labels with equivalent ranges (check
+	    // out Ottringham for an example).  And it would be nice
+	    // if the scale tests were a bit more readable.
+	    // if (fabs(radius - iconSize) < 0.01) {
+	    if ((dme->range() / _metresPerPixel) > __maximumLabel) {
+		if (isTACAN) {
+		    _drawLabel("%N\nDME %F %I %M", dme, pointSize, 0.0, 
+			       offset, p);
+		} else if (isILS) {
+		    _drawLabel("%I", dme, pointSize, 0.0, offset, p);
+		} else {
+		    _drawLabel("%N\n%F %I %M", dme, pointSize, 0.0, offset, p);
+		}
+	    // } else if (radius > iconSize / 2.0) {
+	    } else if ((dme->range() / _metresPerPixel) > __mediumLabel) {
+		if (isTACAN) {
+		    _drawLabel("DME %F %I", dme, pointSize, 0.0, offset, p);
+		} else if (!isILS) {
+		    _drawLabel("%F %I", dme, pointSize, 0.0, offset, p);
+		}
+	    } else {
+		if (!isILS) {
+		    _drawLabel("%I", dme, pointSize, 0.0, offset, p);
+		}
 	    }
 	}
     }
@@ -1452,113 +1569,6 @@ void NavaidsOverlay::_renderMarker(Marker *m)
 	    // EYE - kind of a stupid assert.
 	    assert(m->type() == Marker::INNER);
 	    glCallList(_ILSMarkerDLs[2]);
-	}
-    }
-    geodPopMatrix();
-}
-
-// Renders a stand-alone DME.
-void NavaidsOverlay::_renderDME(DME *dme)
-{
-    // We draw DMEs in 3 different ways here, depending on whether
-    // they are standalone DMEs, TACANs, or ILS DMEs.
-    bool isTACAN, isILS;
-    isTACAN = (dynamic_cast<TACAN *>(dme) != NULL);
-    NavaidSystem *sys = NavaidSystem::owner(dme);
-    if (sys) {
-	isILS = (dynamic_cast<ILS *>(sys) != NULL);
-    }
-
-    float iconSize;
-    if (isILS) {
-	iconSize = __DMEILSScale * __iconSize;
-    } else {
-	iconSize = __DMEScale * __iconSize;
-    }
-
-    // Scaled size of DME, in pixels.  We try to draw the DME at this
-    // radius, as long as it won't be too small or too big.
-    float radius = dme->range() * 0.1 / _metresPerPixel;
-    const float minDMESize = 1.0;
-    const float maxDMESize = iconSize;
-    const float labelPointSize = 10.0; // Pixels
-    
-    if (radius < minDMESize) {
-	return;
-    }
-
-    if (radius > maxDMESize) {
-	radius = maxDMESize;
-    }
-
-    geodPushMatrix(dme->bounds().center, dme->lat(), dme->lon()); {
-	////////////////////
-	// DME icon
-	////////////////////
-	glPushMatrix();
-	glPushAttrib(GL_LINE_BIT); {
-	    // A line width of 1 makes it too hard to pick out, at
-	    // least when drawn in grey.
-	    glLineWidth(2.0);
-
-	    float scale = radius * _metresPerPixel;
-	    glScalef(scale, scale, scale);
-	
-	    if (isTACAN) {
-		glCallList(_TACANSymbolDL);
-	    } else if (isILS) {
-		glCallList(_DMEILSSymbolDL);
-	    } else {
-		glCallList(_DMESymbolDL);
-	    }
-	}
-	glPopAttrib();
-	glPopMatrix();
-
-	////////////////////
-	// DME label
-	////////////////////
-	if (_overlays.isVisible(Overlays::LABELS) && 
-	    (radius > iconSize / 5.0)) {
-	    // Put the DME name, frequency, id, and morse code in a
-	    // box above the icon (separated by a bit of space).  The
-	    // box has a translucent white background with a solid
-	    // border to make it easier to read.
-	    float pointSize = labelPointSize * _metresPerPixel;
-	    float offset = radius * 1.5 * _metresPerPixel;
-	    LayoutManager::Point p = LayoutManager::LC;
-
-	    // This is a bit byzantine, but the idea is that we only
-	    // draw ILS DME labels when zoomed in pretty close; and
-	    // TACANs have an explicit "DME" in their labels (unless
-	    // we've zoomed out too far).
-
-	    // EYE - we really should make the labels match what
-	    // happens with VOR labels with equivalent ranges (check
-	    // out Ottringham for an example).  And it would be nice
-	    // if the scale tests were a bit more readable.
-	    // if (fabs(radius - iconSize) < 0.01) {
-	    if ((dme->range() / _metresPerPixel) > __maximumLabel) {
-		if (isTACAN) {
-		    _drawLabel("%N\nDME %F %I %M", dme, pointSize, 0.0, 
-			       offset, p);
-		} else if (isILS) {
-		    _drawLabel("%I", dme, pointSize, 0.0, offset, p);
-		} else {
-		    _drawLabel("%N\n%F %I %M", dme, pointSize, 0.0, offset, p);
-		}
-	    // } else if (radius > iconSize / 2.0) {
-	    } else if ((dme->range() / _metresPerPixel) > __mediumLabel) {
-		if (isTACAN) {
-		    _drawLabel("DME %F %I", dme, pointSize, 0.0, offset, p);
-		} else if (!isILS) {
-		    _drawLabel("%F %I", dme, pointSize, 0.0, offset, p);
-		}
-	    } else {
-		if (!isILS) {
-		    _drawLabel("%I", dme, pointSize, 0.0, offset, p);
-		}
-	    }
 	}
     }
     geodPopMatrix();
@@ -1827,27 +1837,30 @@ void NavaidsOverlay::notification(Notification::type n)
 	setDirty();
     } else if ((n == Notification::AircraftMoved) ||
 	       (n == Notification::NewFlightTrack)) {
+	// The aircraft moved, or we loaded a new flight track.  We
+	// may have to update how "live" radios are drawn.  First, get
+	// the current point in the flight track.
 	_p = _overlays.ac()->currentPoint();
 
-	// The aircraft moved, or we loaded a new flight track.  We
-	// may have to update how "live" radios are drawn.
 	if (!_p) {
 	    // No flight data, so no flight track.  We'll probably need to
 	    // redraw any radio "beams".
-	    setDirty();
+	    _VORDirty = true;
+	    _NDBDirty = true;
+	    _ILSDirty = true;
 	    return;
 	}
 
 	// Check if the radios have changed.  If so, set the
 	// appropriate navaids overlay dirty as well.
-	// EYE - different frequency representations?
+
+	// EYE - make sure there's a navaid in range?
 	if ((_radios[0] != _p->nav1_freq) || (_radials[0] != _p->nav1_rad)) {
 	    _radios[0] = _p->nav1_freq;
 	    _radials[0] = _p->nav1_rad;
 	    // NAV1 and NAV2 radios don't tune in NDBs, so we don't
 	    // set the NDBs dirty.
 	    _VORDirty = true;
-	    _NDBDirty = true;
 	    _ILSDirty = true;
 	}
 	if ((_radios[1] != _p->nav2_freq) || (_radials[1] != _p->nav2_rad)) {
@@ -1856,7 +1869,6 @@ void NavaidsOverlay::notification(Notification::type n)
 	    // NAV1 and NAV2 radios don't tune in NDBs, so we don't
 	    // set the NDBs dirty.
 	    _VORDirty = true;
-	    _NDBDirty = true;
 	    _ILSDirty = true;
 	}
 
@@ -1865,6 +1877,13 @@ void NavaidsOverlay::notification(Notification::type n)
 	// redraw the radial.  However, live NDBs are drawn with a
 	// "radial" that tracks the aircraft, so they must be redrawn
 	// whenever the aircraft moves.
+
+	// EYE - check if we're tuned to a radio, or if we just
+	// untuned a radio?  We don't need to redraw NDBs if we have
+	// none tuned now and didn't the last time we rendered.  To
+	// put it another way, we need to redraw the NDB "beam" when:
+	// (a) we're tuned in and we move, (b) we just tuned in, or
+	// (c) we just tuned out.
 	_NDBDirty = true;
     } else if (n == Notification::MagTrue) {
 	// This means that we have to switch our display between

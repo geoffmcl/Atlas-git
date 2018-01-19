@@ -28,16 +28,16 @@
 
 #include "LayoutManager.hxx"
 #include "Notifications.hxx"
+#include "Overlays.hxx"
 
 // Forward class declarations
-class Overlays;
 class NavData;
 class Navaid;
 class VOR;
 class NDB;
+class DME;
 class Marker;
 class ILS;
-class DME;
 class FlightData;
 
 // Used for drawing labels on navaids.
@@ -56,10 +56,15 @@ class NavaidsOverlay: public Subscriber {
 
     void setDirty();
 
-    void drawVORs(NavData *navData);
-    void drawNDBs(NavData *navData);
-    void drawILSs(NavData *navData);
-    void drawDMEs(NavData *navData);
+    // Draws the given overlay type, which must be VOR, NDB, or DME.
+    // ILSs are dealt with specially in drawILS.
+    void draw(NavData *navData, Overlays::OverlayType t);
+    // Drawing an ILS is more difficult than regular navaids, because
+    // it is sandwiched between airport layers (just because it looks
+    // nicer).  So we have this special method, with a 'background'
+    // boolean to control behaviour.  If 'background' is true, it
+    // draws markers and localizers, otherwise it draws ILS DMEs.
+    void drawILS(NavData *navData, bool background);
 
     // Subscriber interface.
     void notification(Notification::type n);
@@ -68,16 +73,19 @@ class NavaidsOverlay: public Subscriber {
     void _createVORRose();
     void _createVORSymbols();
     void _createNDBSymbols();
-    void _createMarkerSymbols();
     void _createDMESymbols();
+    void _createMarkerSymbols();
     void _createILSSymbols();
     void _createILSSymbol(GLuint dl, const float *colour);
 
-    void _renderVOR(VOR *vor);
-    void _renderNDB(NDB *ndb);
+    void _resetHits(NavData *navData);
+    template<class T>
+    void _draw(std::vector<T *> navaids, bool& dirty, GLuint dl);
+    void _draw(VOR *vor);
+    void _draw(NDB *ndb);
+    void _draw(DME *dme);
     void _renderMarker(Marker *marker);
     void _renderILS(ILS *ils);
-    void _renderDME(DME *dme);
 
     Label *_makeLabel(const char *fmt, Navaid *n,
 		      float labelPointSize,
@@ -92,13 +100,21 @@ class NavaidsOverlay: public Subscriber {
     Overlays& _overlays;
     double _metresPerPixel;
 
+    std::vector<VOR *> _VORs;
+    std::vector<NDB *> _NDBs;
+    std::vector<DME *> _DMEs;
+    std::vector<ILS *> _ILSs;
+
     GLuint _VORRoseDL, _VORSymbolDL, _VORTACSymbolDL, _VORDMESymbolDL;
     GLuint _NDBSymbolDL, _NDBDMESymbolDL;
     // EYE - can we make _ILSMarkerDLs indexed by Marker::Type?
     GLuint _ILSSymbolDL, _LOCSymbolDL, _ILSMarkerDLs[3];
     GLuint _TACANSymbolDL, _DMESymbolDL, _DMEILSSymbolDL;
-    GLuint _VORDisplayList, _NDBDisplayList, _ILSDisplayList, _DMEDisplayList;
-    bool _VORDirty, _NDBDirty, _ILSDirty, _DMEDirty;
+
+    GLuint _VORsDL, _NDBsDL, _DMEsDL;
+    GLuint _ILSBackgroundDL, _ILSForegroundDL;
+
+    bool _hitsDirty, _VORDirty, _NDBDirty, _DMEDirty, _ILSDirty;
 
     // Radio frequencies for NAV1, NAV2, and the ADF, and radials for
     // NAV1 and NAV2.  These are checked each time we get an
@@ -106,9 +122,12 @@ class NavaidsOverlay: public Subscriber {
     // decide whether we need to redraw navaids.
 
     // EYE - in the future we should accomodate more radios, and in a
-    // more general way.
+    // more general way (although we're limited by the current Atlas
+    // protocol).  And why do FlightTracks store radials as floats?
+    // (Or maybe the correct question is, why does the Atlas protocol
+    // store radials as floats?)
     unsigned int _radios[3];
-    int _radials[2];
+    float _radials[2];
     // We assume that if _p is not NULL there's valid flight data.
     FlightData *_p;
 };
