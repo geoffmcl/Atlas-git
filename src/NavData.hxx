@@ -490,7 +490,7 @@ class NDB_DME: public PairedNavaidSystem {
     NDB *ndb();
     DME *dme();
 
-    NDB *other(DME *tacan);
+    NDB *other(DME *dme);
     DME *other(NDB *vor);
 };
 
@@ -845,6 +845,9 @@ class ARP: public Searchable, public Cullable {
 //////////////////////////////////////////////////////////////////////
 // NavData - The one class to rule them all.
 //////////////////////////////////////////////////////////////////////
+
+// EYE - rename to Navaids?
+// EYE - have a Navaids class and a separate Airports class?
 
 class NavData {
   public:
