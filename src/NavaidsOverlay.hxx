@@ -29,15 +29,10 @@
 #include "LayoutManager.hxx"
 #include "Notifications.hxx"
 #include "Overlays.hxx"
+#include "NavData.hxx"		// Needed for Marker Type enumeration.
 
 // Forward class declarations
 class NavData;
-class Navaid;
-class VOR;
-class NDB;
-class DME;
-class Marker;
-class ILS;
 class FlightData;
 
 //////////////////////////////////////////////////////////////////////
@@ -153,8 +148,7 @@ class NavaidsOverlay: public Subscriber {
 
     DisplayList _VORRoseDL, _VORSymbolDL, _VORTACSymbolDL, _VORDMESymbolDL;
     DisplayList _NDBSymbolDL, _NDBDMESymbolDL;
-    // EYE - can we make _ILSMarkerDLs indexed by Marker::Type?
-    DisplayList _ILSSymbolDL, _LOCSymbolDL, _ILSMarkerDLs[3];
+    DisplayList _ILSSymbolDL, _LOCSymbolDL, _ILSMarkerDLs[Marker::_LAST];
     DisplayList _TACANSymbolDL, _DMESymbolDL, _DMEILSSymbolDL;
 
     DisplayList _VORsDL, _NDBsDL, _DMEsDL;

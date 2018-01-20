@@ -93,7 +93,9 @@ const float dme_colour[4] = {0.498, 0.498, 0.498, 1.0};
 //
 // const float dme_colour[4] = {0.000, 0.420, 0.624, 1.0};
 
-// Markers
+// Markers.  Note that the order of entries must match the Marker
+// class Type enumeration (ie, first OUTER, then MIDDLE, finally
+// INNER).
 const float marker_colours[3][4] = 
     {{0.0, 0.0, 1.0, 0.5},	// Outer marker (blue)
      {1.0, 0.5, 0.0, 0.5},	// Middle marker (amber)
@@ -110,8 +112,9 @@ const float loc_colour[4] = {0.5, 0.5, 0.5, 0.7};
 const float ils_label_colour[4] = {0.0, 0.0, 0.0, 0.75};
 
 // EYE - magic numbers
-// EYE - can we make it indexed by Marker::Type?
-// Radii, in metres, for outer, middle, and inner markers.
+// Radii, in metres, for outer, middle, and inner markers.  Like
+// marker_colours, it must match the order of the Marker Type
+// enumeration.
 const float markerRadii[3] = 
     {1.0 * SG_NM_TO_METER,
      0.35 * SG_NM_TO_METER,
@@ -150,32 +153,6 @@ NavaidsOverlay::NavaidsOverlay(Overlays& overlays):
     _VORDirty(false), _NDBDirty(false), _DMEDirty(false), _ILSDirty(false),
     _p(NULL)
 {
-    // // Create all the display list indices.  Note that we must have a
-    // // valid OpenGL context for this to work.
-    // _VORRoseDL = glGenLists(1);
-    // _VORSymbolDL = glGenLists(1);
-    // _VORTACSymbolDL = glGenLists(1);
-    // _VORDMESymbolDL = glGenLists(1);
-
-    // _NDBSymbolDL = glGenLists(1);
-    // _NDBDMESymbolDL = glGenLists(1);
-
-    // _ILSSymbolDL = glGenLists(1);
-    // _LOCSymbolDL = glGenLists(1);
-    // _ILSMarkerDLs[0] = glGenLists(1);
-    // _ILSMarkerDLs[1] = glGenLists(1);
-    // _ILSMarkerDLs[2] = glGenLists(1);
-
-    // _TACANSymbolDL = glGenLists(1);
-    // _DMESymbolDL = glGenLists(1);
-    // _DMEILSSymbolDL = glGenLists(1);
-
-    // _VORsDL = glGenLists(1);
-    // _NDBsDL = glGenLists(1);
-    // _DMEsDL = glGenLists(1);
-    // _ILSBackgroundDL = glGenLists(1);
-    // _ILSForegroundDL = glGenLists(1);
-
     // EYE - these should all have standard sizes (eg, 1.0), but I
     // know for sure that the DME symbols don't.  This should be
     // corrected.  Or, they should be scaled such that if all are
@@ -202,27 +179,6 @@ NavaidsOverlay::NavaidsOverlay(Overlays& overlays):
 
 NavaidsOverlay::~NavaidsOverlay()
 {
-    // // EYE - make sure we have all the display lists here
-    // glDeleteLists(_VORsDL, 1);
-    // glDeleteLists(_NDBsDL, 1);
-    // glDeleteLists(_DMEsDL, 1);
-    // glDeleteLists(_ILSBackgroundDL, 1);
-    // glDeleteLists(_ILSForegroundDL, 1);
-
-    // glDeleteLists(_VORRoseDL, 1);
-    // glDeleteLists(_VORSymbolDL, 1);
-    // glDeleteLists(_VORTACSymbolDL, 1);
-    // glDeleteLists(_VORDMESymbolDL, 1);
-    // glDeleteLists(_NDBSymbolDL, 1);
-    // glDeleteLists(_NDBDMESymbolDL, 1);
-    // glDeleteLists(_ILSSymbolDL, 1);
-    // glDeleteLists(_LOCSymbolDL, 1);
-    // glDeleteLists(_TACANSymbolDL, 1);
-    // glDeleteLists(_DMESymbolDL, 1);
-    // glDeleteLists(_DMEILSSymbolDL, 1);
-    // glDeleteLists(_ILSMarkerDLs[0], 1);
-    // glDeleteLists(_ILSMarkerDLs[1], 1);
-    // glDeleteLists(_ILSMarkerDLs[2], 1);
 }
 
 // Creates a standard VOR rose of radius 1.0.  This is a circle with
@@ -681,7 +637,7 @@ void NavaidsOverlay::_createMarkerSymbols()
     // Resolution of our arcs.
     const int segments = 10;
 
-    for (int i = 0; i < 3; i++) {
+    for (int i = Marker::OUTER; i < Marker::_LAST; i++) {
 	_ILSMarkerDLs[i].begin(); {
 	    const float offset = cos(30.0 * SG_DEGREES_TO_RADIANS) * markerRadii[i];
 
@@ -1574,15 +1530,7 @@ void NavaidsOverlay::_renderMarker(Marker *m)
 
     geodPushMatrix(m->bounds().center, m->lat(), m->lon()); {
 	glRotatef(-m->heading() + 90.0, 0.0, 0.0, 1.0);
-	if (m->type() == Marker::OUTER) {
-	    _ILSMarkerDLs[0].call();
-	} else if (m->type() == Marker::MIDDLE) {
-	    _ILSMarkerDLs[1].call();
-	} else {
-	    // EYE - kind of a stupid assert.
-	    assert(m->type() == Marker::INNER);
-	    _ILSMarkerDLs[2].call();
-	}
+	_ILSMarkerDLs[m->type()].call();
     }
     geodPopMatrix();
 }

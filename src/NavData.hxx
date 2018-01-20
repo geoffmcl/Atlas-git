@@ -353,7 +353,7 @@ class GS: public Navaid {
 class Marker: public Navaid {
   public:
     enum Type {
-	OUTER, MIDDLE, INNER
+	OUTER, MIDDLE, INNER, _LAST
     };
 
     Marker(double lat, double lon, int elev, const char *name, float heading,
