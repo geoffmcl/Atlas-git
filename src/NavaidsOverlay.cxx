@@ -33,6 +33,38 @@
 
 using namespace std;
 
+GLuint DisplayList::_compiling = 0;
+
+DisplayList::DisplayList()
+{
+    _dl = glGenLists(1);
+    assert(_dl != 0);
+}
+
+DisplayList::~DisplayList()
+{
+    glDeleteLists(_dl, 1);
+}
+
+void DisplayList::begin()
+{
+    assert(_compiling == 0);
+    glNewList(_dl, GL_COMPILE);
+    _compiling = _dl;
+}
+
+void DisplayList::end()
+{
+    assert(_compiling != 0);
+    glEndList();
+    _compiling = 0;
+}
+
+void DisplayList::call()
+{
+    glCallList(_dl);
+}
+
 float clearColour[4] = {1.0, 1.0, 1.0, 0.0};
 
 // EYE - change to sgVec4?
@@ -118,31 +150,31 @@ NavaidsOverlay::NavaidsOverlay(Overlays& overlays):
     _VORDirty(false), _NDBDirty(false), _DMEDirty(false), _ILSDirty(false),
     _p(NULL)
 {
-    // Create all the display list indices.  Note that we must have a
-    // valid OpenGL context for this to work.
-    _VORRoseDL = glGenLists(1);
-    _VORSymbolDL = glGenLists(1);
-    _VORTACSymbolDL = glGenLists(1);
-    _VORDMESymbolDL = glGenLists(1);
+    // // Create all the display list indices.  Note that we must have a
+    // // valid OpenGL context for this to work.
+    // _VORRoseDL = glGenLists(1);
+    // _VORSymbolDL = glGenLists(1);
+    // _VORTACSymbolDL = glGenLists(1);
+    // _VORDMESymbolDL = glGenLists(1);
 
-    _NDBSymbolDL = glGenLists(1);
-    _NDBDMESymbolDL = glGenLists(1);
+    // _NDBSymbolDL = glGenLists(1);
+    // _NDBDMESymbolDL = glGenLists(1);
 
-    _ILSSymbolDL = glGenLists(1);
-    _LOCSymbolDL = glGenLists(1);
-    _ILSMarkerDLs[0] = glGenLists(1);
-    _ILSMarkerDLs[1] = glGenLists(1);
-    _ILSMarkerDLs[2] = glGenLists(1);
+    // _ILSSymbolDL = glGenLists(1);
+    // _LOCSymbolDL = glGenLists(1);
+    // _ILSMarkerDLs[0] = glGenLists(1);
+    // _ILSMarkerDLs[1] = glGenLists(1);
+    // _ILSMarkerDLs[2] = glGenLists(1);
 
-    _TACANSymbolDL = glGenLists(1);
-    _DMESymbolDL = glGenLists(1);
-    _DMEILSSymbolDL = glGenLists(1);
+    // _TACANSymbolDL = glGenLists(1);
+    // _DMESymbolDL = glGenLists(1);
+    // _DMEILSSymbolDL = glGenLists(1);
 
-    _VORsDL = glGenLists(1);
-    _NDBsDL = glGenLists(1);
-    _DMEsDL = glGenLists(1);
-    _ILSBackgroundDL = glGenLists(1);
-    _ILSForegroundDL = glGenLists(1);
+    // _VORsDL = glGenLists(1);
+    // _NDBsDL = glGenLists(1);
+    // _DMEsDL = glGenLists(1);
+    // _ILSBackgroundDL = glGenLists(1);
+    // _ILSForegroundDL = glGenLists(1);
 
     // EYE - these should all have standard sizes (eg, 1.0), but I
     // know for sure that the DME symbols don't.  This should be
@@ -170,27 +202,27 @@ NavaidsOverlay::NavaidsOverlay(Overlays& overlays):
 
 NavaidsOverlay::~NavaidsOverlay()
 {
-    // EYE - make sure we have all the display lists here
-    glDeleteLists(_VORsDL, 1);
-    glDeleteLists(_NDBsDL, 1);
-    glDeleteLists(_DMEsDL, 1);
-    glDeleteLists(_ILSBackgroundDL, 1);
-    glDeleteLists(_ILSForegroundDL, 1);
+    // // EYE - make sure we have all the display lists here
+    // glDeleteLists(_VORsDL, 1);
+    // glDeleteLists(_NDBsDL, 1);
+    // glDeleteLists(_DMEsDL, 1);
+    // glDeleteLists(_ILSBackgroundDL, 1);
+    // glDeleteLists(_ILSForegroundDL, 1);
 
-    glDeleteLists(_VORRoseDL, 1);
-    glDeleteLists(_VORSymbolDL, 1);
-    glDeleteLists(_VORTACSymbolDL, 1);
-    glDeleteLists(_VORDMESymbolDL, 1);
-    glDeleteLists(_NDBSymbolDL, 1);
-    glDeleteLists(_NDBDMESymbolDL, 1);
-    glDeleteLists(_ILSSymbolDL, 1);
-    glDeleteLists(_LOCSymbolDL, 1);
-    glDeleteLists(_TACANSymbolDL, 1);
-    glDeleteLists(_DMESymbolDL, 1);
-    glDeleteLists(_DMEILSSymbolDL, 1);
-    glDeleteLists(_ILSMarkerDLs[0], 1);
-    glDeleteLists(_ILSMarkerDLs[1], 1);
-    glDeleteLists(_ILSMarkerDLs[2], 1);
+    // glDeleteLists(_VORRoseDL, 1);
+    // glDeleteLists(_VORSymbolDL, 1);
+    // glDeleteLists(_VORTACSymbolDL, 1);
+    // glDeleteLists(_VORDMESymbolDL, 1);
+    // glDeleteLists(_NDBSymbolDL, 1);
+    // glDeleteLists(_NDBDMESymbolDL, 1);
+    // glDeleteLists(_ILSSymbolDL, 1);
+    // glDeleteLists(_LOCSymbolDL, 1);
+    // glDeleteLists(_TACANSymbolDL, 1);
+    // glDeleteLists(_DMESymbolDL, 1);
+    // glDeleteLists(_DMEILSSymbolDL, 1);
+    // glDeleteLists(_ILSMarkerDLs[0], 1);
+    // glDeleteLists(_ILSMarkerDLs[1], 1);
+    // glDeleteLists(_ILSMarkerDLs[2], 1);
 }
 
 // Creates a standard VOR rose of radius 1.0.  This is a circle with
@@ -204,8 +236,7 @@ void NavaidsOverlay::_createVORRose()
     // Draw a standard VOR rose or radius 1.  It is drawn in the XY
     // plane, with north in the positive Y direction, and east in the
     // positive X direction.
-    assert(_VORRoseDL != 0);
-    glNewList(_VORRoseDL, GL_COMPILE); {
+    _VORRoseDL.begin(); {
 	glBegin(GL_LINE_LOOP); {
 	    const int subdivision = 5;	// 5-degree steps
 
@@ -291,7 +322,7 @@ void NavaidsOverlay::_createVORRose()
 	    glPopMatrix();
 	}
     }
-    glEndList();
+    DisplayList::end();
 }
 
 // Creates display lists for the 3 VOR symbols: VOR (a hexagon with a
@@ -311,8 +342,7 @@ void NavaidsOverlay::_createVORSymbols()
     ////////////////////
     // VOR
     ////////////////////
-    assert(_VORSymbolDL != 0);
-    glNewList(_VORSymbolDL, GL_COMPILE); {
+    _VORSymbolDL.begin(); {
 	glColor4fv(vor_colour);
 	glBegin(GL_LINE_LOOP); {
 	    for (int i = 0; i < 360; i += 60) {
@@ -332,16 +362,15 @@ void NavaidsOverlay::_createVORSymbols()
 	}
 	glEnd();
     }
-    glEndList();
+    DisplayList::end();
 
     ////////////////////
     // VORTAC
     ////////////////////
     const float lobeThickness = size * 0.5;
 
-    assert(_VORTACSymbolDL != 0);
-    glNewList(_VORTACSymbolDL, GL_COMPILE); {
-	glCallList(_VORSymbolDL);
+    _VORTACSymbolDL.begin(); {
+	_VORSymbolDL.call();
     
 	for (int i = 0; i < 360; i += 120) {
 	    glPushMatrix(); {
@@ -358,7 +387,7 @@ void NavaidsOverlay::_createVORSymbols()
 	    glPopMatrix();
 	}
     }
-    glEndList();
+    DisplayList::end();
 
     ////////////////////
     // VOR-DME
@@ -368,9 +397,8 @@ void NavaidsOverlay::_createVORSymbols()
     // Half the length of the short (left and right) side.
     const float shortSide = sqrt(3.0) / 2.0 * size;
 
-    assert(_VORDMESymbolDL != 0);
-    glNewList(_VORDMESymbolDL, GL_COMPILE); {
-	glCallList(_VORSymbolDL);
+    _VORDMESymbolDL.begin(); {
+	_VORSymbolDL.call();
 
 	glBegin(GL_LINE_LOOP); {
 	    glVertex2f(-longSide, -shortSide);
@@ -380,7 +408,7 @@ void NavaidsOverlay::_createVORSymbols()
 	}
 	glEnd();
     }
-    glEndList();
+    DisplayList::end();
 }
 
 // Create an NDB symbol and and NDB-DME symbol, in the WAC style.
@@ -427,8 +455,7 @@ void NavaidsOverlay::_createNDBSymbols()
     ////////////////////
     // NDB
     ////////////////////
-    assert(_NDBSymbolDL != 0);
-    glNewList(_NDBSymbolDL, GL_COMPILE); {
+    _NDBSymbolDL.begin(); {
 	glColor4fv(ndb_colour);
 	glBegin(GL_POINTS); {
 	    // Centre dot.
@@ -474,14 +501,13 @@ void NavaidsOverlay::_createNDBSymbols()
 	}
 	glPopAttrib();
     }
-    glEndList();
+    DisplayList::end();
 
     ////////////////////
     // NDB-DME
     ////////////////////
-    assert(_NDBDMESymbolDL != 0);
-    glNewList(_NDBDMESymbolDL, GL_COMPILE); {
-	glCallList(_NDBSymbolDL);
+    _NDBDMESymbolDL.begin(); {
+	_NDBSymbolDL.call();
 
 	// DME square
 	glColor4fv(vor_colour);	// On US charts.
@@ -493,7 +519,7 @@ void NavaidsOverlay::_createNDBSymbols()
 	}
 	glEnd();
     }
-    glEndList();
+    DisplayList::end();
 }
 
 // Creates DME symbols - TACANs and stand-alone DMEs (this includes
@@ -508,8 +534,7 @@ void NavaidsOverlay::_createDMESymbols()
     ////////////////////
     // TACAN
     ////////////////////
-    assert(_TACANSymbolDL != 0);
-    glNewList(_TACANSymbolDL, GL_COMPILE); {
+    _TACANSymbolDL.begin(); {
 	glColor4fv(dme_colour);
 	glBegin(GL_LINE_LOOP); {
 	    for (int i = 0; i < 360; i += 120) {
@@ -544,7 +569,7 @@ void NavaidsOverlay::_createDMESymbols()
 	}
 	glEnd();
     }
-    glEndList();    
+    DisplayList::end();
 
     // EYE - define this elsewhere, so it can be used in VORs and
     // NDBs?
@@ -552,10 +577,7 @@ void NavaidsOverlay::_createDMESymbols()
     ////////////////////
     // DME
     ////////////////////
-    assert(_DMESymbolDL != 0);
-    glNewList(_DMESymbolDL, GL_COMPILE); {
-	glCallList(_DMESymbolDL);
-
+    _DMESymbolDL.begin(); {
 	// DME square
 	glColor4fv(dme_colour);
 	glBegin(GL_LINE_LOOP); {
@@ -566,15 +588,12 @@ void NavaidsOverlay::_createDMESymbols()
 	}
 	glEnd();
     }
-    glEndList();
+    DisplayList::end();
 
     ////////////////////
     // ILS DME
     ////////////////////
-    assert(_DMEILSSymbolDL != 0);
-    glNewList(_DMEILSSymbolDL, GL_COMPILE); {
-	glCallList(_DMEILSSymbolDL);
-
+    _DMEILSSymbolDL.begin(); {
 	// Small circle with a dot in the middle.
 	glColor4fv(dme_colour);
 	glBegin(GL_LINE_LOOP); {
@@ -599,8 +618,7 @@ void NavaidsOverlay::_createDMESymbols()
 	}
 	glEnd();
     }
-    glEndList();
-
+    DisplayList::end();
 }
 
 // Creates ILS localizer symbol, with a length of 1.  The symbol is
@@ -616,10 +634,9 @@ void NavaidsOverlay::_createILSSymbols()
 
 // Creates a single ILS-type symbol, for the given display list
 // variable, in the given colour.
-void NavaidsOverlay::_createILSSymbol(GLuint dl, const float *colour)
+void NavaidsOverlay::_createILSSymbol(DisplayList& dl, const float *colour)
 {
-    assert(dl != 0);
-    glNewList(dl, GL_COMPILE); {
+    dl.begin(); {
 	glBegin(GL_TRIANGLES); {
 	    // The right side is pink.
 	    glColor4fv(colour);
@@ -653,7 +670,7 @@ void NavaidsOverlay::_createILSSymbol(GLuint dl, const float *colour)
 	}
 	glEnd();
     }
-    glEndList();
+    DisplayList::end();
 }
 
 // Creates 3 marker symbols, with units in metres.  The symbols are
@@ -665,8 +682,7 @@ void NavaidsOverlay::_createMarkerSymbols()
     const int segments = 10;
 
     for (int i = 0; i < 3; i++) {
-	assert(_ILSMarkerDLs[i] != 0);
-	glNewList(_ILSMarkerDLs[i], GL_COMPILE); {
+	_ILSMarkerDLs[i].begin(); {
 	    const float offset = cos(30.0 * SG_DEGREES_TO_RADIANS) * markerRadii[i];
 
 	    glColor4fv(marker_colours[i]);
@@ -711,7 +727,7 @@ void NavaidsOverlay::_createMarkerSymbols()
 	    }
 	    glEnd();
 	}
-	glEndList();
+	DisplayList::end();
     }
 }
 
@@ -849,8 +865,7 @@ void NavaidsOverlay::drawILS(NavData *navData, bool background)
     if (_ILSDirty) {
 	// Something's changed, so we need to regenerate both ILS
 	// display lists.
-	assert(_ILSBackgroundDL != 0);
-	glNewList(_ILSBackgroundDL, GL_COMPILE); {
+	_ILSBackgroundDL.begin(); {
 	    // First draw *all* the markers.  We do this because we
 	    // don't want markers drawn on top of ILS paths (including
 	    // nearby paths, eg KSFO 28R and 28L).
@@ -871,10 +886,9 @@ void NavaidsOverlay::drawILS(NavData *navData, bool background)
 		_renderILS(_ILSs[i]);
 	    }
 	}
-	glEndList();
+	DisplayList::end();
 
-	assert(_ILSForegroundDL != 0);
-	glNewList(_ILSForegroundDL, GL_COMPILE); {
+	_ILSForegroundDL.begin(); {
 	    for (unsigned int i = 0; i < _ILSs.size(); i++) {
 		DME *dme = _ILSs[i]->dme();
 		if (dme) {
@@ -885,15 +899,15 @@ void NavaidsOverlay::drawILS(NavData *navData, bool background)
 		}
 	    }
 	}
-	glEndList();
+	DisplayList::end();
 
 	_ILSDirty = false;
     }
 
     if (background) {
-	glCallList(_ILSBackgroundDL);
+	_ILSBackgroundDL.call();
     } else {
-	glCallList(_ILSForegroundDL);
+	_ILSForegroundDL.call();
     }
 }
 
@@ -936,23 +950,22 @@ void NavaidsOverlay::_resetHits(NavData *navData)
 }
 
 template<class T>
-void NavaidsOverlay::_draw(vector<T *> navaids, bool& dirty, GLuint dl)
+void NavaidsOverlay::_draw(vector<T *> navaids, bool& dirty, DisplayList& dl)
 {
     if (dirty) {
 	// Something's changed, so we need to regenerate the display
 	// list.
-	assert(dl != 0);
-	glNewList(dl, GL_COMPILE); {
+	dl.begin(); {
 	    for (unsigned int i = 0; i < navaids.size(); i++) {
 		_draw(navaids[i]);
 	    }
 	}
-	glEndList();
+	DisplayList::end();
 
 	dirty = false;
     }
 
-    glCallList(dl);
+    dl.call();
 }
 
 // Drawing strategy:
@@ -1042,12 +1055,12 @@ void NavaidsOverlay::_draw(VOR *vor)
 		NavaidSystem *sys = NavaidSystem::owner(vor);
 		if (!sys) {
 		    // It's a standalone VOR.
-		    glCallList(_VORSymbolDL);
+		    _VORSymbolDL.call();
 		} else if (dynamic_cast<VORTAC *>(sys)) {
-		    glCallList(_VORTACSymbolDL);
+		    _VORTACSymbolDL.call();
 		} else {
 		    assert(dynamic_cast<VOR_DME *>(sys));
-		    glCallList(_VORDMESymbolDL);
+		    _VORDMESymbolDL.call();
 		}
 	    }
 	    glPopAttrib();
@@ -1139,7 +1152,7 @@ void NavaidsOverlay::_draw(VOR *vor)
 	    
 		// Draw the VOR rose using the VOR colour.
 		glColor4fv(vor_colour);
-		glCallList(_VORRoseDL);
+		_VORRoseDL.call();
 	    }
 	    glPopAttrib();
 	}
@@ -1196,10 +1209,10 @@ void NavaidsOverlay::_draw(NDB *ndb)
 
 		if (!sys) {
 		    // Standalone NDB.
-		    glCallList(_NDBSymbolDL);
+		    _NDBSymbolDL.call();
 		} else {
 		    assert(dynamic_cast<NDB_DME *>(sys));
-		    glCallList(_NDBDMESymbolDL);
+		    _NDBDMESymbolDL.call();
 		}
 		// EYE - Do LOMs?  An LOM is just an NDB on top of an
 		// outer marker.  However, of the 24 LOMs listed in
@@ -1327,11 +1340,11 @@ void NavaidsOverlay::_draw(DME *dme)
 	    glScalef(scale, scale, scale);
 	
 	    if (isTACAN) {
-		glCallList(_TACANSymbolDL);
+		_TACANSymbolDL.call();
 	    } else if (isILS) {
-		glCallList(_DMEILSSymbolDL);
+		_DMEILSSymbolDL.call();
 	    } else {
-		glCallList(_DMESymbolDL);
+		_DMESymbolDL.call();
 	    }
 	}
 	glPopAttrib();
@@ -1460,9 +1473,9 @@ void NavaidsOverlay::_renderILS(ILS *ils)
 		// Don't draw a back course.
 		_createTriangle(ilsWidth, clearColour, ilsColour, false);
 	    } else if (ils->gs()) {
-		glCallList(_ILSSymbolDL);
+		_ILSSymbolDL.call();
 	    } else {
-		glCallList(_LOCSymbolDL);
+		_LOCSymbolDL.call();
 	    }
 	}
 	glPopMatrix();
@@ -1562,13 +1575,13 @@ void NavaidsOverlay::_renderMarker(Marker *m)
     geodPushMatrix(m->bounds().center, m->lat(), m->lon()); {
 	glRotatef(-m->heading() + 90.0, 0.0, 0.0, 1.0);
 	if (m->type() == Marker::OUTER) {
-	    glCallList(_ILSMarkerDLs[0]);
+	    _ILSMarkerDLs[0].call();
 	} else if (m->type() == Marker::MIDDLE) {
-	    glCallList(_ILSMarkerDLs[1]);
+	    _ILSMarkerDLs[1].call();
 	} else {
 	    // EYE - kind of a stupid assert.
 	    assert(m->type() == Marker::INNER);
-	    glCallList(_ILSMarkerDLs[2]);
+	    _ILSMarkerDLs[2].call();
 	}
     }
     geodPopMatrix();

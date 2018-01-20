@@ -40,6 +40,52 @@ class Marker;
 class ILS;
 class FlightData;
 
+//////////////////////////////////////////////////////////////////////
+// DisplayList
+//////////////////////////////////////////////////////////////////////
+
+// This is a convenience class for managing OpenGL display lists.  It
+// generates an empty display list upon creation (which means an
+// OpenGL context *must* already exist).  That display list is deleted
+// upon destruction.  Calling begin() starts the compilation of a
+// display list.  Every call to begin() must be paired with a call to
+// end().  Nested begin()/end() pairs are not allowed.  The resulting
+// display list can be rendered by calling call().
+//
+// This class does a bit of error checking.  Calls to begin() are not
+// allowed if a begin() is already in progress.  Calls to end() fail
+// if there has been no corresponding begin().  "Failure" for this
+// class means a failed assertion, resulting in program termination.
+// Maybe one day I'll implement exceptions instead.
+//
+// Note that end() is a class method, not an instance method.  This
+// means you can call it via DisplayList::end().  This mimics OpenGL,
+// for which a glEndList() call just terminates whatever display list
+// is currently being compiled.  Note as well that you can also call
+// end() with an instance (eg, someDL.end()).
+class DisplayList {
+  public:
+    DisplayList();
+    ~DisplayList();
+
+    // Define the display list.  Put OpenGL rendering calls between
+    // the calls to begin() and end().
+    void begin();
+    static void end();
+
+    // Render the display list.
+    void call();
+
+    GLuint dl() { return _dl; }
+
+  protected:
+    // True if begin() has been called.  When end() is called, it is
+    // reset to false.
+    static GLuint _compiling;
+
+    GLuint _dl;
+};
+
 // Used for drawing labels on navaids.
 // EYE - make Label a class?
 struct Label {
@@ -76,11 +122,11 @@ class NavaidsOverlay: public Subscriber {
     void _createDMESymbols();
     void _createMarkerSymbols();
     void _createILSSymbols();
-    void _createILSSymbol(GLuint dl, const float *colour);
+    void _createILSSymbol(DisplayList& dl, const float *colour);
 
     void _resetHits(NavData *navData);
     template<class T>
-    void _draw(std::vector<T *> navaids, bool& dirty, GLuint dl);
+    void _draw(std::vector<T *> navaids, bool& dirty, DisplayList& dl);
     void _draw(VOR *vor);
     void _draw(NDB *ndb);
     void _draw(DME *dme);
@@ -105,14 +151,14 @@ class NavaidsOverlay: public Subscriber {
     std::vector<DME *> _DMEs;
     std::vector<ILS *> _ILSs;
 
-    GLuint _VORRoseDL, _VORSymbolDL, _VORTACSymbolDL, _VORDMESymbolDL;
-    GLuint _NDBSymbolDL, _NDBDMESymbolDL;
+    DisplayList _VORRoseDL, _VORSymbolDL, _VORTACSymbolDL, _VORDMESymbolDL;
+    DisplayList _NDBSymbolDL, _NDBDMESymbolDL;
     // EYE - can we make _ILSMarkerDLs indexed by Marker::Type?
-    GLuint _ILSSymbolDL, _LOCSymbolDL, _ILSMarkerDLs[3];
-    GLuint _TACANSymbolDL, _DMESymbolDL, _DMEILSSymbolDL;
+    DisplayList _ILSSymbolDL, _LOCSymbolDL, _ILSMarkerDLs[3];
+    DisplayList _TACANSymbolDL, _DMESymbolDL, _DMEILSSymbolDL;
 
-    GLuint _VORsDL, _NDBsDL, _DMEsDL;
-    GLuint _ILSBackgroundDL, _ILSForegroundDL;
+    DisplayList _VORsDL, _NDBsDL, _DMEsDL;
+    DisplayList _ILSBackgroundDL, _ILSForegroundDL;
 
     bool _hitsDirty, _VORDirty, _NDBDirty, _DMEDirty, _ILSDirty;
 
