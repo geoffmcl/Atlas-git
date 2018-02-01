@@ -74,11 +74,11 @@ AtlasBaseWindow::~AtlasBaseWindow()
     // We can be called from anywhere, so we need to make sure that
     // we're the current GLUT window before deleting the fonts (which
     // results in the deletion of an OpenGL texture).
-    int currentWindow = set();
+    int currentWindow = setCurrent();
 
     delete _regularFont;
     delete _boldFont;
 
     // Restore the previous current window.
-    set(currentWindow);
+    setCurrent(currentWindow);
 }

@@ -62,10 +62,10 @@ class GLUTWindow {
 
     // Set the new current GLUT window to id, returning the id of the
     // previous GLUT window.
-    static int set(int id);
+    static int setCurrent(int id);
     // Set ourselves to be the new current window, returning the
     // window id of the previous window.
-    int set() { return set(_id); }
+    int setCurrent() { return setCurrent(_id); }
 
     // Mark the given window as being ready for redisplay.
     static void postRedisplay(int id);

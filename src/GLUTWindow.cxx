@@ -43,7 +43,7 @@
 using namespace std;
 
 // Class methods
-int GLUTWindow::set(int id)
+int GLUTWindow::setCurrent(int id)
 {
     int oldID = glutGetWindow();
     // Switch to the new window if it's different than this one (and
@@ -92,25 +92,25 @@ GLUTWindow::~GLUTWindow()
 void GLUTWindow::setTitle(const char *title)
 {
     // Ensure that we are the current window.
-    int currentWindow = set();
+    int currentWindow = setCurrent();
 
     // Set our title.
     glutSetWindowTitle(title);
 
     // Restore current window (if necessary);
-    set(currentWindow);
+    setCurrent(currentWindow);
 }
 
 void GLUTWindow::reshape(int width, int height)
 {
     // Ensure that we are the current window.
-    int currentWindow = set();
+    int currentWindow = setCurrent();
 
     // Resize.
     glutReshapeWindow(width, height);
 
     // Restore current window (if necessary);
-    set(currentWindow);
+    setCurrent(currentWindow);
 }
 
 void GLUTWindow::startTimer(unsigned int msecs, cb method)
@@ -142,14 +142,14 @@ void GLUTWindow::startTimer(unsigned int msecs, cb method)
 
 void GLUTWindow::reveal()
 {
-    set();
+    setCurrent();
     glutShowWindow();
     _visible = true;
 }
 
 void GLUTWindow::hide()
 {
-    set();
+    setCurrent();
     glutHideWindow();
     _visible = false;
 }
@@ -157,13 +157,13 @@ void GLUTWindow::hide()
 int GLUTWindow::width()
 {
     // Ensure that we are the current window.
-    int currentWindow = set();
+    int currentWindow = setCurrent();
 
     // Get our width.
     int result = glutGet(GLUT_WINDOW_WIDTH);
 
     // Restore current window (if necessary);
-    set(currentWindow);
+    setCurrent(currentWindow);
 
     return result;
 }
@@ -171,13 +171,13 @@ int GLUTWindow::width()
 int GLUTWindow::height()
 {
     // Ensure that we are the current window.
-    int currentWindow = set();
+    int currentWindow = setCurrent();
 
     // Get our height.
     int result = glutGet(GLUT_WINDOW_HEIGHT);
 
     // Restore current window (if necessary);
-    set(currentWindow);
+    setCurrent(currentWindow);
 
     return result;
 }
@@ -185,10 +185,10 @@ int GLUTWindow::height()
 void GLUTWindow::attach(int button, GLUTMenu *menu)
 {
     // Ensure that we are the current window.
-    int currentWindow = set();
+    int currentWindow = setCurrent();
 
-    // EYE - make a method in GLUTMenu to do this, like set() in
-    // GLUTWindow?
+    // EYE - make a method in GLUTMenu to do this, like setCurrent()
+    // in GLUTWindow?
     int oldMenu = glutGetMenu();
     if (oldMenu != menu->id()) {
 	glutSetMenu(menu->id());
@@ -202,19 +202,19 @@ void GLUTWindow::attach(int button, GLUTMenu *menu)
 	glutSetMenu(oldMenu);
     }
     // Restore current window (if necessary);
-    set(currentWindow);
+    setCurrent(currentWindow);
 }
 
 void GLUTWindow::detach(int button)
 {
     // Ensure that we are the current window.
-    int currentWindow = set();
+    int currentWindow = setCurrent();
 
     // Detach whatever menu is on that button.
     glutDetachMenu(button);
 
     // Restore current window (if necessary);
-    set(currentWindow);
+    setCurrent(currentWindow);
 }
 
 void GLUTWindow::__displayFunc()
@@ -308,11 +308,11 @@ void GLUTWindow::__timerFunc(int id)
     cb method = p.second;
 
     // Set it to be the current window, and call it.
-    int currentWindow = win->set();
+    int currentWindow = win->setCurrent();
     (win->*method)();
 
     // Restore the old window to be current.
-    set(currentWindow);
+    setCurrent(currentWindow);
 }
 
 //////////////////////////////////////////////////////////////////////
