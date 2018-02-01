@@ -50,14 +50,14 @@ FlightData::~FlightData()
 {
 }
 
-// We force users to access the navaids vector via this method because
-// we want to avoid searching for navaids if we can.  The alternative
-// is searching for navaids for the entire flight track when we load
-// it in, which can be prohibitively slow.
+// We force users to access the navaids set via this method because we
+// want to avoid searching for navaids if we can.  The alternative is
+// searching for navaids for the entire flight track when we load it
+// in, which can be prohibitively slow.
 
 // EYE - Have an Atlas/NMEA tag in FlightData?  Or change the way we
 // record radio data so that it isn't in each FlightData record?
-const vector<Navaid *>& FlightData::navaids()
+const set<Navaid *>& FlightData::navaids()
 {
     if (!_navaidsLoaded) {
 	_navaidsLoaded = true;
@@ -83,11 +83,11 @@ const vector<Navaid *>& FlightData::navaids()
 	    if (n) {
 		unsigned int freq = n->frequency();
 		if (nav1_freq == freq) {
-		    _navaids.push_back(n);
+		    _navaids.insert(n);
 		} else if (nav2_freq == freq) {
-		    _navaids.push_back(n);
+		    _navaids.insert(n);
 		} else if (adf_freq == freq) {
-		    _navaids.push_back(n);
+		    _navaids.insert(n);
 		}
 	    }
 	}

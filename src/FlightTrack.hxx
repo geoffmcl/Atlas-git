@@ -32,7 +32,7 @@
 
 // C++ system include files
 #include <string>
-#include <vector>
+#include <set>
 #include <deque>
 
 // Other libraries' include files
@@ -74,13 +74,13 @@ class FlightData {
 				// flight (in metres)
 
     // List of tuned-in navaids at this point in the flight.
-    const std::vector<Navaid *>& navaids();
+    const std::set<Navaid *>& navaids();
 
   protected:
     // EYE - all of this stuff really belongs in the FlightTrack.
     NavData *_navData;
     bool _navaidsLoaded;
-    std::vector<Navaid *> _navaids;	// In-range tuned navaids.
+    std::set<Navaid *> _navaids;	// In-range tuned navaids.
 };
 
 class FlightTrack {
