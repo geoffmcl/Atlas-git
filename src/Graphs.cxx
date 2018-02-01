@@ -25,6 +25,7 @@
 #include "Graphs.hxx"
 
 // C++ system files
+#include <set>
 #include <algorithm>		// min(), max()
 
 // Our project's includes
@@ -463,9 +464,9 @@ GraphsWindow::~GraphsWindow()
 
 void GraphsWindow::special(int key, int x, int y)
 {
-    int win = set();
+    int win = setCurrent();
     _special(key, x, y);
-    set(win);
+    setCurrent(win);
 }
 
 void GraphsWindow::setAircraftColour(const float *colour)
@@ -1656,9 +1657,10 @@ void GraphsWindow::Altitudes::load()
 	// Check each active navaid to see if: (a) it's a glideslope,
 	// (b) it's in our "cone of interest" (as defined by
 	// 'maxRange').  If it is, then we need to graph it.
-	const vector<Navaid *>& navaids = p->navaids();
-	for (size_t j = 0; j < navaids.size(); j++) {
-	    GS *gs = dynamic_cast<GS *>(navaids[j]);
+	const set<Navaid *>& navaids = p->navaids();
+	set<Navaid *>::const_iterator j;
+	for (j = navaids.begin(); j != navaids.end(); j++) {
+	    GS *gs = dynamic_cast<GS *>(*j);
 
 	    //////////////////////////////////////////////////
 	    // (a) Is it a glideslope?

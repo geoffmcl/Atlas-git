@@ -2335,9 +2335,10 @@ void InfoUI::_setText()
     	// Separate navaids based on frequency.
     	vector<Navaid *> VOR1s, VOR2s; // EYE - or DME!
 	vector<NDB *> NDBs;
-    	const vector<Navaid *> &navaids = p->navaids();
-    	for (size_t i = 0; i < navaids.size(); i++) {
-    	    Navaid *n = navaids[i];
+    	const set<Navaid *> &navaids = p->navaids();
+	set<Navaid *>::const_iterator i;
+    	for (i = navaids.begin(); i != navaids.end(); i++) {
+    	    Navaid *n = *i;
     	    if (p->nav1_freq == n->frequency()) {
     		VOR1s.push_back(n);
     	    } 
@@ -3700,7 +3701,7 @@ bool ScreenLocation::_intersection(float x, float y, SGVec3<double> *c,
     GLdouble wx, wy, wz;	// World x, y, z coords.
 
     // Make sure we're the active window.
-    int oldWindow = _win->set();
+    int oldWindow = _win->setCurrent();
 
     // Our line is given by two points: the intersection of our
     // viewing "ray" with the near depth plane and far depth planes.
@@ -3758,7 +3759,7 @@ bool ScreenLocation::_intersection(float x, float y, SGVec3<double> *c,
 
     // Beyond this point, we don't do any OpenGL stuff, so we can
     // restore the old active window.
-    _win->set(oldWindow);
+    _win->setCurrent(oldWindow);
 
     // If the user was interested in getting an elevation and we
     // actually got one, we can return now.
@@ -4721,9 +4722,9 @@ void AtlasWindow::_visibility(int state)
 
 void AtlasWindow::_setShading()
 {
-    int currentWin = set();
+    int currentWin = setCurrent();
     glShadeModel(_ac->smoothShading() ? GL_SMOOTH : GL_FLAT);
-    set(currentWin);
+    setCurrent(currentWin);
 }
 
 // Set the light position (in eye coordinates, not world coordinates).
@@ -4744,14 +4745,14 @@ void AtlasWindow::_setAzimuthElevation()
     lightPosition[3] = 0.0;
 
     // Now set OpenGL's LIGHT0.
-    int currentWin = set();
+    int currentWin = setCurrent();
     glMatrixMode(GL_MODELVIEW);
     glPushMatrix(); {
 	glLoadIdentity();
 	glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
     }
     glPopMatrix();
-    set(currentWin);
+    setCurrent(currentWin);
 }
 
 // Make the palette base relative.  A palette base of 0.0 (AKA
@@ -5033,9 +5034,9 @@ void AtlasWindow::setShowOutlines(bool on)
 
 void AtlasWindow::keyboard(unsigned char key, int x, int y)
 {
-    int win = set();
+    int win = setCurrent();
     _keyboard(key, x, y);
-    set(win);
+    setCurrent(win);
 }
 
 void AtlasWindow::searchFinished(int i)
@@ -5287,7 +5288,7 @@ void AtlasWindow::zoomTo(double scale)
 //     glGetDoublev(GL_VIEWPORT, viewport);
 //     double metresPerPixel = (planes[1] - planes[0]) / viewport[2];
 
-    int currentWin = set();
+    int currentWin = setCurrent();
     glPushAttrib(GL_TRANSFORM_BIT); { // Save current matrix mode.
     	glMatrixMode(GL_PROJECTION);
     	glLoadIdentity();
@@ -5299,7 +5300,7 @@ void AtlasWindow::zoomTo(double scale)
     		_frustum.getFar());
     }
     glPopAttrib();
-    set(currentWin);
+    setCurrent(currentWin);
 
     // Tell our scenery and navdata objects about the zoom.
     _scenery->zoom(_frustum, _metresPerPixel);
@@ -5862,7 +5863,7 @@ void AtlasWindow::_move()
 {
     // We do OpenGL stuff, so we need to make sure our context is
     // current.
-    int win = set();
+    int win = setCurrent();
     // Note that we always look at the origin.  This means that our
     // views will not quite be perpendicular to the earth's surface,
     // since the earth is not perfectly spherical.
@@ -5877,7 +5878,7 @@ void AtlasWindow::_move()
     glGetDoublev(GL_MODELVIEW_MATRIX, (GLdouble *)mvm);
 
     // Return to the former context.
-    set(win);
+    setCurrent(win);
 
     // // This does the equivalent of the above, using the pseudo-code
     // // given on the gluLookAt man page.
