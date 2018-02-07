@@ -57,7 +57,7 @@ Overlays::Overlays(AtlasWindow *aw): _aw(aw)
 {
     // Load data.
     _airports = new AirportsOverlay(*this);
-    _navaids = new NavaidsOverlay(*this);
+    _navaids = new NavaidsOverlay();
     _fixes = new FixesOverlay(*this);
     _airways = new AirwaysOverlay(*this);
     _tracks = new FlightTracksOverlay(*this);
@@ -108,7 +108,7 @@ void Overlays::draw(NavData *navData)
     }
     // We sandwich ILSs between runway backgrounds and the runways.
     if (_overlays[NAVAIDS] && _overlays[ILS]) {
-	_navaids->drawILS(navData, true);
+	_navaids->draw(navData, ILS, _overlays[LABELS]);
     }
     if (_overlays[AIRPORTS]) {
 	_airports->drawForegrounds(navData);
@@ -121,20 +121,20 @@ void Overlays::draw(NavData *navData)
     // various overlay subclasses?  It would certainly make for neater
     // code here.
     if (_overlays[NAVAIDS] && _overlays[ILS]) {
-	_navaids->drawILS(navData, false);
+	_navaids->draw(navData, ILS, _overlays[LABELS]);
     }
     if (_overlays[AIRWAYS]) {
 	_airways->draw(_overlays[HIGH], _overlays[LOW], navData);
     }
     if (_overlays[NAVAIDS]) {
 	if (_overlays[VOR]) {
-	    _navaids->draw(navData, VOR);
+	    _navaids->draw(navData, VOR, _overlays[LABELS]);
 	}
 	if (_overlays[NDB]) {
-	    _navaids->draw(navData, NDB);
+	    _navaids->draw(navData, NDB, _overlays[LABELS]);
 	}
 	if (_overlays[DME]) {
-	    _navaids->draw(navData, DME);
+	    _navaids->draw(navData, DME, _overlays[LABELS]);
 	}
 	if (_overlays[FIXES]) {
 	    _fixes->draw(navData);
@@ -161,7 +161,6 @@ void Overlays::setVisibility(OverlayType type, bool value)
     // overlay contents.
     if (type == LABELS) {
 	_airports->setDirty();
-	_navaids->setDirty();
 	_fixes->setDirty();
 	_tracks->setDirty();
     }
