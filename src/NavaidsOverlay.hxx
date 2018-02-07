@@ -105,6 +105,8 @@ struct IconScalingPolicy {
     // An upper limit to the scaled range.  The icon will be drawn no
     // larger than this.
     float maxSize;		// Pixels
+    // Font size.  This scales in proportion to the icon size.
+    float labelPointSize;
 };
 
 // A class to render navaids.  As a subscriber, it keeps track of

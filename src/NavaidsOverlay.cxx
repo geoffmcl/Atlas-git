@@ -148,7 +148,7 @@ const float __markerRadii[3] =
 // between __smallLabel and __mediumLabel, we draw small labels.  When
 // between __mediumLabel and __maximumLabel, we draw medium labels.
 // When greater than __maximumLabel, we draw large labels.
-const float __smallLabel = 100.0, __mediumLabel = 250.0, __maximumLabel = 600.0;
+const float __smallLabel = 50.0, __mediumLabel = 250.0, __maximumLabel = 600.0;
 
 // Standard label font size, in pixels.
 const float __labelPointSize = 10.0;
@@ -611,6 +611,10 @@ bool NavaidRenderer<T, S>::_iconVisible(Navaid *n, IconScalingPolicy& isp,
 	result = false;
     }
 
+    // If the icon is shrinking, shrink the label text
+    // proportionately.
+    isp.labelPointSize = _labelPointSize * radius / isp.maxSize;
+
     return result;
 }
 
@@ -683,10 +687,6 @@ void VORRenderer::notification(Notification::type n)
 		(_p->nav1_freq != p->nav1_freq) ||
 		(_p->nav2_rad != p->nav2_rad) ||
 		(_p->nav2_freq != p->nav2_freq)) {
-		// EYE - we should display statistics on the number of
-		// invalidations (for all layers, and all renderers),
-		// just to see if they're behaving the way we expect.
-
 		// Something changed, so we need to redraw.
 		_layers[RadioLayer].invalidate();
 	    }
@@ -711,7 +711,7 @@ void VORRenderer::_createVORRose()
     // plane, with north in the positive Y direction, and east in the
     // positive X direction.
     _VORRoseDL.begin(); {
-	// EYE - set colour here, like in _createVORSymbols?
+	glColor4fv(__vorColour);
 	glBegin(GL_LINE_LOOP); {
 	    const int subdivision = 5;	// 5-degree steps
 
@@ -937,26 +937,15 @@ void VORRenderer::_draw(bool labels)
     }
 }
 
-// EYE - check this documentation.  I think it's wrong now.
-
 // Drawing strategy:
 //
-// - draw nothing
-// - draw icon
 // - draw icon, rose
-// - draw icon, rose, ticks and labels
+// - draw icon
+// - draw nothing
 //
-// - label with id if close enough
-// - label with id and frequency
 // - label with name / id, frequency and morse
-//
-// Sizing strategy:
-//
-// - icon fixed, draw if VOR range more than x pixels
-// - rose proportional to range, with maximum and minimum sizes (if
-//   less than minimum, don't draw)
-// - label font proportional to rose size, but within tight limits
-// - move label closer to icon as we zoom out?
+// - label with id and frequency
+// - label with id, shrinking as we move away
 void VORRenderer::_drawVOR(VOR *vor)
 {
     // Although we don't do this at the moment, we might want to try
@@ -983,7 +972,8 @@ void VORRenderer::_drawVOR(VOR *vor)
 	    glScalef(scale, scale, scale);
 
 	    glPushAttrib(GL_POINT_BIT); {
-		// EYE - magic number
+		// This is the size of the point in the middle of the
+		// VOR.
 		glPointSize(3.0);
 
 		// How we draw the VOR depends on if it's a member of
@@ -1094,13 +1084,16 @@ void VORRenderer::_drawVORLabel(VOR *vor)
 	    iconEdge = -(iconRadius + 5.0) * _metresPerPixel;
 	Label *l;
 	if (range > __maximumLabel) {
-	    l = __makeLabel("%N\n%F %I %M", vor, _labelPointSize, 0, 
+	    // The whole kit and caboodle.
+	    l = __makeLabel("%N\n%F %I %M", vor, _isp.labelPointSize, 0, 
 			    roseCentre);
 	} else if (range > __mediumLabel) {
-	    l = __makeLabel("%F %I", vor, _labelPointSize, 0, roseCentre);
+	    // ID and frequency.
+	    l = __makeLabel("%F %I", vor, _isp.labelPointSize, 0, roseCentre);
 	} else {
-	    l = __makeLabel("%I", vor, _labelPointSize, 
-			   0, iconEdge, LayoutManager::UC);
+	    // Just the ID.
+	    l = __makeLabel("%I", vor, _isp.labelPointSize, 0, iconEdge, 
+			    LayoutManager::UC);
 	}
 
 	if (l->lm.y() > iconEdge) {
@@ -1408,7 +1401,7 @@ void NDBRenderer::_drawNDBLabel(NDB *ndb)
 	if (range > __maximumLabel) {
 	    if (!sys) {
 		// Standalone NDB.
-		__drawLabel("%N\n%F %I %M", ndb, _labelPointSize, 0, 
+		__drawLabel("%N\n%F %I %M", ndb, _isp.labelPointSize, 0, 
 			    labelOffset, lp);
 	    } else {
 		assert(dynamic_cast<NDB_DME *>(sys));
@@ -1417,20 +1410,21 @@ void NDBRenderer::_drawNDBLabel(NDB *ndb)
 		// EYE - drawLabel should check for pairs.  Or, we
 		// could have a separate drawLabel for
 		// NavaidSystems.
-		__drawLabel("%N\n%F (%f) %I %M", ndb, _labelPointSize, 
+		__drawLabel("%N\n%F (%f) %I %M", ndb, _isp.labelPointSize, 
 			    0, labelOffset, lp);
 	    }
 	} else if (range > __mediumLabel) {
 	    if (!sys) {
 		// Standalone NDB.
-		__drawLabel("%F %I", ndb, _labelPointSize, 0, labelOffset, lp);
+		__drawLabel("%F %I", ndb, _isp.labelPointSize, 0, labelOffset, 
+			    lp);
 	    } else {
 		// NDB-DME
-		__drawLabel("%F (%f) %I", ndb, _labelPointSize, 0, labelOffset, 
-			    lp);
+		__drawLabel("%F (%f) %I", ndb, _isp.labelPointSize, 0, 
+			    labelOffset, lp);
 	    }
 	} else {
-	    __drawLabel("%I", ndb, _labelPointSize, 0, labelOffset, lp);
+	    __drawLabel("%I", ndb, _isp.labelPointSize, 0, labelOffset, lp);
 	}
     }
     geodPopMatrix();
@@ -1505,9 +1499,6 @@ void DMERenderer::_createDMESymbols()
 	glEnd();
     }
     _TACANSymbolDL.end();
-
-    // EYE - define this elsewhere, so it can be used in VORs and
-    // NDBs?
 
     ////////////////////
     // DME
@@ -1629,22 +1620,22 @@ void DMERenderer::_drawDMELabel(DME *dme)
 	// Ottringham for an example).
 	if (range > __maximumLabel) {
 	    if (isTACAN) {
-		__drawLabel("%N\nDME %F %I %M", dme, _labelPointSize, 0.0, 
+		__drawLabel("%N\nDME %F %I %M", dme, _isp.labelPointSize, 0.0, 
 			    labelOffset, lp);
 	    } else {
-		__drawLabel("%N\n%F %I %M", dme, _labelPointSize, 0.0, 
+		__drawLabel("%N\n%F %I %M", dme, _isp.labelPointSize, 0.0, 
 			    labelOffset, lp);
 	    }
 	} else if (range > __mediumLabel) {
 	    if (isTACAN) {
-		__drawLabel("DME %F %I", dme, _labelPointSize, 0.0, 
+		__drawLabel("DME %F %I", dme, _isp.labelPointSize, 0.0, 
 			    labelOffset, lp);
 	    } else {
-		__drawLabel("%F %I", dme, _labelPointSize, 0.0, 
+		__drawLabel("%F %I", dme, _isp.labelPointSize, 0.0, 
 			    labelOffset, lp);
 	    }
 	} else {
-	    __drawLabel("%I", dme, _labelPointSize, 0.0, labelOffset, lp);
+	    __drawLabel("%I", dme, _isp.labelPointSize, 0.0, labelOffset, lp);
 	}
     }
     geodPopMatrix();
@@ -1754,7 +1745,6 @@ void ILSRenderer::_createMarkerSymbols()
 	    const float offset = cos(30.0 * SG_DEGREES_TO_RADIANS) * __markerRadii[i];
 
 	    glColor4fv(__markerColours[i]);
-	    // EYE - do here, or in the calling routine?
 	    glBegin(GL_POLYGON); {
 		// Draw first arc (counterclockwise).
 		for (int j = 0; j < segments; j++) {
@@ -1969,7 +1959,6 @@ void ILSRenderer::_drawLOC(ILS *ils)
 	glPushMatrix(); {
 	    glRotatef(-p.loc->heading(), 0.0, 0.0, 1.0);
 	    glScalef(p.length, p.length, p.length);
-	    // EYE - I changed the logic from the NAV days.  Check this!
 	    if (p.live) {
 		// // We draw two triangles: one for the front course and
 		// // one for the back course.
@@ -2016,9 +2005,9 @@ void ILSRenderer::_drawLOCLabel(ILS *ils)
 	    glRotatef(-(p.loc->heading() + 90.0), 0.0, 0.0, 1.0);
 	}
 
-	// EYE - Slightly translucent colours look better than opaque
-	// ones, and they look better if there's a coloured background
-	// (as we have with the box around VORs and NDBs).
+	// Slightly translucent colours look better than opaque ones,
+	// and they look better if there's a coloured background (as
+	// we have with the box around VORs and NDBs).
 	glColor4fv(__ilsLabelColour);
 	float offset;
 	if (p.loc->heading() < 180.0) {
@@ -2033,8 +2022,6 @@ void ILSRenderer::_drawLOCLabel(ILS *ils)
 
 	// We draw the ILS in a single style, but it might be
 	// better to alter it depending on the scale.
-
-	// EYE - have a separate drawLabel for navaid systems?
 	__drawLabel("RWY %N\n%F %I %M", p.loc, p.pointSize, offset, 0.0);
 
 	// Now add a heading near the end.
