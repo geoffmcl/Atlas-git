@@ -33,6 +33,11 @@
 
 using namespace std;
 
+//////////////////////////////////////////////////////////////////////
+// DisplayList
+//////////////////////////////////////////////////////////////////////
+
+// True if begin() has been called without a corresponding end().
 bool DisplayList::_compiling = false;
 
 DisplayList::DisplayList(): _dl(0), _valid(false)
@@ -77,13 +82,16 @@ void DisplayList::call()
     glCallList(_dl);
 }
 
-float clearColour[4] = {1.0, 1.0, 1.0, 0.0};
+//////////////////////////////////////////////////////////////////////
+// Internals - these are constants and functions used elsewhere in the
+// file.
+//////////////////////////////////////////////////////////////////////
 
-// EYE - change to sgVec4?
+const float __clearColour[4] = {1.0, 1.0, 1.0, 0.0};
 // VOR (teal)
-const float vor_colour[4] = {0.000, 0.420, 0.624, 1.0};
+const float __vorColour[4] = {0.000, 0.420, 0.624, 1.0};
 // NDB (purple)
-const float ndb_colour[4] = {0.525, 0.294, 0.498, 1.0};
+const float __ndbColour[4] = {0.525, 0.294, 0.498, 1.0};
 
 // TACAN (grey? orange? brown? black?)
 
@@ -91,7 +99,7 @@ const float ndb_colour[4] = {0.525, 0.294, 0.498, 1.0};
 // but (a) this colour is used for many navaids, and (b) it's an IFR
 // chart, and (c) it's Canadian
 //
-const float dme_colour[4] = {0.498, 0.498, 0.498, 1.0};
+const float __dmeColour[4] = {0.498, 0.498, 0.498, 1.0};
 //
 // EYE - theoretically, we should use the same colour for all DME
 // components of navaids - VOR-DME, NDB-DME, VORTAC, TACAN - but it's
@@ -99,49 +107,39 @@ const float dme_colour[4] = {0.498, 0.498, 0.498, 1.0};
 //
 // This colour looks okay - not too bright, but enough to show up.
 // Still, it's not entirely satisfactory.
-// const float dme_colour[4] = {0.75, 0.5, 0.25, 1.0};
+// const float __dmeColour[4] = {0.75, 0.5, 0.25, 1.0};
 //
 // This is the same as VORs.
 //
-// const float dme_colour[4] = {0.000, 0.420, 0.624, 1.0};
+// const float __dmeColour[4] = {0.000, 0.420, 0.624, 1.0};
 
 // Markers.  Note that the order of entries must match the Marker
 // class Type enumeration (ie, first OUTER, then MIDDLE, finally
 // INNER).
-const float marker_colours[3][4] = 
+const float __markerColours[3][4] = 
     {{0.0, 0.0, 1.0, 0.5},	// Outer marker (blue)
      {1.0, 0.5, 0.0, 0.5},	// Middle marker (amber)
      {1.0, 1.0, 1.0, 0.5}};	// Inner marker (white)
+
 // ILS localizer (from Canada Air Pilot, CYYZ.pdf)
 // - clear on left, solid pink on right, black outline, heavy black
 //   line down centre
-const float ils_colour[4] = {1.000, 0.659, 0.855, 0.7};
-// EYE - This is my own invention - a localizer (no glideslope) is
-// drawn in grey.
-const float loc_colour[4] = {0.5, 0.5, 0.5, 0.7};
+const float __ilsColour[4] = {1.000, 0.659, 0.855, 0.7};
 
-// EYE - not a standard
-const float ils_label_colour[4] = {0.0, 0.0, 0.0, 0.75};
+// This is my own invention - a localizer (no glideslope) is drawn in
+// grey.
+const float __locColour[4] = {0.5, 0.5, 0.5, 0.7};
 
-// EYE - magic numbers
+// ILS text is slightly translucent.
+const float __ilsLabelColour[4] = {0.0, 0.0, 0.0, 0.75};
+
 // Radii, in metres, for outer, middle, and inner markers.  Like
-// marker_colours, it must match the order of the Marker Type
+// __markerColours, it must match the order of the Marker Type
 // enumeration.
-const float markerRadii[3] = 
+const float __markerRadii[3] = 
     {1.0 * SG_NM_TO_METER,
      0.35 * SG_NM_TO_METER,
      0.25 * SG_NM_TO_METER};
-// This denotes the radius of a marker's bounding sphere, in nautical
-// miles.  It must be an integer, and no smaller than the maximum
-// radius in markerRadii.  We specify this because the navaid database
-// doesn't give a range for markers.
-const int markerRange = 1;
-
-// EYE - put into NavaidsOverlay class?
-
-// EYE - what do we really want?  Should we be comparing text sizes
-// with ranges?  Note that at the present, these numbers represent the
-// navaid range in pixels.
 
 // EYE - make user-adjustable?
 
@@ -153,8 +151,6 @@ const int markerRange = 1;
 const float __smallLabel = 100.0, __mediumLabel = 250.0, __maximumLabel = 600.0;
 
 // Standard label font size, in pixels.
-
-// EYE - make user-adjustable?
 const float __labelPointSize = 10.0;
 
 // Standard icon size, in pixels.  In some ways it should really be
@@ -163,11 +159,7 @@ const float __labelPointSize = 10.0;
 // size.  However, when zoomed out, this will be altered.  Also, some
 // icons are naturally bigger (ie, NDBs), so they have an additional
 // scaling factor to make their relative sizes correct.
-
-// EYE - __iconSize should be made user-adjustable.
 const float __iconSize = 10.0;
-
-// EYE - make these part of NavaidsOverlay?  NavaidRenderer?
 
 // Draws a two-dimentional isocelese triangle with angular width of
 // 'width' degrees, and radius 1.0.  The centre of the triangle is at
@@ -181,10 +173,10 @@ const float __iconSize = 10.0;
 //
 // This routine is used to create the "radials" emanating from a
 // navaid that is tuned-in by the current aircraft.
-static void _createTriangle(float width, 
-			    const float *leftColour,
-			    const float *rightColour,
-			    bool both = true)
+static void __createTriangle(float width, 
+			     const float *leftColour,
+			     const float *rightColour,
+			     bool both = true)
 {
     float deflection = sin(width / 2.0 * SG_DEGREES_TO_RADIANS);
 
@@ -258,48 +250,16 @@ static void _createTriangle(float width,
     glEnd();
 }
 
-void NavaidsOverlay::draw(NavData *navData, Overlays::OverlayType t, 
-			  bool labels)
-{
-    // EYE - VORs/VORS/VOR?  FIXES/FIX/Fixes/Fix?  Overlays.hxx should
-    // be a bit more consistent.
-
-    // EYE - what, in general, should we pass in, and what should be
-    // part of the class?  For example, should we maintain a pointer
-    // to NavData, or pass it in?  Should the parameters to the
-    // drawing routine (labels on/off, default font, ...) be be in the
-    // class (directly or indirectly, via a pointer to Globals or
-    // Overlays) or passed in?  Is the goal to make access as direct
-    // as possible, or as central and consistent as possible?
-
-    if (t == Overlays::VOR) {
-	_vr.draw(navData, labels);
-    } else if (t == Overlays::NDB) {
-	_nr.draw(navData, labels);
-    } else if (t == Overlays::DME) {
-	_dr.draw(navData, labels);
-    } else if (t == Overlays::ILS) {
-	_ir.draw(navData, labels);
-    }
-}
-
-// Used for drawing labels on navaids.
-// EYE - make Label a class?
+// Used for drawing labels on navaids.  It contains all the
+// information needed to draw a navaid label - the colour, the scale,
+// the layout (which includes the label text and position
+// information), and the morse identifier (id).
 struct Label {
     float colour[4];
-    std::string id;
-    LayoutManager lm;
     float metresPerPixel;
+    LayoutManager lm;
+    std::string id;
 };
-
-float _renderMorse(const string& id, float height,
-		   float x, float y, float metresPerPixel, bool render = true);
-// Returns width necessary to render the given string in morse code,
-// at the current point size.
-float _morseWidth(const string& id, float height, float metresPerPixel)
-{
-    return _renderMorse(id, height, 0.0, 0.0, metresPerPixel, false);
-}
 
 // Either draws the given string in morse code at the given location
 // (if render is true), OR returns the width necessary to draw it (if
@@ -308,8 +268,9 @@ float _morseWidth(const string& id, float height, float metresPerPixel)
 // is height high).  We assume that the current OpenGL units are
 // metres.  The location (x, y) specifies the lower-left corner of the
 // rendered morse text.
-float _renderMorse(const string& id, float height,
-		   float x, float y, float metresPerPixel, bool render)
+static float __renderMorse(const string& id, float height,
+			   float x, float y, float metresPerPixel, 
+			   bool render = true)
 {
     float maxWidth = 0.0;
 
@@ -372,22 +333,20 @@ float _renderMorse(const string& id, float height,
     return maxWidth;
 }
 
+// Returns width necessary to render the given string in morse code,
+// at the current point size.
+static float __morseWidth(const string& id, float height, float metresPerPixel)
+{
+    return __renderMorse(id, height, 0.0, 0.0, metresPerPixel, false);
+}
+
 // Called from the layout manager when it encounters an addBox() box.
-void _morseCallback(LayoutManager *lm, float x, float y, void *userData)
+static void __morseCallback(LayoutManager *lm, float x, float y, void *userData)
 {
     Label *l = (Label *)userData;
     float ascent = lm->font()->ascent() * lm->pointSize();
-    _renderMorse(l->id, ascent, x, y, l->metresPerPixel);
+    __renderMorse(l->id, ascent, x, y, l->metresPerPixel);
 }
-
-//////////////////////////////////////////////////////////////////////
-// EYE - temporary, just to set it off from previous text.  Move
-// documentation down here if we go ahead with this.
-//////////////////////////////////////////////////////////////////////
-
-// EYE - should _makeLabel(), ..., as well as _renderMorse, ... be
-// made part of NavaidsOverlay?  NavaidRenderer?  Just leave them as
-// static functions?
 
 // Create a navaid label.  We use a printf-style format string to
 // specify the style.  The format string can include text (including
@@ -406,18 +365,18 @@ void _morseCallback(LayoutManager *lm, float x, float y, void *userData)
 //
 // Each line of text is centered, and the point p of the bounding box
 // is placed at <x, y>.
-Label *_makeLabel(const char *fmt, Navaid *n,
-		  float labelPointSize,
-		  float x, float y,
-		  LayoutManager::Point lp = LayoutManager::CC)
+static Label *__makeLabel(const char *fmt, Navaid *n,
+			  float labelPointSize,
+			  float x, float y,
+			  LayoutManager::Point lp = LayoutManager::CC)
 {
     // The label consists of a list of lines.  Each line consists of
     // intermixed text and morse.  The label, each line, and text and
     // morse unit has a width, height, and origin.
     Label *l = new Label;
 
-    // Set our font and find out what our ascent is (_morseWidth and
-    // _renderMorse need it).
+    // Set our font and find out what our ascent is (__morseWidth and
+    // __renderMorse need it).
     atlasFntTexFont *f = globals.aw->regularFont();
     l->lm.setFont(f, labelPointSize);
     float ascent = l->lm.font()->ascent() * labelPointSize;
@@ -443,9 +402,9 @@ Label *_makeLabel(const char *fmt, Navaid *n,
 		      double _metresPerPixel = globals.aw->scale();
 		      l->lm.addText(line.str());
 		      line.clear();
-		      l->lm.addBox(_morseWidth(n->id(), ascent, 
-					       _metresPerPixel), 
-				   0.0, _morseCallback, (void *)l);
+		      l->lm.addBox(__morseWidth(n->id(), ascent, 
+						_metresPerPixel), 
+				   0.0, __morseCallback, (void *)l);
 		      l->id = n->id();
 		      l->metresPerPixel = _metresPerPixel;
 		  }
@@ -517,16 +476,16 @@ Label *_makeLabel(const char *fmt, Navaid *n,
     l->lm.end();
 
     if (dynamic_cast<VOR *>(n)) {
-	memcpy(l->colour, vor_colour, sizeof(float) * 4);
+	memcpy(l->colour, __vorColour, sizeof(float) * 4);
 	l->lm.setBoxed(true);
     } else if (dynamic_cast<DME *>(n)) {
-	memcpy(l->colour, dme_colour, sizeof(float) * 4);
+	memcpy(l->colour, __dmeColour, sizeof(float) * 4);
 	l->lm.setBoxed(true);
     } else if (dynamic_cast<NDB *>(n)) {
-	memcpy(l->colour, ndb_colour, sizeof(float) * 4);
+	memcpy(l->colour, __ndbColour, sizeof(float) * 4);
 	l->lm.setBoxed(true);
     } else if (dynamic_cast<LOC *>(n)) {
-	memcpy(l->colour, ils_label_colour, sizeof(float) * 4);
+	memcpy(l->colour, __ilsLabelColour, sizeof(float) * 4);
     } else {
 	assert(0);
     }
@@ -536,29 +495,36 @@ Label *_makeLabel(const char *fmt, Navaid *n,
     return l;
 }
 
-// Draws the label, with point p on the label placed at x, y.  The
-// label will be drawn in the current font, at the given point size.
-// VORs, DMEs and NDBs are drawn with a box around the text and a
-// translucent white background behind the text.
-void _drawLabel(Label *l)
+// Draws the given label.  The label (generated by __makeLabel) has
+// all the information needed for rendering by a layout manager.
+static void __drawLabel(Label *l)
 {
     // Draw the text.
     glColor4fv(l->colour);
     l->lm.drawText();
 }
 
-void _drawLabel(const char *fmt, Navaid *n,
+// Draws a label for the given navaid in the style given by fmt, with
+// point lp on the label placed at x, y.  The label will be drawn in
+// the current font, at the given point size.  VORs, DMEs and NDBs are
+// drawn with a box around the text and a translucent white background
+// behind the text.
+void __drawLabel(const char *fmt, Navaid *n,
 		float labelPointSize,
 		float x, float y,
 		LayoutManager::Point lp = LayoutManager::CC)
 {
     Label *l;
 
-    l = _makeLabel(fmt, n, labelPointSize, x, y, lp);
-    _drawLabel(l);
+    l = __makeLabel(fmt, n, labelPointSize, x, y, lp);
+    __drawLabel(l);
 
     delete l;
 }
+
+//////////////////////////////////////////////////////////////////////
+// NavaidRenderer
+//////////////////////////////////////////////////////////////////////
 
 template <class T, class S>
 NavaidRenderer<T, S>::NavaidRenderer(int noOfPasses, int noOfLayers): 
@@ -602,7 +568,15 @@ void NavaidRenderer<T, S>::notification(Notification::type n)
     }
 }
 
-// EYE - document this!!!!!
+// A tricky little method.  It is called in subclasses when they want
+// to render a layer.  The subclass passes in the layer (simple
+// enough), and a pointer to a method that will do the rendering (not
+// so simple).  The method checks if the layer (a display list) is
+// valid.  If not, it starts compiling the display list.  It passes
+// each element of _navaids to the given method, which is responsible
+// for all the OpenGL needed to render it.  After drawing all the
+// navaids, it ends the display list.  Finally, it calls the display
+// list to draw it.
 template <class T, class S>
 void NavaidRenderer<T, S>::_drawLayer(DisplayList& dl, void (S::*fn)(T))
 {
@@ -640,6 +614,18 @@ bool NavaidRenderer<T, S>::_iconVisible(Navaid *n, IconScalingPolicy& isp,
     return result;
 }
 
+//////////////////////////////////////////////////////////////////////
+// VORRenderer
+//////////////////////////////////////////////////////////////////////
+
+// This function is used in calls to count_if() in notification
+// methods.  It returns true if the given navaid is of the given type.
+template <class T>
+static bool _isA(Navaid *n)
+{
+    return dynamic_cast<T>(n);
+}
+
 // Line width of VOR rose as a factor of VOR range.
 const float VORRenderer::_lineScale = 0.005;
 const float VORRenderer::_maxLineWidth = 5.0;
@@ -649,23 +635,18 @@ const float VORRenderer::_angularWidth = 10.0;
 VORRenderer::VORRenderer(): NavaidRenderer<VOR *, VORRenderer>(1, _LayerCount), 
 			    _radioactive(false)
 {
+    // The scaling policy for the VOR icons.
     _isp.rangeScaleFactor = 0.1;
     _isp.minSize = 1.0;
     _isp.maxSize = __iconSize;
 
+    // The scaling policy for the VOR rose.
     _rsp.rangeScaleFactor = 0.1;
     _rsp.minSize = __iconSize * 4.0;
     _rsp.maxSize = 150.0;
 
     subscribe(Notification::AircraftMoved);
     subscribe(Notification::NewFlightTrack);
-}
-
-// This function is used in the notification method.  It returns true
-// if the given navaid is a VOR.
-static bool _IsVOR(Navaid *n)
-{
-    return dynamic_cast<VOR *>(n);
 }
 
 void VORRenderer::notification(Notification::type n)
@@ -691,7 +672,8 @@ void VORRenderer::notification(Notification::type n)
 	// current flight data point.
 	FlightData *p = globals.aw->ac()->currentPoint();
 	const set<Navaid *>& navaids = p->navaids();
-	bool radioactive = count_if(navaids.begin(), navaids.end(), _IsVOR);
+	bool radioactive = 
+	    count_if(navaids.begin(), navaids.end(), _isA<VOR *>);
 
 	// Were we tuned in before or now?
 	if (_radioactive || radioactive) {
@@ -837,7 +819,7 @@ void VORRenderer::_createVORSymbols()
     // VOR
     ////////////////////
     _VORSymbolDL.begin(); {
-	glColor4fv(vor_colour);
+	glColor4fv(__vorColour);
 	glBegin(GL_LINE_LOOP); {
 	    for (int i = 0; i < 360; i += 60) {
 		float theta, x, y;
@@ -1044,7 +1026,7 @@ void VORRenderer::_drawVOR(VOR *vor)
 		glLineWidth(lineWidth);
 	    
 		// Draw the VOR rose using the VOR colour.
-		glColor4fv(vor_colour);
+		glColor4fv(__vorColour);
 		_VORRoseDL.call();
 	    }
 	    glPopAttrib();
@@ -1066,8 +1048,8 @@ void VORRenderer::_drawRadio(VOR *vor)
 	    glPushMatrix(); {
 		glRotatef(-rad, 0.0, 0.0, 1.0);
 		glScalef(vor->range(), vor->range(), vor->range());
-		_createTriangle(_angularWidth, clearColour, 
-				globals.vor1Colour);
+		__createTriangle(_angularWidth, __clearColour, 
+				 globals.vor1Colour);
 	    }
 	    glPopMatrix();
 	}
@@ -1076,8 +1058,8 @@ void VORRenderer::_drawRadio(VOR *vor)
 	    glPushMatrix(); {
 		glRotatef(-rad, 0.0, 0.0, 1.0);
 		glScalef(vor->range(), vor->range(), vor->range());
-		_createTriangle(_angularWidth, clearColour, 
-				globals.vor2Colour);
+		__createTriangle(_angularWidth, __clearColour, 
+				 globals.vor2Colour);
 	    }
 	    glPopMatrix();
 	}
@@ -1111,13 +1093,13 @@ void VORRenderer::_drawVORLabel(VOR *vor)
 	float roseCentre = -roseRadius / 2.0 * _metresPerPixel,
 	    iconEdge = -(iconRadius + 5.0) * _metresPerPixel;
 	Label *l;
-	// EYE - magic numbers
 	if (range > __maximumLabel) {
-	    l = _makeLabel("%N\n%F %I %M", vor, _labelPointSize, 0, roseCentre);
+	    l = __makeLabel("%N\n%F %I %M", vor, _labelPointSize, 0, 
+			    roseCentre);
 	} else if (range > __mediumLabel) {
-	    l = _makeLabel("%F %I", vor, _labelPointSize, 0, roseCentre);
+	    l = __makeLabel("%F %I", vor, _labelPointSize, 0, roseCentre);
 	} else {
-	    l = _makeLabel("%I", vor, _labelPointSize, 
+	    l = __makeLabel("%I", vor, _labelPointSize, 
 			   0, iconEdge, LayoutManager::UC);
 	}
 
@@ -1125,12 +1107,16 @@ void VORRenderer::_drawVORLabel(VOR *vor)
 	    l->lm.moveTo(0.0, iconEdge);
 	    l->lm.setAnchor(LayoutManager::UC);
 	}
-	_drawLabel(l);
+	__drawLabel(l);
 
 	delete l;
     }
     geodPopMatrix();
 }
+
+//////////////////////////////////////////////////////////////////////
+// NDBRenderer
+//////////////////////////////////////////////////////////////////////
 
 // Size of dots, relative to size of NDB icon.
 const float NDBRenderer::_dotScale = 0.1;
@@ -1148,19 +1134,10 @@ NDBRenderer::NDBRenderer(): NavaidRenderer<NDB *, NDBRenderer>(1, _LayerCount),
     // users something to distract them with.
     _isp.maxSize = 2.5 * __iconSize;
 
-    // EYE - since our notification method deals with zooms and moves,
-    // should we subscribe here?
     subscribe(Notification::AircraftMoved);
     subscribe(Notification::NewFlightTrack);
 }
 
-
-// This function is used in the notification method.  It returns true
-// if the given navaid is an NDB.
-static bool _IsNDB(Navaid *n)
-{
-    return dynamic_cast<NDB *>(n);
-}
 
 void NDBRenderer::notification(Notification::type n)
 {
@@ -1179,7 +1156,8 @@ void NDBRenderer::notification(Notification::type n)
 	// position.
 	_p = globals.aw->ac()->currentPoint();
 	const set<Navaid *>& navaids = _p->navaids();
-	bool radioactive = count_if(navaids.begin(), navaids.end(), _IsNDB);
+	bool radioactive = 
+	    count_if(navaids.begin(), navaids.end(), _isA<NDB *>);
 
 	// Were we tuned in before or now?
 	if (_radioactive || radioactive) {
@@ -1236,7 +1214,7 @@ void NDBRenderer::_createNDBSymbols()
     // NDB
     ////////////////////
     _NDBSymbolDL.begin(); {
-	glColor4fv(ndb_colour);
+	glColor4fv(__ndbColour);
 	glBegin(GL_POINTS); {
 	    // Centre dot.
 	    glVertex2f(0.0, 0.0);
@@ -1290,7 +1268,7 @@ void NDBRenderer::_createNDBSymbols()
 	_NDBSymbolDL.call();
 
 	// DME square
-	glColor4fv(vor_colour);	// On US charts.
+	glColor4fv(__vorColour);	// On US charts.
 	glBegin(GL_LINE_LOOP); {
 	    glVertex2f(-0.5, -0.5);
 	    glVertex2f(0.5, -0.5);
@@ -1334,8 +1312,6 @@ void NDBRenderer::_draw(bool labels)
 
     // Labels (layer 2)
     if (labels) {
-	// EYE - change to just _drawLabel (and do the same for VOR,
-	// ...)
 	_drawLayer(_layers[NDBLabelLayer], &NDBRenderer::_drawNDBLabel);
     }
 }
@@ -1401,8 +1377,8 @@ void NDBRenderer::_drawRadio(NDB *ndb)
 			       &rad, &end, &l);
 	    glRotatef(180.0 - rad, 0.0, 0.0, 1.0);
 	    glScalef(ndb->range(), ndb->range(), ndb->range());
-	    _createTriangle(_angularWidth, globals.adfColour, 
-			    globals.adfColour, false);
+	    __createTriangle(_angularWidth, globals.adfColour, 
+			     globals.adfColour, false);
 	}
 	geodPopMatrix();
     }
@@ -1432,8 +1408,8 @@ void NDBRenderer::_drawNDBLabel(NDB *ndb)
 	if (range > __maximumLabel) {
 	    if (!sys) {
 		// Standalone NDB.
-		_drawLabel("%N\n%F %I %M", ndb, _labelPointSize, 0, 
-			   labelOffset, lp);
+		__drawLabel("%N\n%F %I %M", ndb, _labelPointSize, 0, 
+			    labelOffset, lp);
 	    } else {
 		assert(dynamic_cast<NDB_DME *>(sys));
 		// NDB-DME
@@ -1441,23 +1417,28 @@ void NDBRenderer::_drawNDBLabel(NDB *ndb)
 		// EYE - drawLabel should check for pairs.  Or, we
 		// could have a separate drawLabel for
 		// NavaidSystems.
-		_drawLabel("%N\n%F (%f) %I %M", ndb, _labelPointSize, 
-			   0, labelOffset, lp);
+		__drawLabel("%N\n%F (%f) %I %M", ndb, _labelPointSize, 
+			    0, labelOffset, lp);
 	    }
 	} else if (range > __mediumLabel) {
 	    if (!sys) {
 		// Standalone NDB.
-		_drawLabel("%F %I", ndb, _labelPointSize, 0, labelOffset, lp);
+		__drawLabel("%F %I", ndb, _labelPointSize, 0, labelOffset, lp);
 	    } else {
 		// NDB-DME
-		_drawLabel("%F (%f) %I", ndb, _labelPointSize, 0, labelOffset, lp);
+		__drawLabel("%F (%f) %I", ndb, _labelPointSize, 0, labelOffset, 
+			    lp);
 	    }
 	} else {
-	    _drawLabel("%I", ndb, _labelPointSize, 0, labelOffset, lp);
+	    __drawLabel("%I", ndb, _labelPointSize, 0, labelOffset, lp);
 	}
     }
     geodPopMatrix();
 }
+
+//////////////////////////////////////////////////////////////////////
+// DMERenderer
+//////////////////////////////////////////////////////////////////////
 
 DMERenderer::DMERenderer(): NavaidRenderer<DME *, DMERenderer>(1, _LayerCount)
 {
@@ -1482,7 +1463,6 @@ void DMERenderer::notification(Notification::type n)
 // elsewhere.
 void DMERenderer::_createDMESymbols()
 {
-    // EYE - use the size constant defined in _createVORSymbols?
     const float size = 1.0;
     const float lobeThickness = size * 0.5;
 
@@ -1490,7 +1470,7 @@ void DMERenderer::_createDMESymbols()
     // TACAN
     ////////////////////
     _TACANSymbolDL.begin(); {
-	glColor4fv(dme_colour);
+	glColor4fv(__dmeColour);
 	glBegin(GL_LINE_LOOP); {
 	    for (int i = 0; i < 360; i += 120) {
 		float theta, x, y;
@@ -1534,7 +1514,7 @@ void DMERenderer::_createDMESymbols()
     ////////////////////
     _DMESymbolDL.begin(); {
 	// DME square
-	glColor4fv(dme_colour);
+	glColor4fv(__dmeColour);
 	glBegin(GL_LINE_LOOP); {
 	    glVertex2f(-size, -size);
 	    glVertex2f(size, -size);
@@ -1649,25 +1629,30 @@ void DMERenderer::_drawDMELabel(DME *dme)
 	// Ottringham for an example).
 	if (range > __maximumLabel) {
 	    if (isTACAN) {
-		_drawLabel("%N\nDME %F %I %M", dme, _labelPointSize, 0.0, 
-			   labelOffset, lp);
+		__drawLabel("%N\nDME %F %I %M", dme, _labelPointSize, 0.0, 
+			    labelOffset, lp);
 	    } else {
-		_drawLabel("%N\n%F %I %M", dme, _labelPointSize, 0.0, 
-			   labelOffset, lp);
+		__drawLabel("%N\n%F %I %M", dme, _labelPointSize, 0.0, 
+			    labelOffset, lp);
 	    }
 	} else if (range > __mediumLabel) {
 	    if (isTACAN) {
-		_drawLabel("DME %F %I", dme, _labelPointSize, 0.0, labelOffset, 
-			   lp);
+		__drawLabel("DME %F %I", dme, _labelPointSize, 0.0, 
+			    labelOffset, lp);
 	    } else {
-		_drawLabel("%F %I", dme, _labelPointSize, 0.0, labelOffset, lp);
+		__drawLabel("%F %I", dme, _labelPointSize, 0.0, 
+			    labelOffset, lp);
 	    }
 	} else {
-	    _drawLabel("%I", dme, _labelPointSize, 0.0, labelOffset, lp);
+	    __drawLabel("%I", dme, _labelPointSize, 0.0, labelOffset, lp);
 	}
     }
     geodPopMatrix();
 }
+
+//////////////////////////////////////////////////////////////////////
+// ILSRenderer
+//////////////////////////////////////////////////////////////////////
 
 // How much to scale the ILS DME icon compared to a standard icon.
 const float ILSRenderer::_DMEScale = 0.5;
@@ -1678,13 +1663,6 @@ ILSRenderer::ILSRenderer(): NavaidRenderer<ILS *, ILSRenderer>(2, _LayerCount),
     subscribe(Notification::AircraftMoved);
     subscribe(Notification::NewFlightTrack);
     subscribe(Notification::MagTrue);
-}
-
-// This function is used in the notification method.  It returns true
-// if the given navaid is a localizer.
-static bool _IsLOC(Navaid *n)
-{
-    return dynamic_cast<LOC *>(n);
 }
 
 void ILSRenderer::notification(Notification::type n)
@@ -1705,7 +1683,7 @@ void ILSRenderer::notification(Notification::type n)
 
 	_p = globals.aw->ac()->currentPoint();
 	const set<Navaid *>& navaids = _p->navaids();
-	_radioactive = count_if(navaids.begin(), navaids.end(), _IsLOC);
+	_radioactive = count_if(navaids.begin(), navaids.end(), _isA<LOC *>);
     } else if (n == Notification::MagTrue) {
 	_layers[LOCLabelLayer].invalidate();
     }
@@ -1716,12 +1694,10 @@ void ILSRenderer::notification(Notification::type n)
 // Creates ILS localizer symbol, with a length of 1.  The symbol is
 // drawn in the x-y plane, with the pointy end at 0,0, and the other
 // end at 0, -1.
-
-// EYE - add ILS symbol (a dot with a circle) at the tip?
 void ILSRenderer::_createILSSymbols()
 {
-    _createILSSymbol(_ILSSymbolDL, ils_colour);
-    _createILSSymbol(_LOCSymbolDL, loc_colour);
+    _createILSSymbol(_ILSSymbolDL, __ilsColour);
+    _createILSSymbol(_LOCSymbolDL, __locColour);
 }
 
 // Creates a single ILS-type symbol, for the given display list
@@ -1775,25 +1751,25 @@ void ILSRenderer::_createMarkerSymbols()
 
     for (int i = Marker::OUTER; i < Marker::_LAST; i++) {
 	_ILSMarkerDLs[i].begin(); {
-	    const float offset = cos(30.0 * SG_DEGREES_TO_RADIANS) * markerRadii[i];
+	    const float offset = cos(30.0 * SG_DEGREES_TO_RADIANS) * __markerRadii[i];
 
-	    glColor4fv(marker_colours[i]);
+	    glColor4fv(__markerColours[i]);
 	    // EYE - do here, or in the calling routine?
 	    glBegin(GL_POLYGON); {
 		// Draw first arc (counterclockwise).
 		for (int j = 0; j < segments; j++) {
 		    float pHdg = (segments / 2 - j) * (60.0 / segments) 
 			* SG_DEGREES_TO_RADIANS;
-		    glVertex2f(offset - cos(pHdg) * markerRadii[i], 
-			       sin(pHdg) * markerRadii[i]);
+		    glVertex2f(offset - cos(pHdg) * __markerRadii[i], 
+			       sin(pHdg) * __markerRadii[i]);
 		}
 
 		// Now the other arc.
 		for (int j = 0; j < segments; j++) {
 		    float pHdg = (segments / 2 - j) * (60.0 / segments) 
 			* SG_DEGREES_TO_RADIANS;
-		    glVertex2f(cos(pHdg) * markerRadii[i] - offset, 
-			       -sin(pHdg) * markerRadii[i]);
+		    glVertex2f(cos(pHdg) * __markerRadii[i] - offset, 
+			       -sin(pHdg) * __markerRadii[i]);
 		}
 	    }
 	    glEnd();
@@ -1805,16 +1781,16 @@ void ILSRenderer::_createMarkerSymbols()
 		for (int j = 0; j < segments; j++) {
 		    float pHdg = (segments / 2 - j) * (60.0 / segments) 
 			* SG_DEGREES_TO_RADIANS;
-		    glVertex2f(offset - cos(pHdg) * markerRadii[i], 
-			       sin(pHdg) * markerRadii[i]);
+		    glVertex2f(offset - cos(pHdg) * __markerRadii[i], 
+			       sin(pHdg) * __markerRadii[i]);
 		}
 
 		// Now the other arc.
 		for (int j = 0; j < segments; j++) {
 		    float pHdg = (segments / 2 - j) * (60.0 / segments) 
 			* SG_DEGREES_TO_RADIANS;
-		    glVertex2f(cos(pHdg) * markerRadii[i] - offset,
-			       -sin(pHdg) * markerRadii[i]);
+		    glVertex2f(cos(pHdg) * __markerRadii[i] - offset,
+			       -sin(pHdg) * __markerRadii[i]);
 		}
 	    }
 	    glEnd();
@@ -1829,7 +1805,7 @@ void ILSRenderer::_createDMESymbol()
 
     _DMESymbolDL.begin(); {
 	// Small circle with a dot in the middle.
-	glColor4fv(dme_colour);
+	glColor4fv(__dmeColour);
 	glBegin(GL_LINE_LOOP); {
 	    const int subdivision = 30;	// 30-degree steps
 
@@ -1970,14 +1946,6 @@ void ILSRenderer::_drawMarkers(ILS *ils)
     }
 }
 
-// EYE - to do:
-//
-// - come up with a standard draw/no draw criterion
-// - put constants in class
-// - make markers disappear at the same time as the rest of the ILS
-// - make ILSSymbolDL and LOCSymbolDL 3 degrees side, like live ones
-// - can we separate out live localizers to their own layer?
-// - ...
 void ILSRenderer::_drawLOC(ILS *ils)
 {
     DrawingParams p;
@@ -2005,9 +1973,9 @@ void ILSRenderer::_drawLOC(ILS *ils)
 	    if (p.live) {
 		// // We draw two triangles: one for the front course and
 		// // one for the back course.
-		// _createTriangle(ilsWidth, clearColour, ilsColour, true);
+		// __createTriangle(ilsWidth, __clearColour, ilsColour, true);
 		// Don't draw a back course.
-		_createTriangle(ilsWidth, clearColour, p.colour, false);
+		__createTriangle(ilsWidth, __clearColour, p.colour, false);
 	    } else if (ils->gs()) {
 		_ILSSymbolDL.call();
 	    } else {
@@ -2048,18 +2016,16 @@ void ILSRenderer::_drawLOCLabel(ILS *ils)
 	    glRotatef(-(p.loc->heading() + 90.0), 0.0, 0.0, 1.0);
 	}
 
-	// EYE - Slightly translucent colours look better
-	// than opaque ones, and they look better if
-	// there's a coloured background (as we have with
-	// the box around VORs and NDBs).
-	glColor4fv(ils_label_colour);
+	// EYE - Slightly translucent colours look better than opaque
+	// ones, and they look better if there's a coloured background
+	// (as we have with the box around VORs and NDBs).
+	glColor4fv(__ilsLabelColour);
 	float offset;
 	if (p.loc->heading() < 180.0) {
-	    // EYE - a bit ugly - because we're using
-	    // _renderMorse(), we have to have GL units as
-	    // metres (fix this somehow?), so we can't call
-	    // glScalef(), so we have to scale everything
-	    // ourselves.
+	    // EYE - a bit ugly - because we're using __renderMorse(),
+	    // we have to have GL units as metres (fix this somehow?),
+	    // so we can't call glScalef(), so we have to scale
+	    // everything ourselves.
 	    offset = -0.5 * p.length;
 	} else {
 	    offset = 0.5 * p.length;
@@ -2069,7 +2035,7 @@ void ILSRenderer::_drawLOCLabel(ILS *ils)
 	// better to alter it depending on the scale.
 
 	// EYE - have a separate drawLabel for navaid systems?
-	_drawLabel("RWY %N\n%F %I %M", p.loc, p.pointSize, offset, 0.0);
+	__drawLabel("RWY %N\n%F %I %M", p.loc, p.pointSize, offset, 0.0);
 
 	// Now add a heading near the end.
 	// EYE - magic number
@@ -2097,7 +2063,7 @@ void ILSRenderer::_drawLOCLabel(ILS *ils)
 	lm.addText(globals.str.str());
 	lm.end();
 
-	glColor4fv(ils_label_colour);
+	glColor4fv(__ilsLabelColour);
 	lm.drawText();
     }
     geodPopMatrix();
@@ -2173,7 +2139,36 @@ void ILSRenderer::_drawDMELabel(ILS *ils)
 
 	// Since ILS DMEs have the same frequency as the corresponding
 	// localizer, we don't display frequencies.
-	_drawLabel("%I", dme, p.pointSize, 0.0, offset, lp);
+	__drawLabel("%I", dme, p.pointSize, 0.0, offset, lp);
     }
     geodPopMatrix();
+}
+
+//////////////////////////////////////////////////////////////////////
+// NavaidsOverlay
+//////////////////////////////////////////////////////////////////////
+
+void NavaidsOverlay::draw(NavData *navData, Overlays::OverlayType t, 
+			  bool labels)
+{
+    // EYE - VORs/VORS/VOR?  FIXES/FIX/Fixes/Fix?  Overlays.hxx should
+    // be a bit more consistent.
+
+    // EYE - what, in general, should we pass in, and what should be
+    // part of the class?  For example, should we maintain a pointer
+    // to NavData, or pass it in?  Should the parameters to the
+    // drawing routine (labels on/off, default font, ...) be be in the
+    // class (directly or indirectly, via a pointer to Globals or
+    // Overlays) or passed in?  Is the goal to make access as direct
+    // as possible, or as central and consistent as possible?
+
+    if (t == Overlays::VOR) {
+	_vr.draw(navData, labels);
+    } else if (t == Overlays::NDB) {
+	_nr.draw(navData, labels);
+    } else if (t == Overlays::DME) {
+	_dr.draw(navData, labels);
+    } else if (t == Overlays::ILS) {
+	_ir.draw(navData, labels);
+    }
 }
