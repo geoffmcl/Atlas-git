@@ -87,6 +87,10 @@ void DisplayList::call()
 // file.
 //////////////////////////////////////////////////////////////////////
 
+// EYE - should some of these be moved closer to where they are used?
+// For example, ILS stuff really should just reside with the ILS
+// renderer class, shouldn't it?
+
 const float __clearColour[4] = {1.0, 1.0, 1.0, 0.0};
 // VOR (teal)
 const float __vorColour[4] = {0.000, 0.420, 0.624, 1.0};
@@ -141,7 +145,8 @@ const float __markerRadii[3] =
      0.35 * SG_NM_TO_METER,
      0.25 * SG_NM_TO_METER};
 
-// EYE - make user-adjustable?
+// EYE - make user-adjustable?  Combine these into some kind of label
+// policy?
 
 // When to switch label display types.  When the range of the navaid,
 // in pixels, is less than __smallLabel, we don't draw labels.  When
@@ -526,8 +531,7 @@ void __drawLabel(const char *fmt, Navaid *n,
 // NavaidRenderer
 //////////////////////////////////////////////////////////////////////
 
-template <class T, class S>
-NavaidRenderer<T, S>::NavaidRenderer(int noOfPasses, int noOfLayers): 
+NavaidRenderer::NavaidRenderer(int noOfPasses, int noOfLayers): 
     _navaidsDirty(true), _currentPass(0), _noOfPasses(noOfPasses)
 {
     _layers.resize(noOfLayers);
@@ -536,13 +540,7 @@ NavaidRenderer<T, S>::NavaidRenderer(int noOfPasses, int noOfLayers):
     subscribe(Notification::Zoomed);
 }
 
-template <class T, class S>
-NavaidRenderer<T, S>::~NavaidRenderer()
-{
-}
-
-template <class T, class S>
-void NavaidRenderer<T, S>::draw(NavData *nd, bool labels)
+void NavaidRenderer::draw(NavData *nd, bool labels)
 {
     if (_navaidsDirty) {
 	_navaids.clear();
@@ -555,8 +553,7 @@ void NavaidRenderer<T, S>::draw(NavData *nd, bool labels)
     _currentPass = (_currentPass + 1) % _noOfPasses;
 }
 
-template <class T, class S>
-void NavaidRenderer<T, S>::notification(Notification::type n)
+void NavaidRenderer::notification(Notification::type n)
 {
     if (n == Notification::Moved) {
 	_navaidsDirty = true;
@@ -568,23 +565,55 @@ void NavaidRenderer<T, S>::notification(Notification::type n)
     }
 }
 
-// A tricky little method.  It is called in subclasses when they want
-// to render a layer.  The subclass passes in the layer (simple
-// enough), and a pointer to a method that will do the rendering (not
-// so simple).  The method checks if the layer (a display list) is
-// valid.  If not, it starts compiling the display list.  It passes
-// each element of _navaids to the given method, which is responsible
-// for all the OpenGL needed to render it.  After drawing all the
-// navaids, it ends the display list.  Finally, it calls the display
-// list to draw it.
-template <class T, class S>
-void NavaidRenderer<T, S>::_drawLayer(DisplayList& dl, void (S::*fn)(T))
+// Called by subclasses when they want to draw a layer.  It does a bit
+// of housekeeping by checking if the display list is valid.  If so,
+// it just calls it directly and returns.  If not, it goes through
+// each navaid, and throws the problem back to the subclass, asking it
+// to draw the navaid for the given layer (_drawNavaid).  It's a bit
+// byzantine, but it saves subclasses from implementing the same
+// boilerplate code.
+//
+// Note: I experimented with a templated NavaidRenderer class, and
+// also just a templated _drawLayer method.  The advantage of the
+// templated class was being able to have an arbitrary type for the
+// _navaids vector.  Having the templated class or templated method
+// allowed subclasses to pass a rendering method into _drawLayer and
+// we could call that method directly.  The disadvantage was the
+// syntactic complexity of the template code.  Just so I don't forget,
+// here's how I defined the templated method:
+//
+// template <class T, class S>
+// void NavaidRenderer::_drawLayers(DisplayList& dl, void(T::*fn)(S))
+//
+// I needed two classes - the subclass type (eg, VORRenderer) and the
+// navaid class (eg, VOR *).  And here are the key calls in the
+// method:
+//
+//     T *caller = dynamic_cast<T *>(this);
+//     ...
+// 		(caller->*fn)(dynamic_cast<S>(_navaids[i]));
+//
+// In the subclass _draw() method, here's how I'd call _drawLayers():
+//
+// _drawLayers<VORRenderer, VOR *>(_layers[VORLayer], &VORRenderer::_drawVOR);
+//
+// Finally, when the class was templated, subclasses couldn't
+// reference the _navaids vector directly (I don't know why).
+// Instead, they'd have to do one of 3 things:
+//
+// (a) this->_navaids
+// (b) NavaidRenderer<T, S>::_navaids
+// (c) using NavaidRenderer<T, S>::_navaids; (in the class declaration)
+//     _navaids; (here)
+//
+// All in all, not pretty, and not worth it in my opinion.
+void NavaidRenderer::_drawLayer(int layer)
 {
-    S *caller = dynamic_cast<S *>(this);
+    DisplayList& dl = _layers[layer];
     if (!dl.valid()) {
 	dl.begin(); {
 	    for (size_t i = 0; i < _navaids.size(); i++) {
-		(caller->*fn)(_navaids[i]);
+		_drawNavaid(_navaids[i], layer);
 	    }
 	}
 	dl.end();
@@ -592,8 +621,7 @@ void NavaidRenderer<T, S>::_drawLayer(DisplayList& dl, void (S::*fn)(T))
     dl.call();
 }
 
-template <class T, class S>
-bool NavaidRenderer<T, S>::_iconVisible(Navaid *n, IconScalingPolicy& isp, 
+bool NavaidRenderer::_iconVisible(Navaid *n, IconScalingPolicy& isp, 
 					float& radius)
 {
     bool result = true;
@@ -636,8 +664,7 @@ const float VORRenderer::_maxLineWidth = 5.0;
 // How fat to make VOR radials.
 const float VORRenderer::_angularWidth = 10.0;
 
-VORRenderer::VORRenderer(): NavaidRenderer<VOR *, VORRenderer>(1, _LayerCount), 
-			    _radioactive(false)
+VORRenderer::VORRenderer(): NavaidRenderer(1, _LayerCount), _radioactive(false)
 {
     // The scaling policy for the VOR icons.
     _isp.rangeScaleFactor = 0.1;
@@ -696,7 +723,7 @@ void VORRenderer::notification(Notification::type n)
 	_p = p;
     }
 
-    NavaidRenderer<VOR *, VORRenderer>::notification(n);
+    NavaidRenderer::notification(n);
 }
 
 // Creates a standard VOR rose of radius 1.0.  This is a circle with
@@ -889,23 +916,11 @@ void VORRenderer::_createVORSymbols()
 
 void VORRenderer::_getNavaids(NavData *nd)
 {
-    // I'm not completely clear why, but we can't access member
-    // variables from a templated base class directly.  For example,
-    // to access _navaids, we can't just say '_navaids'.  Instead, we
-    // have these choices:
-    //
-    // (a) this->_navaids
-    // (b) NavaidRenderer<T>::_navaids
-    // (c) using NavaidRenderer<T>::_navaids; (in the class declaration)
-    //     _navaids; (here)
-    //
-    // I don't know if this is a compiler bug, but it appears in gcc
-    // 4.2.1 and gcc 6.4.0.
     const vector<Cullable *>& intersections = nd->hits(NavData::NAVAIDS);
     for (unsigned int i = 0; i < intersections.size(); i++) {
 	VOR *vor = dynamic_cast<VOR *>(intersections[i]);
 	if (vor) {
-	    this->_navaids.push_back(vor);
+	    _navaids.push_back(vor);
 	}
     }
 }
@@ -924,16 +939,33 @@ void VORRenderer::_draw(bool labels)
     }
 
     // VORs (layer 0)
-    _drawLayer(_layers[VORLayer], &VORRenderer::_drawVOR);
+    NavaidRenderer::_drawLayer(VORLayer);
 
     // Radio "beams" (layer 1)
     if (_radioactive) {
-	_drawLayer(_layers[RadioLayer], &VORRenderer::_drawRadio);
+	NavaidRenderer::_drawLayer(RadioLayer);
     }
 
     // Labels (layer 2)
     if (labels) {
-	_drawLayer(_layers[VORLabelLayer], &VORRenderer::_drawVORLabel);
+	NavaidRenderer::_drawLayer(VORLabelLayer);
+    }
+}
+
+void VORRenderer::_drawNavaid(Navaid *n, int layer)
+{
+    VOR *vor = dynamic_cast<VOR *>(n);
+    assert(vor);
+    switch (layer) {
+      case VORLayer:
+	_drawVOR(vor);
+	break;
+      case RadioLayer:
+	_drawRadio(vor);
+	break;
+      case VORLabelLayer:
+	_drawVORLabel(vor);
+	break;
     }
 }
 
@@ -1116,8 +1148,7 @@ const float NDBRenderer::_dotScale = 0.1;
 // How fat to make NDB radials (degrees).
 const float NDBRenderer::_angularWidth = 2.5;
 
-NDBRenderer::NDBRenderer(): NavaidRenderer<NDB *, NDBRenderer>(1, _LayerCount),
-			    _radioactive(false)
+NDBRenderer::NDBRenderer(): NavaidRenderer(1, _LayerCount), _radioactive(false)
 {
     _isp.rangeScaleFactor = 0.1;
     _isp.minSize = 1.0;
@@ -1159,7 +1190,7 @@ void NDBRenderer::notification(Notification::type n)
 	_radioactive = radioactive;
     }
 
-    NavaidRenderer<NDB *, NDBRenderer>::notification(n);
+    NavaidRenderer::notification(n);
 }
 
 // Create an NDB symbol and and NDB-DME symbol, in the WAC style.
@@ -1279,7 +1310,7 @@ void NDBRenderer::_getNavaids(NavData *nd)
     for (unsigned int i = 0; i < intersections.size(); i++) {
 	NDB *ndb = dynamic_cast<NDB *>(intersections[i]);
 	if (ndb) {
-	    this->_navaids.push_back(ndb);
+	    _navaids.push_back(ndb);
 	}
     }
 }
@@ -1296,16 +1327,33 @@ void NDBRenderer::_draw(bool labels)
     }
 
     // NDBs (layer 0)
-    _drawLayer(_layers[NDBLayer], &NDBRenderer::_drawNDB);
+    NavaidRenderer::_drawLayer(NDBLayer);
 
     // Radio "beams" (layer 1)
     if (_radioactive) {
-	_drawLayer(_layers[RadioLayer], &NDBRenderer::_drawRadio);
+	NavaidRenderer::_drawLayer(RadioLayer);
     }
 
     // Labels (layer 2)
     if (labels) {
-	_drawLayer(_layers[NDBLabelLayer], &NDBRenderer::_drawNDBLabel);
+	NavaidRenderer::_drawLayer(NDBLabelLayer);
+    }
+}
+
+void NDBRenderer::_drawNavaid(Navaid *n, int layer)
+{
+    NDB *ndb = dynamic_cast<NDB *>(n);
+    assert(ndb);
+    switch (layer) {
+      case NDBLayer:
+	_drawNDB(ndb);
+	break;
+      case RadioLayer:
+	_drawRadio(ndb);
+	break;
+      case NDBLabelLayer:
+	_drawNDBLabel(ndb);
+	break;
     }
 }
 
@@ -1434,7 +1482,7 @@ void NDBRenderer::_drawNDBLabel(NDB *ndb)
 // DMERenderer
 //////////////////////////////////////////////////////////////////////
 
-DMERenderer::DMERenderer(): NavaidRenderer<DME *, DMERenderer>(1, _LayerCount)
+DMERenderer::DMERenderer(): NavaidRenderer(1, _LayerCount)
 {
     _isp.rangeScaleFactor = 0.1;
     _isp.minSize = 1.0;
@@ -1449,7 +1497,7 @@ void DMERenderer::notification(Notification::type n)
 	_layers[DMELabelLayer].invalidate();
     }
 
-    NavaidRenderer<DME *, DMERenderer>::notification(n);
+    NavaidRenderer::notification(n);
 }
 
 // Creates DME symbols - TACANs and stand-alone DMEs (this includes
@@ -1527,7 +1575,7 @@ void DMERenderer::_getNavaids(NavData *nd)
 	// (VOR-DME, VORTAC, NDB-DME, or ILS), then they will be
 	// rendered elsewhere.
 	if (dme && !NavaidSystem::owner(dme)) {
-	    this->_navaids.push_back(dme);
+	    _navaids.push_back(dme);
 	}
     }
 }
@@ -1542,11 +1590,25 @@ void DMERenderer::_draw(bool labels)
     }
 
     // DMEs (layer 0)
-    _drawLayer(_layers[DMELayer], &DMERenderer::_drawDME);
+    NavaidRenderer::_drawLayer(DMELayer);
 
     // Labels (layer 1)
     if (labels) {
-	_drawLayer(_layers[DMELabelLayer], &DMERenderer::_drawDMELabel);
+	NavaidRenderer::_drawLayer(DMELabelLayer);
+    }
+}
+
+void DMERenderer::_drawNavaid(Navaid *n, int layer)
+{
+    DME *dme = dynamic_cast<DME *>(n);
+    assert(dme);
+    switch (layer) {
+      case DMELayer:
+	_drawDME(dme);
+	break;
+      case DMELabelLayer:
+	_drawDMELabel(dme);
+	break;
     }
 }
 
@@ -1589,9 +1651,6 @@ void DMERenderer::_drawDME(DME *dme)
     geodPopMatrix();
 }
 
-// EYE - I think DME (and VOR, and NDB) labels disappear too
-// precipitously.  Maybe they should shrink like ILS labels (or should
-// we try fading them out?).
 void DMERenderer::_drawDMELabel(DME *dme)
 {
     float radius;
@@ -1648,8 +1707,7 @@ void DMERenderer::_drawDMELabel(DME *dme)
 // How much to scale the ILS DME icon compared to a standard icon.
 const float ILSRenderer::_DMEScale = 0.5;
 
-ILSRenderer::ILSRenderer(): NavaidRenderer<ILS *, ILSRenderer>(2, _LayerCount),
-			    _radioactive(false)
+ILSRenderer::ILSRenderer(): NavaidRenderer(2, _LayerCount), _radioactive(false)
 {
     subscribe(Notification::AircraftMoved);
     subscribe(Notification::NewFlightTrack);
@@ -1679,7 +1737,7 @@ void ILSRenderer::notification(Notification::type n)
 	_layers[LOCLabelLayer].invalidate();
     }
 
-    NavaidRenderer<ILS *, ILSRenderer>::notification(n);
+    NavaidRenderer::notification(n);
 }
 
 // Creates ILS localizer symbol, with a length of 1.  The symbol is
@@ -1742,7 +1800,8 @@ void ILSRenderer::_createMarkerSymbols()
 
     for (int i = Marker::OUTER; i < Marker::_LAST; i++) {
 	_ILSMarkerDLs[i].begin(); {
-	    const float offset = cos(30.0 * SG_DEGREES_TO_RADIANS) * __markerRadii[i];
+	    const float offset = 
+		cos(30.0 * SG_DEGREES_TO_RADIANS) * __markerRadii[i];
 
 	    glColor4fv(__markerColours[i]);
 	    glBegin(GL_POLYGON); {
@@ -1826,11 +1885,7 @@ void ILSRenderer::_getNavaids(NavData *nd)
     const vector<Cullable *>& intersections = nd->hits(NavData::NAVAIDS);
     for (unsigned int i = 0; i < intersections.size(); i++) {
 	if (LOC *loc = dynamic_cast<LOC *>(intersections[i])) {
-	    // We're more interested in the ILS system, not the
-	    // localizer component.
-	    ILS *ils = dynamic_cast<ILS *>(NavaidSystem::owner(loc));
-	    assert(ils);
-	    this->_navaids.push_back(ils);
+	    _navaids.push_back(loc);
 	}
     }
 }
@@ -1846,25 +1901,49 @@ void ILSRenderer::_draw(bool labels)
 
     if (_currentPass == 0) {
 	// 0: Markers
-	_drawLayer(_layers[MarkerLayer], &ILSRenderer::_drawMarkers);
+	NavaidRenderer::_drawLayer(MarkerLayer);
 
 	// 1: Localizers (tuned-in and not tuned-in)
-	_drawLayer(_layers[LOCLayer], &ILSRenderer::_drawLOC);
+	NavaidRenderer::_drawLayer(LOCLayer);
 
 	// 2: Localizer labels
 	if (labels) {
-	    _drawLayer(_layers[LOCLabelLayer], &ILSRenderer::_drawLOCLabel);
+	    NavaidRenderer::_drawLayer(LOCLabelLayer);
 	}
     } else if (_currentPass == 1) {
 	// 3: DMEs
-	_drawLayer(_layers[DMELayer], &ILSRenderer::_drawDME);
+	NavaidRenderer::_drawLayer(DMELayer);
 
 	// 4: DME labels
 	if (labels) {
-	    _drawLayer(_layers[DMELabelLayer], &ILSRenderer::_drawDMELabel);
+	    NavaidRenderer::_drawLayer(DMELabelLayer);
 	}
     } else {
 	assert(false);
+    }
+}
+
+void ILSRenderer::_drawNavaid(Navaid *n, int layer)
+{
+    LOC *loc = dynamic_cast<LOC *>(n);
+    assert(loc);
+    ILS *ils = dynamic_cast<ILS *>(NavaidSystem::owner(loc));
+    switch (layer) {
+      case MarkerLayer:
+	_drawMarkers(ils);
+	break;
+      case LOCLayer:
+	_drawLOC(ils);
+	break;
+      case LOCLabelLayer:
+	_drawLOCLabel(ils);
+	break;
+      case DMELayer:
+	_drawDME(ils);
+	break;
+      case DMELabelLayer:
+	_drawDMELabel(ils);
+	break;
     }
 }
 

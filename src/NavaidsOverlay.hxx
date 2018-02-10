@@ -135,42 +135,32 @@ struct IconScalingPolicy {
 // Subclasses know which pass is current via the _currentPass
 // variable.  This variable is updated automatically.
 //
-// To use the class, you need to create a subclass.  The subclass
-// declaration requires 2 template arguments, both of which are
-// classes.  The first, T, is just a pointer to the class of the
-// navaid ("VOR *", "NDB *", ...).  The second is the name of the
-// subclass.  For example, to declare a renderer for VORs called Foo,
-// declare thusly:
+// To use the class, you need to create a subclass.  Subclasses need
+// to implement 3 virtual methods: 
 //
-// class Foo: public NavaidRenderer<VOR *, Foo> {
-// ...
+// (1) _getNavaids() - When called, the _navaids vector is empty.  The
+//     subclass must get the hits from the NavData class, then add the
+//     appropriate navaids to the vector.
 //
-// The reason for passing in the subclass name is to make the
-// _drawLayer() method work.  It takes two parameters: the layer to
-// draw, and a method to call which will render one instance of the
-// navaid for that layer.  C++ needs to know the class that owns the
-// method in the declaration (at least I think it does - it's the only
-// way I could make it work).
+// (2) _draw() - This should check the current pass (_currentPass) and
+//     call _drawLayer() for the layers that need to be rendered in
+//     that pass.  It is passed a 'labels' boolean, which is true if
+//     labels should be rendered.  It's up to subclasses to choose
+//     which layers to draw - for example, if there's a flight track
+//     and the radio is tuned in to a navaid, they can draw a radio
+//     beam to indicate the navaid is active.
 //
-// Subclasses need to implement 2 virtual methods: (1) _getNavaids(),
-// which gets the hits from the NavData class, then adds the
-// appropriate navaids to the _navaids vector, and (2) _draw(), which
-// checks the current pass and calls _drawLayer() for the layers that
-// need to be rendered in that pass.  It is passed a 'labels' boolean,
-// which is true if labels should be rendered.  Subclasses are free to
-// choose which layers to draw - for example, if there's a flight
-// track and the radio is tuned in to a navaid, they can draw a radio
-// beam to indicate the navaid is active.
+// (3) _drawNavaid() - This is called when a single navaid for a given
+//     layer must be rendered.
 //
 // Subclasses should also implement the notification() method, mostly
-// to invalidate layers that need to be rerendered.  They must also
+// to invalidate layers that need to be rerendered.  Just remember to
 // call NavaidRenderer's notification() method, so that it can update
 // _navaidsDirty, _metresPerPixel, ...
-template <class T, class S>
 class NavaidRenderer: public Subscriber {
   public:
     NavaidRenderer(int noOfPasses, int noOfLayers);
-    virtual ~NavaidRenderer();
+    virtual ~NavaidRenderer() {}
 
     void draw(NavData *nd, bool labels);
 
@@ -180,7 +170,9 @@ class NavaidRenderer: public Subscriber {
   protected:
     virtual void _getNavaids(NavData *nd) = 0;
     virtual void _draw(bool labels) = 0;
-    virtual void _drawLayer(DisplayList& dl, void (S::*fn)(T));
+    virtual void _drawNavaid(Navaid *n, int layer) = 0;
+
+    void _drawLayer(int layer);
     // Returns true if, for the navaid and its scaling policy, the
     // navaid icon should be drawn.  As a side effect, it returns the
     // icon size in 'radius'.
@@ -195,11 +187,11 @@ class NavaidRenderer: public Subscriber {
     // Keep track of our passes.
     int _currentPass, _noOfPasses;
     // The actual navaids, and the rendering layers.
-    std::vector<T> _navaids;
+    std::vector<Navaid *> _navaids;
     std::vector<DisplayList> _layers;
 };
 
-class VORRenderer: public NavaidRenderer<VOR *, VORRenderer> {
+class VORRenderer: public NavaidRenderer {
   public:
     VORRenderer();
 
@@ -214,6 +206,8 @@ class VORRenderer: public NavaidRenderer<VOR *, VORRenderer> {
 
     void _getNavaids(NavData *nd);
     void _draw(bool labels);
+    void _drawNavaid(Navaid *n, int layer);
+
     void _drawVOR(VOR *vor);
     void _drawRadio(VOR *vor);
     void _drawVORLabel(VOR *vor);
@@ -233,7 +227,7 @@ class VORRenderer: public NavaidRenderer<VOR *, VORRenderer> {
     FlightData *_p;
 };
 
-class NDBRenderer: public NavaidRenderer<NDB *, NDBRenderer> {
+class NDBRenderer: public NavaidRenderer {
   public:
     NDBRenderer();
 
@@ -247,6 +241,8 @@ class NDBRenderer: public NavaidRenderer<NDB *, NDBRenderer> {
 
     void _getNavaids(NavData *nd);
     void _draw(bool labels);
+    void _drawNavaid(Navaid *n, int layer);
+
     void _drawNDB(NDB *ndb);
     void _drawRadio(NDB *ndb);
     void _drawNDBLabel(NDB *ndb);
@@ -262,7 +258,7 @@ class NDBRenderer: public NavaidRenderer<NDB *, NDBRenderer> {
     FlightData *_p;
 };
 
-class DMERenderer: public NavaidRenderer<DME *, DMERenderer> {
+class DMERenderer: public NavaidRenderer {
   public:
     DMERenderer();
 
@@ -276,6 +272,8 @@ class DMERenderer: public NavaidRenderer<DME *, DMERenderer> {
 
     void _getNavaids(NavData *nd);
     void _draw(bool labels);
+    void _drawNavaid(Navaid *n, int layer);
+
     void _drawDME(DME *dme);
     void _drawDMELabel(DME *dme);
 
@@ -283,7 +281,7 @@ class DMERenderer: public NavaidRenderer<DME *, DMERenderer> {
     DisplayList _DMESymbolDL, _TACANSymbolDL;
 };
 
-class ILSRenderer: public NavaidRenderer<ILS *, ILSRenderer> {
+class ILSRenderer: public NavaidRenderer {
   public:
     ILSRenderer();
 
@@ -312,6 +310,8 @@ class ILSRenderer: public NavaidRenderer<ILS *, ILSRenderer> {
 
     void _getNavaids(NavData *nd);
     void _draw(bool labels);
+    void _drawNavaid(Navaid *n, int layer);
+
     bool _ILSVisible(ILS *ils, DrawingParams& p);
     void _drawMarkers(ILS *ils);
     void _drawLOC(ILS *ils);
