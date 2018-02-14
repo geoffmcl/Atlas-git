@@ -1674,9 +1674,6 @@ void DMERenderer::_drawDMELabel(DME *dme)
 	LayoutManager::Point lp = LayoutManager::LC;
 	bool isTACAN = (dynamic_cast<TACAN *>(dme) != NULL);
 
-	// EYE - we really should make the labels match what happens
-	// with VOR labels with equivalent ranges (check out
-	// Ottringham for an example).
 	if (range > __maximumLabel) {
 	    if (isTACAN) {
 		__drawLabel("%N\nDME %F %I %M", dme, _isp.labelPointSize, 0.0, 
@@ -2193,10 +2190,6 @@ void ILSRenderer::_drawDMELabel(ILS *ils)
 	// border to make it easier to read.
 	float offset = (iconSize + 5.0) * _metresPerPixel;
 	LayoutManager::Point lp = LayoutManager::LC;
-
-	// EYE - we really should make the labels match what
-	// happens with VOR labels with equivalent ranges (check
-	// out Ottringham for an example).
 
 	// EYE - what about overlapping DMEs?  London Heathrow has ILL
 	// and IBB on top of each other, as well as IAA and IRR.  Is
