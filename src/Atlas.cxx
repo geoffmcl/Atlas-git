@@ -84,46 +84,6 @@ int main(int argc, char **argv)
     // One controller to rule them all.
     _ac = new AtlasController(paletteDir.c_str());
 
-    // Read in files.
-    for (unsigned int i = 0; i < p.flightFiles.size(); i++) {
-    	// First check if we've loaded that file already.
-    	const char *file = p.flightFiles[i].c_str();
-    	if (_ac->find(file) == FlightTracks::NaFT) {
-    	    // Nope - open it.
-    	    try {
-    		FlightTrack *t =new FlightTrack(_ac->navData(), file);
-    		// Set the mark aircraft to the beginning of the track.
-    		t->setMark(0);
-    		_ac->addTrack(t);
-    	    } catch (std::runtime_error e) {
-    		printf("Failed to read flight file '%s'\n", file);
-    	    }
-    	}
-    }
-    // Make network connections.
-    const vector<int>& ncs = p.networkConnections.prefs();
-    for (unsigned int i = 0; i < ncs.size(); i++) {
-    	// Already loaded?.
-    	int port = ncs[i];
-    	if (_ac->find(port) == FlightTracks::NaFT) {
-    	    FlightTrack *f = 
-    		new FlightTrack(_ac->navData(), port, p.maxTrack);
-    	    _ac->addTrack(f);
-    	}
-    }
-    // Make serial connections.
-    const vector<Prefs::SerialConnection>& scs = p.serialConnections.prefs();
-    for (unsigned int i = 0; i < scs.size(); i++) {
-    	// Already loaded?.
-    	const string& device = scs[i].device();
-    	int baud = scs[i].baud();
-    	if (_ac->find(device.c_str(), baud) == FlightTracks::NaFT) {
-    	    FlightTrack *f = new FlightTrack(_ac->navData(), device.c_str(), 
-					     baud, p.maxTrack);
-    	    _ac->addTrack(f);
-    	}
-    }
-
     // GLUT initialization.
     glutInit(&argc, argv);
 
@@ -243,6 +203,46 @@ int main(int argc, char **argv)
 	}
     }
   
+    // Read in files.
+    for (unsigned int i = 0; i < p.flightFiles.size(); i++) {
+    	// First check if we've loaded that file already.
+    	const char *file = p.flightFiles[i].c_str();
+    	if (_ac->find(file) == FlightTracks::NaFT) {
+    	    // Nope - open it.
+    	    try {
+    		FlightTrack *t =new FlightTrack(_ac->navData(), file);
+    		// Set the mark aircraft to the beginning of the track.
+    		t->setMark(0);
+    		_ac->addTrack(t);
+    	    } catch (std::runtime_error e) {
+    		printf("Failed to read flight file '%s'\n", file);
+    	    }
+    	}
+    }
+    // Make network connections.
+    const vector<int>& ncs = p.networkConnections.prefs();
+    for (unsigned int i = 0; i < ncs.size(); i++) {
+    	// Already loaded?.
+    	int port = ncs[i];
+    	if (_ac->find(port) == FlightTracks::NaFT) {
+    	    FlightTrack *f = 
+    		new FlightTrack(_ac->navData(), port, p.maxTrack);
+    	    _ac->addTrack(f);
+    	}
+    }
+    // Make serial connections.
+    const vector<Prefs::SerialConnection>& scs = p.serialConnections.prefs();
+    for (unsigned int i = 0; i < scs.size(); i++) {
+    	// Already loaded?.
+    	const string& device = scs[i].device();
+    	int baud = scs[i].baud();
+    	if (_ac->find(device.c_str(), baud) == FlightTracks::NaFT) {
+    	    FlightTrack *f = new FlightTrack(_ac->navData(), device.c_str(), 
+					     baud, p.maxTrack);
+    	    _ac->addTrack(f);
+    	}
+    }
+
     // Set our default zoom and position.
     globals.aw->zoomTo(p.zoom);
     if (!_ac->tracks().empty()) {
