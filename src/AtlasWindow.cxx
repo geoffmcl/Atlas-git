@@ -1580,8 +1580,9 @@ void InfoUI::notification(Notification::type n)
 // All the functions have the following parameters:
 //
 // navs - a vector of in-range, tuned-in navaids
-// x - the "number" of the radio (ie, 1 for NAV 1, 2 for NAV 2).  Set
-//     it to 0 if you don't want a number to appear in the string
+// radioNo - the "number" of the radio (ie, 1 for NAV 1, 2 for NAV 2).
+//           Set it to 0 if you don't want a number to appear in the
+//           string
 // p - the flight data for the current aircraft position
 // freq - the frequency of the radio
 // str - the formatted string
@@ -1599,125 +1600,10 @@ void InfoUI::notification(Notification::type n)
 // indicate there are more by adding an ellipsis ("...").
 
 // Called for VORs, VORTACs, VOR-DMEs, and DMEs.
-// static void __VORsAsString(vector<NAV *> &navs, int x, 
-// 			   FlightData *p, int freq, float radial, 
-// 			   AtlasString &str)
-// {
-//     NAV *vor = NULL, *dme = NULL;
-//     string *id = NULL;
-//     string id;
-//     double vorStrength = 0.0, dmeStrength = 0.0;
-//     double dmeDistance = 0.0;
-//     size_t matchingNavaids = 0;
-
-//     // Find VOR and/or DME with strongest signal.
-//     for (size_t i = 0; i < navs.size(); i++) {
-// 	NAV *n = navs[i];
-
-// 	// We assume that signal strength is proportional to the
-// 	// square of the range, and inversely proportional to the
-// 	// square of the distance.  But 'we' may be wrong.  To prevent
-// 	// divide-by-zero errors, we arbitrarily set 1 metre as the
-// 	// minimum distance.
-// 	double d = SG_MAX2(sgdDistanceVec3(p->cart, n->bounds().center), 1.0);
-// 	double s = (double)n->range / d;
-// 	s *= s;
-
-// 	if ((n->navtype == NAV_VOR) && (s > vorStrength)) {
-// 	    vor = n;
-// 	    id = &(n->id);
-// 	    vorStrength = s;
-// 	} 
-// 	if ((n->navtype == NAV_DME) && (s > dmeStrength)) {
-// 	    dme = n;
-// 	    id = &(n->id);
-// 	    dmeDistance = d - dme->magvar;
-// 	    dmeStrength = s;
-// 	} 
-// 	if ((n->navtype == NAV_VOR) && (s > dmeStrength) &&
-// 	    ((n->navsubtype == VOR_DME) || (n->navsubtype == VORTAC))) {
-// 	    dme = n;
-// 	    id = &(n->id);
-// 	    dmeDistance = d - dme->magvar;
-// 	    dmeStrength = s;
-// 	}
-//     }
-//     if (vor) {
-// 	matchingNavaids++;
-//     }
-//     if (dme) {
-// 	matchingNavaids++;
-//     }
-//     assert((navs.size() == 0) || (matchingNavaids > 0));
-
-//     str.printf("NAV");
-//     if (x > 0) {
-// 	str.appendf(" %d", x);
-//     }
-//     str.appendf(": %s@%03.0f%c", formatFrequency(freq), radial, degreeSymbol);
-
-//     if (navs.size() > 0) {
-// 	str.appendf(" (%s", id->c_str());
-
-// 	if (vor != NULL) {
-// 	    // Calculate the actual radial the aircraft is on,
-// 	    // corrected by the VOR's slaved variation.
-// 	    double ar, endHdg, length;
-// 	    geo_inverse_wgs_84(vor->lat, vor->lon, 
-// 			       p->lat, p->lon, &ar, &endHdg, &length);
-// 	    // 'ar' is the 'actual radial' - the bearing from the
-// 	    // VOR TO the aircraft, adjusted for the VOR's idea of
-// 	    // what the magnetic variation is.
-// 	    ar -= vor->magvar;
-
-// 	    // We want to show a TO/FROM indication, and the actual
-// 	    // radial we're on.  Since we can think of a single radial
-// 	    // as extending both TO and FROM the VOR, there are really
-// 	    // two radials for every bearing from the VOR (a FROM
-// 	    // radial, and a TO radial 180 degrees different).  We
-// 	    // choose the one that's closest to our dialled-in radial.
-// 	    double diff = normalizeHeading(ar - radial, false);
-// 	    const char *fromStr;
-// 	    if ((diff <= 90.0) || (diff >= 270.0)) {
-// 		fromStr = "FROM";
-// 	    } else {
-// 		fromStr = "TO";
-// 		ar = normalizeHeading(ar - 180.0, false);
-// 	    }
-
-// 	    str.appendf(", %03.0f%c %s", normalizeHeading(rint(ar), false), 
-// 			degreeSymbol, fromStr);
-// 	}
-
-// 	if (dme != NULL) {
-// 	    str.appendf(", %.1f DME", dmeDistance * SG_METER_TO_NM);
-// 	}
-
-// 	str.appendf(")");
-//     }
-
-//     // Indicate if there are matching navaids that we aren't
-//     // displaying.
-//     if (navs.size() > matchingNavaids) {
-// 	str.appendf(" ...");
-//     }
-// }
-
 static void __VORsAsString(vector<Navaid *>& navs, int radioNo, 
 			   FlightData *p, int freq, float radial, 
 			   AtlasString &str)
 {
-    str.printf("NAV");
-    if (radioNo > 0) {
-	str.appendf(" %d", radioNo);
-    }
-    str.appendf(": %s@%03.0f%c", formatFrequency(freq), radial, degreeSymbol);
-
-    // If there are no navaids, there's nothing more to do.
-    if (navs.size() == 0) {
-	return;
-    }
-
     Navaid *n = NULL;
     double strength = 0.0;
 
@@ -1835,160 +1721,46 @@ static void __VORsAsString(vector<Navaid *>& navs, int radioNo,
 // transmitter, then we may recognize that as closest at varying
 // times.
 //
-// Our solution is to first group all transmitters together based on
-// ID.  The various bits of an ILS system (localizer, optional
-// glideslope, optional DME) will have identical names.  We then
-// compare the signal strengths of the all the localizers (which are
-// guaranteed to exist, unlike glideslopes and DMEs) and choose the
-// group containing the *weakest* localizer signal.  This heuristic
-// works when both ends of a single runway have the same ILS
-// frequencies.  It will fail if, for example, two different runways
-// (perhaps at two different airports) have the same ILS frequencies.
-// As far as I know, this situation never occurs.
-// static void __ILSsAsString(vector<NAV *> &navs, int x, 
-// 			   FlightData *p, int freq, float radial, 
-// 			   bool magTrue, AtlasString &str)
-// {
-//     // To make our life easier and presentation nicer, we first group
-//     // navaids based on ID.  Then we sort the groups based on
-//     // localizer strength.
-//     map<string, vector<NAV *> > groups;
-
-//     for (size_t i = 0; i < navs.size(); i++) {
-// 	NAV *n = navs[i];
-// 	groups[n->id].push_back(n);
-//     }
-
-//     vector<NAV *> *chosen = NULL;
-//     const string* id = NULL;
-//     double weakest;
-//     for (map<string, vector<NAV *> >::iterator i = groups.begin(); 
-// 	 i != groups.end(); i++) {
-// 	vector<NAV *> &components = i->second;
-
-// 	for (size_t j = 0; j < components.size(); j++) {
-// 	    NAV *n = components[j];
-// 	    if (n->navtype == NAV_ILS) {
-// 		// To prevent divide-by-zero errors, we arbitrarily
-// 		// set 1 metre as the minimum distance.
-// 		double d = 
-// 		    SG_MAX2(sgdDistanceSquaredVec3(p->cart, 
-// 						   n->bounds().center), 
-// 			    1.0);
-// 		double s = (double)n->range * (double)n->range / d;
-// 		if ((chosen == NULL) || (s < weakest)) {
-// 		    chosen = &components;
-// 		    id = &(i->first);
-// 		    weakest = s;
-// 		}
-// 	    }
-// 	}
-//     }
-
-//     str.printf("NAV");
-//     if (x > 0) {
-// 	str.appendf(" %d", x);
-//     }
-//     str.appendf(": %s@%03.0f%c", formatFrequency(freq), radial, degreeSymbol);
-
-//     // Navaid information
-//     if (chosen != NULL) {
-// 	NAV *loc = NULL, *dme = NULL;
-// 	double ar, d;
-// 	const char *magTrueChar = "T";
-
-// 	for (size_t j = 0; j < chosen->size(); j++) {
-// 	    NAV *n = chosen->at(j);
-// 	    if (n->navtype == NAV_ILS) {
-// 		loc = n;
-
-// 		double endHdg, length;
-// 		geo_inverse_wgs_84(p->lat, p->lon, 
-// 				   n->lat, n->lon, &ar, &endHdg, &length);
-// 		if (magTrue) {
-// 		    magTrueChar = "";
-// 		    ar -= magneticVariation(loc->lat, loc->lon, loc->elev);
-// 		}
-// 	    } else if (n->navtype == NAV_DME) {
-// 		dme = n;
-// 		d = sgdDistanceVec3(p->cart, 
-// 				    dme->bounds().center) - dme->magvar;
-// 	    }
-// 	}
-// 	str.appendf(" (%s", id->c_str());
-
-// 	if (loc != NULL) {
-// 	    str.appendf(", %03.0f%c%s", normalizeHeading(rint(ar), false), 
-// 			degreeSymbol, magTrueChar);
-// 	}
-
-// 	if (dme != NULL) {
-// 	    str.appendf(", %.1f DME", d * SG_METER_TO_NM);
-// 	}
-
-// 	str.appendf(")");
-
-// 	if (groups.size() > 1) {
-// 	    str.appendf(" ...");
-// 	}
-//     }
-// }
-
-// EYE - is the __ a good prefix for this?  Maybe declare inside the
-// function?
-class __NearerILS {
-  public:
-    __NearerILS(const sgdVec3 c) { sgdCopyVec3(_centre, c); }
-    bool operator()(const ILS *left, const ILS* right) const;
-  protected:
-    sgdVec3 _centre;
-};
-
-bool __NearerILS::operator()(const ILS *left, const ILS *right) const 
-{
-    return (left->loc()->signalStrength(_centre) > 
-	    right->loc()->signalStrength(_centre));
-};
-
-static void __ILSsAsString(vector<Navaid *> &navs, int x, 
+// Our solution is to concentrate on the localizers, ignoring the
+// signals from glideslopes and DMEs.  We compare the signal strengths
+// of the all the localizers and choose the one containing the
+// *weakest* localizer signal.  This heuristic works when both ends of
+// a single runway have the same ILS frequencies.  It will fail if,
+// for example, two different runways (perhaps at two different
+// airports) have the same ILS frequencies.  As far as I know, this
+// situation never occurs.
+static void __ILSsAsString(vector<Navaid *> &navs, int radioNo, 
 			   FlightData *p, int freq, float radial, 
 			   bool magTrue, AtlasString &str)
 {
-    str.printf("NAV");
-    // EYE - change x to radioNo or whatever?
-    if (x > 0) {
-	str.appendf(" %d", x);
-    }
-    str.appendf(": %s@%03.0f%c", formatFrequency(freq), radial, degreeSymbol);
-
-    // If there are no navaids, there's nothing left to do.
-    if (navs.size() == 0) {
-	return;
-    }
-
-    // For each navaid, we see what ILS it's a member of and add the
-    // ILS to a set.  The set is sorted sorted on localizer strength,
-    // the most powerful sorting earliest.
-    __NearerILS _comparator(p->cart);
-    set<ILS *, __NearerILS> systems(_comparator);
+    // We check all localizers for signal strength (we might be tuned
+    // in to glideslopes and DMEs, but we don't care about those).
+    // Remember that we're looking for the weakest localizer signal.
+    LOC *loc = NULL;
+    double strength = std::numeric_limits<double>::max();
+    int matchingLocs = 0;
     for (size_t i = 0; i < navs.size(); i++) {
-	Navaid *n = navs[i];
-	ILS *sys = dynamic_cast<ILS *>(NavaidSystem::owner(n));
-	if (sys) {
-	    systems.insert(sys);
+	LOC *tmp = dynamic_cast<LOC *>(navs[i]);
+
+	if (!tmp) {
+	    continue;
+	}
+
+	double s = tmp->signalStrength(p->cart);
+	if (s < strength) {
+	    // We found a new closest localizer.
+	    loc = tmp;
+	    strength = s;
+	    matchingLocs++;
 	}
     }
-
-    if (systems.size() == 0) {
-	return;
-    }
+    assert(loc);
 
     // We're within range of an ILS system, so print out its info.
-    ILS *nearest = *(systems.begin());
-    str.appendf(" (%s", nearest->id().c_str());
+    ILS *ils = dynamic_cast<ILS *>(NavaidSystem::owner(loc));
+    str.appendf(" (%s", ils->id().c_str());
 
     // All ILSs must have a localizer.
-    LOC *loc = nearest->loc();
     double ar, endHdg, length;
     const char *magTrueChar = "T";
     geo_inverse_wgs_84(p->lat, p->lon, 
@@ -2001,7 +1773,7 @@ static void __ILSsAsString(vector<Navaid *> &navs, int x,
 		degreeSymbol, magTrueChar);
 
     // An ILS may or may not have a DME.
-    DME *dme = nearest->dme();
+    DME *dme = ils->dme();
     if (dme) {
 	double d = sgdDistanceVec3(p->cart, dme->bounds().center) - dme->bias();
 	str.appendf(", %.1f DME", d * SG_METER_TO_NM);
@@ -2009,111 +1781,47 @@ static void __ILSsAsString(vector<Navaid *> &navs, int x,
 
     str.appendf(")");
 
-    if (systems.size() > 1) {
+    if (matchingLocs > 1) {
 	str.appendf(" ...");
     }
 }
 
 // Called for any non-NDB navaids.  Depending on the given frequency,
 // we pass things on to __VORsAsString or __ILSsAsString.
-// static void __NAVsAsString(vector<NAV *> &navs, int x, 
-// 			   FlightData *p, int freq, float radial, 
-// 			   bool magTrue, AtlasString &str)
-// {
-//     // Use the frequency (kHz) to decide what we're looking at.  If <
-//     // 112000 and the hundreds digit is odd, then it is an ILS.
-//     // Otherwise, it is a VOR.  Note that "VOR" also includes DMEs,
-//     // and that an ILS can include a DME as well.
-//     int hundreds = (freq % 1000) / 100;
-//     if ((freq < 112000) && (hundreds & 0x1)) {
-// 	// ILS
-// 	__ILSsAsString(navs, x, p, freq, radial, magTrue, str);
-// 	return;
-//     } else {
-// 	__VORsAsString(navs, x, p, freq, radial, str);
-//     }
-// }
-static void __NAVsAsString(vector<Navaid *> &navs, int x, 
+static void __NAVsAsString(vector<Navaid *> &navs, int radioNo, 
 			   FlightData *p, int freq, float radial, 
 			   bool magTrue, AtlasString &str)
 {
+    // Print out the text common to all non-NDB navaids.
+    str.printf("NAV");
+    if (radioNo > 0) {
+	str.appendf(" %d", radioNo);
+    }
+    str.appendf(": %s@%03.0f%c", formatFrequency(freq), radial, degreeSymbol);
+
+    // If there are no navaids, there's nothing left to do.
+    if (navs.size() == 0) {
+	return;
+    }
+
     // Use the frequency to decide what we're looking at.
     if (Navaid::validILSFrequency(freq)) {
-	__ILSsAsString(navs, x, p, freq, radial, magTrue, str);
+	__ILSsAsString(navs, radioNo, p, freq, radial, magTrue, str);
 	return;
     } else {
-	__VORsAsString(navs, x, p, freq, radial, str);
+	__VORsAsString(navs, radioNo, p, freq, radial, str);
     }
 }
 
 // Renders the given NDBs, which must match the given frequency, as a
 // string.
-// static void __NDBsAsString(vector<NAV *> &navs, int x, 
-// 			   FlightData *p, int freq, bool magTrue,
-// 			   AtlasString &str)
-// {
-//     NAV *match = NULL;
-//     double strength = 0.0;
-
-//     // Find NDB with strongest signal.
-//     for (size_t i = 0; i < navs.size(); i++) {
-// 	NAV *n = navs[i];
-
-// 	// We assume that signal strength is proportional to the
-// 	// square of the range, and inversely proportional to the
-// 	// square of the distance.  But 'we' may be wrong.  To prevent
-// 	// divide-by-zero errors, we arbitrarily set 1 metre as the
-// 	// minimum distance.
-// 	double d = SG_MAX2(sgdDistanceSquaredVec3(p->cart, n->bounds().center),
-// 			   1.0);
-// 	double s = (double)n->range * (double)n->range / d;
-
-// 	if (s > strength) {
-// 	    match = n;
-// 	}
-//     }
-//     assert((navs.size() == 0) || (match != NULL));
-
-//     str.printf("ADF");
-//     if (x > 0) {
-// 	str.appendf(" %d", x);
-//     }
-//     str.appendf(": %d", freq);
-
-//     if (navs.size() > 0) {
-// 	// Calculate the absolute and relative bearings to the navaid
-// 	// (the absolute bearing is given in magnetic or true
-// 	// degrees).
-// 	double ab, rb;
-// 	double endHdg, length;
-// 	geo_inverse_wgs_84(p->lat, p->lon,
-// 			   match->lat, match->lon,
-// 			   &ab, &endHdg, &length);
-// 	rb = ab - p->hdg;
-// 	char magTrueChar = 'T';
-// 	if (magTrue) {
-// 	    magTrueChar = 'M';
-// 	    ab = ab - 
-// 		magneticVariation(p->lat, p->lon, p->alt * SG_FEET_TO_METER);
-// 	}
-
-// 	str.appendf(" (%s, %03.0f%c%cB, %03.0f%cRB)",
-// 		    match->id.c_str(), 
-// 		    normalizeHeading(rint(ab), false), degreeSymbol, 
-// 		    magTrueChar,
-// 		    normalizeHeading(rint(rb), false), degreeSymbol);
-//     }
-//     if (navs.size() > 1) {
-// 	str.appendf(" ...");
-//     }
-// }
-static void __NDBsAsString(vector<NDB *> &ndbs, int x, 
+static void __NDBsAsString(vector<NDB *> &ndbs, int radioNo, 
 			   FlightData *p, int freq, bool magTrue,
 			   AtlasString &str)
 {
     str.printf("ADF");
-    if (x > 0) {
-	str.appendf(" %d", x);
+    if (radioNo > 0) {
+	str.appendf(" %d", radioNo);
     }
     str.appendf(": %s", formatFrequency(freq));
 
@@ -2173,104 +1881,6 @@ static void __NDBsAsString(vector<NDB *> &ndbs, int x,
 
 // Sets the text strings displayed in the information dialog, based on
 // the current position in the current track.
-// void InfoUI::_setText()
-// {
-//     FlightData *p = _ac->currentPoint();
-//     if (p == (FlightData *)NULL) {
-// 	return;
-//     }
-
-//     static AtlasString latStr, lonStr, altStr, hdgStr, spdStr, hmsStr,
-// 	dstStr, vor1Str, vor2Str, adfStr;
-
-//     latStr.printf("Lat: %c%s", (p->lat < 0) ? 'S':'N', 
-// 		  formatAngle(p->lat, _ac->degMinSec()));
-//     lonStr.printf("Lon: %c%s", (p->lon < 0) ? 'W':'E', 
-// 		  formatAngle(p->lon, _ac->degMinSec()));
-//     if (_ac->currentTrack()->isAtlasProtocol()) {
-// 	const char *magTrueChar = "T";
-// 	double hdg = p->hdg;
-// 	if (_ac->magTrue()) {
-// 	    magTrueChar = "";
-// 	    // EYE - use the time of the flight instead of current time?
-// 	    hdg -= magneticVariation(p->lat, p->lon, p->alt * SG_FEET_TO_METER);
-// 	}
-// 	hdg = normalizeHeading(rint(hdg), false);
-// 	hdgStr.printf("Hdg: %03.0f%c%s", hdg, degreeSymbol, magTrueChar);
-// 	spdStr.printf("Speed: %.0f kt EAS", p->spd);
-//     } else {
-// 	const char *magTrueChar = "T";
-// 	double hdg = p->hdg;
-// 	if (_ac->magTrue()) {
-// 	    magTrueChar = "";
-// 	    // EYE - use the time of the flight instead of current time?
-// 	    hdg -= magneticVariation(p->lat, p->lon, p->alt * SG_FEET_TO_METER);
-// 	}
-// 	hdg = normalizeHeading(rint(hdg), false);
-// 	hdgStr.printf("Track: %03.0f%c%s", hdg, degreeSymbol, magTrueChar);
-// 	spdStr.printf("Speed: %.0f kt GS", p->spd);
-//     }
-//     altStr.printf("Alt: %.0f ft MSL", p->alt);
-//     int hours, minutes, seconds;
-//     seconds = lrintf(p->est_t_offset);
-//     hours = seconds / 3600;
-//     seconds -= hours * 3600;
-//     minutes = seconds / 60;
-//     seconds -= minutes * 60;
-//     hmsStr.printf("Time: %d:%02d:%02d", hours, minutes, seconds);
-//     dstStr.printf("Dist: %.1f nm", p->dist * SG_METER_TO_NM);
-
-//     // Only the atlas protocol has navaid information.
-//     if (_ac->currentTrack()->isAtlasProtocol()) {
-//     	// Navaid information.  Printing a summary of navaid
-//     	// information is complicated, because a single frequency can
-//     	// match several navaids.  Sometimes this is because several
-//     	// independent navaids are within range (this is unusual, but
-//     	// possible), so we probably want to print information on the
-//     	// nearest.  Sometimes it is because they form a "set" (eg, a
-//     	// VOR-DME, an ILS system with a localizer, glideslope, and
-//     	// DME, ...), in which case we want to print information on
-//     	// the set as a whole.  And sometimes it is because of both
-//     	// reasons (ILS systems with identical frequencies at opposite
-//     	// ends of a runway).
-
-//     	// Separate navaids based on frequency.
-//     	vector<NAV *> VOR1s, VOR2s, NDBs;
-//     	const vector<NAV *> &navaids = p->navaids();
-//     	for (size_t i = 0; i < navaids.size(); i++) {
-//     	    NAV *n = navaids[i];
-//     	    if (p->nav1_freq == n->freq) {
-//     		VOR1s.push_back(n);
-//     	    } 
-//     	    if (p->nav2_freq == n->freq) {
-//     		VOR2s.push_back(n);
-//     	    } 
-//     	    if (p->adf_freq == n->freq) {
-//     		NDBs.push_back(n);
-//     	    }
-//     	}
-//     	// Create strings for each.
-//     	bool mt = _ac->magTrue();
-//     	__NAVsAsString(VOR1s, 1, p, p->nav1_freq, p->nav1_rad, mt, vor1Str);
-//     	__NAVsAsString(VOR2s, 2, p, p->nav2_freq, p->nav2_rad, mt, vor2Str);
-//     	__NDBsAsString(NDBs, 0, p, p->adf_freq, mt, adfStr);
-//     } else {
-// 	vor1Str.printf("n/a");
-// 	vor2Str.printf("n/a");
-// 	adfStr.printf("n/a");
-//     }
-
-//     _latText->setLabel(latStr.str());
-//     _lonText->setLabel(lonStr.str());
-//     _altText->setLabel(altStr.str());
-//     _hdgText->setLabel(hdgStr.str());
-//     _spdText->setLabel(spdStr.str());
-//     _hmsText->setLabel(hmsStr.str());
-//     _dstText->setLabel(dstStr.str());
-//     _VOR1Text->setLabel(vor1Str.str());
-//     _VOR2Text->setLabel(vor2Str.str());
-//     _ADFText->setLabel(adfStr.str());
-// }
 void InfoUI::_setText()
 {
     FlightData *p = _ac->currentPoint();
@@ -4681,7 +4291,6 @@ void AtlasWindow::_keyboard(unsigned char key, int x, int y)
 }
 
 // Called when 'special' keys are pressed.
-#include "NavaidsOverlay.hxx"
 void AtlasWindow::_special(int key, int x, int y) 
 {
     assert(glutGetWindow() == id());
