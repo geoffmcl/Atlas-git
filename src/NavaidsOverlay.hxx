@@ -3,9 +3,9 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2017 Brian Schack
+  Copyright (C) 2009 - 2018 Brian Schack
 
-  Loads and draws navaids (VORs, NDBs, ILS systems, and DMEs).
+  Loads and draws navaids (VORs, NDBs, ILS systems, DMEs, and fixes).
 
   This file is part of Atlas.
 
@@ -26,13 +26,11 @@
 #ifndef _NAVAIDS_OVERLAY_H
 #define _NAVAIDS_OVERLAY_H
 
-#include "LayoutManager.hxx"
 #include "Notifications.hxx"
 #include "Overlays.hxx"
 #include "NavData.hxx"		// Needed for Marker Type enumeration.
 
 // Forward class declarations
-class NavData;
 class FlightData;
 
 //////////////////////////////////////////////////////////////////////
@@ -89,7 +87,7 @@ class DisplayList {
 };
 
 //////////////////////////////////////////////////////////////////////
-// NavaidRenderer
+// WaypointRenderer
 //////////////////////////////////////////////////////////////////////
 
 // Most navaid icons are scaled according their range and a few other
@@ -109,38 +107,40 @@ struct IconScalingPolicy {
     float labelPointSize;
 };
 
-// A class to render navaids.  As a subscriber, it keeps track of
-// whether a zoom or move event has occurred, and uses that to
-// repopulate a vector of navaids (_navaids) and update the scale
+// A class to render waypoints (or, to be technical, anything derived
+// from a Waypoint).  As a subscriber, it keeps track of whether a
+// zoom or move event has occurred, and uses that to repopulate a
+// vector of waypoints (_waypoints) and update the scale
 // (_metresPerPixel) and label point size (_labelPointSize).
 //
 // It has the concepts of "passes" and "layers".  Layers are fairly
-// simple - a typical rendering of a navaid might consist of the
-// navaid icons, labels for the icons, and maybe a radio "beam" drawn
-// when a flight track is active.  Each of those is called a layer.
-// When you create an instance of a NavaidRenderer, you tell it the
-// number of layers, and it appropriately sizes the _layers vector,
-// which contains one display list for each layer.  It is up to the
-// subclasser to invalidate those display lists when they need to be
-// re-rendered.  Typically this is done in the notification() method.
+// simple - a typical rendering of a waypoint might consist of the
+// waypoint icons, labels for the icons, and maybe a radio "beam"
+// drawn when a flight track is active.  Each of those is called a
+// layer.  When you create an instance of a WaypointRenderer, you tell
+// it the number of layers, and it appropriately sizes the _layers
+// vector, which contains one display list for each layer.  It is up
+// to the subclasser to invalidate those display lists when they need
+// to be re-rendered.  Typically this is done in the notification()
+// method.
 //
 // A pass, on the other hand, is basically a kludge, created for ILS
 // systems, which need to be drawn in two passes.  The first pass
-// draws the markers and localizer beams, while the second pass draws
-// any DMEs associated with the ILS.  If an instance is declared with
-// multiple passes, the draw() method needs to be called that many
-// times (ie, twice for a 2-pass instance, thrice for a 3-pass
-// instance, ...) to render everything.  As a caller, if you lose
-// track of which pass you're on, well, you're out of luck.
-// Subclasses know which pass is current via the _currentPass
-// variable.  This variable is updated automatically.
+// draws the markers and localizer beams, then some airport stuff is
+// drawn, then the second pass draws any DMEs associated with the ILS.
+// If an instance is declared with multiple passes, the draw() method
+// needs to be called that many times (ie, twice for a 2-pass
+// instance, thrice for a 3-pass instance, ...) to render everything.
+// As a caller, if you lose track of which pass you're on, well,
+// you're out of luck.  Subclasses know which pass is current via the
+// _currentPass variable.  This variable is updated automatically.
 //
 // To use the class, you need to create a subclass.  Subclasses need
-// to implement 3 virtual methods: 
+// to implement 2 virtual methods: 
 //
-// (1) _getNavaids() - When called, the _navaids vector is empty.  The
-//     subclass must get the hits from the NavData class, then add the
-//     appropriate navaids to the vector.
+// (1) _getWaypoints() - When called, the _waypoints vector is empty.
+//     The subclass must get the hits from the NavData class, then add
+//     the appropriate waypoints to the vector.
 //
 // (2) _draw() - This should check the current pass (_currentPass) and
 //     call _drawLayer() for the layers that need to be rendered in
@@ -150,17 +150,14 @@ struct IconScalingPolicy {
 //     and the radio is tuned in to a navaid, they can draw a radio
 //     beam to indicate the navaid is active.
 //
-// (3) _drawNavaid() - This is called when a single navaid for a given
-//     layer must be rendered.
-//
 // Subclasses should also implement the notification() method, mostly
 // to invalidate layers that need to be rerendered.  Just remember to
-// call NavaidRenderer's notification() method, so that it can update
-// _navaidsDirty, _metresPerPixel, ...
-class NavaidRenderer: public Subscriber {
+// call WaypointRenderer's notification() method, so that it can
+// update _waypointsDirty, _metresPerPixel, ...
+class WaypointRenderer: public Subscriber {
   public:
-    NavaidRenderer(int noOfPasses, int noOfLayers);
-    virtual ~NavaidRenderer() {}
+    WaypointRenderer(int noOfPasses, int noOfLayers);
+    virtual ~WaypointRenderer() {}
 
     void draw(NavData *nd, bool labels);
 
@@ -168,30 +165,35 @@ class NavaidRenderer: public Subscriber {
     virtual void notification(Notification::type n);
 
   protected:
-    virtual void _getNavaids(NavData *nd) = 0;
+    // Methods that need to be implemented by subclasses.
+    virtual void _getWaypoints(NavData *nd) = 0;
     virtual void _draw(bool labels) = 0;
-    virtual void _drawNavaid(Navaid *n, int layer) = 0;
 
-    void _drawLayer(int layer);
+    // Called by subclasses when they want to draw a specific layer.
+    // It checks if the layer is invalid or not.  If it is, it begins
+    // compiling a new display list, and calls the given function to
+    // render the layer.  At the end, it calls the display list (ie,
+    // draws it).
+    template <class T> void _drawLayer(DisplayList& dl, void (T::*fn)());
     // Returns true if, for the navaid and its scaling policy, the
     // navaid icon should be drawn.  As a side effect, it returns the
     // icon size in 'radius'.
     bool _iconVisible(Navaid *n, IconScalingPolicy& isp, float& radius);
 
     // True if we receive a zoom or move notification.  This will
-    // result in a call to _getNavaids().
-    bool _navaidsDirty;
+    // result in a call to _getWaypoints().
+    bool _waypointsDirty;
     // Useful values updated when we're notified of a zoom event.
     double _metresPerPixel;
     float _labelPointSize;
     // Keep track of our passes.
     int _currentPass, _noOfPasses;
-    // The actual navaids, and the rendering layers.
-    std::vector<Navaid *> _navaids;
+    // The actual waypoints, and the rendering layers.
+    std::vector<Waypoint *> _waypoints;
     std::vector<DisplayList> _layers;
 };
 
-class VORRenderer: public NavaidRenderer {
+class VORRenderer: public WaypointRenderer {
   public:
     VORRenderer();
 
@@ -202,15 +204,14 @@ class VORRenderer: public NavaidRenderer {
     void _createVORRose();
     void _createVORSymbols();
 
-    enum {VORLayer, RadioLayer, VORLabelLayer, _LayerCount} _layerNames;
+    enum {VORLayer, RadioLayer, LabelLayer, _LayerCount} _layerNames;
 
-    void _getNavaids(NavData *nd);
+    void _getWaypoints(NavData *nd);
     void _draw(bool labels);
-    void _drawNavaid(Navaid *n, int layer);
 
-    void _drawVOR(VOR *vor);
-    void _drawRadio(VOR *vor);
-    void _drawVORLabel(VOR *vor);
+    void _drawVORs();
+    void _drawRadios();
+    void _drawLabels();
 
     static const float _lineScale, _maxLineWidth;
     static const float _angularWidth;   // Width of 'radial' (degrees)
@@ -227,7 +228,7 @@ class VORRenderer: public NavaidRenderer {
     FlightData *_p;
 };
 
-class NDBRenderer: public NavaidRenderer {
+class NDBRenderer: public WaypointRenderer {
   public:
     NDBRenderer();
 
@@ -237,15 +238,14 @@ class NDBRenderer: public NavaidRenderer {
   protected:
     void _createNDBSymbols();
 
-    enum {NDBLayer, RadioLayer, NDBLabelLayer, _LayerCount} _layerNames;
+    enum {NDBLayer, RadioLayer, LabelLayer, _LayerCount} _layerNames;
 
-    void _getNavaids(NavData *nd);
+    void _getWaypoints(NavData *nd);
     void _draw(bool labels);
-    void _drawNavaid(Navaid *n, int layer);
 
-    void _drawNDB(NDB *ndb);
-    void _drawRadio(NDB *ndb);
-    void _drawNDBLabel(NDB *ndb);
+    void _drawNDBs();
+    void _drawRadios();
+    void _drawLabels();
 
     static const float _dotScale;
     static const float _angularWidth; // Width of 'radial' (degrees)
@@ -258,7 +258,7 @@ class NDBRenderer: public NavaidRenderer {
     FlightData *_p;
 };
 
-class DMERenderer: public NavaidRenderer {
+class DMERenderer: public WaypointRenderer {
   public:
     DMERenderer();
 
@@ -268,20 +268,36 @@ class DMERenderer: public NavaidRenderer {
   protected:
     void _createDMESymbols();
 
-    enum {DMELayer, DMELabelLayer, _LayerCount} _layerNames;
+    enum {DMELayer, LabelLayer, _LayerCount} _layerNames;
 
-    void _getNavaids(NavData *nd);
+    void _getWaypoints(NavData *nd);
     void _draw(bool labels);
-    void _drawNavaid(Navaid *n, int layer);
 
-    void _drawDME(DME *dme);
-    void _drawDMELabel(DME *dme);
+    void _drawDMEs();
+    void _drawLabels();
 
     IconScalingPolicy _isp;
     DisplayList _DMESymbolDL, _TACANSymbolDL;
 };
 
-class ILSRenderer: public NavaidRenderer {
+class FixRenderer: public WaypointRenderer {
+  public:
+    FixRenderer();
+
+    // Subscriber interface.
+    void notification(Notification::type n);
+
+  protected:
+    enum {FixLayer, LabelLayer, _LayerCount} _layerNames;
+
+    void _getWaypoints(NavData *nd);
+    void _draw(bool labels);
+
+    void _drawFixes();
+    void _drawLabels();
+};
+
+class ILSRenderer: public WaypointRenderer {
   public:
     ILSRenderer();
 
@@ -308,16 +324,15 @@ class ILSRenderer: public NavaidRenderer {
 	float pointSize;
     };
 
-    void _getNavaids(NavData *nd);
+    void _getWaypoints(NavData *nd);
     void _draw(bool labels);
-    void _drawNavaid(Navaid *n, int layer);
 
     bool _ILSVisible(ILS *ils, DrawingParams& p);
-    void _drawMarkers(ILS *ils);
-    void _drawLOC(ILS *ils);
-    void _drawLOCLabel(ILS *ils);
-    void _drawDME(ILS *ils);
-    void _drawDMELabel(ILS *ils);
+    void _drawMarkers();
+    void _drawLOCs();
+    void _drawLOCLabels();
+    void _drawDMEs();
+    void _drawDMELabels();
 
     static const float _DMEScale;
 
@@ -346,6 +361,7 @@ class NavaidsOverlay {
     VORRenderer _vr;
     NDBRenderer _nr;
     DMERenderer _dr;
+    FixRenderer _fr;
     ILSRenderer _ir;
 };
 

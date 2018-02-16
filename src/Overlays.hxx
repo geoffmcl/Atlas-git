@@ -35,7 +35,6 @@
 class AirportsOverlay;
 class AirwaysOverlay;
 class CrosshairsOverlay;
-class FixesOverlay;
 class FlightTracksOverlay;
 class NavaidsOverlay;
 class RangeRingsOverlay;
@@ -69,7 +68,6 @@ class Overlays {
     AirportsOverlay* airportsOverlay() { return _airports; }
     NavaidsOverlay* navaidsOverlay() { return _navaids; }
     AirwaysOverlay* airwaysOverlay() { return _airways; }
-    FixesOverlay* fixesOverlay() { return _fixes; }
     FlightTracksOverlay* flightTracksOverlay() { return _tracks; }
     CrosshairsOverlay* crosshairsOverlay() { return _crosshairs; }
     RangeRingsOverlay* rangeRingsOverlay() { return _rangeRings; }
@@ -81,7 +79,6 @@ class Overlays {
     AirportsOverlay *_airports;
     NavaidsOverlay *_navaids;
     AirwaysOverlay *_airways;
-    FixesOverlay *_fixes;
     FlightTracksOverlay *_tracks;
     CrosshairsOverlay *_crosshairs;
     RangeRingsOverlay *_rangeRings;

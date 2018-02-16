@@ -28,7 +28,6 @@
 #include "AirportsOverlay.hxx"
 #include "AirwaysOverlay.hxx"
 #include "CrosshairsOverlay.hxx"
-#include "FixesOverlay.hxx"
 #include "FlightTracksOverlay.hxx"
 #include "NavaidsOverlay.hxx"
 #include "RangeRingsOverlay.hxx"
@@ -58,7 +57,6 @@ Overlays::Overlays(AtlasWindow *aw): _aw(aw)
     // Load data.
     _airports = new AirportsOverlay(*this);
     _navaids = new NavaidsOverlay();
-    _fixes = new FixesOverlay(*this);
     _airways = new AirwaysOverlay(*this);
     _tracks = new FlightTracksOverlay(*this);
     _crosshairs = new CrosshairsOverlay(*this);
@@ -70,7 +68,6 @@ Overlays::~Overlays()
     delete _airports;
     delete _navaids;
     delete _airways;
-    delete _fixes;
     delete _tracks;
     delete _crosshairs;
     delete _rangeRings;
@@ -137,7 +134,7 @@ void Overlays::draw(NavData *navData)
 	    _navaids->draw(navData, DME, _overlays[LABELS]);
 	}
 	if (_overlays[FIXES]) {
-	    _fixes->draw(navData);
+	    _navaids->draw(navData, FIXES, _overlays[LABELS]);
 	}
     }
     if (_overlays[CROSSHAIRS]) {
@@ -161,7 +158,6 @@ void Overlays::setVisibility(OverlayType type, bool value)
     // overlay contents.
     if (type == LABELS) {
 	_airports->setDirty();
-	_fixes->setDirty();
 	_tracks->setDirty();
     }
 }

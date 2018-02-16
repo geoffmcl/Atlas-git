@@ -19,7 +19,6 @@ Atlas_SOURCES = \
 	Overlays.cxx Overlays.hxx \
 	AirportsOverlay.hxx AirportsOverlay.cxx \
 	AirwaysOverlay.hxx AirwaysOverlay.cxx \
-	FixesOverlay.hxx FixesOverlay.cxx \
 	NavaidsOverlay.hxx NavaidsOverlay.cxx \
 	FlightTracksOverlay.hxx FlightTracksOverlay.cxx \
 	CrosshairsOverlay.hxx CrosshairsOverlay.cxx \

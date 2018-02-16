@@ -29,7 +29,7 @@
 #include "AtlasWindow.hxx"
 #include "FlightTrack.hxx"
 #include "Globals.hxx"
-#include "NavData.hxx"
+#include "LayoutManager.hxx"
 
 using namespace std;
 
@@ -263,7 +263,7 @@ struct Label {
     float colour[4];
     float metresPerPixel;
     LayoutManager lm;
-    std::string id;
+    string id;
 };
 
 // Either draws the given string in morse code at the given location
@@ -528,11 +528,11 @@ void __drawLabel(const char *fmt, Navaid *n,
 }
 
 //////////////////////////////////////////////////////////////////////
-// NavaidRenderer
+// WaypointRenderer
 //////////////////////////////////////////////////////////////////////
 
-NavaidRenderer::NavaidRenderer(int noOfPasses, int noOfLayers): 
-    _navaidsDirty(true), _currentPass(0), _noOfPasses(noOfPasses)
+WaypointRenderer::WaypointRenderer(int noOfPasses, int noOfLayers): 
+    _waypointsDirty(true), _currentPass(0), _noOfPasses(noOfPasses)
 {
     _layers.resize(noOfLayers);
 
@@ -540,12 +540,12 @@ NavaidRenderer::NavaidRenderer(int noOfPasses, int noOfLayers):
     subscribe(Notification::Zoomed);
 }
 
-void NavaidRenderer::draw(NavData *nd, bool labels)
+void WaypointRenderer::draw(NavData *nd, bool labels)
 {
-    if (_navaidsDirty) {
-	_navaids.clear();
-	_getNavaids(nd);
-	_navaidsDirty = false;
+    if (_waypointsDirty) {
+	_waypoints.clear();
+	_getWaypoints(nd);
+	_waypointsDirty = false;
     }
 
     _draw(labels);
@@ -553,75 +553,70 @@ void NavaidRenderer::draw(NavData *nd, bool labels)
     _currentPass = (_currentPass + 1) % _noOfPasses;
 }
 
-void NavaidRenderer::notification(Notification::type n)
+void WaypointRenderer::notification(Notification::type n)
 {
     if (n == Notification::Moved) {
-	_navaidsDirty = true;
+	_waypointsDirty = true;
     } else if (n == Notification::Zoomed) {
 	// EYE - what about an initial value for _metresPerPixel?
 	_metresPerPixel = globals.aw->scale();
 	_labelPointSize = __labelPointSize * _metresPerPixel;
-	_navaidsDirty = true;
+	_waypointsDirty = true;
     }
 }
 
 // Called by subclasses when they want to draw a layer.  It does a bit
 // of housekeeping by checking if the display list is valid.  If so,
-// it just calls it directly and returns.  If not, it goes through
-// each navaid, and throws the problem back to the subclass, asking it
-// to draw the navaid for the given layer (_drawNavaid).  It's a bit
-// byzantine, but it saves subclasses from implementing the same
-// boilerplate code.
+// it just calls it directly and returns.  If not, it begins compiling
+// the displaylist, using the method supplied by the subclass to
+// render the layer..  It's a bit byzantine, but it saves subclasses
+// from implementing the same boilerplate code.
 //
-// Note: I experimented with a templated NavaidRenderer class, and
-// also just a templated _drawLayer method.  The advantage of the
-// templated class was being able to have an arbitrary type for the
-// _navaids vector.  Having the templated class or templated method
-// allowed subclasses to pass a rendering method into _drawLayer and
-// we could call that method directly.  The disadvantage was the
+// Note: I experimented with a templated WaypointRenderer class.  The
+// advantage of the templated class was being able to have an
+// arbitrary type for the _waypoints vector.  The disadvantage was the
 // syntactic complexity of the template code.  Just so I don't forget,
 // here's how I defined the templated method:
 //
 // template <class T, class S>
-// void NavaidRenderer::_drawLayers(DisplayList& dl, void(T::*fn)(S))
+// void WaypointRenderer::_drawLayers(DisplayList& dl, void(T::*fn)(S))
 //
 // I needed two classes - the subclass type (eg, VORRenderer) and the
-// navaid class (eg, VOR *).  And here are the key calls in the
+// waypoint class (eg, VOR *).  And here are the key calls in the
 // method:
 //
 //     T *caller = dynamic_cast<T *>(this);
 //     ...
-// 		(caller->*fn)(dynamic_cast<S>(_navaids[i]));
+// 		(caller->*fn)(dynamic_cast<S>(_waypoints[i]));
 //
 // In the subclass _draw() method, here's how I'd call _drawLayers():
 //
 // _drawLayers<VORRenderer, VOR *>(_layers[VORLayer], &VORRenderer::_drawVOR);
 //
 // Finally, when the class was templated, subclasses couldn't
-// reference the _navaids vector directly (I don't know why).
+// reference the _waypoints vector directly (I don't know why).
 // Instead, they'd have to do one of 3 things:
 //
-// (a) this->_navaids
-// (b) NavaidRenderer<T, S>::_navaids
-// (c) using NavaidRenderer<T, S>::_navaids; (in the class declaration)
-//     _navaids; (here)
+// (a) this->_waypoints
+// (b) WaypointRenderer<T, S>::_waypoints
+// (c) using WaypointRenderer<T, S>::_waypoints; (in the class declaration)
+//     _waypoints; (here)
 //
 // All in all, not pretty, and not worth it in my opinion.
-void NavaidRenderer::_drawLayer(int layer)
+template <class T>
+void WaypointRenderer::_drawLayer(DisplayList &dl, void (T::*fn)())
 {
-    DisplayList& dl = _layers[layer];
     if (!dl.valid()) {
 	dl.begin(); {
-	    for (size_t i = 0; i < _navaids.size(); i++) {
-		_drawNavaid(_navaids[i], layer);
-	    }
+	    T *caller = dynamic_cast<T *>(this);
+	    (caller->*fn)();
 	}
 	dl.end();
     }
     dl.call();
 }
 
-bool NavaidRenderer::_iconVisible(Navaid *n, IconScalingPolicy& isp, 
+bool WaypointRenderer::_iconVisible(Navaid *n, IconScalingPolicy& isp, 
 					float& radius)
 {
     bool result = true;
@@ -664,7 +659,8 @@ const float VORRenderer::_maxLineWidth = 5.0;
 // How fat to make VOR radials.
 const float VORRenderer::_angularWidth = 10.0;
 
-VORRenderer::VORRenderer(): NavaidRenderer(1, _LayerCount), _radioactive(false)
+VORRenderer::VORRenderer(): 
+    WaypointRenderer(1, _LayerCount), _radioactive(false)
 {
     // The scaling policy for the VOR icons.
     _isp.rangeScaleFactor = 0.1;
@@ -685,7 +681,7 @@ void VORRenderer::notification(Notification::type n)
     if ((n == Notification::Moved) ||
 	(n == Notification::Zoomed)) {
 	_layers[VORLayer].invalidate();
-	_layers[VORLabelLayer].invalidate();
+	_layers[LabelLayer].invalidate();
     } else if ((n == Notification::AircraftMoved) ||
 	       (n == Notification::NewFlightTrack)) {
 	// We don't need to redraw our radio layer if, for a given
@@ -723,7 +719,7 @@ void VORRenderer::notification(Notification::type n)
 	_p = p;
     }
 
-    NavaidRenderer::notification(n);
+    WaypointRenderer::notification(n);
 }
 
 // Creates a standard VOR rose of radius 1.0.  This is a circle with
@@ -914,13 +910,13 @@ void VORRenderer::_createVORSymbols()
     _VORDMESymbolDL.end();
 }
 
-void VORRenderer::_getNavaids(NavData *nd)
+void VORRenderer::_getWaypoints(NavData *nd)
 {
     const vector<Cullable *>& intersections = nd->hits(NavData::NAVAIDS);
     for (unsigned int i = 0; i < intersections.size(); i++) {
 	VOR *vor = dynamic_cast<VOR *>(intersections[i]);
 	if (vor) {
-	    _navaids.push_back(vor);
+	    _waypoints.push_back(vor);
 	}
     }
 }
@@ -939,33 +935,16 @@ void VORRenderer::_draw(bool labels)
     }
 
     // VORs (layer 0)
-    NavaidRenderer::_drawLayer(VORLayer);
+    _drawLayer(_layers[VORLayer], &VORRenderer::_drawVORs);
 
     // Radio "beams" (layer 1)
     if (_radioactive) {
-	NavaidRenderer::_drawLayer(RadioLayer);
+	_drawLayer(_layers[RadioLayer], &VORRenderer::_drawRadios);
     }
 
     // Labels (layer 2)
     if (labels) {
-	NavaidRenderer::_drawLayer(VORLabelLayer);
-    }
-}
-
-void VORRenderer::_drawNavaid(Navaid *n, int layer)
-{
-    VOR *vor = dynamic_cast<VOR *>(n);
-    assert(vor);
-    switch (layer) {
-      case VORLayer:
-	_drawVOR(vor);
-	break;
-      case RadioLayer:
-	_drawRadio(vor);
-	break;
-      case VORLabelLayer:
-	_drawVORLabel(vor);
-	break;
+	_drawLayer(_layers[LabelLayer], &VORRenderer::_drawLabels);
     }
 }
 
@@ -978,165 +957,176 @@ void VORRenderer::_drawNavaid(Navaid *n, int layer)
 // - label with name / id, frequency and morse
 // - label with id and frequency
 // - label with id, shrinking as we move away
-void VORRenderer::_drawVOR(VOR *vor)
+void VORRenderer::_drawVORs()
 {
-    // Although we don't do this at the moment, we might want to try
-    // different approaches to scaling the VOR.  For example, we could
-    // give it a fixed screen size (eg, 100 pixels).  Or, we could
-    // give it a fixed scale (eg, 10nm).  This is similar to what
-    // paper VOR maps do.  Our current method is to have a scale
-    // proportional to its range - more powerful VORs are drawn
-    // larger.  Whatever the strategy, the end result is the
-    // definition of 'radius', a value defined in screen pixels.
-    float radius;
-    if (!_iconVisible(vor, _isp, radius)) {
-	return;
-    }
+    for (size_t i = 0; i < _waypoints.size(); i++) {
+	VOR *vor = dynamic_cast<VOR *>(_waypoints[i]);
 
-    geodPushMatrix(vor->bounds().center, vor->lat(), vor->lon()); {
-	////////////////////
-	// VOR icon
-	////////////////////
-	glPushMatrix(); {
-	    // We usually draw the icon at constant size.  However, we
-	    // never draw it larger than the VOR radius.
-	    float scale = radius * _metresPerPixel;
-	    glScalef(scale, scale, scale);
+	// Although we don't do this at the moment, we might want to
+	// try different approaches to scaling the VOR.  For example,
+	// we could give it a fixed screen size (eg, 100 pixels).  Or,
+	// we could give it a fixed scale (eg, 10nm).  This is similar
+	// to what paper VOR maps do.  Our current method is to have a
+	// scale proportional to its range - more powerful VORs are
+	// drawn larger.  Whatever the strategy, the end result is the
+	// definition of 'radius', a value defined in screen pixels.
+	float radius;
+	if (!_iconVisible(vor, _isp, radius)) {
+	    return;
+	}
 
-	    glPushAttrib(GL_POINT_BIT); {
-		// This is the size of the point in the middle of the
-		// VOR.
-		glPointSize(3.0);
+	geodPushMatrix(vor->bounds().center, vor->lat(), vor->lon()); {
+	    ////////////////////
+	    // VOR icon
+	    ////////////////////
+	    glPushMatrix(); {
+		// We usually draw the icon at constant size.  However, we
+		// never draw it larger than the VOR radius.
+		float scale = radius * _metresPerPixel;
+		glScalef(scale, scale, scale);
 
-		// How we draw the VOR depends on if it's a member of
-		// a navaid pair.
-		NavaidSystem *sys = NavaidSystem::owner(vor);
-		if (!sys) {
-		    // It's a standalone VOR.
-		    _VORSymbolDL.call();
-		} else if (dynamic_cast<VORTAC *>(sys)) {
-		    _VORTACSymbolDL.call();
-		} else {
-		    assert(dynamic_cast<VOR_DME *>(sys));
-		    _VORDMESymbolDL.call();
+		glPushAttrib(GL_POINT_BIT); {
+		    // This is the size of the point in the middle of the
+		    // VOR.
+		    glPointSize(3.0);
+
+		    // How we draw the VOR depends on if it's a member of
+		    // a navaid pair.
+		    NavaidSystem *sys = NavaidSystem::owner(vor);
+		    if (!sys) {
+			// It's a standalone VOR.
+			_VORSymbolDL.call();
+		    } else if (dynamic_cast<VORTAC *>(sys)) {
+			_VORTACSymbolDL.call();
+		    } else {
+			assert(dynamic_cast<VOR_DME *>(sys));
+			_VORDMESymbolDL.call();
+		    }
 		}
+		glPopAttrib();
 	    }
-	    glPopAttrib();
-	}
-	glPopMatrix();
+	    glPopMatrix();
 
-	////////////////////
-	// VOR rose
-	////////////////////
-	if (_iconVisible(vor, _rsp, radius)) {
-	    // Calculate the line width for drawing the rose.  We
-	    // scale the line width because when zooming in, it looks
-	    // better if the lines become fatter.
-	    float lineWidth;
-	    if ((_lineScale * radius) > _maxLineWidth) {
-		lineWidth = _maxLineWidth;
-	    } else {
-		lineWidth = _lineScale * radius;
-	    }
+	    ////////////////////
+	    // VOR rose
+	    ////////////////////
+	    if (_iconVisible(vor, _rsp, radius)) {
+		// Calculate the line width for drawing the rose.  We
+		// scale the line width because when zooming in, it
+		// looks better if the lines become fatter.
+		float lineWidth;
+		if ((_lineScale * radius) > _maxLineWidth) {
+		    lineWidth = _maxLineWidth;
+		} else {
+		    lineWidth = _lineScale * radius;
+		}
 
-	    glScalef(radius * _metresPerPixel,
-		     radius * _metresPerPixel,
-		     radius * _metresPerPixel);
-	    glRotatef(-vor->variation(), 0.0, 0.0, 1.0);
+		glScalef(radius * _metresPerPixel,
+			 radius * _metresPerPixel,
+			 radius * _metresPerPixel);
+		glRotatef(-vor->variation(), 0.0, 0.0, 1.0);
 
-	    glPushAttrib(GL_LINE_BIT); {
-		glLineWidth(lineWidth);
+		glPushAttrib(GL_LINE_BIT); {
+		    glLineWidth(lineWidth);
 	    
-		// Draw the VOR rose using the VOR colour.
-		glColor4fv(__vorColour);
-		_VORRoseDL.call();
+		    // Draw the VOR rose using the VOR colour.
+		    glColor4fv(__vorColour);
+		    _VORRoseDL.call();
+		}
+		glPopAttrib();
 	    }
-	    glPopAttrib();
 	}
+	geodPopMatrix();
     }
-    geodPopMatrix();
 }
 
-void VORRenderer::_drawRadio(VOR *vor)
+void VORRenderer::_drawRadios()
 {
-    geodPushMatrix(vor->bounds().center, vor->lat(), vor->lon()); {
-	// It's possible for zero, one, or both of the radios to
-	// be tuned in to the navaid.
-	double rad;
-	// NMEA tracks set their frequencies to 0, so these tests
-	// should always fail for NMEA tracks.
-	if (vor->frequency() == _p->nav1_freq) {
-	    rad = _p->nav1_rad + vor->variation();
-	    glPushMatrix(); {
-		glRotatef(-rad, 0.0, 0.0, 1.0);
-		glScalef(vor->range(), vor->range(), vor->range());
-		__createTriangle(_angularWidth, __clearColour, 
-				 globals.vor1Colour);
-	    }
-	    glPopMatrix();
-	}
-	if (vor->frequency() == _p->nav2_freq) {
-	    rad = _p->nav2_rad + vor->variation();
-	    glPushMatrix(); {
-		glRotatef(-rad, 0.0, 0.0, 1.0);
-		glScalef(vor->range(), vor->range(), vor->range());
-		__createTriangle(_angularWidth, __clearColour, 
-				 globals.vor2Colour);
-	    }
-	    glPopMatrix();
-	}
-    }
-    geodPopMatrix();
+    for (size_t i = 0; i < _waypoints.size(); i++) {
+	VOR *vor = dynamic_cast<VOR *>(_waypoints[i]);
 
+	geodPushMatrix(vor->bounds().center, vor->lat(), vor->lon()); {
+	    // It's possible for zero, one, or both of the radios to
+	    // be tuned in to the navaid.
+	    double rad;
+	    // NMEA tracks set their frequencies to 0, so these tests
+	    // should always fail for NMEA tracks.
+	    if (vor->frequency() == _p->nav1_freq) {
+		rad = _p->nav1_rad + vor->variation();
+		glPushMatrix(); {
+		    glRotatef(-rad, 0.0, 0.0, 1.0);
+		    glScalef(vor->range(), vor->range(), vor->range());
+		    __createTriangle(_angularWidth, __clearColour, 
+				     globals.vor1Colour);
+		}
+		glPopMatrix();
+	    }
+	    if (vor->frequency() == _p->nav2_freq) {
+		rad = _p->nav2_rad + vor->variation();
+		glPushMatrix(); {
+		    glRotatef(-rad, 0.0, 0.0, 1.0);
+		    glScalef(vor->range(), vor->range(), vor->range());
+		    __createTriangle(_angularWidth, __clearColour, 
+				     globals.vor2Colour);
+		}
+		glPopMatrix();
+	    }
+	}
+	geodPopMatrix();
+    }
 }
 
-void VORRenderer::_drawVORLabel(VOR *vor)
+void VORRenderer::_drawLabels()
 {
-    float iconRadius;
-    if (!_iconVisible(vor, _isp, iconRadius)) {
-	return;
-    }
+    for (size_t i = 0; i < _waypoints.size(); i++) {
+	VOR *vor = dynamic_cast<VOR *>(_waypoints[i]);
 
-    // We ignore the return value because it's valid to draw the VOR
-    // without a compass rose.
-    float roseRadius;
-    _iconVisible(vor, _rsp, roseRadius);
-
-    // Range of VOR, in pixels.
-    float range = vor->range() / _metresPerPixel;
-    if (range < __smallLabel) {
-	return;
-    }
-
-    geodPushMatrix(vor->bounds().center, vor->lat(), vor->lon()); {
-	// Place the centre of the label halfway between the VOR
-	// centre and the southern rim, as long as it won't result
-	// in the label overwriting the icon.
-	float roseCentre = -roseRadius / 2.0 * _metresPerPixel,
-	    iconEdge = -(iconRadius + 5.0) * _metresPerPixel;
-	Label *l;
-	if (range > __maximumLabel) {
-	    // The whole kit and caboodle.
-	    l = __makeLabel("%N\n%F %I %M", vor, _isp.labelPointSize, 0, 
-			    roseCentre);
-	} else if (range > __mediumLabel) {
-	    // ID and frequency.
-	    l = __makeLabel("%F %I", vor, _isp.labelPointSize, 0, roseCentre);
-	} else {
-	    // Just the ID.
-	    l = __makeLabel("%I", vor, _isp.labelPointSize, 0, iconEdge, 
-			    LayoutManager::UC);
+	float iconRadius;
+	if (!_iconVisible(vor, _isp, iconRadius)) {
+	    return;
 	}
 
-	if (l->lm.y() > iconEdge) {
-	    l->lm.moveTo(0.0, iconEdge);
-	    l->lm.setAnchor(LayoutManager::UC);
-	}
-	__drawLabel(l);
+	// We ignore the return value because it's valid to draw the
+	// VOR without a compass rose.
+	float roseRadius;
+	_iconVisible(vor, _rsp, roseRadius);
 
-	delete l;
+	// Range of VOR, in pixels.
+	float range = vor->range() / _metresPerPixel;
+	if (range < __smallLabel) {
+	    return;
+	}
+
+	geodPushMatrix(vor->bounds().center, vor->lat(), vor->lon()); {
+	    // Place the centre of the label halfway between the VOR
+	    // centre and the southern rim, as long as it won't result
+	    // in the label overwriting the icon.
+	    float roseCentre = -roseRadius / 2.0 * _metresPerPixel,
+		iconEdge = -(iconRadius + 5.0) * _metresPerPixel;
+	    Label *l;
+	    if (range > __maximumLabel) {
+		// The whole kit and caboodle.
+		l = __makeLabel("%N\n%F %I %M", vor, _isp.labelPointSize, 0, 
+				roseCentre);
+	    } else if (range > __mediumLabel) {
+		// ID and frequency.
+		l = __makeLabel("%F %I", vor, _isp.labelPointSize, 0, roseCentre);
+	    } else {
+		// Just the ID.
+		l = __makeLabel("%I", vor, _isp.labelPointSize, 0, iconEdge, 
+				LayoutManager::UC);
+	    }
+
+	    if (l->lm.y() > iconEdge) {
+		l->lm.moveTo(0.0, iconEdge);
+		l->lm.setAnchor(LayoutManager::UC);
+	    }
+	    __drawLabel(l);
+
+	    delete l;
+	}
+	geodPopMatrix();
     }
-    geodPopMatrix();
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -1148,7 +1138,8 @@ const float NDBRenderer::_dotScale = 0.1;
 // How fat to make NDB radials (degrees).
 const float NDBRenderer::_angularWidth = 2.5;
 
-NDBRenderer::NDBRenderer(): NavaidRenderer(1, _LayerCount), _radioactive(false)
+NDBRenderer::NDBRenderer(): 
+    WaypointRenderer(1, _LayerCount), _radioactive(false)
 {
     _isp.rangeScaleFactor = 0.1;
     _isp.minSize = 1.0;
@@ -1168,7 +1159,7 @@ void NDBRenderer::notification(Notification::type n)
     if ((n == Notification::Moved) ||
 	(n == Notification::Zoomed)) {
 	_layers[NDBLayer].invalidate();
-	_layers[NDBLabelLayer].invalidate();
+	_layers[LabelLayer].invalidate();
     } else if ((n == Notification::AircraftMoved) ||
 	       (n == Notification::NewFlightTrack)) {
 	// We don't need to redraw our radio layer if we have no NDBs
@@ -1190,7 +1181,7 @@ void NDBRenderer::notification(Notification::type n)
 	_radioactive = radioactive;
     }
 
-    NavaidRenderer::notification(n);
+    WaypointRenderer::notification(n);
 }
 
 // Create an NDB symbol and and NDB-DME symbol, in the WAC style.
@@ -1304,13 +1295,13 @@ void NDBRenderer::_createNDBSymbols()
     _NDBDMESymbolDL.end();
 }
 
-void NDBRenderer::_getNavaids(NavData *nd)
+void NDBRenderer::_getWaypoints(NavData *nd)
 {
     const vector<Cullable *>& intersections = nd->hits(NavData::NAVAIDS);
     for (unsigned int i = 0; i < intersections.size(); i++) {
 	NDB *ndb = dynamic_cast<NDB *>(intersections[i]);
 	if (ndb) {
-	    _navaids.push_back(ndb);
+	    _waypoints.push_back(ndb);
 	}
     }
 }
@@ -1327,162 +1318,155 @@ void NDBRenderer::_draw(bool labels)
     }
 
     // NDBs (layer 0)
-    NavaidRenderer::_drawLayer(NDBLayer);
+    _drawLayer(_layers[NDBLayer], &NDBRenderer::_drawNDBs);
 
     // Radio "beams" (layer 1)
     if (_radioactive) {
-	NavaidRenderer::_drawLayer(RadioLayer);
+	_drawLayer(_layers[RadioLayer], &NDBRenderer::_drawRadios);
     }
 
     // Labels (layer 2)
     if (labels) {
-	NavaidRenderer::_drawLayer(NDBLabelLayer);
-    }
-}
-
-void NDBRenderer::_drawNavaid(Navaid *n, int layer)
-{
-    NDB *ndb = dynamic_cast<NDB *>(n);
-    assert(ndb);
-    switch (layer) {
-      case NDBLayer:
-	_drawNDB(ndb);
-	break;
-      case RadioLayer:
-	_drawRadio(ndb);
-	break;
-      case NDBLabelLayer:
-	_drawNDBLabel(ndb);
-	break;
+	_drawLayer(_layers[LabelLayer], &NDBRenderer::_drawLabels);
     }
 }
 
 // Draw the given NDB.
-void NDBRenderer::_drawNDB(NDB *ndb)
+void NDBRenderer::_drawNDBs()
 {
-    // Scaled size of NDB icon, in pixels.
-    float radius;
-    if (!_iconVisible(ndb, _isp, radius)) {
-	return;
-    }
-    
-    geodPushMatrix(ndb->bounds().center, ndb->lat(), ndb->lon()); {
-	////////////////////
-	// NDB icon
-	////////////////////
-	glPushAttrib(GL_POINT_BIT); {
-	    // The dots in the NDB scale with the NDB icon.
-	    glPointSize(radius * _dotScale);
-
-	    float scale = radius * _metresPerPixel;
-	    glScalef(scale, scale, scale);
-
-	    // How we draw and label the NDB depends on if it's a
-	    // member of a navaid pair.
-	    NavaidSystem *sys = NavaidSystem::owner(ndb);
-	    if (!sys) {
-		// Standalone NDB.
-		_NDBSymbolDL.call();
-	    } else {
-		assert(dynamic_cast<NDB_DME *>(sys));
-		_NDBDMESymbolDL.call();
-	    }
-	    // EYE - Do LOMs?  An LOM is just an NDB on top of an
-	    // outer marker.  However, of the 24 LOMs listed in the
-	    // 850 file, 16 don't have corresponding outer markers.
-	    // What to do?
-	    //
-	    // A: check some LOMs on real VFR charts and see how
-	    // they're rendered.  Curiously, most of them are in
-	    // Denmark, and they're just rendered as regular NDBs.  I
-	    // suspect the Danish LOMs are actually just NDBs, and
-	    // mislabelled in nav.dat.
+    for (size_t i = 0; i < _waypoints.size(); i++) {
+	NDB *ndb = dynamic_cast<NDB *>(_waypoints[i]);
+	// Scaled size of NDB icon, in pixels.
+	float radius;
+	if (!_iconVisible(ndb, _isp, radius)) {
+	    return;
 	}
-	glPopAttrib();
-    }
-    geodPopMatrix();
-}
-
-void NDBRenderer::_drawRadio(NDB *ndb)
-{
-    // Are we tuned into this particular NDB?
-    if (_p->navaids().count(ndb) > 0) {
+    
 	geodPushMatrix(ndb->bounds().center, ndb->lat(), ndb->lon()); {
-	    // EYE - this seems like overkill.  Is there a simpler
-	    // way?  Really, I should be able to use a directly
-	    // calculated angle.  After all, the NDB doesn't
-	    // really care about the curvature of the earth.
-	    double rad, end, l;
-	    geo_inverse_wgs_84(ndb->lat(), ndb->lon(), 
-			       _p->lat, _p->lon, 
-			       &rad, &end, &l);
-	    glRotatef(180.0 - rad, 0.0, 0.0, 1.0);
-	    glScalef(ndb->range(), ndb->range(), ndb->range());
-	    __createTriangle(_angularWidth, globals.adfColour, 
-			     globals.adfColour, false);
+	    ////////////////////
+	    // NDB icon
+	    ////////////////////
+	    glPushAttrib(GL_POINT_BIT); {
+		// The dots in the NDB scale with the NDB icon.
+		glPointSize(radius * _dotScale);
+
+		float scale = radius * _metresPerPixel;
+		glScalef(scale, scale, scale);
+
+		// How we draw and label the NDB depends on if it's a
+		// member of a navaid pair.
+		NavaidSystem *sys = NavaidSystem::owner(ndb);
+		if (!sys) {
+		    // Standalone NDB.
+		    _NDBSymbolDL.call();
+		} else {
+		    assert(dynamic_cast<NDB_DME *>(sys));
+		    _NDBDMESymbolDL.call();
+		}
+		// EYE - Do LOMs?  An LOM is just an NDB on top of an
+		// outer marker.  However, of the 24 LOMs listed in
+		// the 850 file, 16 don't have corresponding outer
+		// markers.  What to do?
+		//
+		// A: check some LOMs on real VFR charts and see how
+		// they're rendered.  Curiously, most of them are in
+		// Denmark, and they're just rendered as regular NDBs.
+		// I suspect the Danish LOMs are actually just NDBs,
+		// and mislabelled in nav.dat.
+	    }
+	    glPopAttrib();
 	}
 	geodPopMatrix();
     }
 }
 
-void NDBRenderer::_drawNDBLabel(NDB *ndb)
+void NDBRenderer::_drawRadios()
 {
-    // Scaled size of NDB icon, in pixels.
-    float radius;
-    if (!_iconVisible(ndb, _isp, radius)) {
-	return;
-    }
-
-    // Range of NDB, in pixels.
-    float range = ndb->range() / _metresPerPixel;
-    if (range < __smallLabel) {
-	return;
-    }
-
-    // How we draw and label the NDB depends on if it's a member of a
-    // navaid pair.
-    NavaidSystem *sys = NavaidSystem::owner(ndb);
-
-    geodPushMatrix(ndb->bounds().center, ndb->lat(), ndb->lon()); {
-	float labelOffset = (radius + 5.0) * _metresPerPixel;
-	LayoutManager::Point lp = LayoutManager::LC;
-	if (range > __maximumLabel) {
-	    if (!sys) {
-		// Standalone NDB.
-		__drawLabel("%N\n%F %I %M", ndb, _isp.labelPointSize, 0, 
-			    labelOffset, lp);
-	    } else {
-		assert(dynamic_cast<NDB_DME *>(sys));
-		// NDB-DME
-
-		// EYE - drawLabel should check for pairs.  Or, we
-		// could have a separate drawLabel for
-		// NavaidSystems.
-		__drawLabel("%N\n%F (%f) %I %M", ndb, _isp.labelPointSize, 
-			    0, labelOffset, lp);
+    for (size_t i = 0; i < _waypoints.size(); i++) {
+	NDB *ndb = dynamic_cast<NDB *>(_waypoints[i]);
+	// Are we tuned into this particular NDB?
+	if (_p->navaids().count(ndb) > 0) {
+	    geodPushMatrix(ndb->bounds().center, ndb->lat(), ndb->lon()); {
+		// EYE - this seems like overkill.  Is there a simpler
+		// way?  Really, I should be able to use a directly
+		// calculated angle.  After all, the NDB doesn't
+		// really care about the curvature of the earth.
+		double rad, end, l;
+		geo_inverse_wgs_84(ndb->lat(), ndb->lon(), 
+				   _p->lat, _p->lon, 
+				   &rad, &end, &l);
+		glRotatef(180.0 - rad, 0.0, 0.0, 1.0);
+		glScalef(ndb->range(), ndb->range(), ndb->range());
+		__createTriangle(_angularWidth, globals.adfColour, 
+				 globals.adfColour, false);
 	    }
-	} else if (range > __mediumLabel) {
-	    if (!sys) {
-		// Standalone NDB.
-		__drawLabel("%F %I", ndb, _isp.labelPointSize, 0, labelOffset, 
-			    lp);
-	    } else {
-		// NDB-DME
-		__drawLabel("%F (%f) %I", ndb, _isp.labelPointSize, 0, 
-			    labelOffset, lp);
-	    }
-	} else {
-	    __drawLabel("%I", ndb, _isp.labelPointSize, 0, labelOffset, lp);
+	    geodPopMatrix();
 	}
     }
-    geodPopMatrix();
+}
+
+void NDBRenderer::_drawLabels()
+{
+    for (size_t i = 0; i < _waypoints.size(); i++) {
+	NDB *ndb = dynamic_cast<NDB *>(_waypoints[i]);
+
+	// Scaled size of NDB icon, in pixels.
+	float radius;
+	if (!_iconVisible(ndb, _isp, radius)) {
+	    return;
+	}
+
+	// Range of NDB, in pixels.
+	float range = ndb->range() / _metresPerPixel;
+	if (range < __smallLabel) {
+	    return;
+	}
+
+	// How we draw and label the NDB depends on if it's a member
+	// of a navaid pair.
+	NavaidSystem *sys = NavaidSystem::owner(ndb);
+
+	geodPushMatrix(ndb->bounds().center, ndb->lat(), ndb->lon()); {
+	    float labelOffset = (radius + 5.0) * _metresPerPixel;
+	    LayoutManager::Point lp = LayoutManager::LC;
+	    if (range > __maximumLabel) {
+		if (!sys) {
+		    // Standalone NDB.
+		    __drawLabel("%N\n%F %I %M", ndb, _isp.labelPointSize, 0, 
+				labelOffset, lp);
+		} else {
+		    assert(dynamic_cast<NDB_DME *>(sys));
+		    // NDB-DME
+
+		    // EYE - drawLabel should check for pairs.  Or, we
+		    // could have a separate drawLabel for
+		    // NavaidSystems.
+		    __drawLabel("%N\n%F (%f) %I %M", ndb, _isp.labelPointSize, 
+				0, labelOffset, lp);
+		}
+	    } else if (range > __mediumLabel) {
+		if (!sys) {
+		    // Standalone NDB.
+		    __drawLabel("%F %I", ndb, _isp.labelPointSize, 0, labelOffset, 
+				lp);
+		} else {
+		    // NDB-DME
+		    __drawLabel("%F (%f) %I", ndb, _isp.labelPointSize, 0, 
+				labelOffset, lp);
+		}
+	    } else {
+		__drawLabel("%I", ndb, _isp.labelPointSize, 0, labelOffset, lp);
+	    }
+	}
+	geodPopMatrix();
+    }
 }
 
 //////////////////////////////////////////////////////////////////////
 // DMERenderer
 //////////////////////////////////////////////////////////////////////
 
-DMERenderer::DMERenderer(): NavaidRenderer(1, _LayerCount)
+DMERenderer::DMERenderer(): WaypointRenderer(1, _LayerCount)
 {
     _isp.rangeScaleFactor = 0.1;
     _isp.minSize = 1.0;
@@ -1494,10 +1478,10 @@ void DMERenderer::notification(Notification::type n)
     if ((n == Notification::Moved) ||
 	(n == Notification::Zoomed)) {
 	_layers[DMELayer].invalidate();
-	_layers[DMELabelLayer].invalidate();
+	_layers[LabelLayer].invalidate();
     }
 
-    NavaidRenderer::notification(n);
+    WaypointRenderer::notification(n);
 }
 
 // Creates DME symbols - TACANs and stand-alone DMEs (this includes
@@ -1565,7 +1549,7 @@ void DMERenderer::_createDMESymbols()
     _DMESymbolDL.end();
 }
 
-void DMERenderer::_getNavaids(NavData *nd)
+void DMERenderer::_getWaypoints(NavData *nd)
 {
     const vector<Cullable *>& intersections = nd->hits(NavData::NAVAIDS);
     for (unsigned int i = 0; i < intersections.size(); i++) {
@@ -1575,7 +1559,7 @@ void DMERenderer::_getNavaids(NavData *nd)
 	// (VOR-DME, VORTAC, NDB-DME, or ILS), then they will be
 	// rendered elsewhere.
 	if (dme && !NavaidSystem::owner(dme)) {
-	    _navaids.push_back(dme);
+	    _waypoints.push_back(dme);
 	}
     }
 }
@@ -1590,111 +1574,235 @@ void DMERenderer::_draw(bool labels)
     }
 
     // DMEs (layer 0)
-    NavaidRenderer::_drawLayer(DMELayer);
+    _drawLayer(_layers[DMELayer], &DMERenderer::_drawDMEs);
 
     // Labels (layer 1)
     if (labels) {
-	NavaidRenderer::_drawLayer(DMELabelLayer);
-    }
-}
-
-void DMERenderer::_drawNavaid(Navaid *n, int layer)
-{
-    DME *dme = dynamic_cast<DME *>(n);
-    assert(dme);
-    switch (layer) {
-      case DMELayer:
-	_drawDME(dme);
-	break;
-      case DMELabelLayer:
-	_drawDMELabel(dme);
-	break;
+	_drawLayer(_layers[LabelLayer], &DMERenderer::_drawLabels);
     }
 }
 
 // Renders a stand-alone DME.
-void DMERenderer::_drawDME(DME *dme)
+void DMERenderer::_drawDMEs()
 {
-    // Scaled size of DME, in pixels.  We try to draw the DME at this
-    // radius, as long as it won't be too small or too big.
-    float radius;
-    if (!_iconVisible(dme, _isp, radius)) {
-	return;
-    }
+    for (size_t i = 0; i < _waypoints.size(); i++) {
+	DME *dme = dynamic_cast<DME *>(_waypoints[i]);
 
-    // We draw DMEs in 2 different ways here: DMEs and TACANs.
-    bool isTACAN;
-    isTACAN = (dynamic_cast<TACAN *>(dme) != NULL);
-
-    geodPushMatrix(dme->bounds().center, dme->lat(), dme->lon()); {
-	////////////////////
-	// DME icon
-	////////////////////
-	glPushMatrix();
-	glPushAttrib(GL_LINE_BIT); {
-	    // A line width of 1 makes it too hard to pick out, at
-	    // least when drawn in grey.
-	    glLineWidth(2.0);
-
-	    float scale = radius * _metresPerPixel;
-	    glScalef(scale, scale, scale);
-	
-	    if (isTACAN) {
-		_TACANSymbolDL.call();
-	    } else {
-		_DMESymbolDL.call();
-	    }
+	// Scaled size of DME, in pixels.  We try to draw the DME at
+	// this radius, as long as it won't be too small or too big.
+	float radius;
+	if (!_iconVisible(dme, _isp, radius)) {
+	    return;
 	}
-	glPopAttrib();
-	glPopMatrix();
+
+	// We draw DMEs in 2 different ways here: DMEs and TACANs.
+	bool isTACAN;
+	isTACAN = (dynamic_cast<TACAN *>(dme) != NULL);
+
+	geodPushMatrix(dme->bounds().center, dme->lat(), dme->lon()); {
+	    ////////////////////
+	    // DME icon
+	    ////////////////////
+	    glPushMatrix();
+	    glPushAttrib(GL_LINE_BIT); {
+		// A line width of 1 makes it too hard to pick out, at
+		// least when drawn in grey.
+		glLineWidth(2.0);
+
+		float scale = radius * _metresPerPixel;
+		glScalef(scale, scale, scale);
+	
+		if (isTACAN) {
+		    _TACANSymbolDL.call();
+		} else {
+		    _DMESymbolDL.call();
+		}
+	    }
+	    glPopAttrib();
+	    glPopMatrix();
+	}
+	geodPopMatrix();
     }
-    geodPopMatrix();
 }
 
-void DMERenderer::_drawDMELabel(DME *dme)
+void DMERenderer::_drawLabels()
 {
-    float radius;
-    if (!_iconVisible(dme, _isp, radius)) {
+    for (size_t i = 0; i < _waypoints.size(); i++) {
+	DME *dme = dynamic_cast<DME *>(_waypoints[i]);
+	float radius;
+	if (!_iconVisible(dme, _isp, radius)) {
+	    return;
+	}
+
+	// Range of DME, in pixels.
+	float range = dme->range() / _metresPerPixel;
+	if (range < __smallLabel) {
+	    return;
+	}
+
+	geodPushMatrix(dme->bounds().center, dme->lat(), dme->lon()); {
+	    // Put the DME name, frequency, id, and morse code in a
+	    // box above the icon (separated by a bit of space).  The
+	    // box has a translucent white background with a solid
+	    // border to make it easier to read.  TACANs have an
+	    // explicit "DME" in their labels (unless we've zoomed out
+	    // too far).
+	    float labelOffset = (radius + 5.0) * _metresPerPixel;
+	    LayoutManager::Point lp = LayoutManager::LC;
+	    bool isTACAN = (dynamic_cast<TACAN *>(dme) != NULL);
+
+	    if (range > __maximumLabel) {
+		if (isTACAN) {
+		    __drawLabel("%N\nDME %F %I %M", dme, _isp.labelPointSize, 
+				0.0, labelOffset, lp);
+		} else {
+		    __drawLabel("%N\n%F %I %M", dme, _isp.labelPointSize, 0.0, 
+				labelOffset, lp);
+		}
+	    } else if (range > __mediumLabel) {
+		if (isTACAN) {
+		    __drawLabel("DME %F %I", dme, _isp.labelPointSize, 0.0, 
+				labelOffset, lp);
+		} else {
+		    __drawLabel("%F %I", dme, _isp.labelPointSize, 0.0, 
+				labelOffset, lp);
+		}
+	    } else {
+		__drawLabel("%I", dme, _isp.labelPointSize, 0.0, labelOffset, 
+			    lp);
+	    }
+	}
+	geodPopMatrix();
+    }
+}
+
+//////////////////////////////////////////////////////////////////////
+// FixRenderer
+//////////////////////////////////////////////////////////////////////
+
+// EYE - make these part of class?  Put above where all the other
+// constants are?
+
+// Above this level, no fixes are drawn.
+const float noLevel = 1250.0;
+// Above this level, but below noLevel, enroute fixes are drawn.
+const float enrouteLevel = 250.0;
+// EYE - doesn't seem to be true - we draw both
+// Below enRouteLevel, only approach fixes are drawn.
+
+// Bright yellow.
+const float enroute_fix_colour[4] = {1.0, 1.0, 0.0, 0.7};
+const float terminal_fix_colour[4] = {1.0, 0.0, 1.0, 0.7};
+
+// EYE - match __ilsLabelColour?
+const float fix_label_colour[4] = {0.2, 0.2, 0.2, 0.7};
+
+FixRenderer::FixRenderer(): WaypointRenderer(1, _LayerCount)
+{
+}
+
+void FixRenderer::notification(Notification::type n)
+{
+    if ((n == Notification::Moved) ||
+	(n == Notification::Zoomed)) {
+	_layers[FixLayer].invalidate();
+	_layers[LabelLayer].invalidate();
+    }
+
+    WaypointRenderer::notification(n);
+}
+
+void FixRenderer::_getWaypoints(NavData *nd)
+{
+    // If we're zoomed out far, we don't do anything.
+    if (_metresPerPixel > noLevel) {
 	return;
     }
 
-    // Range of DME, in pixels.
-    float range = dme->range() / _metresPerPixel;
-    if (range < __smallLabel) {
-	return;
-    }
-
-    geodPushMatrix(dme->bounds().center, dme->lat(), dme->lon()); {
-	// Put the DME name, frequency, id, and morse code in a box
-	// above the icon (separated by a bit of space).  The box has
-	// a translucent white background with a solid border to make
-	// it easier to read.  TACANs have an explicit "DME" in their
-	// labels (unless we've zoomed out too far).
-	float labelOffset = (radius + 5.0) * _metresPerPixel;
-	LayoutManager::Point lp = LayoutManager::LC;
-	bool isTACAN = (dynamic_cast<TACAN *>(dme) != NULL);
-
-	if (range > __maximumLabel) {
-	    if (isTACAN) {
-		__drawLabel("%N\nDME %F %I %M", dme, _isp.labelPointSize, 0.0, 
-			    labelOffset, lp);
-	    } else {
-		__drawLabel("%N\n%F %I %M", dme, _isp.labelPointSize, 0.0, 
-			    labelOffset, lp);
-	    }
-	} else if (range > __mediumLabel) {
-	    if (isTACAN) {
-		__drawLabel("DME %F %I", dme, _isp.labelPointSize, 0.0, 
-			    labelOffset, lp);
-	    } else {
-		__drawLabel("%F %I", dme, _isp.labelPointSize, 0.0, 
-			    labelOffset, lp);
-	    }
-	} else {
-	    __drawLabel("%I", dme, _isp.labelPointSize, 0.0, labelOffset, lp);
+    const vector<Cullable *>& intersections = nd->hits(NavData::FIXES);
+    for (unsigned int i = 0; i < intersections.size(); i++) {
+	Fix *fix = dynamic_cast<Fix *>(intersections[i]);
+	if (fix) {
+	    _waypoints.push_back(fix);
 	}
     }
-    geodPopMatrix();
+}
+
+void FixRenderer::_draw(bool labels)
+{
+    assert(_currentPass == 0);
+
+    // If we're zoomed out far, we don't draw anything.
+    if (_metresPerPixel >= noLevel) {
+	return;
+    }
+
+    // Fixes (layer 0)
+    _drawLayer(_layers[FixLayer], &FixRenderer::_drawFixes);
+
+    // Labels (layer 1)
+    if (labels) {
+	_drawLayer(_layers[LabelLayer], &FixRenderer::_drawLabels);
+    }
+}
+
+// Renders a stand-alone Fix (a dot).
+void FixRenderer::_drawFixes()
+{
+    for (size_t i = 0; i < _waypoints.size(); i++) {
+	Fix *fix = dynamic_cast<Fix *>(_waypoints[i]);
+
+	// EYE - another constant
+	// Size of point used to represent the fix.
+	const float fixSize = 4.0;
+
+	if (!fix->isTerminal() && (_metresPerPixel < noLevel)) {
+	    glColor4fv(enroute_fix_colour);
+	} else if (fix->isTerminal() && (_metresPerPixel < enrouteLevel)) {
+	    glColor4fv(terminal_fix_colour);
+	} else {
+	    continue;
+	}
+
+	glPushAttrib(GL_POINT_BIT); {
+	    // We use a non-standard point size, so we need to wrap
+	    // this in a glPushAttrib().
+	    glPointSize(fixSize);
+	    geodPushMatrix(fix->bounds().center, fix->lat(), fix->lon()); {
+		glBegin(GL_POINTS); {
+		    glVertex2f(0.0, 0.0);
+		}
+		glEnd();
+	    }
+	    geodPopMatrix();
+	}
+	glPopAttrib();
+    }
+}
+
+void FixRenderer::_drawLabels()
+{
+    // EYE - magic number
+    const float labelOffset = _metresPerPixel * 5.0;
+
+    // EYE - make lm part of class?
+    LayoutManager lm;
+    glColor4fv(fix_label_colour);
+    lm.setFont(globals.aw->regularFont(), _labelPointSize);
+    for (size_t i = 0; i < _waypoints.size(); i++) {
+	Fix *fix = dynamic_cast<Fix *>(_waypoints[i]);
+
+	lm.setText(fix->id());
+	if (!fix->isTerminal() && (_metresPerPixel < noLevel)) {
+	    lm.moveTo(labelOffset, 0.0, LayoutManager::CL);
+	} else if (fix->isTerminal() && (_metresPerPixel < enrouteLevel)) {
+	    lm.moveTo(-labelOffset, 0.0, LayoutManager::CR);
+	} else {
+	    continue;
+	}
+
+	geodDrawText(lm, fix->bounds().center, fix->lat(), fix->lon());
+    }
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -1704,7 +1812,8 @@ void DMERenderer::_drawDMELabel(DME *dme)
 // How much to scale the ILS DME icon compared to a standard icon.
 const float ILSRenderer::_DMEScale = 0.5;
 
-ILSRenderer::ILSRenderer(): NavaidRenderer(2, _LayerCount), _radioactive(false)
+ILSRenderer::ILSRenderer(): 
+    WaypointRenderer(2, _LayerCount), _radioactive(false)
 {
     subscribe(Notification::AircraftMoved);
     subscribe(Notification::NewFlightTrack);
@@ -1734,7 +1843,7 @@ void ILSRenderer::notification(Notification::type n)
 	_layers[LOCLabelLayer].invalidate();
     }
 
-    NavaidRenderer::notification(n);
+    WaypointRenderer::notification(n);
 }
 
 // Creates ILS localizer symbol, with a length of 1.  The symbol is
@@ -1877,12 +1986,12 @@ void ILSRenderer::_createDMESymbol()
     _DMESymbolDL.end();
 }
 
-void ILSRenderer::_getNavaids(NavData *nd)
+void ILSRenderer::_getWaypoints(NavData *nd)
 {
     const vector<Cullable *>& intersections = nd->hits(NavData::NAVAIDS);
     for (unsigned int i = 0; i < intersections.size(); i++) {
 	if (LOC *loc = dynamic_cast<LOC *>(intersections[i])) {
-	    _navaids.push_back(loc);
+	    _waypoints.push_back(loc);
 	}
     }
 }
@@ -1898,49 +2007,25 @@ void ILSRenderer::_draw(bool labels)
 
     if (_currentPass == 0) {
 	// 0: Markers
-	NavaidRenderer::_drawLayer(MarkerLayer);
+	_drawLayer(_layers[MarkerLayer], &ILSRenderer::_drawMarkers);
 
 	// 1: Localizers (tuned-in and not tuned-in)
-	NavaidRenderer::_drawLayer(LOCLayer);
+	_drawLayer(_layers[LOCLayer], &ILSRenderer::_drawLOCs);
 
 	// 2: Localizer labels
 	if (labels) {
-	    NavaidRenderer::_drawLayer(LOCLabelLayer);
+	    _drawLayer(_layers[LOCLabelLayer], &ILSRenderer::_drawLOCLabels);
 	}
     } else if (_currentPass == 1) {
 	// 3: DMEs
-	NavaidRenderer::_drawLayer(DMELayer);
+	_drawLayer(_layers[DMELayer], &ILSRenderer::_drawDMEs);
 
 	// 4: DME labels
 	if (labels) {
-	    NavaidRenderer::_drawLayer(DMELabelLayer);
+	    _drawLayer(_layers[DMELabelLayer], &ILSRenderer::_drawDMELabels);
 	}
     } else {
 	assert(false);
-    }
-}
-
-void ILSRenderer::_drawNavaid(Navaid *n, int layer)
-{
-    LOC *loc = dynamic_cast<LOC *>(n);
-    assert(loc);
-    ILS *ils = dynamic_cast<ILS *>(NavaidSystem::owner(loc));
-    switch (layer) {
-      case MarkerLayer:
-	_drawMarkers(ils);
-	break;
-      case LOCLayer:
-	_drawLOC(ils);
-	break;
-      case LOCLabelLayer:
-	_drawLOCLabel(ils);
-	break;
-      case DMELayer:
-	_drawDME(ils);
-	break;
-      case DMELabelLayer:
-	_drawDMELabel(ils);
-	break;
     }
 }
 
@@ -1989,67 +2074,77 @@ bool ILSRenderer::_ILSVisible(ILS *ils, DrawingParams& p)
     return (p.length / _metresPerPixel > minimumLength);
 }
 
-void ILSRenderer::_drawMarkers(ILS *ils)
+void ILSRenderer::_drawMarkers()
 {
-    DrawingParams p;
-    if (!_ILSVisible(ils, p)) {
-	return;
-    }
+    for (size_t i = 0; i < _waypoints.size(); i++) {
+	ILS *ils = ILS::ils(dynamic_cast<LOC *>(_waypoints[i]));
 
-    const set<Marker *>& markers = ils->markers();
-    set<Marker *>::iterator it;
-    for (it = markers.begin(); it != markers.end(); it++) {
-	Marker *m = *it;
-
-	// If we're getting desperate, we could test marker sizes, and
-	// not draw them if they're too small.  But it's easier just
-	// to draw them whenever the ILS as a whole is rendered.
-	geodPushMatrix(m->bounds().center, m->lat(), m->lon()); {
-	    glRotatef(-m->heading() + 90.0, 0.0, 0.0, 1.0);
-	    _ILSMarkerDLs[m->type()].call();
+	DrawingParams p;
+	if (!_ILSVisible(ils, p)) {
+	    return;
 	}
-	geodPopMatrix();
+
+	const set<Marker *>& markers = ils->markers();
+	set<Marker *>::iterator it;
+	for (it = markers.begin(); it != markers.end(); it++) {
+	    Marker *m = *it;
+
+	    // If we're getting desperate, we could test marker sizes,
+	    // and not draw them if they're too small.  But it's
+	    // easier just to draw them whenever the ILS as a whole is
+	    // rendered.
+	    geodPushMatrix(m->bounds().center, m->lat(), m->lon()); {
+		glRotatef(-m->heading() + 90.0, 0.0, 0.0, 1.0);
+		_ILSMarkerDLs[m->type()].call();
+	    }
+	    geodPopMatrix();
+	}
     }
 }
 
-void ILSRenderer::_drawLOC(ILS *ils)
+void ILSRenderer::_drawLOCs()
 {
-    DrawingParams p;
-    if (!_ILSVisible(ils, p)) {
-	return;
-    }
+    for (size_t i = 0; i < _waypoints.size(); i++) {
+	ILS *ils = ILS::ils(dynamic_cast<LOC *>(_waypoints[i]));
 
-    // EYE - the ilsWidth value is only used for live localizers.
-    // Should we use it when creating the ILS localizer symbols?
-
-    // Localizers are drawn 3 degrees wide.  This is an approximation,
-    // as localizer angular widths actually vary.  According to the
-    // FAA AIM, localizers are adjusted so that they are 700' wide at
-    // the runway threshold.  Localizers on long runways then, have a
-    // smaller angular width than those on short runways.  We're not
-    // going for full physical accuracy, but rather for a symbolic
-    // representation of reality, so 3.0 is good enough.
-    const float ilsWidth = 3.0;
-
-    geodPushMatrix(p.loc->bounds().center, p.loc->lat(), p.loc->lon()); {
-	glPushMatrix(); {
-	    glRotatef(-p.loc->heading(), 0.0, 0.0, 1.0);
-	    glScalef(p.length, p.length, p.length);
-	    if (p.live) {
-		// // We draw two triangles: one for the front course and
-		// // one for the back course.
-		// __createTriangle(ilsWidth, __clearColour, ilsColour, true);
-		// Don't draw a back course.
-		__createTriangle(ilsWidth, __clearColour, p.colour, false);
-	    } else if (ils->gs()) {
-		_ILSSymbolDL.call();
-	    } else {
-		_LOCSymbolDL.call();
-	    }
+	DrawingParams p;
+	if (!_ILSVisible(ils, p)) {
+	    return;
 	}
-	glPopMatrix();
+
+	// EYE - the ilsWidth value is only used for live localizers.
+	// Should we use it when creating the ILS localizer symbols?
+
+	// Localizers are drawn 3 degrees wide.  This is an
+	// approximation, as localizer angular widths actually vary.
+	// According to the FAA AIM, localizers are adjusted so that
+	// they are 700' wide at the runway threshold.  Localizers on
+	// long runways then, have a smaller angular width than those
+	// on short runways.  We're not going for full physical
+	// accuracy, but rather for a symbolic representation of
+	// reality, so 3.0 is good enough.
+	const float ilsWidth = 3.0;
+
+	geodPushMatrix(p.loc->bounds().center, p.loc->lat(), p.loc->lon()); {
+	    glPushMatrix(); {
+		glRotatef(-p.loc->heading(), 0.0, 0.0, 1.0);
+		glScalef(p.length, p.length, p.length);
+		if (p.live) {
+		    // // We draw two triangles: one for the front course
+		    // // and one for the back course.
+		    // __createTriangle(ilsWidth, __clearColour, ilsColour, true);
+		    // Don't draw a back course.
+		    __createTriangle(ilsWidth, __clearColour, p.colour, false);
+		} else if (ils->gs()) {
+		    _ILSSymbolDL.call();
+		} else {
+		    _LOCSymbolDL.call();
+		}
+	    }
+	    glPopMatrix();
+	}
+	geodPopMatrix();
     }
-    geodPopMatrix();
 }
 
 // ILS
@@ -2066,141 +2161,158 @@ void ILSRenderer::_drawLOC(ILS *ils)
 //
 // full name	   | heading
 // freq, id, morse |
-void ILSRenderer::_drawLOCLabel(ILS *ils)
+void ILSRenderer::_drawLOCLabels()
 {
-    DrawingParams p;
-    if (!_ILSVisible(ils, p)) {
-	return;
+    for (size_t i = 0; i < _waypoints.size(); i++) {
+	ILS *ils = ILS::ils(dynamic_cast<LOC *>(_waypoints[i]));
+
+	DrawingParams p;
+	if (!_ILSVisible(ils, p)) {
+	    return;
+	}
+
+	geodPushMatrix(p.loc->bounds().center, p.loc->lat(), p.loc->lon()); {
+	    // Label the ILS.
+	    if (p.loc->heading() < 180.0) {
+		glRotatef(-(p.loc->heading() + 270.0), 0.0, 0.0, 1.0);
+	    } else {
+		glRotatef(-(p.loc->heading() + 90.0), 0.0, 0.0, 1.0);
+	    }
+
+	    // Slightly translucent colours look better than opaque
+	    // ones, and they look better if there's a coloured
+	    // background (as we have with the box around VORs and
+	    // NDBs).
+	    glColor4fv(__ilsLabelColour);
+	    float offset;
+	    if (p.loc->heading() < 180.0) {
+		// EYE - a bit ugly - because we're using
+		// __renderMorse(), we have to have GL units as metres
+		// (fix this somehow?), so we can't call glScalef(),
+		// so we have to scale everything ourselves.
+		offset = -0.5 * p.length;
+	    } else {
+		offset = 0.5 * p.length;
+	    }
+
+	    // We draw the ILS in a single style, but it might be
+	    // better to alter it depending on the scale.
+	    __drawLabel("RWY %N\n%F %I %M", p.loc, p.pointSize, offset, 0.0);
+
+	    // Now add a heading near the end.
+	    // EYE - magic number
+	    offset *= 1.75;
+	    LayoutManager lm;
+	    // EYE - magic number
+	    lm.setFont(globals.aw->regularFont(), p.pointSize * 1.25);
+	    lm.begin(offset, 0.0);
+	    // EYE - just record this once, when the navaid is loaded?
+	    double magvar = 0.0;
+	    const char *magTrue = "T";
+	    // EYE - these accessor chains are getting pretty long.
+	    if (globals.aw->ac()->magTrue()) {
+		magvar = magneticVariation(p.loc->lat(), p.loc->lon(), 
+					   p.loc->elev());
+		magTrue = "";
+	    }
+	    int heading = 
+		normalizeHeading(rint(p.loc->heading() - magvar), false);
+
+	    // EYE - we should add the glideslope too, if it has one
+	    // (eg, "284@3.00")
+
+	    globals.str.printf("%03d%c%s", heading, degreeSymbol, magTrue);
+	    lm.addText(globals.str.str());
+	    lm.end();
+
+	    glColor4fv(__ilsLabelColour);
+	    lm.drawText();
+	}
+	geodPopMatrix();
     }
-
-    geodPushMatrix(p.loc->bounds().center, p.loc->lat(), p.loc->lon()); {
-	// Label the ILS.
-	if (p.loc->heading() < 180.0) {
-	    glRotatef(-(p.loc->heading() + 270.0), 0.0, 0.0, 1.0);
-	} else {
-	    glRotatef(-(p.loc->heading() + 90.0), 0.0, 0.0, 1.0);
-	}
-
-	// Slightly translucent colours look better than opaque ones,
-	// and they look better if there's a coloured background (as
-	// we have with the box around VORs and NDBs).
-	glColor4fv(__ilsLabelColour);
-	float offset;
-	if (p.loc->heading() < 180.0) {
-	    // EYE - a bit ugly - because we're using __renderMorse(),
-	    // we have to have GL units as metres (fix this somehow?),
-	    // so we can't call glScalef(), so we have to scale
-	    // everything ourselves.
-	    offset = -0.5 * p.length;
-	} else {
-	    offset = 0.5 * p.length;
-	}
-
-	// We draw the ILS in a single style, but it might be
-	// better to alter it depending on the scale.
-	__drawLabel("RWY %N\n%F %I %M", p.loc, p.pointSize, offset, 0.0);
-
-	// Now add a heading near the end.
-	// EYE - magic number
-	offset *= 1.75;
-	LayoutManager lm;
-	// EYE - magic number
-	lm.setFont(globals.aw->regularFont(), p.pointSize * 1.25);
-	lm.begin(offset, 0.0);
-	// EYE - just record this once, when the navaid is loaded?
-	double magvar = 0.0;
-	const char *magTrue = "T";
-	// EYE - these accessor chains are getting pretty long.
-	if (globals.aw->ac()->magTrue()) {
-	    magvar = magneticVariation(p.loc->lat(), p.loc->lon(), 
-				       p.loc->elev());
-	    magTrue = "";
-	}
-	int heading = 
-	    normalizeHeading(rint(p.loc->heading() - magvar), false);
-
-	// EYE - we should add the glideslope too, if it has
-	// one (eg, "284@3.00")
-
-	globals.str.printf("%03d%c%s", heading, degreeSymbol, magTrue);
-	lm.addText(globals.str.str());
-	lm.end();
-
-	glColor4fv(__ilsLabelColour);
-	lm.drawText();
-    }
-    geodPopMatrix();
 }
 
-void ILSRenderer::_drawDME(ILS *ils)
+void ILSRenderer::_drawDMEs()
 {
-    DME *dme = ils->dme();
-    if (!dme) {
-	// Not all ILS systems have DMEs.
-	return;
-    }
+    // EYE - if performance is an issue, it might help to move some of
+    // the OpenGL calls to the outside of this loop.  For example, we
+    // don't need to set the line width over and over again - it only
+    // needs to be done once.  This applies to all the _drawFoos()
+    // methods.
+    for (size_t i = 0; i < _waypoints.size(); i++) {
+	ILS *ils = ILS::ils(dynamic_cast<LOC *>(_waypoints[i]));
 
-    DrawingParams p;
-    if (!_ILSVisible(ils, p)) {
-	return;
-    }
-
-    float iconSize = _DMEScale * __iconSize;
-
-    geodPushMatrix(dme->bounds().center, dme->lat(), dme->lon()); {
-	glPushMatrix();
-	glPushAttrib(GL_LINE_BIT); {
-	    // A line width of 1 makes it too hard to pick out, at
-	    // least when drawn in grey.
-	    glLineWidth(2.0);
-
-	    float scale = iconSize * _metresPerPixel;
-	    glScalef(scale, scale, scale);
-	    _DMESymbolDL.call();
+	DME *dme = ils->dme();
+	if (!dme) {
+	    // Not all ILS systems have DMEs.
+	    continue;
 	}
-	glPopAttrib();
-	glPopMatrix();
+
+	DrawingParams p;
+	if (!_ILSVisible(ils, p)) {
+	    return;
+	}
+
+	float scale = _DMEScale * __iconSize * _metresPerPixel;
+
+	geodPushMatrix(dme->bounds().center, dme->lat(), dme->lon()); {
+	    glPushMatrix();
+	    glPushAttrib(GL_LINE_BIT); {
+		// A line width of 1 makes it too hard to pick out, at
+		// least when drawn in grey.
+		glLineWidth(2.0);
+
+		glScalef(scale, scale, scale);
+		_DMESymbolDL.call();
+	    }
+	    glPopAttrib();
+	    glPopMatrix();
+	}
+	geodPopMatrix();
     }
-    geodPopMatrix();
 }
 
-void ILSRenderer::_drawDMELabel(ILS *ils)
+void ILSRenderer::_drawDMELabels()
 {
-    DME *dme = ils->dme();
-    if (!dme) {
-	// Not all ILS systems have DMEs.
-	return;
+    for (size_t i = 0; i < _waypoints.size(); i++) {
+	ILS *ils = ILS::ils(dynamic_cast<LOC *>(_waypoints[i]));
+
+	DME *dme = ils->dme();
+	if (!dme) {
+	    // Not all ILS systems have DMEs.
+	    continue;
+	}
+
+	DrawingParams p;
+	if (!_ILSVisible(ils, p)) {
+	    return;
+	}
+
+	// EYE - should we scale the DME as we zoom out?  If so, we
+	// need to decide the point at which the scaling should begin.
+	// We could adopt the approach taken in _ILSVisible for
+	// scaling fonts, where scaling begins at a fixed zoom level.
+	float iconSize = _DMEScale * __iconSize;
+
+	geodPushMatrix(dme->bounds().center, dme->lat(), dme->lon()); {
+	    // Put the DME name, frequency, id, and morse code in a
+	    // box above the icon (separated by a bit of space).  The
+	    // box has a translucent white background with a solid
+	    // border to make it easier to read.
+	    float offset = (iconSize + 5.0) * _metresPerPixel;
+	    LayoutManager::Point lp = LayoutManager::LC;
+
+	    // EYE - what about overlapping DMEs?  London Heathrow has
+	    // ILL and IBB on top of each other, as well as IAA and
+	    // IRR.  Is this common?  It's not a mistake, as the EGLL
+	    // airport diagram shows them co-located.  Tricky.
+
+	    // Since ILS DMEs have the same frequency as the
+	    // corresponding localizer, we don't display frequencies.
+	    __drawLabel("%I", dme, p.pointSize, 0.0, offset, lp);
+	}
+	geodPopMatrix();
     }
-
-    DrawingParams p;
-    if (!_ILSVisible(ils, p)) {
-	return;
-    }
-
-    // EYE - should we scale the DME as we zoom out?  If so, we need
-    // to decide the point at which the scaling should begin.  We
-    // could adopt the approach taken in _ILSVisible for scaling
-    // fonts, where scaling begins at a fixed zoom level.
-    float iconSize = _DMEScale * __iconSize;
-
-    geodPushMatrix(dme->bounds().center, dme->lat(), dme->lon()); {
-	// Put the DME name, frequency, id, and morse code in a
-	// box above the icon (separated by a bit of space).  The
-	// box has a translucent white background with a solid
-	// border to make it easier to read.
-	float offset = (iconSize + 5.0) * _metresPerPixel;
-	LayoutManager::Point lp = LayoutManager::LC;
-
-	// EYE - what about overlapping DMEs?  London Heathrow has ILL
-	// and IBB on top of each other, as well as IAA and IRR.  Is
-	// this common?  It's not a mistake, as the EGLL airport
-	// diagram shows them co-located.  Tricky.
-
-	// Since ILS DMEs have the same frequency as the corresponding
-	// localizer, we don't display frequencies.
-	__drawLabel("%I", dme, p.pointSize, 0.0, offset, lp);
-    }
-    geodPopMatrix();
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -2227,6 +2339,8 @@ void NavaidsOverlay::draw(NavData *navData, Overlays::OverlayType t,
 	_nr.draw(navData, labels);
     } else if (t == Overlays::DME) {
 	_dr.draw(navData, labels);
+    } else if (t == Overlays::FIXES) {
+	_fr.draw(navData, labels);
     } else if (t == Overlays::ILS) {
 	_ir.draw(navData, labels);
     }
