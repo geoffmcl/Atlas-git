@@ -983,6 +983,11 @@ void ILS::addMarker(Marker *m)
     add(m);
 }
 
+ILS *ILS::ils(LOC *loc)
+{
+    return dynamic_cast<ILS *>(NavaidSystem::owner(loc));
+}
+
 ostream& operator<<(ostream& os, const ILS& ils)
 {
     os << "ILS (" ;

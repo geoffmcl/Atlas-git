@@ -548,6 +548,9 @@ class ILS: public NavaidSystem {
     DME *dme() const { return _dme; }
     const std::set<Marker *>& markers() const { return _markers; }
 
+    // A handy shortcut - given a localizer, what is its owning ILS?
+    static ILS *ils(LOC *loc);
+
     const std::string& id() const { return loc()->id(); }
     const std::string& name() const { return loc()->name(); }
 
