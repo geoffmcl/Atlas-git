@@ -36,7 +36,11 @@ class AirportsOverlay;
 class AirwaysOverlay;
 class CrosshairsOverlay;
 class FlightTracksOverlay;
-class NavaidsOverlay;
+class VOROverlay;
+class NDBOverlay;
+class DMEOverlay;
+class FixOverlay;
+class ILSOverlay;
 class RangeRingsOverlay;
 
 class AtlasController;
@@ -66,7 +70,11 @@ class Overlays {
     bool isVisible(OverlayType type);
 
     AirportsOverlay* airportsOverlay() { return _airports; }
-    NavaidsOverlay* navaidsOverlay() { return _navaids; }
+    VOROverlay* vorOverlay() { return _VORs; }
+    NDBOverlay* ndbOverlay() { return _NDBs; }
+    DMEOverlay* dmeOverlay() { return _DMEs; }
+    FixOverlay* fixOverlay() { return _Fixes; }
+    ILSOverlay* ilsOverlay() { return _ILSs; }
     AirwaysOverlay* airwaysOverlay() { return _airways; }
     FlightTracksOverlay* flightTracksOverlay() { return _tracks; }
     CrosshairsOverlay* crosshairsOverlay() { return _crosshairs; }
@@ -77,7 +85,11 @@ class Overlays {
     std::bitset<_LAST> _overlays;
 
     AirportsOverlay *_airports;
-    NavaidsOverlay *_navaids;
+    VOROverlay *_VORs;
+    NDBOverlay *_NDBs;
+    DMEOverlay *_DMEs;
+    FixOverlay *_Fixes;
+    ILSOverlay *_ILSs;
     AirwaysOverlay *_airways;
     FlightTracksOverlay *_tracks;
     CrosshairsOverlay *_crosshairs;

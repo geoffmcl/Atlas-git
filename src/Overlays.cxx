@@ -56,7 +56,11 @@ Overlays::Overlays(AtlasWindow *aw): _aw(aw)
 {
     // Load data.
     _airports = new AirportsOverlay(*this);
-    _navaids = new NavaidsOverlay();
+    _VORs = new VOROverlay();
+    _NDBs = new NDBOverlay();
+    _DMEs = new DMEOverlay();
+    _Fixes = new FixOverlay();
+    _ILSs = new ILSOverlay();
     _airways = new AirwaysOverlay(*this);
     _tracks = new FlightTracksOverlay(*this);
     _crosshairs = new CrosshairsOverlay(*this);
@@ -66,7 +70,11 @@ Overlays::Overlays(AtlasWindow *aw): _aw(aw)
 Overlays::~Overlays()
 {
     delete _airports;
-    delete _navaids;
+    delete _VORs;
+    delete _NDBs;
+    delete _DMEs;
+    delete _Fixes;
+    delete _ILSs;
     delete _airways;
     delete _tracks;
     delete _crosshairs;
@@ -105,7 +113,7 @@ void Overlays::draw(NavData *navData)
     }
     // We sandwich ILSs between runway backgrounds and the runways.
     if (_overlays[NAVAIDS] && _overlays[ILS]) {
-	_navaids->draw(navData, ILS, _overlays[LABELS]);
+	_ILSs->draw(navData, _overlays[LABELS]);
     }
     if (_overlays[AIRPORTS]) {
 	_airports->drawForegrounds(navData);
@@ -118,23 +126,23 @@ void Overlays::draw(NavData *navData)
     // various overlay subclasses?  It would certainly make for neater
     // code here.
     if (_overlays[NAVAIDS] && _overlays[ILS]) {
-	_navaids->draw(navData, ILS, _overlays[LABELS]);
+	_ILSs->draw(navData, _overlays[LABELS]);
     }
     if (_overlays[AIRWAYS]) {
 	_airways->draw(_overlays[HIGH], _overlays[LOW], navData);
     }
     if (_overlays[NAVAIDS]) {
 	if (_overlays[VOR]) {
-	    _navaids->draw(navData, VOR, _overlays[LABELS]);
+	    _VORs->draw(navData, _overlays[LABELS]);
 	}
 	if (_overlays[NDB]) {
-	    _navaids->draw(navData, NDB, _overlays[LABELS]);
+	    _NDBs->draw(navData, _overlays[LABELS]);
 	}
 	if (_overlays[DME]) {
-	    _navaids->draw(navData, DME, _overlays[LABELS]);
+	    _DMEs->draw(navData, _overlays[LABELS]);
 	}
 	if (_overlays[FIXES]) {
-	    _navaids->draw(navData, FIXES, _overlays[LABELS]);
+	    _Fixes->draw(navData, _overlays[LABELS]);
 	}
     }
     if (_overlays[CROSSHAIRS]) {

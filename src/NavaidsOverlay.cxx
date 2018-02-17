@@ -528,10 +528,10 @@ void __drawLabel(const char *fmt, Navaid *n,
 }
 
 //////////////////////////////////////////////////////////////////////
-// WaypointRenderer
+// WaypointOverlay
 //////////////////////////////////////////////////////////////////////
 
-WaypointRenderer::WaypointRenderer(int noOfPasses, int noOfLayers): 
+WaypointOverlay::WaypointOverlay(int noOfPasses, int noOfLayers): 
     _waypointsDirty(true), _currentPass(0), _noOfPasses(noOfPasses)
 {
     _layers.resize(noOfLayers);
@@ -540,7 +540,7 @@ WaypointRenderer::WaypointRenderer(int noOfPasses, int noOfLayers):
     subscribe(Notification::Zoomed);
 }
 
-void WaypointRenderer::draw(NavData *nd, bool labels)
+void WaypointOverlay::draw(NavData *nd, bool labels)
 {
     if (_waypointsDirty) {
 	_waypoints.clear();
@@ -553,7 +553,7 @@ void WaypointRenderer::draw(NavData *nd, bool labels)
     _currentPass = (_currentPass + 1) % _noOfPasses;
 }
 
-void WaypointRenderer::notification(Notification::type n)
+void WaypointOverlay::notification(Notification::type n)
 {
     if (n == Notification::Moved) {
 	_waypointsDirty = true;
@@ -572,16 +572,16 @@ void WaypointRenderer::notification(Notification::type n)
 // render the layer..  It's a bit byzantine, but it saves subclasses
 // from implementing the same boilerplate code.
 //
-// Note: I experimented with a templated WaypointRenderer class.  The
+// Note: I experimented with a templated WaypointOverlay class.  The
 // advantage of the templated class was being able to have an
 // arbitrary type for the _waypoints vector.  The disadvantage was the
 // syntactic complexity of the template code.  Just so I don't forget,
 // here's how I defined the templated method:
 //
 // template <class T, class S>
-// void WaypointRenderer::_drawLayers(DisplayList& dl, void(T::*fn)(S))
+// void WaypointOverlay::_drawLayers(DisplayList& dl, void(T::*fn)(S))
 //
-// I needed two classes - the subclass type (eg, VORRenderer) and the
+// I needed two classes - the subclass type (eg, VOROverlay) and the
 // waypoint class (eg, VOR *).  And here are the key calls in the
 // method:
 //
@@ -591,20 +591,20 @@ void WaypointRenderer::notification(Notification::type n)
 //
 // In the subclass _draw() method, here's how I'd call _drawLayers():
 //
-// _drawLayers<VORRenderer, VOR *>(_layers[VORLayer], &VORRenderer::_drawVOR);
+// _drawLayers<VOROverlay, VOR *>(_layers[VORLayer], &VOROverlay::_drawVOR);
 //
 // Finally, when the class was templated, subclasses couldn't
 // reference the _waypoints vector directly (I don't know why).
 // Instead, they'd have to do one of 3 things:
 //
 // (a) this->_waypoints
-// (b) WaypointRenderer<T, S>::_waypoints
-// (c) using WaypointRenderer<T, S>::_waypoints; (in the class declaration)
+// (b) WaypointOverlay<T, S>::_waypoints
+// (c) using WaypointOverlay<T, S>::_waypoints; (in the class declaration)
 //     _waypoints; (here)
 //
 // All in all, not pretty, and not worth it in my opinion.
 template <class T>
-void WaypointRenderer::_drawLayer(DisplayList &dl, void (T::*fn)())
+void WaypointOverlay::_drawLayer(DisplayList &dl, void (T::*fn)())
 {
     if (!dl.valid()) {
 	dl.begin(); {
@@ -616,7 +616,7 @@ void WaypointRenderer::_drawLayer(DisplayList &dl, void (T::*fn)())
     dl.call();
 }
 
-bool WaypointRenderer::_iconVisible(Navaid *n, IconScalingPolicy& isp, 
+bool WaypointOverlay::_iconVisible(Navaid *n, IconScalingPolicy& isp, 
 					float& radius)
 {
     bool result = true;
@@ -642,7 +642,7 @@ bool WaypointRenderer::_iconVisible(Navaid *n, IconScalingPolicy& isp,
 }
 
 //////////////////////////////////////////////////////////////////////
-// VORRenderer
+// VOROverlay
 //////////////////////////////////////////////////////////////////////
 
 // This function is used in calls to count_if() in notification
@@ -654,13 +654,12 @@ static bool _isA(Navaid *n)
 }
 
 // Line width of VOR rose as a factor of VOR range.
-const float VORRenderer::_lineScale = 0.005;
-const float VORRenderer::_maxLineWidth = 5.0;
+const float VOROverlay::_lineScale = 0.005;
+const float VOROverlay::_maxLineWidth = 5.0;
 // How fat to make VOR radials.
-const float VORRenderer::_angularWidth = 10.0;
+const float VOROverlay::_angularWidth = 10.0;
 
-VORRenderer::VORRenderer(): 
-    WaypointRenderer(1, _LayerCount), _radioactive(false)
+VOROverlay::VOROverlay(): WaypointOverlay(1, _LayerCount), _radioactive(false)
 {
     // The scaling policy for the VOR icons.
     _isp.rangeScaleFactor = 0.1;
@@ -676,7 +675,7 @@ VORRenderer::VORRenderer():
     subscribe(Notification::NewFlightTrack);
 }
 
-void VORRenderer::notification(Notification::type n)
+void VOROverlay::notification(Notification::type n)
 {
     if ((n == Notification::Moved) ||
 	(n == Notification::Zoomed)) {
@@ -719,7 +718,7 @@ void VORRenderer::notification(Notification::type n)
 	_p = p;
     }
 
-    WaypointRenderer::notification(n);
+    WaypointOverlay::notification(n);
 }
 
 // Creates a standard VOR rose of radius 1.0.  This is a circle with
@@ -728,7 +727,7 @@ void VORRenderer::notification(Notification::type n)
 //
 // The rose is drawn in the current colour, with the current line
 // width.
-void VORRenderer::_createVORRose()
+void VOROverlay::_createVORRose()
 {
     // Draw a standard VOR rose or radius 1.  It is drawn in the XY
     // plane, with north in the positive Y direction, and east in the
@@ -833,7 +832,7 @@ void VORRenderer::_createVORRose()
 // these objects (eg, line width, point size), are not set here, the
 // reasoning being that the caller should be able to vary them if
 // necessary.
-void VORRenderer::_createVORSymbols()
+void VOROverlay::_createVORSymbols()
 {
     // Radius of VOR symbol.
     const float size = 1.0;
@@ -910,7 +909,7 @@ void VORRenderer::_createVORSymbols()
     _VORDMESymbolDL.end();
 }
 
-void VORRenderer::_getWaypoints(NavData *nd)
+void VOROverlay::_getWaypoints(NavData *nd)
 {
     const vector<Cullable *>& intersections = nd->hits(NavData::NAVAIDS);
     for (unsigned int i = 0; i < intersections.size(); i++) {
@@ -921,7 +920,7 @@ void VORRenderer::_getWaypoints(NavData *nd)
     }
 }
 
-void VORRenderer::_draw(bool labels)
+void VOROverlay::_draw(bool labels)
 {
     assert(_currentPass == 0);
 
@@ -935,16 +934,16 @@ void VORRenderer::_draw(bool labels)
     }
 
     // VORs (layer 0)
-    _drawLayer(_layers[VORLayer], &VORRenderer::_drawVORs);
+    _drawLayer(_layers[VORLayer], &VOROverlay::_drawVORs);
 
     // Radio "beams" (layer 1)
     if (_radioactive) {
-	_drawLayer(_layers[RadioLayer], &VORRenderer::_drawRadios);
+	_drawLayer(_layers[RadioLayer], &VOROverlay::_drawRadios);
     }
 
     // Labels (layer 2)
     if (labels) {
-	_drawLayer(_layers[LabelLayer], &VORRenderer::_drawLabels);
+	_drawLayer(_layers[LabelLayer], &VOROverlay::_drawLabels);
     }
 }
 
@@ -957,7 +956,7 @@ void VORRenderer::_draw(bool labels)
 // - label with name / id, frequency and morse
 // - label with id and frequency
 // - label with id, shrinking as we move away
-void VORRenderer::_drawVORs()
+void VOROverlay::_drawVORs()
 {
     for (size_t i = 0; i < _waypoints.size(); i++) {
 	VOR *vor = dynamic_cast<VOR *>(_waypoints[i]);
@@ -1040,7 +1039,7 @@ void VORRenderer::_drawVORs()
     }
 }
 
-void VORRenderer::_drawRadios()
+void VOROverlay::_drawRadios()
 {
     for (size_t i = 0; i < _waypoints.size(); i++) {
 	VOR *vor = dynamic_cast<VOR *>(_waypoints[i]);
@@ -1076,7 +1075,7 @@ void VORRenderer::_drawRadios()
     }
 }
 
-void VORRenderer::_drawLabels()
+void VOROverlay::_drawLabels()
 {
     for (size_t i = 0; i < _waypoints.size(); i++) {
 	VOR *vor = dynamic_cast<VOR *>(_waypoints[i]);
@@ -1130,16 +1129,15 @@ void VORRenderer::_drawLabels()
 }
 
 //////////////////////////////////////////////////////////////////////
-// NDBRenderer
+// NDBOverlay
 //////////////////////////////////////////////////////////////////////
 
 // Size of dots, relative to size of NDB icon.
-const float NDBRenderer::_dotScale = 0.1;
+const float NDBOverlay::_dotScale = 0.1;
 // How fat to make NDB radials (degrees).
-const float NDBRenderer::_angularWidth = 2.5;
+const float NDBOverlay::_angularWidth = 2.5;
 
-NDBRenderer::NDBRenderer(): 
-    WaypointRenderer(1, _LayerCount), _radioactive(false)
+NDBOverlay::NDBOverlay(): WaypointOverlay(1, _LayerCount), _radioactive(false)
 {
     _isp.rangeScaleFactor = 0.1;
     _isp.minSize = 1.0;
@@ -1154,7 +1152,7 @@ NDBRenderer::NDBRenderer():
 }
 
 
-void NDBRenderer::notification(Notification::type n)
+void NDBOverlay::notification(Notification::type n)
 {
     if ((n == Notification::Moved) ||
 	(n == Notification::Zoomed)) {
@@ -1181,11 +1179,11 @@ void NDBRenderer::notification(Notification::type n)
 	_radioactive = radioactive;
     }
 
-    WaypointRenderer::notification(n);
+    WaypointOverlay::notification(n);
 }
 
 // Create an NDB symbol and and NDB-DME symbol, in the WAC style.
-void NDBRenderer::_createNDBSymbols()
+void NDBOverlay::_createNDBSymbols()
 {
     // According to VFR_Chart_Symbols.pdf, there are 10 concentric
     // circles of dots, with 16, 21, 26, 31, 36, 41, 46, 51, 56, and 61
@@ -1295,7 +1293,7 @@ void NDBRenderer::_createNDBSymbols()
     _NDBDMESymbolDL.end();
 }
 
-void NDBRenderer::_getWaypoints(NavData *nd)
+void NDBOverlay::_getWaypoints(NavData *nd)
 {
     const vector<Cullable *>& intersections = nd->hits(NavData::NAVAIDS);
     for (unsigned int i = 0; i < intersections.size(); i++) {
@@ -1308,7 +1306,7 @@ void NDBRenderer::_getWaypoints(NavData *nd)
 
 // Draw the navaids.  Draw their labels if 'labels' is true, and draw
 // NDB radio "beams" if _radioactive is true.
-void NDBRenderer::_draw(bool labels)
+void NDBOverlay::_draw(bool labels)
 {
     assert(_currentPass == 0);
 
@@ -1318,21 +1316,21 @@ void NDBRenderer::_draw(bool labels)
     }
 
     // NDBs (layer 0)
-    _drawLayer(_layers[NDBLayer], &NDBRenderer::_drawNDBs);
+    _drawLayer(_layers[NDBLayer], &NDBOverlay::_drawNDBs);
 
     // Radio "beams" (layer 1)
     if (_radioactive) {
-	_drawLayer(_layers[RadioLayer], &NDBRenderer::_drawRadios);
+	_drawLayer(_layers[RadioLayer], &NDBOverlay::_drawRadios);
     }
 
     // Labels (layer 2)
     if (labels) {
-	_drawLayer(_layers[LabelLayer], &NDBRenderer::_drawLabels);
+	_drawLayer(_layers[LabelLayer], &NDBOverlay::_drawLabels);
     }
 }
 
 // Draw the given NDB.
-void NDBRenderer::_drawNDBs()
+void NDBOverlay::_drawNDBs()
 {
     for (size_t i = 0; i < _waypoints.size(); i++) {
 	NDB *ndb = dynamic_cast<NDB *>(_waypoints[i]);
@@ -1380,7 +1378,7 @@ void NDBRenderer::_drawNDBs()
     }
 }
 
-void NDBRenderer::_drawRadios()
+void NDBOverlay::_drawRadios()
 {
     for (size_t i = 0; i < _waypoints.size(); i++) {
 	NDB *ndb = dynamic_cast<NDB *>(_waypoints[i]);
@@ -1405,7 +1403,7 @@ void NDBRenderer::_drawRadios()
     }
 }
 
-void NDBRenderer::_drawLabels()
+void NDBOverlay::_drawLabels()
 {
     for (size_t i = 0; i < _waypoints.size(); i++) {
 	NDB *ndb = dynamic_cast<NDB *>(_waypoints[i]);
@@ -1463,17 +1461,17 @@ void NDBRenderer::_drawLabels()
 }
 
 //////////////////////////////////////////////////////////////////////
-// DMERenderer
+// DMEOverlay
 //////////////////////////////////////////////////////////////////////
 
-DMERenderer::DMERenderer(): WaypointRenderer(1, _LayerCount)
+DMEOverlay::DMEOverlay(): WaypointOverlay(1, _LayerCount)
 {
     _isp.rangeScaleFactor = 0.1;
     _isp.minSize = 1.0;
     _isp.maxSize = __iconSize;
 }
 
-void DMERenderer::notification(Notification::type n)
+void DMEOverlay::notification(Notification::type n)
 {
     if ((n == Notification::Moved) ||
 	(n == Notification::Zoomed)) {
@@ -1481,13 +1479,13 @@ void DMERenderer::notification(Notification::type n)
 	_layers[LabelLayer].invalidate();
     }
 
-    WaypointRenderer::notification(n);
+    WaypointOverlay::notification(n);
 }
 
 // Creates DME symbols - TACANs and stand-alone DMEs (this includes
 // DME and DME-ILS).  The others - VOR-DME, NDB-DME - are handled
 // elsewhere.
-void DMERenderer::_createDMESymbols()
+void DMEOverlay::_createDMESymbols()
 {
     const float size = 1.0;
     const float lobeThickness = size * 0.5;
@@ -1549,7 +1547,7 @@ void DMERenderer::_createDMESymbols()
     _DMESymbolDL.end();
 }
 
-void DMERenderer::_getWaypoints(NavData *nd)
+void DMEOverlay::_getWaypoints(NavData *nd)
 {
     const vector<Cullable *>& intersections = nd->hits(NavData::NAVAIDS);
     for (unsigned int i = 0; i < intersections.size(); i++) {
@@ -1564,7 +1562,7 @@ void DMERenderer::_getWaypoints(NavData *nd)
     }
 }
 
-void DMERenderer::_draw(bool labels)
+void DMEOverlay::_draw(bool labels)
 {
     assert(_currentPass == 0);
 
@@ -1574,16 +1572,16 @@ void DMERenderer::_draw(bool labels)
     }
 
     // DMEs (layer 0)
-    _drawLayer(_layers[DMELayer], &DMERenderer::_drawDMEs);
+    _drawLayer(_layers[DMELayer], &DMEOverlay::_drawDMEs);
 
     // Labels (layer 1)
     if (labels) {
-	_drawLayer(_layers[LabelLayer], &DMERenderer::_drawLabels);
+	_drawLayer(_layers[LabelLayer], &DMEOverlay::_drawLabels);
     }
 }
 
 // Renders a stand-alone DME.
-void DMERenderer::_drawDMEs()
+void DMEOverlay::_drawDMEs()
 {
     for (size_t i = 0; i < _waypoints.size(); i++) {
 	DME *dme = dynamic_cast<DME *>(_waypoints[i]);
@@ -1625,7 +1623,7 @@ void DMERenderer::_drawDMEs()
     }
 }
 
-void DMERenderer::_drawLabels()
+void DMEOverlay::_drawLabels()
 {
     for (size_t i = 0; i < _waypoints.size(); i++) {
 	DME *dme = dynamic_cast<DME *>(_waypoints[i]);
@@ -1677,7 +1675,7 @@ void DMERenderer::_drawLabels()
 }
 
 //////////////////////////////////////////////////////////////////////
-// FixRenderer
+// FixOverlay
 //////////////////////////////////////////////////////////////////////
 
 // EYE - make these part of class?  Put above where all the other
@@ -1697,11 +1695,11 @@ const float terminal_fix_colour[4] = {1.0, 0.0, 1.0, 0.7};
 // EYE - match __ilsLabelColour?
 const float fix_label_colour[4] = {0.2, 0.2, 0.2, 0.7};
 
-FixRenderer::FixRenderer(): WaypointRenderer(1, _LayerCount)
+FixOverlay::FixOverlay(): WaypointOverlay(1, _LayerCount)
 {
 }
 
-void FixRenderer::notification(Notification::type n)
+void FixOverlay::notification(Notification::type n)
 {
     if ((n == Notification::Moved) ||
 	(n == Notification::Zoomed)) {
@@ -1709,10 +1707,10 @@ void FixRenderer::notification(Notification::type n)
 	_layers[LabelLayer].invalidate();
     }
 
-    WaypointRenderer::notification(n);
+    WaypointOverlay::notification(n);
 }
 
-void FixRenderer::_getWaypoints(NavData *nd)
+void FixOverlay::_getWaypoints(NavData *nd)
 {
     // If we're zoomed out far, we don't do anything.
     if (_metresPerPixel > noLevel) {
@@ -1728,7 +1726,7 @@ void FixRenderer::_getWaypoints(NavData *nd)
     }
 }
 
-void FixRenderer::_draw(bool labels)
+void FixOverlay::_draw(bool labels)
 {
     assert(_currentPass == 0);
 
@@ -1738,16 +1736,16 @@ void FixRenderer::_draw(bool labels)
     }
 
     // Fixes (layer 0)
-    _drawLayer(_layers[FixLayer], &FixRenderer::_drawFixes);
+    _drawLayer(_layers[FixLayer], &FixOverlay::_drawFixes);
 
     // Labels (layer 1)
     if (labels) {
-	_drawLayer(_layers[LabelLayer], &FixRenderer::_drawLabels);
+	_drawLayer(_layers[LabelLayer], &FixOverlay::_drawLabels);
     }
 }
 
 // Renders a stand-alone Fix (a dot).
-void FixRenderer::_drawFixes()
+void FixOverlay::_drawFixes()
 {
     for (size_t i = 0; i < _waypoints.size(); i++) {
 	Fix *fix = dynamic_cast<Fix *>(_waypoints[i]);
@@ -1780,7 +1778,7 @@ void FixRenderer::_drawFixes()
     }
 }
 
-void FixRenderer::_drawLabels()
+void FixOverlay::_drawLabels()
 {
     // EYE - magic number
     const float labelOffset = _metresPerPixel * 5.0;
@@ -1806,21 +1804,20 @@ void FixRenderer::_drawLabels()
 }
 
 //////////////////////////////////////////////////////////////////////
-// ILSRenderer
+// ILSOverlay
 //////////////////////////////////////////////////////////////////////
 
 // How much to scale the ILS DME icon compared to a standard icon.
-const float ILSRenderer::_DMEScale = 0.5;
+const float ILSOverlay::_DMEScale = 0.5;
 
-ILSRenderer::ILSRenderer(): 
-    WaypointRenderer(2, _LayerCount), _radioactive(false)
+ILSOverlay::ILSOverlay(): WaypointOverlay(2, _LayerCount), _radioactive(false)
 {
     subscribe(Notification::AircraftMoved);
     subscribe(Notification::NewFlightTrack);
     subscribe(Notification::MagTrue);
 }
 
-void ILSRenderer::notification(Notification::type n)
+void ILSOverlay::notification(Notification::type n)
 {
     if ((n == Notification::Moved) ||
 	(n == Notification::Zoomed)) {
@@ -1843,13 +1840,13 @@ void ILSRenderer::notification(Notification::type n)
 	_layers[LOCLabelLayer].invalidate();
     }
 
-    WaypointRenderer::notification(n);
+    WaypointOverlay::notification(n);
 }
 
 // Creates ILS localizer symbol, with a length of 1.  The symbol is
 // drawn in the x-y plane, with the pointy end at 0,0, and the other
 // end at 0, -1.
-void ILSRenderer::_createILSSymbols()
+void ILSOverlay::_createILSSymbols()
 {
     _createILSSymbol(_ILSSymbolDL, __ilsColour);
     _createILSSymbol(_LOCSymbolDL, __locColour);
@@ -1857,7 +1854,7 @@ void ILSRenderer::_createILSSymbols()
 
 // Creates a single ILS-type symbol, for the given display list
 // variable, in the given colour.
-void ILSRenderer::_createILSSymbol(DisplayList& dl, const float *colour)
+void ILSOverlay::_createILSSymbol(DisplayList& dl, const float *colour)
 {
     dl.begin(); {
 	glBegin(GL_TRIANGLES); {
@@ -1899,7 +1896,7 @@ void ILSRenderer::_createILSSymbol(DisplayList& dl, const float *colour)
 // Creates 3 marker symbols, with units in metres.  The symbols are
 // drawn in the x-y plane, oriented with the long axis along the y
 // axis, and the centre at 0, 0.
-void ILSRenderer::_createMarkerSymbols()
+void ILSOverlay::_createMarkerSymbols()
 {
     // Resolution of our arcs.
     const int segments = 10;
@@ -1954,7 +1951,7 @@ void ILSRenderer::_createMarkerSymbols()
     }
 }
 
-void ILSRenderer::_createDMESymbol()
+void ILSOverlay::_createDMESymbol()
 {
     const float size = 1.0;
 
@@ -1986,7 +1983,7 @@ void ILSRenderer::_createDMESymbol()
     _DMESymbolDL.end();
 }
 
-void ILSRenderer::_getWaypoints(NavData *nd)
+void ILSOverlay::_getWaypoints(NavData *nd)
 {
     const vector<Cullable *>& intersections = nd->hits(NavData::NAVAIDS);
     for (unsigned int i = 0; i < intersections.size(); i++) {
@@ -1996,7 +1993,7 @@ void ILSRenderer::_getWaypoints(NavData *nd)
     }
 }
 
-void ILSRenderer::_draw(bool labels)
+void ILSOverlay::_draw(bool labels)
 {
     // If we haven't created our basic symbols yet, do it now.
     if (!_ILSSymbolDL.valid()) {
@@ -2007,22 +2004,22 @@ void ILSRenderer::_draw(bool labels)
 
     if (_currentPass == 0) {
 	// 0: Markers
-	_drawLayer(_layers[MarkerLayer], &ILSRenderer::_drawMarkers);
+	_drawLayer(_layers[MarkerLayer], &ILSOverlay::_drawMarkers);
 
 	// 1: Localizers (tuned-in and not tuned-in)
-	_drawLayer(_layers[LOCLayer], &ILSRenderer::_drawLOCs);
+	_drawLayer(_layers[LOCLayer], &ILSOverlay::_drawLOCs);
 
 	// 2: Localizer labels
 	if (labels) {
-	    _drawLayer(_layers[LOCLabelLayer], &ILSRenderer::_drawLOCLabels);
+	    _drawLayer(_layers[LOCLabelLayer], &ILSOverlay::_drawLOCLabels);
 	}
     } else if (_currentPass == 1) {
 	// 3: DMEs
-	_drawLayer(_layers[DMELayer], &ILSRenderer::_drawDMEs);
+	_drawLayer(_layers[DMELayer], &ILSOverlay::_drawDMEs);
 
 	// 4: DME labels
 	if (labels) {
-	    _drawLayer(_layers[DMELabelLayer], &ILSRenderer::_drawDMELabels);
+	    _drawLayer(_layers[DMELabelLayer], &ILSOverlay::_drawDMELabels);
 	}
     } else {
 	assert(false);
@@ -2031,7 +2028,7 @@ void ILSRenderer::_draw(bool labels)
 
 // Returns true if the given ILS should be drawn or not.  If visible,
 // 'p' is filled in with the appropriate drawing parameters.
-bool ILSRenderer::_ILSVisible(ILS *ils, DrawingParams& p)
+bool ILSOverlay::_ILSVisible(ILS *ils, DrawingParams& p)
 {
     // Drawn length of an untuned localizer, in nautical miles.
     const float standardLength = 7.5;
@@ -2074,7 +2071,7 @@ bool ILSRenderer::_ILSVisible(ILS *ils, DrawingParams& p)
     return (p.length / _metresPerPixel > minimumLength);
 }
 
-void ILSRenderer::_drawMarkers()
+void ILSOverlay::_drawMarkers()
 {
     for (size_t i = 0; i < _waypoints.size(); i++) {
 	ILS *ils = ILS::ils(dynamic_cast<LOC *>(_waypoints[i]));
@@ -2102,7 +2099,7 @@ void ILSRenderer::_drawMarkers()
     }
 }
 
-void ILSRenderer::_drawLOCs()
+void ILSOverlay::_drawLOCs()
 {
     for (size_t i = 0; i < _waypoints.size(); i++) {
 	ILS *ils = ILS::ils(dynamic_cast<LOC *>(_waypoints[i]));
@@ -2161,7 +2158,7 @@ void ILSRenderer::_drawLOCs()
 //
 // full name	   | heading
 // freq, id, morse |
-void ILSRenderer::_drawLOCLabels()
+void ILSOverlay::_drawLOCLabels()
 {
     for (size_t i = 0; i < _waypoints.size(); i++) {
 	ILS *ils = ILS::ils(dynamic_cast<LOC *>(_waypoints[i]));
@@ -2232,7 +2229,7 @@ void ILSRenderer::_drawLOCLabels()
     }
 }
 
-void ILSRenderer::_drawDMEs()
+void ILSOverlay::_drawDMEs()
 {
     // EYE - if performance is an issue, it might help to move some of
     // the OpenGL calls to the outside of this loop.  For example, we
@@ -2272,7 +2269,7 @@ void ILSRenderer::_drawDMEs()
     }
 }
 
-void ILSRenderer::_drawDMELabels()
+void ILSOverlay::_drawDMELabels()
 {
     for (size_t i = 0; i < _waypoints.size(); i++) {
 	ILS *ils = ILS::ils(dynamic_cast<LOC *>(_waypoints[i]));
@@ -2312,36 +2309,5 @@ void ILSRenderer::_drawDMELabels()
 	    __drawLabel("%I", dme, p.pointSize, 0.0, offset, lp);
 	}
 	geodPopMatrix();
-    }
-}
-
-//////////////////////////////////////////////////////////////////////
-// NavaidsOverlay
-//////////////////////////////////////////////////////////////////////
-
-void NavaidsOverlay::draw(NavData *navData, Overlays::OverlayType t, 
-			  bool labels)
-{
-    // EYE - VORs/VORS/VOR?  FIXES/FIX/Fixes/Fix?  Overlays.hxx should
-    // be a bit more consistent.
-
-    // EYE - what, in general, should we pass in, and what should be
-    // part of the class?  For example, should we maintain a pointer
-    // to NavData, or pass it in?  Should the parameters to the
-    // drawing routine (labels on/off, default font, ...) be be in the
-    // class (directly or indirectly, via a pointer to Globals or
-    // Overlays) or passed in?  Is the goal to make access as direct
-    // as possible, or as central and consistent as possible?
-
-    if (t == Overlays::VOR) {
-	_vr.draw(navData, labels);
-    } else if (t == Overlays::NDB) {
-	_nr.draw(navData, labels);
-    } else if (t == Overlays::DME) {
-	_dr.draw(navData, labels);
-    } else if (t == Overlays::FIXES) {
-	_fr.draw(navData, labels);
-    } else if (t == Overlays::ILS) {
-	_ir.draw(navData, labels);
     }
 }

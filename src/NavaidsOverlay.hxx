@@ -87,7 +87,7 @@ class DisplayList {
 };
 
 //////////////////////////////////////////////////////////////////////
-// WaypointRenderer
+// WaypointOverlay
 //////////////////////////////////////////////////////////////////////
 
 // Most navaid icons are scaled according their range and a few other
@@ -117,7 +117,7 @@ struct IconScalingPolicy {
 // simple - a typical rendering of a waypoint might consist of the
 // waypoint icons, labels for the icons, and maybe a radio "beam"
 // drawn when a flight track is active.  Each of those is called a
-// layer.  When you create an instance of a WaypointRenderer, you tell
+// layer.  When you create an instance of a WaypointOverlay, you tell
 // it the number of layers, and it appropriately sizes the _layers
 // vector, which contains one display list for each layer.  It is up
 // to the subclasser to invalidate those display lists when they need
@@ -152,12 +152,12 @@ struct IconScalingPolicy {
 //
 // Subclasses should also implement the notification() method, mostly
 // to invalidate layers that need to be rerendered.  Just remember to
-// call WaypointRenderer's notification() method, so that it can
-// update _waypointsDirty, _metresPerPixel, ...
-class WaypointRenderer: public Subscriber {
+// call WaypointOverlay's notification() method, so that it can update
+// _waypointsDirty, _metresPerPixel, ...
+class WaypointOverlay: public Subscriber {
   public:
-    WaypointRenderer(int noOfPasses, int noOfLayers);
-    virtual ~WaypointRenderer() {}
+    WaypointOverlay(int noOfPasses, int noOfLayers);
+    virtual ~WaypointOverlay() {}
 
     void draw(NavData *nd, bool labels);
 
@@ -193,9 +193,9 @@ class WaypointRenderer: public Subscriber {
     std::vector<DisplayList> _layers;
 };
 
-class VORRenderer: public WaypointRenderer {
+class VOROverlay: public WaypointOverlay {
   public:
-    VORRenderer();
+    VOROverlay();
 
     // Subscriber interface.
     void notification(Notification::type n);
@@ -228,9 +228,9 @@ class VORRenderer: public WaypointRenderer {
     FlightData *_p;
 };
 
-class NDBRenderer: public WaypointRenderer {
+class NDBOverlay: public WaypointOverlay {
   public:
-    NDBRenderer();
+    NDBOverlay();
 
     // Subscriber interface.
     void notification(Notification::type n);
@@ -258,9 +258,9 @@ class NDBRenderer: public WaypointRenderer {
     FlightData *_p;
 };
 
-class DMERenderer: public WaypointRenderer {
+class DMEOverlay: public WaypointOverlay {
   public:
-    DMERenderer();
+    DMEOverlay();
 
     // Subscriber interface.
     void notification(Notification::type n);
@@ -280,9 +280,9 @@ class DMERenderer: public WaypointRenderer {
     DisplayList _DMESymbolDL, _TACANSymbolDL;
 };
 
-class FixRenderer: public WaypointRenderer {
+class FixOverlay: public WaypointOverlay {
   public:
-    FixRenderer();
+    FixOverlay();
 
     // Subscriber interface.
     void notification(Notification::type n);
@@ -297,9 +297,9 @@ class FixRenderer: public WaypointRenderer {
     void _drawLabels();
 };
 
-class ILSRenderer: public WaypointRenderer {
+class ILSOverlay: public WaypointOverlay {
   public:
-    ILSRenderer();
+    ILSOverlay();
 
     // Subscriber interface.
     void notification(Notification::type n);
@@ -340,29 +340,6 @@ class ILSRenderer: public WaypointRenderer {
 	_DMESymbolDL;
     bool _radioactive;
     FlightData *_p;
-};
-
-//////////////////////////////////////////////////////////////////////
-// NavaidsOverlay
-//////////////////////////////////////////////////////////////////////
-
-class NavaidsOverlay {
-  public:
-    NavaidsOverlay() {}
-
-    // Draws the given overlay type, which must be VOR, NDB, DME, or
-    // ILS.  If an overlay has multiple passes, each call to draw()
-    // will render the next pass for that overlay.  Only ILS's have
-    // this "feature" - they have 2 passes, so you need to call this
-    // twice for ILS's on each rendering cycle.
-    void draw(NavData *navData, Overlays::OverlayType t, bool labels);
-
-  protected:
-    VORRenderer _vr;
-    NDBRenderer _nr;
-    DMERenderer _dr;
-    FixRenderer _fr;
-    ILSRenderer _ir;
 };
 
 #endif
