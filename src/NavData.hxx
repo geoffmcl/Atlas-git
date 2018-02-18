@@ -143,6 +143,7 @@ class Fix: public Waypoint {
 
     // Get and set the fix's type.
     bool isTerminal() const { return _isTerminal; }
+    bool isEnroute() const { return !_isTerminal; }
     void setTerminal() { _isTerminal = true; }
     void setEnRoute() { _isTerminal = false; }
 
