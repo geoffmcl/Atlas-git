@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2017 Brian Schack
+  Copyright (C) 2009 - 2018 Brian Schack
 
   This file is part of Atlas.
 
@@ -128,8 +128,8 @@ void Overlays::draw(NavData *navData)
     if (_overlays[NAVAIDS] && _overlays[ILS]) {
 	_ILSs->draw(navData, _overlays[LABELS]);
     }
-    if (_overlays[AIRWAYS]) {
-	_airways->draw(_overlays[HIGH], _overlays[LOW], navData);
+    if (_overlays[AWYS]) {
+	_airways->draw(_overlays[AWYS_HIGH], _overlays[AWYS_LOW], navData);
     }
     if (_overlays[NAVAIDS]) {
 	if (_overlays[VOR]) {
@@ -156,9 +156,17 @@ void Overlays::draw(NavData *navData)
     }
 }
 
-void Overlays::setVisibility(OverlayType type, bool value)
+void Overlays::toggle(OverlayType type, bool value)
 {
+    // Don't do anything if the overlay is already in the correct
+    // state.
+    if (_overlays[type] == value) {
+	return;
+    }
+
+    // Change the state, and let everyone know it.
     _overlays[type] = value;
+    Notification::notify(Notification::OverlayToggled);
 
     // A special case - toggling an overlay doesn't really dirty it -
     // we just turn it on and off.  However, toggling the labels
@@ -168,6 +176,11 @@ void Overlays::setVisibility(OverlayType type, bool value)
 	_airports->setDirty();
 	_tracks->setDirty();
     }
+}
+
+void Overlays::toggle(OverlayType type)
+{
+    toggle(type, !isVisible(type));
 }
 
 bool Overlays::isVisible(OverlayType type)

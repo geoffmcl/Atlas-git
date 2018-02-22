@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2017 Brian Schack
+  Copyright (C) 2009 - 2018 Brian Schack
 
   The overlays object manages a bunch of other overlays.  It creates
   them, and knows which ones should be displayed.
@@ -62,11 +62,15 @@ class Overlays {
 
     void draw(NavData *navData);
 
-    enum OverlayType {NAVAIDS = 0, VOR, NDB, ILS, DME, FIXES, AIRPORTS, 
-		      AIRWAYS, HIGH, LOW, LABELS, TRACKS, CROSSHAIRS, 
-		      RANGE_RINGS, _LAST};
+    enum OverlayType {NAVAIDS = 0, VOR, NDB, ILS, DME, FIXES, FIXES_ENROUTE, 
+		      FIXES_TERMINAL, AIRPORTS, AWYS, AWYS_HIGH, AWYS_LOW, 
+		      LABELS, TRACKS, CROSSHAIRS, RANGE_RINGS, _LAST};
 
-    void setVisibility(OverlayType type, bool value);
+    // Toggle the overlay on or off.
+    void toggle(OverlayType type, bool value);
+    // Toggle the state of the overlay.
+    void toggle(OverlayType type);
+    // Returns true if the overlay is visible.
     bool isVisible(OverlayType type);
 
     AirportsOverlay* airportsOverlay() { return _airports; }
