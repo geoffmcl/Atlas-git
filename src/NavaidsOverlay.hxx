@@ -288,13 +288,19 @@ class FixOverlay: public WaypointOverlay {
     void notification(Notification::type n);
 
   protected:
-    enum {FixLayer, LabelLayer, _LayerCount} _layerNames;
+    enum {EnrouteFixLayer, TerminalFixLayer, 
+	  EnrouteLabelLayer, TerminalLabelLayer, _LayerCount} _layerNames;
 
     void _getWaypoints(NavData *nd);
     void _draw(bool labels);
 
-    void _drawFixes();
-    void _drawLabels();
+    void _drawEnrouteFixes();
+    void _drawTerminalFixes();
+    void _drawEnrouteLabels();
+    void _drawTerminalLabels();
+
+    void _drawFixes(Overlays::OverlayType t, float fullFix);
+    void _drawLabels(Overlays::OverlayType t, float fullLabel);
 };
 
 class ILSOverlay: public WaypointOverlay {

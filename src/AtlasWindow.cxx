@@ -392,13 +392,13 @@ MainUI::MainUI(int x, int y, AtlasWindow *aw):
     _ac(aw->ac()), _aw(aw), _trackListStrings(NULL), _fileDialog(NULL),
     _closeOkDialog(NULL), _networkPopup(NULL)
 {
-    const int buttonHeight = 20, checkHeight = 10;
+    const int buttonHeight = 20;
     const int smallSpace = 2, bigSpace = 5;
     const int boxHeight = 55;
     const int 
 	preferencesHeight = boxHeight,
 	locationHeight = 4 * buttonHeight + 5 * bigSpace, 
-	navaidsHeight = 7 * buttonHeight + 2 * bigSpace + 6 * smallSpace, 
+	navaidsHeight = 8 * buttonHeight + 2 * bigSpace + 7 * smallSpace, 
 	flightTracksHeight = 7 * buttonHeight + 8 * bigSpace,
 	renderHeight = 3 * buttonHeight + 4 * bigSpace;
     const int width = 210, guiWidth = width - (2 * bigSpace), labelWidth = 45;
@@ -425,15 +425,9 @@ MainUI::MainUI(int x, int y, AtlasWindow *aw):
     cury += buttonHeight + bigSpace;
 
     // Show chunk/tile outlines toggle
-    _showOutlinesToggle = new puButton(curx + bigSpace, 
-				       cury + bigSpace,
-				       curx + bigSpace + checkHeight, 
-				       cury + bigSpace + checkHeight);
-    _showOutlinesToggle->setLabel("Show chunk/tile outlines");
-    _showOutlinesToggle->setLabelPlace(PUPLACE_CENTERED_RIGHT);
-    _showOutlinesToggle->setButtonType(PUBUTTON_VCHECK);
-    _showOutlinesToggle->setUserData(this);
-    _showOutlinesToggle->setCallback(__mainUI_showOutlines_cb);
+    _showOutlinesToggle = _makeCheckbox("Show chunk/tile outlines", 
+					curx + bigSpace, cury + bigSpace,
+					__mainUI_showOutlines_cb);
 
     cury += buttonHeight + bigSpace;
     curx = bigSpace;
@@ -480,13 +474,8 @@ MainUI::MainUI(int x, int y, AtlasWindow *aw):
     _jumpToButton->setCallback(__mainUI_centre_cb);
     curx += trackButtonWidth + bigSpace;
 
-    _trackAircraftToggle = new puButton(curx, cury, 
-					curx + checkHeight, cury + checkHeight);
-    _trackAircraftToggle->setLabel("Follow aircraft");
-    _trackAircraftToggle->setLabelPlace(PUPLACE_CENTERED_RIGHT);
-    _trackAircraftToggle->setButtonType(PUBUTTON_VCHECK);
-    _trackAircraftToggle->setUserData(_aw);
-    _trackAircraftToggle->setCallback(__mainUI_trackAircraft_cb);
+    _trackAircraftToggle = _makeCheckbox("Follow aircraft", curx, cury, 
+				      __mainUI_trackAircraft_cb, _aw);
 
     cury += buttonHeight + bigSpace;
 
@@ -581,62 +570,43 @@ MainUI::MainUI(int x, int y, AtlasWindow *aw):
     _navaidsFrame = new puFrame(0, cury, width, cury + navaidsHeight);
 
     curx = bigSpace;
-    cury += bigSpace + buttonHeight + smallSpace;
+    cury += bigSpace;
 
-    // Indent these buttons.
-    curx += buttonHeight;
-    _navFIX = new puButton(curx, cury, curx + checkHeight, cury + checkHeight);
-    _navFIX->setLabel("FIX");
-    _navFIX->setLabelPlace(PUPLACE_CENTERED_RIGHT);
-    _navFIX->setButtonType(PUBUTTON_VCHECK);
-    // EYE - this wasn't set before - how did it work?  (Ditto for
-    // navDME, navILS, navNDB, and navVOR).
-    _navFIX->setUserData(this);
-    _navFIX->setCallback(__mainUI_overlay_cb);
+    // Doubly indent the fix high/low buttons.
+    curx += 2 * buttonHeight;
+
+    // It would be nice to use "Terminal", but the string is too long.
+    // Widen the box?  Make bigSpace and smallSpace a bit smaller?
+    // _fixTerminal = _makeCheckbox("Terminal", curx, cury);
+    _fixTerminal = _makeCheckbox("Low", curx, cury, __mainUI_overlay_cb);
     cury += buttonHeight + smallSpace;
 
-    _navDME = new puButton(curx, cury, curx + checkHeight, cury + checkHeight);
-    _navDME->setLabel("DME");
-    _navDME->setLabelPlace(PUPLACE_CENTERED_RIGHT);
-    _navDME->setButtonType(PUBUTTON_VCHECK);
-    _navDME->setUserData(this);
-    _navDME->setCallback(__mainUI_overlay_cb);
+    // _fixEnroute = _makeCheckbox("En route", curx, cury);
+    _fixEnroute = _makeCheckbox("High", curx, cury, __mainUI_overlay_cb);
     cury += buttonHeight + smallSpace;
 
-    _navILS = new puButton(curx, cury, curx + checkHeight, cury + checkHeight);
-    _navILS->setLabel("ILS");
-    _navILS->setLabelPlace(PUPLACE_CENTERED_RIGHT);
-    _navILS->setButtonType(PUBUTTON_VCHECK);
-    _navILS->setUserData(this);
-    _navILS->setCallback(__mainUI_overlay_cb);
+    // Now go to a single indent for navaid buttons.
+    curx -= buttonHeight;
+
+    _navFIX = _makeCheckbox("FIX", curx, cury, __mainUI_overlay_cb);
     cury += buttonHeight + smallSpace;
 
-    _navNDB = new puButton(curx, cury, curx + checkHeight, cury + checkHeight);
-    _navNDB->setLabel("NDB");
-    _navNDB->setLabelPlace(PUPLACE_CENTERED_RIGHT);
-    _navNDB->setButtonType(PUBUTTON_VCHECK);
-    _navNDB->setUserData(this);
-    _navNDB->setCallback(__mainUI_overlay_cb);
+    _navDME = _makeCheckbox("DME", curx, cury, __mainUI_overlay_cb);
     cury += buttonHeight + smallSpace;
 
-    _navVOR = new puButton(curx, cury, curx + checkHeight, cury + checkHeight);
-    _navVOR->setLabel("VOR");
-    _navVOR->setLabelPlace(PUPLACE_CENTERED_RIGHT);
-    _navVOR->setButtonType(PUBUTTON_VCHECK);
-    _navVOR->setUserData(this);
-    _navVOR->setCallback(__mainUI_overlay_cb);
+    _navILS = _makeCheckbox("ILS", curx, cury, __mainUI_overlay_cb);
+    cury += buttonHeight + smallSpace;
+
+    _navNDB = _makeCheckbox("NDB", curx, cury, __mainUI_overlay_cb);
+    cury += buttonHeight + smallSpace;
+
+    _navVOR = _makeCheckbox("VOR", curx, cury, __mainUI_overlay_cb);
     cury += buttonHeight + smallSpace;
 
     // Unindent.
     curx -= buttonHeight;
 
-    _navaidsToggle = new puButton(curx, cury, 
-				  curx + checkHeight, cury + checkHeight);
-    _navaidsToggle->setLabel("Navaids");
-    _navaidsToggle->setLabelPlace(PUPLACE_CENTERED_RIGHT);
-    _navaidsToggle->setButtonType(PUBUTTON_VCHECK);
-    _navaidsToggle->setUserData(this);
-    _navaidsToggle->setCallback(__mainUI_overlay_cb);
+    _navaidsToggle = _makeCheckbox("Navaids", curx, cury, __mainUI_overlay_cb);
     cury += buttonHeight;
 
     cury += bigSpace;
@@ -644,76 +614,36 @@ MainUI::MainUI(int x, int y, AtlasWindow *aw):
     // Now move to the right column and do it again, for airports,
     // airways, and labels.
     cury -= navaidsHeight;
-    cury += bigSpace;
+    cury += bigSpace + buttonHeight + smallSpace;
     curx += guiWidth / 2;
 
-    _MEFToggle = new puButton(curx, cury, 
-			      curx + checkHeight, cury + checkHeight);
-    _MEFToggle->setLabel("MEF");
-    _MEFToggle->setLabelPlace(PUPLACE_CENTERED_RIGHT);
-    _MEFToggle->setButtonType(PUBUTTON_VCHECK);
-    _MEFToggle->setUserData(_ac);
-    _MEFToggle->setCallback(__mainUI_MEF_cb);
+    _MEFToggle = _makeCheckbox("MEF", curx, cury, __mainUI_MEF_cb, _ac);
     cury += buttonHeight + smallSpace;
 
-    _tracksToggle = new puButton(curx, cury, 
-				 curx + checkHeight, cury + checkHeight);
-    _tracksToggle->setLabel("Flight tracks");
-    _tracksToggle->setLabelPlace(PUPLACE_CENTERED_RIGHT);
-    _tracksToggle->setButtonType(PUBUTTON_VCHECK);
-    _tracksToggle->setUserData(this);
-    _tracksToggle->setCallback(__mainUI_overlay_cb);
+    _tracksToggle = 
+	_makeCheckbox("Flight tracks", curx, cury, __mainUI_overlay_cb);
     cury += buttonHeight + smallSpace;
 
-    _labelsToggle = new puButton(curx, cury, 
-				 curx + checkHeight, cury + checkHeight);
-    _labelsToggle->setLabel("Labels");
-    _labelsToggle->setLabelPlace(PUPLACE_CENTERED_RIGHT);
-    _labelsToggle->setButtonType(PUBUTTON_VCHECK);
-    _labelsToggle->setUserData(this);
-    _labelsToggle->setCallback(__mainUI_overlay_cb);
+    _labelsToggle = _makeCheckbox("Labels", curx, cury, __mainUI_overlay_cb);
     cury += buttonHeight + smallSpace;
 
     // Indent for the 2 airways subtoggles.
     curx += buttonHeight;
 
-    _awyLow = new puButton(curx, cury, 
-			   curx + checkHeight, cury + checkHeight);
-    _awyLow->setLabel("Low");
-    _awyLow->setLabelPlace(PUPLACE_CENTERED_RIGHT);
-    _awyLow->setButtonType(PUBUTTON_VCHECK);
-    _awyLow->setUserData(this);
-    _awyLow->setCallback(__mainUI_overlay_cb);
+    _awyLow = _makeCheckbox("Low", curx, cury, __mainUI_overlay_cb);
     cury += buttonHeight + smallSpace;
 
-    _awyHigh = new puButton(curx, cury, 
-			    curx + checkHeight, cury + checkHeight);
-    _awyHigh->setLabel("High");
-    _awyHigh->setLabelPlace(PUPLACE_CENTERED_RIGHT);
-    _awyHigh->setButtonType(PUBUTTON_VCHECK);
-    _awyHigh->setUserData(this);
-    _awyHigh->setCallback(__mainUI_overlay_cb);
+    _awyHigh = _makeCheckbox("High", curx, cury, __mainUI_overlay_cb);
     cury += buttonHeight + smallSpace;
 
     // Unindent
     curx -= buttonHeight;
 
-    _airwaysToggle = new puButton(curx, cury, 
-				  curx + checkHeight, cury + checkHeight);
-    _airwaysToggle->setLabel("Airways");
-    _airwaysToggle->setLabelPlace(PUPLACE_CENTERED_RIGHT);
-    _airwaysToggle->setButtonType(PUBUTTON_VCHECK);
-    _airwaysToggle->setUserData(this);
-    _airwaysToggle->setCallback(__mainUI_overlay_cb);
+    _airwaysToggle = _makeCheckbox("Airways", curx, cury, __mainUI_overlay_cb);
     cury += buttonHeight + smallSpace;
 
-    _airportsToggle = new puButton(curx, cury, 
-				   curx + checkHeight, cury + checkHeight);
-    _airportsToggle->setLabel("Airports");
-    _airportsToggle->setLabelPlace(PUPLACE_CENTERED_RIGHT);
-    _airportsToggle->setButtonType(PUBUTTON_VCHECK);
-    _airportsToggle->setUserData(this);
-    _airportsToggle->setCallback(__mainUI_overlay_cb);
+    _airportsToggle = _makeCheckbox("Airports", curx, cury, 
+				    __mainUI_overlay_cb);
     cury += buttonHeight;
 
     cury += bigSpace;
@@ -939,31 +869,36 @@ void MainUI::_zoom_cb(puObject *o)
 
 void MainUI::_overlay_cb(puObject *o)
 {
-    bool on = (o->getValue() != 0);
+    bool state = (o->getValue() != 0);
+    Overlays *ov = _aw->ov();
     if (o == _navaidsToggle) {
-	_aw->setOverlayVisibility(Overlays::NAVAIDS, on);
+	ov->toggle(Overlays::NAVAIDS, state);
     } else if (o == _navVOR) {
-	_aw->setOverlayVisibility(Overlays::VOR, on);
+	ov->toggle(Overlays::VOR, state);
     } else if (o == _navNDB) {
-	_aw->setOverlayVisibility(Overlays::NDB, on);
+	ov->toggle(Overlays::NDB, state);
     } else if (o == _navILS) {
-	_aw->setOverlayVisibility(Overlays::ILS, on);
+	ov->toggle(Overlays::ILS, state);
     } else if (o == _navDME) {
-	_aw->setOverlayVisibility(Overlays::DME, on);
+	ov->toggle(Overlays::DME, state);
     } else if (o == _navFIX) {
-	_aw->setOverlayVisibility(Overlays::FIXES, on);
+	ov->toggle(Overlays::FIXES, state);
+    } else if (o == _fixEnroute) {
+	ov->toggle(Overlays::FIXES_ENROUTE, state);
+    } else if (o == _fixTerminal) {
+	ov->toggle(Overlays::FIXES_TERMINAL, state);
     } else if (o == _airportsToggle) {
-	_aw->setOverlayVisibility(Overlays::AIRPORTS, on);
+	ov->toggle(Overlays::AIRPORTS, state);
     } else if (o == _airwaysToggle) {
-	_aw->setOverlayVisibility(Overlays::AIRWAYS, on);
+	ov->toggle(Overlays::AWYS, state);
     } else if (o == _awyHigh) {
-	_aw->setOverlayVisibility(Overlays::HIGH, on);
+	ov->toggle(Overlays::AWYS_HIGH, state);
     } else if (o == _awyLow) {
-	_aw->setOverlayVisibility(Overlays::LOW, on);
+	ov->toggle(Overlays::AWYS_LOW, state);
     } else if (o == _labelsToggle) {
-	_aw->setOverlayVisibility(Overlays::LABELS, on);
+	ov->toggle(Overlays::LABELS, state);
     } else if (o == _tracksToggle) {
-	_aw->setOverlayVisibility(Overlays::TRACKS, on);
+	ov->toggle(Overlays::TRACKS, state);
     }
 }
 
@@ -1296,38 +1231,25 @@ void MainUI::_setZoom()
 // Sets all the overlay toggles.
 void MainUI::_setOverlays()
 {
-    _navaidsToggle->setValue(_aw->isOverlayVisible(Overlays::NAVAIDS));
-    if (_navaidsToggle->getValue()) {
-	_navVOR->activate();
-	_navNDB->activate();
-	_navILS->activate();
-	_navDME->activate();
-	_navFIX->activate();
-    } else {
-	_navVOR->greyOut();
-	_navNDB->greyOut();
-	_navILS->greyOut();
-	_navDME->greyOut();
-	_navFIX->greyOut();
-    }
-    _navVOR->setValue(_aw->isOverlayVisible(Overlays::VOR));
-    _navNDB->setValue(_aw->isOverlayVisible(Overlays::NDB));
-    _navILS->setValue(_aw->isOverlayVisible(Overlays::ILS));
-    _navDME->setValue(_aw->isOverlayVisible(Overlays::DME));
-    _navFIX->setValue(_aw->isOverlayVisible(Overlays::FIXES));
-    _airportsToggle->setValue(_aw->isOverlayVisible(Overlays::AIRPORTS));
-    _airwaysToggle->setValue(_aw->isOverlayVisible(Overlays::AIRWAYS));
-    if (_airwaysToggle->getValue()) {
-	_awyHigh->activate();
-	_awyLow->activate();
-    } else {
-	_awyHigh->greyOut();
-	_awyLow->greyOut();
-    }
-    _awyHigh->setValue(_aw->isOverlayVisible(Overlays::HIGH));
-    _awyLow->setValue(_aw->isOverlayVisible(Overlays::LOW));
-    _labelsToggle->setValue(_aw->isOverlayVisible(Overlays::LABELS));
-    _tracksToggle->setValue(_aw->isOverlayVisible(Overlays::TRACKS));
+    Overlays *ov = _aw->ov();
+    _navaidsToggle->setValue(ov->isVisible(Overlays::NAVAIDS));
+    _navVOR->setValue(ov->isVisible(Overlays::VOR));
+    _navNDB->setValue(ov->isVisible(Overlays::NDB));
+    _navILS->setValue(ov->isVisible(Overlays::ILS));
+    _navDME->setValue(ov->isVisible(Overlays::DME));
+    _navFIX->setValue(ov->isVisible(Overlays::FIXES));
+    _fixEnroute->setValue(ov->isVisible(Overlays::FIXES_ENROUTE));
+    _fixTerminal->setValue(ov->isVisible(Overlays::FIXES_TERMINAL));
+
+    _airportsToggle->setValue(ov->isVisible(Overlays::AIRPORTS));
+
+    _airwaysToggle->setValue(ov->isVisible(Overlays::AWYS));
+    _awyHigh->setValue(ov->isVisible(Overlays::AWYS_HIGH));
+    _awyLow->setValue(ov->isVisible(Overlays::AWYS_LOW));
+
+    _labelsToggle->setValue(ov->isVisible(Overlays::LABELS));
+
+    _tracksToggle->setValue(ov->isVisible(Overlays::TRACKS));
 }
 
 void MainUI::_setTrackLimit()
@@ -1454,6 +1376,29 @@ void MainUI::_setTrackList()
 void MainUI::_setShowOutlines()
 {
     _showOutlinesToggle->setValue(_aw->showOutlines());
+}
+
+// A convenience function that creates a standard size checkbox.
+
+// EYE - do this for other repeated UI elements?
+puButton *MainUI::_makeCheckbox(const char *name, int x, int y, puCallback cb,
+				void *data)
+{
+    const int checkHeight = 10;
+
+    puButton *result;
+    result = new puButton(x, y, x + checkHeight, y + checkHeight);
+    result->setLabel(name);
+    result->setLabelPlace(PUPLACE_CENTERED_RIGHT);
+    result->setButtonType(PUBUTTON_VCHECK);
+    if (!data) {
+	result->setUserData(this);
+    } else {
+	result->setUserData(data);
+    }
+    result->setCallback(*cb);
+
+    return result;
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -3506,16 +3451,16 @@ AtlasWindow::AtlasWindow(const char *name,
 
     // Create our overlays and initialize them.
     _overlays = new Overlays(this);
-    setOverlayVisibility(Overlays::NAVAIDS, true);
-    setOverlayVisibility(Overlays::VOR, true);
-    setOverlayVisibility(Overlays::NDB, true);
-    setOverlayVisibility(Overlays::ILS, true);
-    setOverlayVisibility(Overlays::AIRPORTS, true);
-    setOverlayVisibility(Overlays::LABELS, true);
-    setOverlayVisibility(Overlays::TRACKS, true);
-    setOverlayVisibility(Overlays::AIRWAYS, false);
-    setOverlayVisibility(Overlays::LOW, true);
-    setOverlayVisibility(Overlays::HIGH, false);
+    _overlays->toggle(Overlays::NAVAIDS, true);
+    _overlays->toggle(Overlays::VOR, true);
+    _overlays->toggle(Overlays::NDB, true);
+    _overlays->toggle(Overlays::ILS, true);
+    _overlays->toggle(Overlays::AIRPORTS, true);
+    _overlays->toggle(Overlays::LABELS, true);
+    _overlays->toggle(Overlays::TRACKS, true);
+    _overlays->toggle(Overlays::AWYS, false);
+    _overlays->toggle(Overlays::AWYS_LOW, true);
+    _overlays->toggle(Overlays::AWYS_HIGH, false);
 
     // EYE - who should initialize this - the controller or the
     // window?
@@ -3562,6 +3507,7 @@ AtlasWindow::AtlasWindow(const char *name,
     subscribe(Notification::LightingOn);
     subscribe(Notification::MEFs);
     subscribe(Notification::NewScenery);
+    // EYE - we produce this one!
     subscribe(Notification::OverlayToggled);
     subscribe(Notification::Palette);
     subscribe(Notification::PaletteList);
@@ -4026,29 +3972,29 @@ void AtlasWindow::_keyboard(unsigned char key, int x, int y)
 	  case 'a':
 	    // Toggle airways.  We cycle through no airways, low
 	    // airways, then high airways.
-	    if (!isOverlayVisible(Overlays::AIRWAYS)) {
+	    if (!_overlays->isVisible(Overlays::AWYS)) {
 		// No airways -> low airways
-		setOverlayVisibility(Overlays::AIRWAYS, true);
-		setOverlayVisibility(Overlays::LOW, true);
-		setOverlayVisibility(Overlays::HIGH, false);
+		_overlays->toggle(Overlays::AWYS, true);
+		_overlays->toggle(Overlays::AWYS_LOW, true);
+		_overlays->toggle(Overlays::AWYS_HIGH, false);
 	    } else {
-		if (isOverlayVisible(Overlays::LOW) &&
-		    !isOverlayVisible(Overlays::HIGH)) {
+		if (_overlays->isVisible(Overlays::AWYS_LOW) &&
+		    !_overlays->isVisible(Overlays::AWYS_HIGH)) {
 		    // Low airways -> high airways
-		    setOverlayVisibility(Overlays::LOW, false);
-		    setOverlayVisibility(Overlays::HIGH, true);
+		    _overlays->toggle(Overlays::AWYS_LOW, false);
+		    _overlays->toggle(Overlays::AWYS_HIGH, true);
 		} else {
 		    // High airways -> no airways
-		    setOverlayVisibility(Overlays::AIRWAYS, false);
-		    setOverlayVisibility(Overlays::LOW, false);
-		    setOverlayVisibility(Overlays::HIGH, false);
+		    _overlays->toggle(Overlays::AWYS, false);
+		    _overlays->toggle(Overlays::AWYS_LOW, false);
+		    _overlays->toggle(Overlays::AWYS_HIGH, false);
 		}
 	    }
 	    break;
 
 	  case 'A':
 	    // Toggle airports.
-	    toggleOverlay(Overlays::AIRPORTS);
+	    _overlays->toggle(Overlays::AIRPORTS);
 	    break;
 
 	  case 'c':
@@ -4064,7 +4010,30 @@ void AtlasWindow::_keyboard(unsigned char key, int x, int y)
 
 	  case 'f':
 	    // Toggle flight tracks.
-	    toggleOverlay(Overlays::TRACKS);
+	    _overlays->toggle(Overlays::TRACKS);
+	    break;
+
+	  case 'F':
+	    // Toggle fixes.  We cycle through no fixes, terminal
+	    // fixes, then en route fixes (just like airways).
+	    if (!_overlays->isVisible(Overlays::FIXES)) {
+		// No fixes -> low fixes
+		_overlays->toggle(Overlays::FIXES, true);
+		_overlays->toggle(Overlays::FIXES_TERMINAL, true);
+		_overlays->toggle(Overlays::FIXES_ENROUTE, false);
+	    } else {
+		if (_overlays->isVisible(Overlays::FIXES_TERMINAL) &&
+		    !_overlays->isVisible(Overlays::FIXES_ENROUTE)) {
+		    // Low fixes -> high fixes
+		    _overlays->toggle(Overlays::FIXES_TERMINAL, false);
+		    _overlays->toggle(Overlays::FIXES_ENROUTE, true);
+		} else {
+		    // High fixes -> no fixes
+		    _overlays->toggle(Overlays::FIXES, false);
+		    _overlays->toggle(Overlays::FIXES_TERMINAL, false);
+		    _overlays->toggle(Overlays::FIXES_ENROUTE, false);
+		}
+	    }
 	    break;
 
  	  case 'i':
@@ -4156,7 +4125,7 @@ void AtlasWindow::_keyboard(unsigned char key, int x, int y)
 
 	  case 'N':
 	    // Toggle navaids.
-	    toggleOverlay(Overlays::NAVAIDS);
+	    _overlays->toggle(Overlays::NAVAIDS);
 	    break;    
 
 	  case 'o':
@@ -4250,7 +4219,7 @@ void AtlasWindow::_keyboard(unsigned char key, int x, int y)
 
 	  case 'v':
 	    // Toggle labels.
-	    toggleOverlay(Overlays::LABELS);
+	    _overlays->toggle(Overlays::LABELS);
 	    break;
 
 	  case 'w':
@@ -4379,7 +4348,7 @@ void AtlasWindow::_setPaletteBase()
     double elev = _ac->currentPalette()->base();
     ScreenLocation *loc = currentLocation();
     if (_ac->currentTrack() && 
-	isOverlayVisible(Overlays::TRACKS) && 
+	_overlays->isVisible(Overlays::TRACKS) && 
 	autocentreMode()) {
 	elev = _ac->currentPoint()->alt * SG_FEET_TO_METER;
     } else if (loc->validElevation()) {
@@ -4407,14 +4376,14 @@ void AtlasWindow::_setCentreType()
 {
     // EYE - combine with setCentreType()?
     if (centreType() == MOUSE) {
-	setOverlayVisibility(Overlays::CROSSHAIRS, false);
-	setOverlayVisibility(Overlays::RANGE_RINGS, false);
+	_overlays->toggle(Overlays::CROSSHAIRS, false);
+	_overlays->toggle(Overlays::RANGE_RINGS, false);
     } else if (centreType() == CROSSHAIRS) {
-	setOverlayVisibility(Overlays::CROSSHAIRS, true);
-	setOverlayVisibility(Overlays::RANGE_RINGS, false);
+	_overlays->toggle(Overlays::CROSSHAIRS, true);
+	_overlays->toggle(Overlays::RANGE_RINGS, false);
     } else {
-	setOverlayVisibility(Overlays::CROSSHAIRS, false);
-	setOverlayVisibility(Overlays::RANGE_RINGS, true);
+	_overlays->toggle(Overlays::CROSSHAIRS, false);
+	_overlays->toggle(Overlays::RANGE_RINGS, true);
     }
 }
 
@@ -4613,23 +4582,6 @@ void AtlasWindow::_renderTimer()
 
 //     glutTimerFunc(MPTimerInterval, MPAircraftTimer, value + 1);
 // }
-
-void AtlasWindow::setOverlayVisibility(Overlays::OverlayType overlay, 
-					   bool on)
-{
-    if (_overlays->isVisible(overlay) != on) {
-	_overlays->setVisibility(overlay, on);
-	// EYE - should we post a notification or just manipulate
-	// things directly?
-	Notification::notify(Notification::OverlayToggled);
-    }
-}
-
-// EYE - make protected?
-void AtlasWindow::toggleOverlay(Overlays::OverlayType overlay)
-{
-    setOverlayVisibility(overlay, !_overlays->isVisible(overlay));
-}
 
 void AtlasWindow::setShowOutlines(bool on)
 {
@@ -5016,7 +4968,8 @@ void AtlasWindow::notification(Notification::type n)
 	       (n == Notification::LightingOn) ||
 	       (n == Notification::Palette) ||
 	       (n == Notification::PaletteList)) {
-	// EYE - should I do anything else?
+	// EYE - should I do anything else?  We just subscribe to them
+	// so we can call postRedisplay().
     } else if (n == Notification::MEFs) {
 	_setMEFs();
     } else if (n == Notification::CentreType) {

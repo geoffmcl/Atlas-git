@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2017 Brian Schack
+  Copyright (C) 2009 - 2018 Brian Schack
 
   This file is part of Atlas.
 
@@ -91,11 +91,11 @@ void DisplayList::call()
 // For example, ILS stuff really should just reside with the ILS
 // renderer class, shouldn't it?
 
-const float __clearColour[4] = {1.0, 1.0, 1.0, 0.0};
+const sgVec4 __clearColour = {1.0, 1.0, 1.0, 0.0};
 // VOR (teal)
-const float __vorColour[4] = {0.000, 0.420, 0.624, 1.0};
+const sgVec4 __vorColour = {0.000, 0.420, 0.624, 1.0};
 // NDB (purple)
-const float __ndbColour[4] = {0.525, 0.294, 0.498, 1.0};
+const sgVec4 __ndbColour = {0.525, 0.294, 0.498, 1.0};
 
 // TACAN (grey? orange? brown? black?)
 
@@ -103,7 +103,7 @@ const float __ndbColour[4] = {0.525, 0.294, 0.498, 1.0};
 // but (a) this colour is used for many navaids, and (b) it's an IFR
 // chart, and (c) it's Canadian
 //
-const float __dmeColour[4] = {0.498, 0.498, 0.498, 1.0};
+const sgVec4 __dmeColour = {0.498, 0.498, 0.498, 1.0};
 //
 // EYE - theoretically, we should use the same colour for all DME
 // components of navaids - VOR-DME, NDB-DME, VORTAC, TACAN - but it's
@@ -111,16 +111,16 @@ const float __dmeColour[4] = {0.498, 0.498, 0.498, 1.0};
 //
 // This colour looks okay - not too bright, but enough to show up.
 // Still, it's not entirely satisfactory.
-// const float __dmeColour[4] = {0.75, 0.5, 0.25, 1.0};
+// const sgVec4 __dmeColour = {0.75, 0.5, 0.25, 1.0};
 //
 // This is the same as VORs.
 //
-// const float __dmeColour[4] = {0.000, 0.420, 0.624, 1.0};
+// const sgVec4 __dmeColour = {0.000, 0.420, 0.624, 1.0};
 
 // Markers.  Note that the order of entries must match the Marker
 // class Type enumeration (ie, first OUTER, then MIDDLE, finally
 // INNER).
-const float __markerColours[3][4] = 
+const sgVec4 __markerColours[3] = 
     {{0.0, 0.0, 1.0, 0.5},	// Outer marker (blue)
      {1.0, 0.5, 0.0, 0.5},	// Middle marker (amber)
      {1.0, 1.0, 1.0, 0.5}};	// Inner marker (white)
@@ -128,14 +128,14 @@ const float __markerColours[3][4] =
 // ILS localizer (from Canada Air Pilot, CYYZ.pdf)
 // - clear on left, solid pink on right, black outline, heavy black
 //   line down centre
-const float __ilsColour[4] = {1.000, 0.659, 0.855, 0.7};
+const sgVec4 __ilsColour = {1.000, 0.659, 0.855, 0.7};
 
 // This is my own invention - a localizer (no glideslope) is drawn in
 // grey.
-const float __locColour[4] = {0.5, 0.5, 0.5, 0.7};
+const sgVec4 __locColour = {0.5, 0.5, 0.5, 0.7};
 
 // ILS text is slightly translucent.
-const float __ilsLabelColour[4] = {0.0, 0.0, 0.0, 0.75};
+const sgVec4 __ilsLabelColour = {0.0, 0.0, 0.0, 0.75};
 
 // Radii, in metres, for outer, middle, and inner markers.  Like
 // __markerColours, it must match the order of the Marker Type
@@ -185,7 +185,7 @@ static void __createTriangle(float width,
 {
     float deflection = sin(width / 2.0 * SG_DEGREES_TO_RADIANS);
 
-    float fadedLeftColour[4], fadedRightColour[4];
+    sgVec4 fadedLeftColour, fadedRightColour;
     sgCopyVec4(fadedLeftColour, leftColour);
     fadedLeftColour[3] = 0.0;
     sgCopyVec4(fadedRightColour, rightColour);
@@ -260,7 +260,7 @@ static void __createTriangle(float width,
 // the layout (which includes the label text and position
 // information), and the morse identifier (id).
 struct Label {
-    float colour[4];
+    sgVec4 colour;
     float metresPerPixel;
     LayoutManager lm;
     string id;
@@ -1681,19 +1681,19 @@ void DMEOverlay::_drawLabels()
 // EYE - make these part of class?  Put above where all the other
 // constants are?
 
-// Above this level, no fixes are drawn.
-const float noLevel = 1250.0;
-// Above this level, but below noLevel, enroute fixes are drawn.
-const float enrouteLevel = 250.0;
-// EYE - doesn't seem to be true - we draw both
-// Below enRouteLevel, only approach fixes are drawn.
+// Transition levels - we use these to decide when to alter rendering
+// of fixes and fix labels.
+const float __highLevel = 1250.0;
+const float __mediumLevel = 250.0;
+const float __lowLevel = 50.0;
 
-// Bright yellow.
-const float enroute_fix_colour[4] = {1.0, 1.0, 0.0, 0.7};
-const float terminal_fix_colour[4] = {1.0, 0.0, 1.0, 0.7};
+// Bright yellow and violet.  Making them opaque makes them show up
+// better.
+const sgVec4 __enrouteFixColour = {1.0, 1.0, 0.0, 1.0};
+const sgVec4 __terminalFixColour = {1.0, 0.0, 1.0, 1.0};
 
 // EYE - match __ilsLabelColour?
-const float fix_label_colour[4] = {0.2, 0.2, 0.2, 0.7};
+const sgVec4 __fixLabelColour = {0.2, 0.2, 0.2, 0.7};
 
 FixOverlay::FixOverlay(): WaypointOverlay(1, _LayerCount)
 {
@@ -1703,8 +1703,10 @@ void FixOverlay::notification(Notification::type n)
 {
     if ((n == Notification::Moved) ||
 	(n == Notification::Zoomed)) {
-	_layers[FixLayer].invalidate();
-	_layers[LabelLayer].invalidate();
+	_layers[EnrouteFixLayer].invalidate();
+	_layers[TerminalFixLayer].invalidate();
+	_layers[EnrouteLabelLayer].invalidate();
+	_layers[TerminalLabelLayer].invalidate();
     }
 
     WaypointOverlay::notification(n);
@@ -1712,11 +1714,6 @@ void FixOverlay::notification(Notification::type n)
 
 void FixOverlay::_getWaypoints(NavData *nd)
 {
-    // If we're zoomed out far, we don't do anything.
-    if (_metresPerPixel > noLevel) {
-	return;
-    }
-
     const vector<Cullable *>& intersections = nd->hits(NavData::FIXES);
     for (unsigned int i = 0; i < intersections.size(); i++) {
 	Fix *fix = dynamic_cast<Fix *>(intersections[i]);
@@ -1730,42 +1727,90 @@ void FixOverlay::_draw(bool labels)
 {
     assert(_currentPass == 0);
 
-    // If we're zoomed out far, we don't draw anything.
-    if (_metresPerPixel >= noLevel) {
-	return;
+    // Fixes
+    // EYE - get aw from Overlays?
+    Overlays *ov = globals.aw->ov();
+    if (ov->isVisible(Overlays::FIXES_ENROUTE)) {
+	_drawLayer(_layers[EnrouteFixLayer], &FixOverlay::_drawEnrouteFixes);
+    }
+    if (ov->isVisible(Overlays::FIXES_TERMINAL)) {
+	_drawLayer(_layers[TerminalFixLayer], &FixOverlay::_drawTerminalFixes);
     }
 
-    // Fixes (layer 0)
-    _drawLayer(_layers[FixLayer], &FixOverlay::_drawFixes);
-
-    // Labels (layer 1)
+    // Labels
     if (labels) {
-	_drawLayer(_layers[LabelLayer], &FixOverlay::_drawLabels);
+	if (ov->isVisible(Overlays::FIXES_ENROUTE)) {
+	    _drawLayer(_layers[EnrouteLabelLayer], 
+		       &FixOverlay::_drawEnrouteLabels);
+	} 
+	if (ov->isVisible(Overlays::FIXES_TERMINAL)) {
+	    _drawLayer(_layers[TerminalLabelLayer], 
+		       &FixOverlay::_drawTerminalLabels);
+	}
     }
 }
 
-// Renders a stand-alone Fix (a dot).
-void FixOverlay::_drawFixes()
+void FixOverlay::_drawEnrouteFixes()
 {
-    for (size_t i = 0; i < _waypoints.size(); i++) {
-	Fix *fix = dynamic_cast<Fix *>(_waypoints[i]);
+    glColor4fv(__enrouteFixColour);
+    _drawFixes(Overlays::FIXES_ENROUTE, __highLevel);
+}
 
-	// EYE - another constant
-	// Size of point used to represent the fix.
-	const float fixSize = 4.0;
+void FixOverlay::_drawTerminalFixes()
+{
+    glColor4fv(__terminalFixColour);
+    _drawFixes(Overlays::FIXES_TERMINAL, __mediumLevel);
+}
 
-	if (!fix->isTerminal() && (_metresPerPixel < noLevel)) {
-	    glColor4fv(enroute_fix_colour);
-	} else if (fix->isTerminal() && (_metresPerPixel < enrouteLevel)) {
-	    glColor4fv(terminal_fix_colour);
-	} else {
-	    continue;
-	}
+void FixOverlay::_drawEnrouteLabels()
+{
+    _drawLabels(Overlays::FIXES_ENROUTE, __mediumLevel);
+}
 
-	glPushAttrib(GL_POINT_BIT); {
-	    // We use a non-standard point size, so we need to wrap
-	    // this in a glPushAttrib().
-	    glPointSize(fixSize);
+void FixOverlay::_drawTerminalLabels()
+{
+    _drawLabels(Overlays::FIXES_TERMINAL, __lowLevel);
+}
+
+// Draws the fixes for the given overlay type (which must be
+// FIXES_ENROUTE or FIXES_TERMINAL).  The fullFix parameter specifies
+// the boundary between full-sized fixes (anything below fullFix), and
+// steadily shrinking fixes (anything between fullFix and fullFix *
+// shrinkRange), and minimal-sized fixes (anything above fullFix *
+// shrinkRange).
+void FixOverlay::_drawFixes(Overlays::OverlayType t, float fullFix)
+{
+    bool drawEnroute = (t == Overlays::FIXES_ENROUTE);
+
+    // EYE - more magic numbers
+
+    // Size of point used to represent the fix.  We draw them fairly
+    // large (4.0 pixels) when zoomed in, then shrink them to 1.0 as
+    // we zoom out.  We never shrink below 1.0, which means that we
+    // never stop drawing them, no matter how far we zoom out.
+    float fixSize = 4.0;
+    const float shrinkRange = 25.0;
+    float minFix = fullFix * shrinkRange;
+    if (_metresPerPixel > minFix) {
+	fixSize = 1.0;
+    } else {
+	// EYE - change the names of these constants!
+	fixSize *= (minFix - _metresPerPixel) / (minFix - fullFix);
+    }
+
+    // We use a non-standard point size, so we need to wrap this in a
+    // glPushAttrib().  We set it outside of the for loop to lower the
+    // number of state change calls.
+    glPushAttrib(GL_POINT_BIT); {
+	glPointSize(fixSize);
+
+	for (size_t i = 0; i < _waypoints.size(); i++) {
+	    Fix *fix = dynamic_cast<Fix *>(_waypoints[i]);
+
+	    if (fix->isEnroute() != drawEnroute) {
+		continue;
+	    }
+
 	    geodPushMatrix(fix->bounds().center, fix->lat(), fix->lon()); {
 		glBegin(GL_POINTS); {
 		    glVertex2f(0.0, 0.0);
@@ -1774,29 +1819,52 @@ void FixOverlay::_drawFixes()
 	    }
 	    geodPopMatrix();
 	}
-	glPopAttrib();
     }
+    glPopAttrib();
 }
 
-void FixOverlay::_drawLabels()
+// Draws the fixes for the given overlay type (which must be
+// FIXES_ENROUTE or FIXES_TERMINAL).  The fullLabel parameter
+// specifies the boundary between full-sized fixes (anything below
+// fullLabel), and steadily shrinking fixes (anything between
+// fullLabel and fullLabel * shrinkRange), and minimal-sized fixes
+// (anything above fullLabel * shrinkRange).
+void FixOverlay::_drawLabels(Overlays::OverlayType t, float fullLabel)
 {
+    bool drawEnroute = (t == Overlays::FIXES_ENROUTE);
+
+    // Start shrinking en route text above fullLevel, and turn them
+    // off entirely above noLabel.
+    const float shrinkRange = 5.0;
+    float noLabel = fullLabel * shrinkRange;
+    if (_metresPerPixel > noLabel) {
+	return;
+    }
+
+    float pointSize = _labelPointSize;
+    if (_metresPerPixel > fullLabel) {
+	pointSize *= (noLabel - _metresPerPixel) / (noLabel - fullLabel);
+    }
+
     // EYE - magic number
     const float labelOffset = _metresPerPixel * 5.0;
 
     // EYE - make lm part of class?
     LayoutManager lm;
-    glColor4fv(fix_label_colour);
-    lm.setFont(globals.aw->regularFont(), _labelPointSize);
+    glColor4fv(__fixLabelColour);
+    lm.setFont(globals.aw->regularFont(), pointSize);
     for (size_t i = 0; i < _waypoints.size(); i++) {
 	Fix *fix = dynamic_cast<Fix *>(_waypoints[i]);
 
-	lm.setText(fix->id());
-	if (!fix->isTerminal() && (_metresPerPixel < noLevel)) {
-	    lm.moveTo(labelOffset, 0.0, LayoutManager::CL);
-	} else if (fix->isTerminal() && (_metresPerPixel < enrouteLevel)) {
-	    lm.moveTo(-labelOffset, 0.0, LayoutManager::CR);
-	} else {
+	if (fix->isEnroute() != drawEnroute) {
 	    continue;
+	}
+
+	lm.setText(fix->id());
+	if (fix->isEnroute()) {
+	    lm.moveTo(labelOffset, 0.0, LayoutManager::CL);
+	} else {
+	    lm.moveTo(-labelOffset, 0.0, LayoutManager::CR);
 	}
 
 	geodDrawText(lm, fix->bounds().center, fix->lat(), fix->lon());

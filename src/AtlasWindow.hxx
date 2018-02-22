@@ -192,11 +192,7 @@ class AtlasWindow: public AtlasBaseWindow, Subscriber {
     ~AtlasWindow();
 
     AtlasController *ac() { return _ac; }
-
-    bool isOverlayVisible(Overlays::OverlayType overlay) 
-      { return _overlays->isVisible(overlay); }
-    void setOverlayVisibility(Overlays::OverlayType overlay, bool on);
-    void toggleOverlay(Overlays::OverlayType overlay);
+    Overlays *ov() { return _overlays; }
 
     // When true, we're displaying tile and chunk outlines on top of
     // regular scenery.
@@ -451,6 +447,7 @@ class MainUI: public Subscriber {
     puButton *_airportsToggle, *_airwaysToggle, *_labelsToggle, *_tracksToggle;
     puButton *_MEFToggle;
     puButton *_navVOR, *_navNDB, *_navILS, *_navDME, *_navFIX;
+    puButton *_fixEnroute, *_fixTerminal;
     puButton *_awyHigh, *_awyLow;
 
     // Flight tracks frame widgets.
@@ -489,6 +486,9 @@ class MainUI: public Subscriber {
     void _setTrack();
     void _setTrackList();
     void _setShowOutlines();
+
+    puButton *_makeCheckbox(const char *name, int x, int y, puCallback cb,
+			    void *data = NULL);
 
     void _zoom_cb(puObject *o);
     void _overlay_cb(puObject *o);
