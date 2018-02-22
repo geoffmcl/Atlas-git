@@ -2539,10 +2539,12 @@ HelpUI::HelpUI(int x, int y, AtlasWindow *aw):
     globals.str.appendf(fmt.str(), "c", "centre the map on the mouse");
     globals.str.appendf(fmt.str(), "d", "toggle info interface and graphs window");
     globals.str.appendf(fmt.str(), "f", "toggle flight tracks");
+    globals.str.appendf(fmt.str(), "F", "toggle fixes");
     globals.str.appendf(fmt.str(), "i", "enlarge airplane image");
     globals.str.appendf(fmt.str(), "I", "shrink airplane image");
     globals.str.appendf(fmt.str(), "j", "toggle search interface");
     globals.str.appendf(fmt.str(), "l", "toggle lighting interface");
+    globals.str.appendf(fmt.str(), "L", "toggle labels");
     globals.str.appendf(fmt.str(), "m", "toggle mouse and centre mode");
     globals.str.appendf(fmt.str(), "M", "toggle MEF display");
     globals.str.appendf(fmt.str(), "n", "make north point up");
@@ -4089,6 +4091,11 @@ void AtlasWindow::_keyboard(unsigned char key, int x, int y)
 		_lightingUI->hide();
 	    }
 	    postRedisplay();
+	    break;
+
+	  case 'L':
+	    // Toggle labels on and off.
+	    _overlays->toggle(Overlays::LABELS);
 	    break;
 
 	  case 'm':
