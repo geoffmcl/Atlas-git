@@ -93,7 +93,9 @@ class DisplayList {
 // Most navaid icons are scaled according their range and a few other
 // factors.  This structure encapsulates those factors.  If we choose
 // a different rendering policy (eg, fixed pixel size, fixed world
-// size, ...), then this will have to be changed.
+// size, ...), then this will have to be changed.  Note that the label
+// point size is derived from the other values, and is set in the
+// _iconRadius() method.
 struct IconScalingPolicy {
     // How big to draw the icon as a proportion of the navaid's range.
     float rangeScaleFactor;
@@ -103,7 +105,8 @@ struct IconScalingPolicy {
     // An upper limit to the scaled range.  The icon will be drawn no
     // larger than this.
     float maxSize;		// Pixels
-    // Font size.  This scales in proportion to the icon size.
+    // Font size.  This scales in proportion to the icon size, and is
+    // derived from the other values.
     float labelPointSize;
 };
 
@@ -175,10 +178,11 @@ class WaypointOverlay: public Subscriber {
     // render the layer.  At the end, it calls the display list (ie,
     // draws it).
     template <class T> void _drawLayer(DisplayList& dl, void (T::*fn)());
-    // Returns true if, for the navaid and its scaling policy, the
-    // navaid icon should be drawn.  As a side effect, it returns the
-    // icon size in 'radius'.
-    bool _iconVisible(Navaid *n, IconScalingPolicy& isp, float& radius);
+    // Returns the icon size, scaled according to the scaling policy.
+    // As a side-effect, it sets the label point size in isp as well.
+    float _iconRadius(Navaid *n, IconScalingPolicy& isp);
+
+    int _fontAdjustment();
 
     // True if we receive a zoom or move notification.  This will
     // result in a call to _getWaypoints().
