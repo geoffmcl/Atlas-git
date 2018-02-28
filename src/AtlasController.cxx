@@ -285,6 +285,8 @@ AtlasController::AtlasController(const char *paletteDir)
     setDegMinSec(true);
     setMagTrue(true);
     setMEFs(true);
+    setFontBias(0);
+
     // Set our current palette.  We try:
     //
     // (1) The palette specified in preferences
@@ -447,6 +449,14 @@ void AtlasController::setMEFs(bool MEFs)
     if (MEFs != _MEFs) {
 	_MEFs = MEFs;
 	Notification::notify(Notification::MEFs);
+    }
+}
+
+void AtlasController::setFontBias(int i)
+{
+    if (i != _fontBias) {
+	_fontBias = i;
+	Notification::notify(Notification::FontSize);
     }
 }
 

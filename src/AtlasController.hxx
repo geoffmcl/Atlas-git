@@ -184,6 +184,13 @@ class AtlasController
     void setMagTrue(bool magTrue);
     bool MEFs() { return _MEFs; }
     void setMEFs(bool MEFs);
+    // A signed number indicating how much bigger or smaller than the
+    // standard size fonts should be.  When changed, the FontSize
+    // notification is broadcast.  Subscribers are free to determine
+    // exactly how to interpret the number, as long as bigger numbers
+    // result in bigger fonts, and smaller numbers in smaller fonts.
+    int fontBias() { return _fontBias; }
+    void setFontBias(int i);
 
     // Flight track stuff.  The following two work on the current
     // track, if it exists.  If it doesn't, they are smart enough to
@@ -237,8 +244,10 @@ class AtlasController
     TileMapper::ImageType _imageType;
     int _JPEGQuality;
 
+    // Display variables.
     bool _degMinSec, _magTrue, _MEFs;
     bool _showTrackInfo;
+    int _fontBias;
 };
 
 #endif
