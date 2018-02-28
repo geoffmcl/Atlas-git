@@ -97,6 +97,7 @@ class Notification {
 	       DegMinSec,        // Switched between DMS/decimal degrees
 	       MagTrue,		 // Switched between true/magnetic headings
 	       MEFs,		 // Toggle MEFs
+	       FontSize,	 // Font size changed
 	       OverlayToggled,	 // Overlay turned on or off
 	       AutocentreMode,	 // Autocentre mode toggled
 
