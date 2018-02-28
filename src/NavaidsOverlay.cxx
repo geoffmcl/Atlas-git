@@ -538,6 +538,7 @@ WaypointOverlay::WaypointOverlay(int noOfPasses, int noOfLayers):
 
     subscribe(Notification::Moved);
     subscribe(Notification::Zoomed);
+    subscribe(Notification::FontSize);
 }
 
 void WaypointOverlay::draw(NavData *nd, bool labels)
@@ -559,9 +560,13 @@ void WaypointOverlay::notification(Notification::type n)
 	_waypointsDirty = true;
     } else if (n == Notification::Zoomed) {
 	// EYE - what about an initial value for _metresPerPixel?
+	// _labelPointSize?  Can we count on a zoom notification
+	// before we need to draw anything?
 	_metresPerPixel = globals.aw->scale();
-	_labelPointSize = __labelPointSize * _metresPerPixel;
+	_labelPointSize = (__labelPointSize + _fontBias()) * _metresPerPixel;
 	_waypointsDirty = true;
+    } else if (n == Notification::FontSize) {
+	_labelPointSize = (__labelPointSize + _fontBias()) * _metresPerPixel;
     }
 }
 
@@ -616,10 +621,9 @@ void WaypointOverlay::_drawLayer(DisplayList &dl, void (T::*fn)())
     dl.call();
 }
 
-bool WaypointOverlay::_iconVisible(Navaid *n, IconScalingPolicy& isp, 
-					float& radius)
+float WaypointOverlay::_iconRadius(Navaid *n, IconScalingPolicy& isp)
 {
-    bool result = true;
+    float radius;
 
     // Scaled size of navaid, in pixels.
     radius = n->range() * isp.rangeScaleFactor / _metresPerPixel;
@@ -631,14 +635,18 @@ bool WaypointOverlay::_iconVisible(Navaid *n, IconScalingPolicy& isp,
 
     if (radius < isp.minSize) {
 	radius = 0;
-	result = false;
     }
 
     // If the icon is shrinking, shrink the label text
     // proportionately.
     isp.labelPointSize = _labelPointSize * radius / isp.maxSize;
 
-    return result;
+    return radius;
+}
+
+int WaypointOverlay::_fontBias() 
+{ 
+    return globals.aw->ac()->fontBias(); 
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -680,6 +688,8 @@ void VOROverlay::notification(Notification::type n)
     if ((n == Notification::Moved) ||
 	(n == Notification::Zoomed)) {
 	_layers[VORLayer].invalidate();
+	_layers[LabelLayer].invalidate();
+    } else if (n == Notification::FontSize) {
 	_layers[LabelLayer].invalidate();
     } else if ((n == Notification::AircraftMoved) ||
 	       (n == Notification::NewFlightTrack)) {
@@ -969,8 +979,8 @@ void VOROverlay::_drawVORs()
 	// scale proportional to its range - more powerful VORs are
 	// drawn larger.  Whatever the strategy, the end result is the
 	// definition of 'radius', a value defined in screen pixels.
-	float radius;
-	if (!_iconVisible(vor, _isp, radius)) {
+	float radius = _iconRadius(vor, _isp);
+	if (radius == 0.0) {
 	    return;
 	}
 
@@ -1009,7 +1019,7 @@ void VOROverlay::_drawVORs()
 	    ////////////////////
 	    // VOR rose
 	    ////////////////////
-	    if (_iconVisible(vor, _rsp, radius)) {
+	    if ((radius = _iconRadius(vor, _rsp)) > 0.0) {
 		// Calculate the line width for drawing the rose.  We
 		// scale the line width because when zooming in, it
 		// looks better if the lines become fatter.
@@ -1080,15 +1090,14 @@ void VOROverlay::_drawLabels()
     for (size_t i = 0; i < _waypoints.size(); i++) {
 	VOR *vor = dynamic_cast<VOR *>(_waypoints[i]);
 
-	float iconRadius;
-	if (!_iconVisible(vor, _isp, iconRadius)) {
+	float iconRadius = _iconRadius(vor, _isp);
+	if (iconRadius == 0.0) {
 	    return;
 	}
 
 	// We ignore the return value because it's valid to draw the
 	// VOR without a compass rose.
-	float roseRadius;
-	_iconVisible(vor, _rsp, roseRadius);
+	float roseRadius = _iconRadius(vor, _rsp);
 
 	// Range of VOR, in pixels.
 	float range = vor->range() / _metresPerPixel;
@@ -1109,7 +1118,8 @@ void VOROverlay::_drawLabels()
 				roseCentre);
 	    } else if (range > __mediumLabel) {
 		// ID and frequency.
-		l = __makeLabel("%F %I", vor, _isp.labelPointSize, 0, roseCentre);
+		l = __makeLabel("%F %I", vor, _isp.labelPointSize, 0, 
+				roseCentre);
 	    } else {
 		// Just the ID.
 		l = __makeLabel("%I", vor, _isp.labelPointSize, 0, iconEdge, 
@@ -1157,6 +1167,8 @@ void NDBOverlay::notification(Notification::type n)
     if ((n == Notification::Moved) ||
 	(n == Notification::Zoomed)) {
 	_layers[NDBLayer].invalidate();
+	_layers[LabelLayer].invalidate();
+    } else if (n == Notification::FontSize) {
 	_layers[LabelLayer].invalidate();
     } else if ((n == Notification::AircraftMoved) ||
 	       (n == Notification::NewFlightTrack)) {
@@ -1335,8 +1347,8 @@ void NDBOverlay::_drawNDBs()
     for (size_t i = 0; i < _waypoints.size(); i++) {
 	NDB *ndb = dynamic_cast<NDB *>(_waypoints[i]);
 	// Scaled size of NDB icon, in pixels.
-	float radius;
-	if (!_iconVisible(ndb, _isp, radius)) {
+	float radius = _iconRadius(ndb, _isp);
+	if (radius == 0.0) {
 	    return;
 	}
     
@@ -1409,8 +1421,8 @@ void NDBOverlay::_drawLabels()
 	NDB *ndb = dynamic_cast<NDB *>(_waypoints[i]);
 
 	// Scaled size of NDB icon, in pixels.
-	float radius;
-	if (!_iconVisible(ndb, _isp, radius)) {
+	float radius = _iconRadius(ndb, _isp);
+	if (radius == 0.0) {
 	    return;
 	}
 
@@ -1445,8 +1457,8 @@ void NDBOverlay::_drawLabels()
 	    } else if (range > __mediumLabel) {
 		if (!sys) {
 		    // Standalone NDB.
-		    __drawLabel("%F %I", ndb, _isp.labelPointSize, 0, labelOffset, 
-				lp);
+		    __drawLabel("%F %I", ndb, _isp.labelPointSize, 0, 
+				labelOffset, lp);
 		} else {
 		    // NDB-DME
 		    __drawLabel("%F (%f) %I", ndb, _isp.labelPointSize, 0, 
@@ -1476,6 +1488,8 @@ void DMEOverlay::notification(Notification::type n)
     if ((n == Notification::Moved) ||
 	(n == Notification::Zoomed)) {
 	_layers[DMELayer].invalidate();
+	_layers[LabelLayer].invalidate();
+    } else if (n == Notification::FontSize) {
 	_layers[LabelLayer].invalidate();
     }
 
@@ -1588,8 +1602,8 @@ void DMEOverlay::_drawDMEs()
 
 	// Scaled size of DME, in pixels.  We try to draw the DME at
 	// this radius, as long as it won't be too small or too big.
-	float radius;
-	if (!_iconVisible(dme, _isp, radius)) {
+	float radius = _iconRadius(dme, _isp);
+	if (radius == 0.0) {
 	    return;
 	}
 
@@ -1627,8 +1641,8 @@ void DMEOverlay::_drawLabels()
 {
     for (size_t i = 0; i < _waypoints.size(); i++) {
 	DME *dme = dynamic_cast<DME *>(_waypoints[i]);
-	float radius;
-	if (!_iconVisible(dme, _isp, radius)) {
+	float radius = _iconRadius(dme, _isp);
+	if (radius == 0.0) {
 	    return;
 	}
 
@@ -1705,6 +1719,9 @@ void FixOverlay::notification(Notification::type n)
 	(n == Notification::Zoomed)) {
 	_layers[EnrouteFixLayer].invalidate();
 	_layers[TerminalFixLayer].invalidate();
+	_layers[EnrouteLabelLayer].invalidate();
+	_layers[TerminalLabelLayer].invalidate();
+    } else if (n == Notification::FontSize) {
 	_layers[EnrouteLabelLayer].invalidate();
 	_layers[TerminalLabelLayer].invalidate();
     }
@@ -1893,6 +1910,9 @@ void ILSOverlay::notification(Notification::type n)
 	_layers[LOCLayer].invalidate();
 	_layers[LOCLabelLayer].invalidate();
 	_layers[DMELayer].invalidate();
+	_layers[DMELabelLayer].invalidate();
+    } else if (n == Notification::FontSize) {
+	_layers[LOCLabelLayer].invalidate();
 	_layers[DMELabelLayer].invalidate();
     } else if ((n == Notification::AircraftMoved) ||
 	       (n == Notification::NewFlightTrack)) {

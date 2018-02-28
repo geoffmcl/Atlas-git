@@ -182,7 +182,7 @@ class WaypointOverlay: public Subscriber {
     // As a side-effect, it sets the label point size in isp as well.
     float _iconRadius(Navaid *n, IconScalingPolicy& isp);
 
-    int _fontAdjustment();
+    int _fontBias();
 
     // True if we receive a zoom or move notification.  This will
     // result in a call to _getWaypoints().
