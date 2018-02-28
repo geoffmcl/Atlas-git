@@ -54,6 +54,7 @@ void __atlasWindow_renderConfirmDialog_cb(puObject *o);
 
 void __mainUI_zoom_cb(puObject *o);
 void __mainUI_overlay_cb(puObject *o);
+void __mainUI_changeFont_cb(puObject *o);
 void __mainUI_MEF_cb(puObject *o);
 void __mainUI_position_cb (puObject *o);
 void __mainUI_clearFlightTrack_cb(puObject *o);
@@ -625,6 +626,27 @@ MainUI::MainUI(int x, int y, AtlasWindow *aw):
     cury += buttonHeight + smallSpace;
 
     _labelsToggle = _makeCheckbox("Labels", curx, cury, __mainUI_overlay_cb);
+    // EYE - More magic numbers.  I think PUI has problems when it
+    // comes to widget placement (especially text), so I have to
+    // resort to some tweaks to get things to line up the way I want.
+    int buttonX = curx + 60, buttonY = cury - (buttonHeight / 4);
+    _biggerFontButton = new puArrowButton(buttonX, 
+					  buttonY + buttonHeight / 2, 
+					  buttonX + buttonHeight,
+					  buttonY + buttonHeight,
+					  PUARROW_UP);
+    _biggerFontButton->setUserData(this);
+    _biggerFontButton->setCallback(__mainUI_changeFont_cb);
+    _smallerFontButton = new puArrowButton(buttonX, 
+					   buttonY, 
+					   buttonX + buttonHeight,
+					   buttonY + buttonHeight / 2,
+					  PUARROW_DOWN);
+    _smallerFontButton->setUserData(this);
+    _smallerFontButton->setCallback(__mainUI_changeFont_cb);
+    _fontSizeText = new puText(buttonX + buttonHeight, buttonY);
+    _fontSizeText->setLabel("+2");
+
     cury += buttonHeight + smallSpace;
 
     // Indent for the 2 airways subtoggles.
@@ -748,6 +770,7 @@ MainUI::MainUI(int x, int y, AtlasWindow *aw):
     _setCentreType();
     _setZoom();
     _setOverlays();
+    _setFontSize();
     _setTrackLimit();
     _setTrack();
     _setTrackList();
@@ -763,6 +786,7 @@ MainUI::MainUI(int x, int y, AtlasWindow *aw):
     subscribe(Notification::CentreType);
     subscribe(Notification::Zoomed);
     subscribe(Notification::OverlayToggled);
+    subscribe(Notification::FontSize);
     subscribe(Notification::FlightTrackModified);
     subscribe(Notification::NewFlightTrack);
     subscribe(Notification::FlightTrackList);
@@ -826,6 +850,8 @@ void MainUI::notification(Notification::type n)
 	}
     } else if (n == Notification::OverlayToggled) {
 	_setOverlays();
+    } else if (n == Notification::FontSize) {
+	_setFontSize();
     } else if (n == Notification::FlightTrackModified) {
 	// If a flight track changes we only care about its new
 	// length.
@@ -900,6 +926,17 @@ void MainUI::_overlay_cb(puObject *o)
     } else if (o == _tracksToggle) {
 	ov->toggle(Overlays::TRACKS, state);
     }
+}
+
+void MainUI::_changeFont_cb(puObject *o)
+{
+    int i = _ac->fontBias();
+    if (o == _biggerFontButton) {
+	i++;
+    } else {
+	i--;
+    }
+    _ac->setFontBias(i);
 }
 
 // Parses the latitude or longitude in the given puInput and returns
@@ -1250,6 +1287,19 @@ void MainUI::_setOverlays()
     _labelsToggle->setValue(ov->isVisible(Overlays::LABELS));
 
     _tracksToggle->setValue(ov->isVisible(Overlays::TRACKS));
+}
+
+void MainUI::_setFontSize()
+{
+    int i = _ac->fontBias();
+    if (i != 0) {
+	_fontSizeLabel.printf("%+d", i);
+    } else {
+	// We do this because we don't want "+0", which we would get
+	// with "%+d".
+	_fontSizeLabel.printf("0");
+    }
+    _fontSizeText->setLabel(_fontSizeLabel.str());
 }
 
 void MainUI::_setTrackLimit()
@@ -5204,6 +5254,12 @@ void __mainUI_overlay_cb(puObject *o)
 {
     MainUI *mainUI = (MainUI *)o->getUserData();
     mainUI->_overlay_cb(o);
+}
+
+void __mainUI_changeFont_cb(puObject *o)
+{
+    MainUI *mainUI = (MainUI *)o->getUserData();
+    mainUI->_changeFont_cb(o);
 }
 
 void __mainUI_MEF_cb(puObject *o)

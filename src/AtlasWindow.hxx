@@ -409,6 +409,7 @@ class MainUI: public Subscriber {
     // Callbacks.
     friend void __mainUI_zoom_cb(puObject *o);
     friend void __mainUI_overlay_cb(puObject *o);
+    friend void __mainUI_changeFont_cb(puObject *o);
     friend void __mainUI_position_cb(puObject *o);
     friend void __mainUI_saveAsFile_cb(puObject *o);
     friend void __mainUI_saveAs_cb(puObject *o);
@@ -449,6 +450,9 @@ class MainUI: public Subscriber {
     puButton *_navVOR, *_navNDB, *_navILS, *_navDME, *_navFIX;
     puButton *_fixEnroute, *_fixTerminal;
     puButton *_awyHigh, *_awyLow;
+    puArrowButton *_biggerFontButton, *_smallerFontButton;
+    puText *_fontSizeText;
+    AtlasString _fontSizeLabel;
 
     // Flight tracks frame widgets.
     puOneShot *_loadButton, *_attachButton;
@@ -482,6 +486,7 @@ class MainUI: public Subscriber {
     void _setCentreType();
     void _setZoom();
     void _setOverlays();
+    void _setFontSize();
     void _setTrackLimit();
     void _setTrack();
     void _setTrackList();
@@ -492,6 +497,7 @@ class MainUI: public Subscriber {
 
     void _zoom_cb(puObject *o);
     void _overlay_cb(puObject *o);
+    void _changeFont_cb(puObject *o);
     void _position_cb(puObject *o);
     void _saveAsFile_cb(puObject *o);
     void _saveAs_cb(puObject *o);
