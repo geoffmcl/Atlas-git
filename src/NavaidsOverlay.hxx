@@ -181,7 +181,7 @@ class WaypointOverlay: public Subscriber {
     // Returns the icon size, scaled according to the scaling policy.
     // As a side-effect, it sets the label point size in isp as well.
     float _iconRadius(Navaid *n, IconScalingPolicy& isp);
-
+    // A shortcut to the font bias maintained by AtlasController.
     int _fontBias();
 
     // True if we receive a zoom or move notification.  This will
