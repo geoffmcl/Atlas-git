@@ -649,10 +649,6 @@ int WaypointOverlay::_fontBias()
     return globals.aw->ac()->fontBias(); 
 }
 
-//////////////////////////////////////////////////////////////////////
-// VOROverlay
-//////////////////////////////////////////////////////////////////////
-
 // This function is used in calls to count_if() in notification
 // methods.  It returns true if the given navaid is of the given type.
 template <class T>
@@ -660,6 +656,10 @@ static bool _isA(Navaid *n)
 {
     return dynamic_cast<T>(n);
 }
+
+//////////////////////////////////////////////////////////////////////
+// VOROverlay
+//////////////////////////////////////////////////////////////////////
 
 // Line width of VOR rose as a factor of VOR range.
 const float VOROverlay::_lineScale = 0.005;
@@ -981,7 +981,7 @@ void VOROverlay::_drawVORs()
 	// definition of 'radius', a value defined in screen pixels.
 	float radius = _iconRadius(vor, _isp);
 	if (radius == 0.0) {
-	    return;
+	    continue;
 	}
 
 	geodPushMatrix(vor->bounds().center, vor->lat(), vor->lon()); {
@@ -1092,7 +1092,7 @@ void VOROverlay::_drawLabels()
 
 	float iconRadius = _iconRadius(vor, _isp);
 	if (iconRadius == 0.0) {
-	    return;
+	    continue;
 	}
 
 	// We ignore the return value because it's valid to draw the
@@ -1102,7 +1102,7 @@ void VOROverlay::_drawLabels()
 	// Range of VOR, in pixels.
 	float range = vor->range() / _metresPerPixel;
 	if (range < __smallLabel) {
-	    return;
+	    continue;
 	}
 
 	geodPushMatrix(vor->bounds().center, vor->lat(), vor->lon()); {
@@ -1349,7 +1349,7 @@ void NDBOverlay::_drawNDBs()
 	// Scaled size of NDB icon, in pixels.
 	float radius = _iconRadius(ndb, _isp);
 	if (radius == 0.0) {
-	    return;
+	    continue;
 	}
     
 	geodPushMatrix(ndb->bounds().center, ndb->lat(), ndb->lon()); {
@@ -1423,13 +1423,13 @@ void NDBOverlay::_drawLabels()
 	// Scaled size of NDB icon, in pixels.
 	float radius = _iconRadius(ndb, _isp);
 	if (radius == 0.0) {
-	    return;
+	    continue;
 	}
 
 	// Range of NDB, in pixels.
 	float range = ndb->range() / _metresPerPixel;
 	if (range < __smallLabel) {
-	    return;
+	    continue;
 	}
 
 	// How we draw and label the NDB depends on if it's a member
@@ -1604,7 +1604,7 @@ void DMEOverlay::_drawDMEs()
 	// this radius, as long as it won't be too small or too big.
 	float radius = _iconRadius(dme, _isp);
 	if (radius == 0.0) {
-	    return;
+	    continue;
 	}
 
 	// We draw DMEs in 2 different ways here: DMEs and TACANs.
@@ -1643,13 +1643,13 @@ void DMEOverlay::_drawLabels()
 	DME *dme = dynamic_cast<DME *>(_waypoints[i]);
 	float radius = _iconRadius(dme, _isp);
 	if (radius == 0.0) {
-	    return;
+	    continue;
 	}
 
 	// Range of DME, in pixels.
 	float range = dme->range() / _metresPerPixel;
 	if (range < __smallLabel) {
-	    return;
+	    continue;
 	}
 
 	geodPushMatrix(dme->bounds().center, dme->lat(), dme->lon()); {
@@ -2166,7 +2166,7 @@ void ILSOverlay::_drawMarkers()
 
 	DrawingParams p;
 	if (!_ILSVisible(ils, p)) {
-	    return;
+	    continue;
 	}
 
 	const set<Marker *>& markers = ils->markers();
@@ -2194,7 +2194,7 @@ void ILSOverlay::_drawLOCs()
 
 	DrawingParams p;
 	if (!_ILSVisible(ils, p)) {
-	    return;
+	    continue;
 	}
 
 	// EYE - the ilsWidth value is only used for live localizers.
@@ -2253,7 +2253,7 @@ void ILSOverlay::_drawLOCLabels()
 
 	DrawingParams p;
 	if (!_ILSVisible(ils, p)) {
-	    return;
+	    continue;
 	}
 
 	geodPushMatrix(p.loc->bounds().center, p.loc->lat(), p.loc->lon()); {
@@ -2335,7 +2335,7 @@ void ILSOverlay::_drawDMEs()
 
 	DrawingParams p;
 	if (!_ILSVisible(ils, p)) {
-	    return;
+	    continue;
 	}
 
 	float scale = _DMEScale * __iconSize * _metresPerPixel;
@@ -2370,7 +2370,7 @@ void ILSOverlay::_drawDMELabels()
 
 	DrawingParams p;
 	if (!_ILSVisible(ils, p)) {
-	    return;
+	    continue;
 	}
 
 	// EYE - should we scale the DME as we zoom out?  If so, we
