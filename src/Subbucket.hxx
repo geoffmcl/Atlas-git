@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2014 Brian Schack
+  Copyright (C) 2009 - 2018 Brian Schack
 
   A subbucket is a part of a bucket (which is a part of a tile, blah,
   blah, blah).  It contains the polygon information for a single
@@ -70,7 +70,7 @@
 // The basic usage is as follows:
 //
 // (1) Create the data.  Since VBO is a subclass of vector, this can
-//     be done using the usual vertex calls.  We override a few -
+//     be done using the usual vector calls.  We override a few -
 //     clear() and push_back() - for our and your convenience.
 //
 // (2) When ready to draw, 'stage' the appropriate attribute VBOs.
