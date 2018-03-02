@@ -371,7 +371,7 @@ static void __morseCallback(LayoutManager *lm, float x, float y, void *userData)
 // Each line of text is centered, and the point p of the bounding box
 // is placed at <x, y>.
 static Label *__makeLabel(const char *fmt, Navaid *n,
-			  float labelPointSize,
+			  float labelSize,
 			  float x, float y,
 			  LayoutManager::Point lp = LayoutManager::CC)
 {
@@ -383,8 +383,8 @@ static Label *__makeLabel(const char *fmt, Navaid *n,
     // Set our font and find out what our ascent is (__morseWidth and
     // __renderMorse need it).
     atlasFntTexFont *f = globals.aw->regularFont();
-    l->lm.setFont(f, labelPointSize);
-    float ascent = l->lm.font()->ascent() * labelPointSize;
+    l->lm.setFont(f, labelSize);
+    float ascent = l->lm.font()->ascent() * labelSize;
 
     // Go through the format string once, using the layout manager to
     // calculate sizes.
@@ -515,13 +515,13 @@ static void __drawLabel(Label *l)
 // drawn with a box around the text and a translucent white background
 // behind the text.
 void __drawLabel(const char *fmt, Navaid *n,
-		float labelPointSize,
+		float labelSize,
 		float x, float y,
 		LayoutManager::Point lp = LayoutManager::CC)
 {
     Label *l;
 
-    l = __makeLabel(fmt, n, labelPointSize, x, y, lp);
+    l = __makeLabel(fmt, n, labelSize, x, y, lp);
     __drawLabel(l);
 
     delete l;
@@ -560,13 +560,13 @@ void WaypointOverlay::notification(Notification::type n)
 	_waypointsDirty = true;
     } else if (n == Notification::Zoomed) {
 	// EYE - what about an initial value for _metresPerPixel?
-	// _labelPointSize?  Can we count on a zoom notification
+	// _labelSize?  Can we count on a zoom notification
 	// before we need to draw anything?
 	_metresPerPixel = globals.aw->scale();
-	_labelPointSize = (__labelPointSize + _fontBias()) * _metresPerPixel;
+	_labelSize = (__labelPointSize + _fontBias()) * _metresPerPixel;
 	_waypointsDirty = true;
     } else if (n == Notification::FontSize) {
-	_labelPointSize = (__labelPointSize + _fontBias()) * _metresPerPixel;
+	_labelSize = (__labelPointSize + _fontBias()) * _metresPerPixel;
     }
 }
 
@@ -639,7 +639,7 @@ float WaypointOverlay::_iconRadius(Navaid *n, IconScalingPolicy& isp)
 
     // If the icon is shrinking, shrink the label text
     // proportionately.
-    isp.labelPointSize = _labelPointSize * radius / isp.maxSize;
+    isp.labelSize = _labelSize * radius / isp.maxSize;
 
     return radius;
 }
@@ -1114,15 +1114,14 @@ void VOROverlay::_drawLabels()
 	    Label *l;
 	    if (range > __maximumLabel) {
 		// The whole kit and caboodle.
-		l = __makeLabel("%N\n%F %I %M", vor, _isp.labelPointSize, 0, 
+		l = __makeLabel("%N\n%F %I %M", vor, _isp.labelSize, 0, 
 				roseCentre);
 	    } else if (range > __mediumLabel) {
 		// ID and frequency.
-		l = __makeLabel("%F %I", vor, _isp.labelPointSize, 0, 
-				roseCentre);
+		l = __makeLabel("%F %I", vor, _isp.labelSize, 0, roseCentre);
 	    } else {
 		// Just the ID.
-		l = __makeLabel("%I", vor, _isp.labelPointSize, 0, iconEdge, 
+		l = __makeLabel("%I", vor, _isp.labelSize, 0, iconEdge, 
 				LayoutManager::UC);
 	    }
 
@@ -1442,7 +1441,7 @@ void NDBOverlay::_drawLabels()
 	    if (range > __maximumLabel) {
 		if (!sys) {
 		    // Standalone NDB.
-		    __drawLabel("%N\n%F %I %M", ndb, _isp.labelPointSize, 0, 
+		    __drawLabel("%N\n%F %I %M", ndb, _isp.labelSize, 0, 
 				labelOffset, lp);
 		} else {
 		    assert(dynamic_cast<NDB_DME *>(sys));
@@ -1451,21 +1450,21 @@ void NDBOverlay::_drawLabels()
 		    // EYE - drawLabel should check for pairs.  Or, we
 		    // could have a separate drawLabel for
 		    // NavaidSystems.
-		    __drawLabel("%N\n%F (%f) %I %M", ndb, _isp.labelPointSize, 
-				0, labelOffset, lp);
+		    __drawLabel("%N\n%F (%f) %I %M", ndb, _isp.labelSize, 0, 
+				labelOffset, lp);
 		}
 	    } else if (range > __mediumLabel) {
 		if (!sys) {
 		    // Standalone NDB.
-		    __drawLabel("%F %I", ndb, _isp.labelPointSize, 0, 
-				labelOffset, lp);
+		    __drawLabel("%F %I", ndb, _isp.labelSize, 0, labelOffset, 
+				lp);
 		} else {
 		    // NDB-DME
-		    __drawLabel("%F (%f) %I", ndb, _isp.labelPointSize, 0, 
+		    __drawLabel("%F (%f) %I", ndb, _isp.labelSize, 0, 
 				labelOffset, lp);
 		}
 	    } else {
-		__drawLabel("%I", ndb, _isp.labelPointSize, 0, labelOffset, lp);
+		__drawLabel("%I", ndb, _isp.labelSize, 0, labelOffset, lp);
 	    }
 	}
 	geodPopMatrix();
@@ -1665,23 +1664,22 @@ void DMEOverlay::_drawLabels()
 
 	    if (range > __maximumLabel) {
 		if (isTACAN) {
-		    __drawLabel("%N\nDME %F %I %M", dme, _isp.labelPointSize, 
-				0.0, labelOffset, lp);
+		    __drawLabel("%N\nDME %F %I %M", dme, _isp.labelSize, 0.0, 
+				labelOffset, lp);
 		} else {
-		    __drawLabel("%N\n%F %I %M", dme, _isp.labelPointSize, 0.0, 
+		    __drawLabel("%N\n%F %I %M", dme, _isp.labelSize, 0.0, 
 				labelOffset, lp);
 		}
 	    } else if (range > __mediumLabel) {
 		if (isTACAN) {
-		    __drawLabel("DME %F %I", dme, _isp.labelPointSize, 0.0, 
+		    __drawLabel("DME %F %I", dme, _isp.labelSize, 0.0, 
 				labelOffset, lp);
 		} else {
-		    __drawLabel("%F %I", dme, _isp.labelPointSize, 0.0, 
-				labelOffset, lp);
+		    __drawLabel("%F %I", dme, _isp.labelSize, 0.0, labelOffset, 
+				lp);
 		}
 	    } else {
-		__drawLabel("%I", dme, _isp.labelPointSize, 0.0, labelOffset, 
-			    lp);
+		__drawLabel("%I", dme, _isp.labelSize, 0.0, labelOffset, lp);
 	    }
 	}
 	geodPopMatrix();
@@ -1858,9 +1856,9 @@ void FixOverlay::_drawLabels(Overlays::OverlayType t, float fullLabel)
 	return;
     }
 
-    float pointSize = _labelPointSize;
+    float labelSize = _labelSize;
     if (_metresPerPixel > fullLabel) {
-	pointSize *= (noLabel - _metresPerPixel) / (noLabel - fullLabel);
+	labelSize *= (noLabel - _metresPerPixel) / (noLabel - fullLabel);
     }
 
     // EYE - magic number
@@ -1869,7 +1867,7 @@ void FixOverlay::_drawLabels(Overlays::OverlayType t, float fullLabel)
     // EYE - make lm part of class?
     LayoutManager lm;
     glColor4fv(__fixLabelColour);
-    lm.setFont(globals.aw->regularFont(), pointSize);
+    lm.setFont(globals.aw->regularFont(), labelSize);
     for (size_t i = 0; i < _waypoints.size(); i++) {
 	Fix *fix = dynamic_cast<Fix *>(_waypoints[i]);
 
@@ -2142,18 +2140,18 @@ bool ILSOverlay::_ILSVisible(ILS *ils, DrawingParams& p)
 	    // drawn to its true length, and we use the radio colour
 	    // to colour it.
 	    p.length = p.loc->range();
-	    p.colour = globals.vor1Colour;
+	    sgCopyVec4(p.colour, globals.vor1Colour);
 	    p.live = true;
 	} else if (p.loc->frequency() == _p->nav2_freq) {
 	    p.length = p.loc->range();
-	    p.colour = globals.vor2Colour;
+	    sgCopyVec4(p.colour, globals.vor2Colour);
 	    p.live = true;
 	}
     }    
 
-    p.pointSize = _labelPointSize;
+    p.labelSize = _labelSize;
     if (_metresPerPixel > fontScalingLevel) {
-	p.pointSize *= fontScalingLevel / _metresPerPixel;
+	p.labelSize *= fontScalingLevel / _metresPerPixel;
     }
 
     return (p.length / _metresPerPixel > minimumLength);
@@ -2282,14 +2280,14 @@ void ILSOverlay::_drawLOCLabels()
 
 	    // We draw the ILS in a single style, but it might be
 	    // better to alter it depending on the scale.
-	    __drawLabel("RWY %N\n%F %I %M", p.loc, p.pointSize, offset, 0.0);
+	    __drawLabel("RWY %N\n%F %I %M", p.loc, p.labelSize, offset, 0.0);
 
 	    // Now add a heading near the end.
 	    // EYE - magic number
 	    offset *= 1.75;
 	    LayoutManager lm;
 	    // EYE - magic number
-	    lm.setFont(globals.aw->regularFont(), p.pointSize * 1.25);
+	    lm.setFont(globals.aw->regularFont(), p.labelSize * 1.25);
 	    lm.begin(offset, 0.0);
 	    // EYE - just record this once, when the navaid is loaded?
 	    double magvar = 0.0;
@@ -2394,7 +2392,7 @@ void ILSOverlay::_drawDMELabels()
 
 	    // Since ILS DMEs have the same frequency as the
 	    // corresponding localizer, we don't display frequencies.
-	    __drawLabel("%I", dme, p.pointSize, 0.0, offset, lp);
+	    __drawLabel("%I", dme, p.labelSize, 0.0, offset, lp);
 	}
 	geodPopMatrix();
     }

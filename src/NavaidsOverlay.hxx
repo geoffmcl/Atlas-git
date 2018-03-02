@@ -105,16 +105,16 @@ struct IconScalingPolicy {
     // An upper limit to the scaled range.  The icon will be drawn no
     // larger than this.
     float maxSize;		// Pixels
-    // Font size.  This scales in proportion to the icon size, and is
-    // derived from the other values.
-    float labelPointSize;
+    // Font size, in metres.  This scales in proportion to the icon
+    // size, and is derived from the other values.
+    float labelSize;
 };
 
 // A class to render waypoints (or, to be technical, anything derived
 // from a Waypoint).  As a subscriber, it keeps track of whether a
 // zoom or move event has occurred, and uses that to repopulate a
 // vector of waypoints (_waypoints) and update the scale
-// (_metresPerPixel) and label point size (_labelPointSize).
+// (_metresPerPixel) and label size (_labelSize).
 //
 // It has the concepts of "passes" and "layers".  Layers are fairly
 // simple - a typical rendering of a waypoint might consist of the
@@ -189,7 +189,7 @@ class WaypointOverlay: public Subscriber {
     bool _waypointsDirty;
     // Useful values updated when we're notified of a zoom event.
     double _metresPerPixel;
-    float _labelPointSize;
+    float _labelSize;		// In metres
     // Keep track of our passes.
     int _currentPass, _noOfPasses;
     // The actual waypoints, and the rendering layers.
@@ -328,10 +328,10 @@ class ILSOverlay: public WaypointOverlay {
     // to the call to _ILSVisible.
     struct DrawingParams {
 	LOC *loc;
-	float length;
+	float length;		// metres
 	bool live;
-	float *colour;
-	float pointSize;
+	sgVec4 colour;
+	float labelSize;	// scaled size of font, in metres
     };
 
     void _getWaypoints(NavData *nd);
