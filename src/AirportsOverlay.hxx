@@ -97,7 +97,11 @@ class AirportsOverlay: public Subscriber {
     void notification(Notification::type n);
 
   protected:
+    // Standard label point size.
+    static const float __labelPointSize;
+
     double _metresPerPixel;
+    float _labelPointSize;
 
     void _createBeacon();
     void _createAirportIcon();

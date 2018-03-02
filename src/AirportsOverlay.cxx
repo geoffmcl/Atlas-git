@@ -39,6 +39,7 @@
 
 // Our project's include files
 #include "AtlasWindow.hxx"
+#include "AtlasController.hxx"
 #include "Globals.hxx"
 #include "LayoutManager.hxx"
 #include "NavData.hxx"
@@ -58,6 +59,9 @@ const float arp_uncontrolled_colour[4] = {0.439, 0.271, 0.420, 1.0};
 const float arp_controlled_colour[4] = {0.000, 0.420, 0.624, 1.0}; 
 // Runway (light grey)
 const float arp_runway_colour[4] = {0.824, 0.863, 0.824, 1.0};
+
+// Standard label font size, in pixels.
+const float AirportsOverlay::__labelPointSize = 18.0;
 
 AirportsOverlay::AirportsOverlay(Overlays& overlays):
     _overlays(overlays),
@@ -81,6 +85,7 @@ AirportsOverlay::AirportsOverlay(Overlays& overlays):
     // Subscribe to moved and zoomed notifications.
     subscribe(Notification::Moved);
     subscribe(Notification::Zoomed);
+    subscribe(Notification::FontSize);
 }
 
 AirportsOverlay::~AirportsOverlay()
@@ -533,9 +538,8 @@ void AirportsOverlay::_labelAirport(ARP *ap, int rA)
     if (scale > 1.0) {
 	scale = 1.0;
     }
-    // EYE - magic number
-//     const float pointSize = _metresPerPixel * 24.0 * scale;
-    const float pointSize = _metresPerPixel * 18.0 * scale;
+    // EYE - magic numbers
+    const float pointSize = _labelPointSize * scale;
     const float mediumFontSize = pointSize * 0.75;
     const float smallFontSize = pointSize * 0.5;
     const float tinyFontSize = pointSize * 0.4;
@@ -749,7 +753,15 @@ void AirportsOverlay::notification(Notification::type n)
 	setDirty();
     } else if (n == Notification::Zoomed) {
 	_metresPerPixel = _overlays.aw()->scale();
+	int fontBias = globals.aw->ac()->fontBias(); 
+	_labelPointSize = (__labelPointSize + fontBias) * _metresPerPixel;
 	setDirty();
+    } else if (n == Notification::FontSize) {
+	int fontBias = globals.aw->ac()->fontBias(); 
+	_labelPointSize = (__labelPointSize + fontBias) * _metresPerPixel;
+
+	// This only changes the display of labels.
+	_labelsDirty = true;
     } else {
 	assert(false);
     }
