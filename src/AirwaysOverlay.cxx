@@ -34,6 +34,7 @@
 
 // Our project's include files
 #include "AtlasWindow.hxx"
+#include "AtlasController.hxx"
 #include "Globals.hxx"
 #include "LayoutManager.hxx"
 #include "NavData.hxx"
@@ -106,6 +107,9 @@ const float awy_high_colour[4] = {0.176, 0.435, 0.667, 0.7};
 sgVec4 nameColour = {1.0, 0.0, 0.0, 1.0};
 sgVec4 elevationColour = {0.0, 1.0, 0.0, 1.0};
 sgVec4 distanceColour = {0.0, 0.0, 1.0, 1.0};
+
+// Standard label size, in pixels.
+const float __labelPointSize = 12.0;
 
 //////////////////////////////////////////////////////////////////////
 // AirwaysOverlay
@@ -186,8 +190,13 @@ void AirwaysOverlay::draw(bool drawHigh, bool drawLow, NavData *navData)
     // EYE - we should create a display list, combine this with the
     // previous bit, blah blah blah
     if (_overlays.isVisible(Overlays::LABELS)) {
+	// Initialize our standard label size.
+	int fontBias = globals.aw->ac()->fontBias(); 
+	_labelPointSize = __labelPointSize + fontBias;
+
 	const vector<Cullable *>& intersections = 
 	    navData->hits(NavData::AIRWAYS);
+
 	for (unsigned int i = 0; i < intersections.size(); i++) {
 	    Segment *seg = dynamic_cast<Segment *>(intersections[i]);
 	    assert(seg);
@@ -274,31 +283,30 @@ bool AirwaysOverlay::_label(const Segment *seg) const
     sgdScaleVec3(middle, 0.5);
 
     // EYE - magic numbers
-    const float maxPointSize = 12.0;
     const float minPointSize = 1.0;
     float pointSize;
     // EYE - magic number
     const float space = 4.0 * _metresPerPixel; // 4 pixel space between boxes
 
     // Strategy - point size ranges from a minimum of minPointSize to
-    // a maximum of maxPointSize.  We set it based on scale.
+    // a maximum of _labelPointSize.  We set it based on scale.
     if (seg->isLow()) {
 	// Start labelling at maxLowAirway, stop labelling at
 	// minLowAirway.  Maximum point size is reached at 2 *
 	// minLowAirway.  Cheesy, yes.
 	pointSize = (maxLowAirway - _metresPerPixel) / 
 	    (maxLowAirway - 2.0 * minLowAirway) *
-	    (maxPointSize - minPointSize) + minPointSize;
+	    (_labelPointSize - minPointSize) + minPointSize;
     } else {
 	pointSize = (maxHighAirway - _metresPerPixel) / 
 	    (maxHighAirway - 2.0 * minHighAirway) *
-	    (maxPointSize - minPointSize) + minPointSize;
+	    (_labelPointSize - minPointSize) + minPointSize;
     }
     if (pointSize < minPointSize) {
 	return false;
     } 
-    if (pointSize > maxPointSize) {
-	pointSize = maxPointSize;
+    if (pointSize > _labelPointSize) {
+	pointSize = _labelPointSize;
     }
     pointSize *= _metresPerPixel;
 

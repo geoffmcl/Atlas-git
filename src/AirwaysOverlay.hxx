@@ -53,6 +53,7 @@ class AirwaysOverlay: public Subscriber {
 
   protected:
     double _metresPerPixel;
+    float _labelPointSize;	// Label size, in pixels.
 
     void _render(const Segment *seg) const;
     bool _label(const Segment *seg) const;
