@@ -61,11 +61,12 @@
 // for the unwary programmer.
 
 // The VBO class is not meant to be used by itself - use one of the
-// subclasses: VertexVBO, NormalVBO, ColourVBO, or IndexVBO.  As
-// hinted at by the names, the VertexVBO implements a vertex buffer
-// object containing vertex data.  Ditto for NormalVBO, ColourVBO, and
-// IndexVBO.  VBO is a subclass of the STL vector class, with a few
-// extra bits thrown in to manage the OpenGL side of things.
+// subclasses: VertexVBO, NormalVBO, ColourVBO, TrianglesVBO, or
+// LinesVBO.  As hinted at by the name, the VertexVBO implements a
+// vertex buffer object containing vertex data.  Ditto for NormalVBO,
+// ColourVBO, TrianglesVBO and LinesVBO.  VBO is a subclass of the STL
+// vector class, with a few extra bits thrown in to manage the OpenGL
+// side of things.
 //
 // The basic usage is as follows:
 //
