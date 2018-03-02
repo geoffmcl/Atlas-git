@@ -97,11 +97,8 @@ class AirportsOverlay: public Subscriber {
     void notification(Notification::type n);
 
   protected:
-    // Standard label point size.
-    static const float __labelPointSize;
-
     double _metresPerPixel;
-    float _labelPointSize;
+    float _labelSize;		// Font size, in metres (on earth)
 
     void _createBeacon();
     void _createAirportIcon();
