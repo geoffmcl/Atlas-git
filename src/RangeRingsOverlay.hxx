@@ -55,9 +55,8 @@ class RangeRingsOverlay: public Subscriber {
     void _pushView();
     void _popView();
 
-    bool _dirty;
     Overlays& _overlays;
-    GLuint _crosshairsDL, _circleDL, _roseDL, _rangeRingsDL;
+    DisplayList _crosshairs, _circle, _rose, _rangeRings;
 };
 
 #endif

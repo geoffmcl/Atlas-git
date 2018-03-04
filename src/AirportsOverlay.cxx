@@ -64,10 +64,7 @@ const float arp_runway_colour[4] = {0.824, 0.863, 0.824, 1.0};
 const float __labelPointSize = 18.0;
 
 AirportsOverlay::AirportsOverlay(Overlays& overlays):
-    _overlays(overlays),
-    _backgroundsDisplayList(0), _runwaysDisplayList(0), _labelsDisplayList(0),
-    _beaconDL(0), _airportIconDL(0),
-    _FGDirty(false), _BGDirty(false), _labelsDirty(false)
+    _overlays(overlays)
 {
     _policy.rO = 15;
     _policy.rI = 11;
@@ -90,12 +87,6 @@ AirportsOverlay::AirportsOverlay(Overlays& overlays):
 
 AirportsOverlay::~AirportsOverlay()
 {
-    glDeleteLists(_backgroundsDisplayList, 1);
-    glDeleteLists(_runwaysDisplayList, 1);
-    glDeleteLists(_labelsDisplayList, 1);
-
-    glDeleteLists(_beaconDL, 1);
-    glDeleteLists(_airportIconDL, 1);
 }
 
 void AirportsOverlay::setPolicy(const AirportPolicy& p)
@@ -110,17 +101,13 @@ AirportPolicy AirportsOverlay::policy()
     return _policy;
 }
 
-// Creates a single predefined beacon and saves it in _beaconDL.
+// Creates a single predefined beacon and saves it in _beacon.
 //
 // A beacon is a five-pointed star of radius 1.0 with a white (well,
 // nearly white) centre.
 void AirportsOverlay::_createBeacon()
 {
-    if (_beaconDL == 0) {
-	_beaconDL = glGenLists(1);
-	assert(_beaconDL != 0);
-    }
-    glNewList(_beaconDL, GL_COMPILE); {
+    _beacon.begin(); {
 	glBegin(GL_TRIANGLES); {
 	    for (int i = 0; i < 5; i ++) {
 		float theta, x, y;
@@ -163,7 +150,7 @@ void AirportsOverlay::_createBeacon()
 	}
 	glPopAttrib();
     }
-    glEndList();
+    _beacon.end();
 }
 
 // Creates the airport icon and saves it in a display list.  The
@@ -178,11 +165,7 @@ void AirportsOverlay::_createBeacon()
 // edge of the view.
 void AirportsOverlay::_createAirportIcon()
 {
-    if (_airportIconDL == 0) {
-	_airportIconDL = glGenLists(1);
-	assert(_airportIconDL != 0);
-    }
-    glNewList(_airportIconDL, GL_COMPILE); {
+    _airportIcon.begin(); {
 	glBegin(GL_POLYGON); {
 	    const int subdivision = 15; // 15-degree steps
 	    // Draw the circle (in a counterclockwise direction).
@@ -198,14 +181,14 @@ void AirportsOverlay::_createAirportIcon()
 	}
 	glEnd();
     }
-    glEndList();
+    _airportIcon.end();
 }
 
 void AirportsOverlay::setDirty()
 {
-    _FGDirty = true;
-    _BGDirty = true;
-    _labelsDirty = true;
+    _backgrounds.invalidate();
+    _runways.invalidate();
+    _labels.invalidate();
 }
 
 // Using the stencil buffer.
@@ -265,7 +248,7 @@ void AirportsOverlay::setDirty()
 
 void AirportsOverlay::drawBackgrounds(NavData *navData)
 {
-    if (_BGDirty) {
+    if (!_backgrounds.valid()) {
 	const int rO = _policy.rO;
 	const int rI = _policy.rI;
 	const int rMin = _policy.rMin;
@@ -279,11 +262,7 @@ void AirportsOverlay::drawBackgrounds(NavData *navData)
 	const vector<Cullable *>& intersections = 
 	    navData->hits(NavData::AIRPORTS);
 
-	if (_backgroundsDisplayList == 0) {
-	    _backgroundsDisplayList = glGenLists(1);
-	    assert(_backgroundsDisplayList != 0);
-	}
-	glNewList(_backgroundsDisplayList, GL_COMPILE);
+	_backgrounds.begin();
 
 	// Background.  We draw the background as an outline if the
 	// airport is larger than the outer circle size.  If the
@@ -325,18 +304,16 @@ void AirportsOverlay::drawBackgrounds(NavData *navData)
 	    }
 	}
 
-	glEndList();
-
-	_BGDirty = false;
+	_backgrounds.end();
     }
 
-    glCallList(_backgroundsDisplayList);
+    _backgrounds.call();
 }
 
 // Draws the runways and the airport beacon.
 void AirportsOverlay::drawForegrounds(NavData *navData)
 {
-    if (_FGDirty) {
+    if (!_runways.valid()) {
 	const int rI = _policy.rI;
 	const int rAMin = _policy.rAMin;
 
@@ -346,11 +323,7 @@ void AirportsOverlay::drawForegrounds(NavData *navData)
 	const vector<Cullable *>& intersections = 
 	    navData->hits(NavData::AIRPORTS);
 
-	if (_runwaysDisplayList == 0) {
-	    _runwaysDisplayList = glGenLists(1);
-	    assert(_runwaysDisplayList != 0);
-	}
-	glNewList(_runwaysDisplayList, GL_COMPILE);
+	_runways.begin();
 
 	// Foreground (runways).  We draw the runways only if the
 	// airport is bigger than the airport minimum.
@@ -407,23 +380,21 @@ void AirportsOverlay::drawForegrounds(NavData *navData)
 			     _metresPerPixel * 10.0,
 			     _metresPerPixel * 10.0);
 
-		    glCallList(_beaconDL);
+		    _beacon.call();
 		};
 		geodPopMatrix();
 	    }
 	}
 
-	glEndList();
-
-	_FGDirty = false;
+	_runways.end();
     }
 
-    glCallList(_runwaysDisplayList);
+    _runways.call();
 }
 
 void AirportsOverlay::drawLabels(NavData *navData)
 {
-    if (_labelsDirty) {
+    if (!_labels.valid()) {
 	const int rI = _policy.rI;
 	const int rMin = _policy.rMin;
 
@@ -433,11 +404,7 @@ void AirportsOverlay::drawLabels(NavData *navData)
 	const vector<Cullable *>& intersections = 
 	    navData->hits(NavData::AIRPORTS);
 
-	if (_labelsDisplayList == 0) {
-	    _labelsDisplayList = glGenLists(1);
-	    assert(_labelsDisplayList != 0);
-	}
-	glNewList(_labelsDisplayList, GL_COMPILE);
+	_labels.begin();
 
 	////////////
 	// Labels //
@@ -478,12 +445,10 @@ void AirportsOverlay::drawLabels(NavData *navData)
 		_labelAirport(ap, rA);
 	    }
 	}	
-	glEndList();
-
-	_labelsDirty = false;
+	_labels.end();
     }
 
-    glCallList(_labelsDisplayList);
+    _labels.call();
 }
 
 // EYE - makes no allowance for the curvature of the earth; assumes
@@ -515,7 +480,7 @@ void AirportsOverlay::_drawIcon(ARP *ap, float radius)
     radius = radius * _metresPerPixel;
     geodPushMatrix(ap->bounds().center, ap->latitude(), ap->longitude()); {
 	glScalef(radius, radius, radius);
-	glCallList(_airportIconDL);
+	_airportIcon.call();
     }
     geodPopMatrix();
 }
@@ -761,7 +726,7 @@ void AirportsOverlay::notification(Notification::type n)
 	_labelSize = (__labelPointSize + fontBias) * _metresPerPixel;
 
 	// This only changes the display of labels.
-	_labelsDirty = true;
+	_labels.invalidate();
     } else {
 	assert(false);
     }

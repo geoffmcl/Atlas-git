@@ -32,8 +32,8 @@
 
 using namespace std;
 
-FlightTracksOverlay::FlightTracksOverlay(Overlays& overlays):
-    _overlays(overlays), _isDirty(false), _dl(0)
+FlightTracksOverlay::FlightTracksOverlay(Overlays& overlays): 
+    _overlays(overlays)
 {
     // Load image for airplane display if requested.
     const SGPath& p = globals.prefs.airplaneImage;
@@ -69,7 +69,6 @@ FlightTracksOverlay::~FlightTracksOverlay()
     // 	 i != _tracks.end(); i++) {
     // 	glDeleteLists(i->second.DL, 1);
     // }
-    glDeleteLists(_dl, 1);
 }
 
 // void FlightTracksOverlay::addTrack(FlightTrack *t, 
@@ -95,11 +94,6 @@ FlightTracksOverlay::~FlightTracksOverlay()
 // 	_tracks.clear();
 //     }
 // }
-
-void FlightTracksOverlay::setDirty()
-{
-    _isDirty = true;
-}
 
 // void FlightTracksOverlay::draw()
 // {
@@ -170,13 +164,8 @@ void FlightTracksOverlay::draw()
     // rendered the same regardless of zooms and moves.  The airplane,
     // however, is drawn anew each time - it's cheap to do, it changes
     // more often, and it has to be drawn differently when we zoom.
-    if (_isDirty) {
-	if (_dl == 0) {
-	    _dl = glGenLists(1);
-	    assert(_dl != 0);
-	}
-
-	glNewList(_dl, GL_COMPILE);
+    if (!_dl.valid()) {
+	_dl.begin();
 	glPushAttrib(GL_LINE_BIT); {
 	    // Draw the track.
 	    glColor4fv(globals.trackColour);
@@ -191,13 +180,11 @@ void FlightTracksOverlay::draw()
 	    glEnd();
 	}
 	glPopAttrib();
-	glEndList();
-	
-	_isDirty = false;
+	_dl.end();
     }
 
     // Draw the track.
-    glCallList(_dl);
+    _dl.call();
 
     // Draw the airplane.  If the track is live, we draw an
     // airplane at the end, in the track colour.  We also draw an
@@ -212,9 +199,9 @@ void FlightTracksOverlay::draw()
 void FlightTracksOverlay::notification(Notification::type n)
 {
     if (n == Notification::NewFlightTrack) {
-	setDirty();
+	_dl.invalidate();
     } else if (n == Notification::FlightTrackModified) {
-	setDirty();
+	_dl.invalidate();
     } else {
 	assert(false);
     }

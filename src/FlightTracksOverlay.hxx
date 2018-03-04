@@ -26,15 +26,10 @@
 #ifndef _FLIGHTTRACKS_OVERLAY_H
 #define _FLIGHTTRACKS_OVERLAY_H
 
-#if defined( __APPLE__)		// For GLuint
-#  include <OpenGL/gl.h>
-#else
-#  include <GL/gl.h>
-#endif
-
 // #include <map>
 
 #include "Notifications.hxx"	// Subscriber
+#include "Overlays.hxx"		// DisplayList
 #include "Scenery.hxx"		// Texture
 
 // struct TRACK_INFO {
@@ -58,8 +53,6 @@ class FlightTracksOverlay: public Subscriber {
     // // Removes the given track.  If t is NULL, it removes all tracks.
     // void removeTrack(FlightTrack *t = NULL);
 
-    void setDirty();
-
     void draw();
 
     // Subscriber interface.
@@ -70,8 +63,7 @@ class FlightTracksOverlay: public Subscriber {
 
     // std::map<FlightTrack*, TRACK_INFO> _tracks;
 
-    bool _isDirty;
-    GLuint _dl;
+    DisplayList _dl;
 
     // Aircraft icon.
     void _drawAirplane(FlightData *d, const sgVec4 colour);

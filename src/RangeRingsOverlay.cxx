@@ -34,16 +34,10 @@ static const float __ringColour[4] = { 0.85, 0.35, 0.25, 1.0 };
 static const float __crosshairSize = 20.0;
 static const float __pointSize = 10.0;
 
-RangeRingsOverlay::RangeRingsOverlay(Overlays& overlays):
-    _dirty(true), _overlays(overlays)
+RangeRingsOverlay::RangeRingsOverlay(Overlays& overlays): _overlays(overlays)
 {
-    // Create all the display list indices.  Note that we must have a
-    // valid OpenGL context for this to work.
-    _crosshairsDL = glGenLists(1);
-    _circleDL = glGenLists(1);
-    _roseDL = glGenLists(1);
-    _rangeRingsDL = glGenLists(1);
-
+    // Create all the display lists.  Note that we must have a valid
+    // OpenGL context for this to work.
     _createCrosshairs();
     _createCircle();
     _createRose();
@@ -54,18 +48,13 @@ RangeRingsOverlay::RangeRingsOverlay(Overlays& overlays):
 
 RangeRingsOverlay::~RangeRingsOverlay()
 {
-    glDeleteLists(_crosshairsDL, 1);
-    glDeleteLists(_circleDL, 1);
-    glDeleteLists(_roseDL, 1);
-    glDeleteLists(_rangeRingsDL, 1);
 }
 
 // Draw a set of range rings on the map.
 void RangeRingsOverlay::draw()
 {
-    if (_dirty) {
-	assert(_rangeRingsDL != 0);
-	glNewList(_rangeRingsDL, GL_COMPILE); {
+    if (!_rangeRings.valid()) {
+	_rangeRings.begin(); {
 	    // Get our centre.
 	    GLfloat viewport[4];
 	    glGetFloatv(GL_VIEWPORT, viewport);
@@ -83,7 +72,7 @@ void RangeRingsOverlay::draw()
 		glPushMatrix(); {
 		    glTranslatef(x, y, 0.0);
 		    glScalef(__crosshairSize, __crosshairSize, __crosshairSize);
-		    glCallList(_crosshairsDL);
+		    _crosshairs.call();
 		}
 		glPopMatrix();
 
@@ -136,32 +125,31 @@ void RangeRingsOverlay::draw()
 		// // Draw a compass rose aligned with magnetic north.
 		// float smallest = w > h ? h : w;
 		// glPushMatrix(); {
-		// 	glTranslatef(x, y, 0.0);
-		// 	glScalef(smallest, smallest, smallest);
-		// 	if (globals.magnetic) {
-		// 	    // EYE - how do we get our current position?  It
-		// 	    // should really be part of Globals.
-		// 	    double var = magneticVariation(37.5, -122.5);
-		// 	    glRotatef(-var, 0.0, 0.0, 1.0);
-		// 	}
-		// 	glCallList(_roseDL);
+		//     glTranslatef(x, y, 0.0);
+		//     glScalef(smallest, smallest, smallest);
+		//     if (globals.magnetic) {
+		// 	// EYE - how do we get our current position?  It
+		// 	// should really be part of Globals.
+		// 	double var = magneticVariation(37.5, -122.5);
+		// 	glRotatef(-var, 0.0, 0.0, 1.0);
+		//     }
+		//     _rose.call();
 		// }
 		// glPopMatrix();
 	    }
 	    _popView();
 	}
-	glEndList();
-	_dirty = false;
+	_rangeRings.end();
     }
 
-    glCallList(_rangeRingsDL);
+    _rangeRings.call();
 }
 
 void RangeRingsOverlay::notification(Notification::type n)
 {
     if (n == Notification::Zoomed) {
 	// Record ourselves as dirty.
-	_dirty = true;
+	_rangeRings.invalidate();
     } else {
 	assert(false);
     }
@@ -173,7 +161,7 @@ void RangeRingsOverlay::_drawCircle(float x, float y, float radius)
     glPushMatrix(); {
     	glTranslatef(x, y, 0.0);
     	glScalef(radius, radius, radius);
-    	glCallList(_circleDL);
+    	_circle.call();
     }
     glPopMatrix();
     
@@ -196,8 +184,7 @@ void RangeRingsOverlay::_drawCircle(float x, float y, float radius)
 // 1 unit long (ie, it's 2 units high and 2 units wide).
 void RangeRingsOverlay::_createCrosshairs()
 {
-    assert(_crosshairsDL != 0);
-    glNewList(_crosshairsDL, GL_COMPILE); {
+    _crosshairs.begin(); {
 	glBegin(GL_LINES); {
 	    glVertex2f(-1.0, 0.0);
 	    glVertex2f(1.0, 0.0);
@@ -206,7 +193,7 @@ void RangeRingsOverlay::_createCrosshairs()
 	}
 	glEnd(); 
     }
-    glEndList();
+    _crosshairs.end();
 }
 
 // Creates a circle of radius 1.0, centred at 0, 0.  It is drawn in
@@ -214,8 +201,7 @@ void RangeRingsOverlay::_createCrosshairs()
 // the positive X direction, using the current colour and line width.
 void RangeRingsOverlay::_createCircle()
 {
-    assert(_circleDL != 0);
-    glNewList(_circleDL, GL_COMPILE); {
+    _circle.begin(); {
 	glBegin(GL_LINE_LOOP); {
 	    const float two_pi = 360.0 * SG_DEGREES_TO_RADIANS;
 	    // Draw the circle as 72 short line segments.
@@ -227,7 +213,7 @@ void RangeRingsOverlay::_createCircle()
 	}
 	glEnd(); 
     }
-    glEndList();
+    _circle.end();
 }
 
 // Creates a compass rose of radius 1.0, centred at 0, 0.  It is drawn
@@ -237,8 +223,7 @@ void RangeRingsOverlay::_createCircle()
 // circle of the rose, just the tick marks and a north arrow.
 void RangeRingsOverlay::_createRose()
 {
-    assert(_roseDL != 0);
-    glNewList(_roseDL, GL_COMPILE); {
+    _rose.begin(); {
 	// Now draw the ticks.
 	// EYE - magic numbers
 	const float thirtiesTickLength = 0.1;
@@ -294,8 +279,8 @@ void RangeRingsOverlay::_createRose()
 	    }
 	    glPopMatrix();
 	}
-	glEndList();
     }
+    _rose.end();
 }
 
 // Convenience routines to set up and tear down a new set projection

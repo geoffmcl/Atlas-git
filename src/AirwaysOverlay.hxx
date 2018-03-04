@@ -26,13 +26,8 @@
 #ifndef _AIRWAYS_OVERLAY_H
 #define _AIRWAYS_OVERLAY_H
 
-#if defined( __APPLE__)		// For GLuint
-#  include <OpenGL/gl.h>
-#else
-#  include <GL/gl.h>
-#endif
-
 #include "Notifications.hxx"	// Subscriber
+#include "Overlays.hxx"		// DisplayList
 
 // Forward class declarations
 class Overlays;
@@ -60,7 +55,7 @@ class AirwaysOverlay: public Subscriber {
 
     Overlays& _overlays;
 
-    GLuint _highDL, _lowDL;	// Display lists
+    DisplayList _high, _low;
 };
 
 #endif

@@ -116,7 +116,7 @@ const float __labelPointSize = 12.0;
 //////////////////////////////////////////////////////////////////////
 
 AirwaysOverlay::AirwaysOverlay(Overlays& overlays):
-    _overlays(overlays), _highDL(0), _lowDL(0)
+    _overlays(overlays)
 {
     // Subscribe to zoomed notifications.
     subscribe(Notification::Zoomed);
@@ -124,8 +124,6 @@ AirwaysOverlay::AirwaysOverlay(Overlays& overlays):
 
 AirwaysOverlay::~AirwaysOverlay()
 {
-    glDeleteLists(_highDL, 1);
-    glDeleteLists(_lowDL, 1);
 }
 
 // EYE - we need to be very careful about OpenGL state changes.  Here,
@@ -145,10 +143,8 @@ void AirwaysOverlay::draw(bool drawHigh, bool drawLow, NavData *navData)
     const set<Segment *>& segments = Segment::segments();
     set<Segment *>::const_iterator it;
     if (drawLow) {
-	if (_lowDL == 0) {
-	    _lowDL = glGenLists(1);
-	    assert(_lowDL != 0);
-	    glNewList(_lowDL, GL_COMPILE); {
+	if (!_low.valid()) {
+	    _low.begin(); {
 		glColor4fv(awy_low_colour);
 		glPushAttrib(GL_LINE_BIT); {
 		    glLineWidth(2.0);
@@ -161,17 +157,15 @@ void AirwaysOverlay::draw(bool drawHigh, bool drawLow, NavData *navData)
 		}
 		glPopAttrib();
 	    }
-	    glEndList();
+	    _low.end();
 	}
 
-	glCallList(_lowDL);
+	_low.call();
     }
 
     if (drawHigh) {
-	if (_highDL == 0) {
-	    _highDL = glGenLists(1);
-	    assert(_highDL != 0);
-	    glNewList(_highDL, GL_COMPILE); {
+	if (!_high.valid()) {
+	    _high.begin(); {
 		glColor4fv(awy_high_colour);
 		for (it = segments.begin(); it != segments.end(); it++) {
 		    Segment *seg = *it;
@@ -180,10 +174,10 @@ void AirwaysOverlay::draw(bool drawHigh, bool drawLow, NavData *navData)
 		    }
 		}
 	    }
-	    glEndList();
+	    _high.end();
 	}
 
-	glCallList(_highDL);
+	_high.call();
     }
 
     // Now label them.

@@ -34,22 +34,54 @@
 
 using namespace std;
 
-// Colours from VFR_Chart_Symbols.pdf:
-//
-// VOR - <0.000, 0.420, 0.624> (same as controlled airport)
-// NDB - <0.525, 0.294, 0.498>
-//
-// city - <1.000, 0.973, 0.459>
-// lake - <0.443, 0.745, 0.827>
-// open water - <0.859, 0.929, 0.945>
+//////////////////////////////////////////////////////////////////////
+// DisplayList
+//////////////////////////////////////////////////////////////////////
 
-// EYE - the choice of colours here was arbitrary.  Are there
-// "official" colours?  Use an official symbol instead?  A: See
-// VFR_Chart_Symbols.pdf, page 28.  It looks like they're blue, and
-// drawn as a symbol.  There's a distinction (in symbol size) made
-// between helipads at airports and stand-alone heliports.
-// const float heli_colour1[4] = {0.271, 0.439, 0.420, 0.7}; 
-// const float heli_colour2[4] = {0.863, 0.824, 0.824, 0.7};
+// True if begin() has been called without a corresponding end().
+bool DisplayList::_compiling = false;
+
+DisplayList::DisplayList(): _dl(0), _valid(false)
+{
+}
+
+DisplayList::~DisplayList()
+{
+    glDeleteLists(_dl, 1);
+}
+
+void DisplayList::begin()
+{
+    assert(!_compiling);
+
+    // Generate the display list if necessary.
+    if (_dl == 0) {
+	_dl = glGenLists(1);
+	assert(_dl);
+    }
+
+    // Start compiling the display list.
+    _valid = false;
+    glNewList(_dl, GL_COMPILE);
+    _compiling = true;
+}
+
+void DisplayList::end()
+{
+    assert(_compiling);
+    glEndList();
+    _valid = true;
+    _compiling = false;
+}
+
+void DisplayList::call()
+{
+    // Although it's not illegal to call an undefined display list,
+    // it's probably a logic error.
+    assert(_dl);
+    assert(_valid);
+    glCallList(_dl);
+}
 
 #include "AtlasWindow.hxx"
 Overlays::Overlays(AtlasWindow *aw): _aw(aw)
@@ -167,15 +199,6 @@ void Overlays::toggle(OverlayType type, bool value)
     // Change the state, and let everyone know it.
     _overlays[type] = value;
     Notification::notify(Notification::OverlayToggled);
-
-    // A special case - toggling an overlay doesn't really dirty it -
-    // we just turn it on and off.  However, toggling the labels
-    // usually does, because the labels are usually drawn with the
-    // overlay contents.
-    if (type == LABELS) {
-	_airports->setDirty();
-	_tracks->setDirty();
-    }
 }
 
 void Overlays::toggle(OverlayType type)
