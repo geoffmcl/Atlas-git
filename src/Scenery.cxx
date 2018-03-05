@@ -29,9 +29,6 @@
 // Our include file
 #include "Scenery.hxx"
 
-// C++ system files
-#include <cassert>
-
 // Our project's include files
 #include "AtlasWindow.hxx"
 #include "AtlasController.hxx"
@@ -39,6 +36,7 @@
 #include "Geographics.hxx"
 #include "Image.hxx"
 #include "LayoutManager.hxx"
+#include "OOGL.hxx"
 
 using namespace std;
 
@@ -89,7 +87,7 @@ class MapTexture {
     Texture _t;
     SGPath _f;
     int _lat, _lon;
-    GLuint _dlist;		// Display list id to draw this texture.
+    DisplayList _dlist;		// Display list to draw this texture.
     float _maxElevation;	// Maximum elevation of the map.
 };
 
@@ -319,7 +317,7 @@ GLuint Texture::name() const
 // and the lat and lon, because the lat and lon can be extracted from
 // the path name, but it makes our life easier.
 MapTexture::MapTexture(const SGPath &f, int lat, int lon): 
-    _f(f), _lat(lat), _lon(lon), _dlist(0), _maxElevation(Bucket::NanE)
+    _f(f), _lat(lat), _lon(lon), _maxElevation(Bucket::NanE)
 {
 }
 
@@ -335,11 +333,8 @@ void MapTexture::draw()
     	return;
     }
 
-    if (_dlist == 0) {
-	_dlist = glGenLists(1);
-	assert(_dlist != 0);
-
-	glNewList(_dlist, GL_COMPILE);
+    if (!_dlist.valid()) {
+	_dlist.begin();
 
 	glEnable(GL_TEXTURE_2D);
 	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL);
@@ -388,10 +383,10 @@ void MapTexture::draw()
 	glEnd();
 	glDisable(GL_TEXTURE_2D);
 
-	glEndList();
+	_dlist.end();
     }
 
-    glCallList(_dlist);
+    _dlist.call();
 }
 
 void MapTexture::load()
@@ -404,10 +399,7 @@ void MapTexture::load()
 void MapTexture::unload()
 {
     _t.unload();
-    if (_dlist > 0) {
-	glDeleteLists(_dlist, 1);
-	_dlist = 0;
-    }
+    _dlist.invalidate();
 }
 
 bool MapTexture::loaded() const

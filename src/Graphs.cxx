@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2007 - 2017 Brian Schack
+  Copyright (C) 2007 - 2018 Brian Schack
 
   This file is part of Atlas.
 
@@ -384,8 +384,7 @@ GraphsWindow::GraphsWindow(const char *name, const char *regularFontFile,
     AtlasBaseWindow(name, regularFontFile, boldFontFile), _ac(ac),
     _track(NULL), _graphTypes(0), _smoothing(0),
     _xAxisType(_XAXIS_COUNT), _time("time (s)"), 
-    _dist("distance (nm)"), _shouldRerender(false),
-    _shouldReload(false), _graphDL(0), _dragging(false)
+    _dist("distance (nm)"), _shouldReload(false), _dragging(false)
 {
     // Standard OpenGL attributes.
     glEnable(GL_LINE_SMOOTH);
@@ -458,8 +457,6 @@ GraphsWindow::~GraphsWindow()
     for (int i = 0; i < _GRAPH_TYPES_COUNT; i++) {
     	puDeleteObject(_ySliders[i]);
     }
-
-    glDeleteLists(_graphDL, 1);
 }
 
 void GraphsWindow::special(int key, int x, int y)
@@ -495,7 +492,7 @@ void GraphsWindow::setFlightTrack(FlightTrack *t)
 
     _track = t;
 
-    _shouldRerender = _shouldReload = true;
+    _shouldReload = true;
 }
 
 // EYE - make smoothing a float?
@@ -514,7 +511,7 @@ void GraphsWindow::setSmoothing(unsigned int s)
     // depends on the smoothing interval.
     // EYE - make reloading Values-specific?  In other words, just
     // mark _values[CLIMB_RATE]?
-    _shouldRerender = _shouldReload = true;
+    _shouldReload = true;
     postRedisplay();
 }
 
@@ -526,7 +523,7 @@ void GraphsWindow::setYAxisType(YAxisType t, bool b)
     _graphTypes[t] = b;
     _ui->setYAxisType(t, b);
 
-    _shouldRerender = true;
+    _graph.invalidate();
     postRedisplay();
 }
 
@@ -539,7 +536,7 @@ void GraphsWindow::setXAxisType(XAxisType t)
     _xAxisType = t;
     _ui->setXAxisType(t);
 
-    _shouldRerender = true;
+    _graph.invalidate();
     postRedisplay();
 }
 
@@ -588,7 +585,7 @@ void GraphsWindow::setAutoscale(XAxisType t, bool b)
 	_dist.setAutoscale(b);
     }
 
-    _shouldRerender = true;
+    _graph.invalidate();
     postRedisplay();
 }
 
@@ -596,7 +593,7 @@ void GraphsWindow::setAutoscale(YAxisType t, bool b)
 {
     _values[t]->setAutoscale(b);
 
-    _shouldRerender = true;
+    _graph.invalidate();
     postRedisplay();
 }
 
@@ -608,7 +605,7 @@ void GraphsWindow::setScale(XAxisType t, float f)
 	_dist.setScale(f);
     }
 
-    _shouldRerender = true;
+    _graph.invalidate();
     postRedisplay();
 }
 
@@ -616,7 +613,7 @@ void GraphsWindow::setScale(YAxisType t, float f)
 {
     _values[t]->setScale(f);
 
-    _shouldRerender = true;
+    _graph.invalidate();
     postRedisplay();
 }
 
@@ -624,14 +621,14 @@ void GraphsWindow::_setSlider(puObject *slider, float val)
 {
     slider->setValue(val);
 
-    _shouldRerender = true;
+    _graph.invalidate();
     postRedisplay();
 }
 
 // This routine receives notifications of events that we've subscribed
 // to.  Basically it translates from some outside event, like the
 // flight track being modified, to some internal action or future
-// action (eg, setting _shouldRerender to true).
+// action (eg, setting _shouldReload to true).
 //
 // In general, we try to postpone as much work as possible, merely
 // recording the fact that work needs to be done.  Later, in the
@@ -646,7 +643,6 @@ void GraphsWindow::notification(Notification::type n)
 	// aircraft movement, since we unconditionally draw the
 	// aircraft mark.
     } else if (n == Notification::FlightTrackModified) {
-	_shouldRerender = true;
 	_shouldReload = true;
     } else if ((n == Notification::NewFlightTrack) || 
 	       (n == Notification::ShowTrackInfo)) {
@@ -660,7 +656,7 @@ void GraphsWindow::notification(Notification::type n)
 
 // Draws all of our graphs (as given by graphTypes) into our window.
 // Graphs span the window horizontally, and each graph gets equal
-// space vertically.  The variables _shouldRerender and _shouldReload
+// space vertically.  The values _graph.valid() and _shouldReload
 // determine what work is actually performed.
 //
 // Assumes that _track is valid and that the _graphTypes value is
@@ -693,26 +689,26 @@ void GraphsWindow::_display()
     }
 
     Values& xVals = _xValues();
-    if (_shouldRerender) {
-	// Make sure our data is up-to-date.
-	_loadData();
 
+    // Make sure our data is up-to-date (this is a no-op if the data
+    // is current).
+    _loadData();
+
+    // Regenerate the graph if necessary.
+    if (!_graph.valid()) {
 	// Set our title.
 	setTitle(_track->niceName());
 
-	// Create a new display list.
-	glDeleteLists(_graphDL, 1);
-	_graphDL = glGenLists(1);
-	assert(_graphDL != 0);
-	glNewList(_graphDL, GL_COMPILE); {
+	// No graphs to plot.  Just return.
+	if (_graphTypes.count() == 0) {
+	    return;
+	}
+
+	// Start compiling a display list.
+	_graph.begin(); {
 	    // Clear everything to white.
 	    glClearColor(1.0, 1.0, 1.0, 0.0);
 	    glClear(GL_COLOR_BUFFER_BIT);
-
-	    // No graphs to plot.  Just return.
-	    if (_graphTypes.count() == 0) {
-		return;
-	    }
 
 	    // EYE - need a routine for _w - (_margin * 2) expression
 	    // EYE - check if this changes _showXSlider - if not, do nothing
@@ -751,12 +747,10 @@ void GraphsWindow::_display()
 		}
 	    }
 	}
-	glEndList();
-
-	_shouldRerender = false;
+	_graph.end();
     }
 
-    glCallList(_graphDL);
+    _graph.call();
 
     // Draw current mark and, if it's live, current aircraft position
     // (which is always at the end of the track, but it's drawn just
@@ -821,7 +815,7 @@ void GraphsWindow::_reshape(int w, int h)
 
     _ui->setSize(_w, _h);
 
-    _shouldRerender = true;
+    _graph.invalidate();
 }
 
 // Called after a mouse click.
@@ -1176,6 +1170,7 @@ void GraphsWindow::_loadData()
 	}
 
 	_shouldReload = false;
+	_graph.invalidate();
     }
 }
 

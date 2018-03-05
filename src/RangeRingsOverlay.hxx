@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2011 - 2012 Brian Schack
+  Copyright (C) 2011 - 2018 Brian Schack
 
   Draws range rings.
 
@@ -26,13 +26,14 @@
 #ifndef _RANGERINGS_OVERLAY_H
 #define _RANGERINGS_OVERLAY_H
 
-#if defined( __APPLE__)		// For GLuint
-#  include <OpenGL/gl.h>
-#else
-#  include <GL/gl.h>
-#endif
+// #if defined( __APPLE__)		// For GLuint
+// #  include <OpenGL/gl.h>
+// #else
+// #  include <GL/gl.h>
+// #endif
 
 #include "Notifications.hxx"
+#include "OOGL.hxx"
 #include "Overlays.hxx"
 
 class RangeRingsOverlay: public Subscriber {

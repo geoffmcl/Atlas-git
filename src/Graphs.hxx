@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2007 - 2017 Brian Schack
+  Copyright (C) 2007 - 2018 Brian Schack
 
   The graphs object draws graphs for a flight track in a window.
 
@@ -33,6 +33,7 @@
 
 #include "AtlasBaseWindow.hxx"
 #include "Notifications.hxx"	// Subscriber
+#include "OOGL.hxx"		// DisplayList
 
 // Forward class declarations
 class AtlasController;
@@ -298,18 +299,9 @@ class GraphsWindow: public AtlasBaseWindow, Subscriber {
     Distances _dist;
     Values *_values[_GRAPH_TYPES_COUNT];
 
-    // These determine whether the graphs should be redrawn anew or
-    // whether we can use the display list stored in _graphDL, and
-    // whether we need to reload the track data.
-    //
-    // _shouldRerender: true when we need to regenerate _graphDL
-    // _shouldReload: true when we need to call _loadData()
-    //
-    // Note that if _shouldReload is true, _shouldRerender is always
-    // true.  Equivalently, if _shouldRerender is false, then so is
-    // _shouldReload.
-    bool _shouldRerender, _shouldReload;
-    GLuint _graphDL;
+    // True when we need to call _loadData().
+    bool _shouldReload;
+    DisplayList _graph;
 
     // UI stuff
     // EYE - put in Values class?

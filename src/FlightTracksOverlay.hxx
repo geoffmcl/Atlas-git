@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2012 Brian Schack
+  Copyright (C) 2009 - 2018 Brian Schack
 
   The flight tracks overlay manages the display of flight tracks.
 
@@ -29,7 +29,7 @@
 // #include <map>
 
 #include "Notifications.hxx"	// Subscriber
-#include "Overlays.hxx"		// DisplayList
+#include "OOGL.hxx"		// DisplayList
 #include "Scenery.hxx"		// Texture
 
 // struct TRACK_INFO {

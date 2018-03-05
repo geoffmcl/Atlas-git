@@ -27,6 +27,7 @@
 #define _NAVAIDS_OVERLAY_H
 
 #include "Notifications.hxx"
+#include "OOGL.hxx"
 #include "Overlays.hxx"
 #include "NavData.hxx"		// Needed for Marker Type enumeration.
 

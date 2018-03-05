@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2011 - 2012 Brian Schack
+  Copyright (C) 2011 - 2018 Brian Schack
 
   This file is part of Atlas.
 

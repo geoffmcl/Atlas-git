@@ -34,55 +34,6 @@
 
 using namespace std;
 
-//////////////////////////////////////////////////////////////////////
-// DisplayList
-//////////////////////////////////////////////////////////////////////
-
-// True if begin() has been called without a corresponding end().
-bool DisplayList::_compiling = false;
-
-DisplayList::DisplayList(): _dl(0), _valid(false)
-{
-}
-
-DisplayList::~DisplayList()
-{
-    glDeleteLists(_dl, 1);
-}
-
-void DisplayList::begin()
-{
-    assert(!_compiling);
-
-    // Generate the display list if necessary.
-    if (_dl == 0) {
-	_dl = glGenLists(1);
-	assert(_dl);
-    }
-
-    // Start compiling the display list.
-    _valid = false;
-    glNewList(_dl, GL_COMPILE);
-    _compiling = true;
-}
-
-void DisplayList::end()
-{
-    assert(_compiling);
-    glEndList();
-    _valid = true;
-    _compiling = false;
-}
-
-void DisplayList::call()
-{
-    // Although it's not illegal to call an undefined display list,
-    // it's probably a logic error.
-    assert(_dl);
-    assert(_valid);
-    glCallList(_dl);
-}
-
 #include "AtlasWindow.hxx"
 Overlays::Overlays(AtlasWindow *aw): _aw(aw)
 {

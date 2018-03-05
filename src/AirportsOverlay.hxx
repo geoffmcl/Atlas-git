@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2008 - 2014 Brian Schack
+  Copyright (C) 2008 - 2018 Brian Schack
 
   The airports overlay manages the loading and drawing of airports.
 
@@ -27,7 +27,7 @@
 #define _AIRPORTS_OVERLAY_H
 
 #include "Notifications.hxx"	// Subscriber
-#include "Overlays.hxx"		// DisplayList
+#include "OOGL.hxx"		// DisplayList
 
 // Forward class declarations
 class Overlays;

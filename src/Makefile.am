@@ -39,7 +39,8 @@ Atlas_SOURCES = \
 	Palette.cxx Palette.hxx \
 	misc.cxx misc.hxx \
 	Globals.cxx Globals.hxx \
-	Geographics.cxx Geographics.hxx
+	Geographics.cxx Geographics.hxx  \
+	OOGL.cxx OOGL.hxx
 ##	PreferencesWindow.cxx PreferencesWindow.hxx
 ##	MPAircraft.cxx MPAircraft.hxx
 

@@ -65,6 +65,7 @@
 
 #include "Scenery.hxx"		// Texture
 #include "Notifications.hxx"
+#include "OOGL.hxx"		// DisplayList
 
 class AtlasWindow;
 class Background: public Subscriber {
@@ -125,10 +126,8 @@ class Background: public Subscriber {
     // Our owning window.
     AtlasWindow *_aw;
 
-    // True if we need to regenerate our display list
-    bool _dirty;
     // Our display lists.
-    GLuint _DL, _latLonDL;
+    DisplayList _bg, _latLon;
     // True if we're displaying a background image, false if we're
     // using a colour
     bool _useImage;

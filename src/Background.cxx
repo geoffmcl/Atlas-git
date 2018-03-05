@@ -46,7 +46,7 @@ const int statusImageWidth = 512;  // The nearest power of 2 >= 360
 const int statusImageHeight = 256; // The nearest power of 2 >= 180
 
 Background::Background(AtlasWindow *aw): 
-    _aw(aw), _dirty(true), _DL(0), _latLonDL(0)
+    _aw(aw)
 {
     // EYE - always load a default background ("background.jpg") - use
     // preferences?  Add an interface to load other backgrounds?
@@ -59,10 +59,6 @@ Background::Background(AtlasWindow *aw):
     // that there's a valid context?  Maybe I should delay everything
     // until the first call to draw().  Note that _init() makes no
     // OpenGL calls.
-
-    // Generate display list ids.
-    _DL = glGenLists(1);
-    assert(_DL != 0);
 
     // Initialize the clear texture.
     GLubyte data[1][1][4];
@@ -129,8 +125,6 @@ Background::Background(AtlasWindow *aw):
 
 Background::~Background()
 {
-    glDeleteLists(_DL, 1);
-    glDeleteLists(_latLonDL, 1);
     glDeleteTextures(1, &_clearTexture);
     glDeleteTextures(1, &_statusTexture);
 }
@@ -141,7 +135,7 @@ void Background::setUseImage(bool b)
 {
     if (b != _useImage) {
 	_useImage = b;
-	_dirty = true;
+	_bg.invalidate();
     }
 }
 
@@ -149,7 +143,7 @@ void Background::setImage(SGPath &p)
 {
     _image.load(p);
     if (_useImage) {
-	_dirty = true;
+	_bg.invalidate();
     }
 }
 
@@ -204,8 +198,8 @@ GLfloat _ocean[4] = {0.573, 0.631, 0.651, 1.0};
 // need, and when to recreate them.
 void Background::draw()
 {
-    if (_dirty) {
-    	glNewList(_DL, GL_COMPILE); {
+    if (!_bg.valid()) {
+	_bg.begin(); {
     	    // We modify the polygon offset, as well as texture units
     	    // 0 and 1.
             glPushAttrib(GL_POLYGON_BIT | GL_TEXTURE_BIT);
@@ -277,11 +271,10 @@ void Background::draw()
     	    glPopClientAttrib();
     	    glPopAttrib();
     	}
-    	glEndList();
-    	_dirty = false;
+	_bg.end();
     }
 
-    glCallList(_DL);
+    _bg.call();
 }
 
 void Background::drawOutlines()
@@ -290,13 +283,10 @@ void Background::drawOutlines()
     // Generate all chunk boundaries (AKA lines of latitude and
     // longitude).  We only need to do this once.  It is actually
     // drawn near the end of this routine.
-    if (_latLonDL == 0) {
-    	_latLonDL = glGenLists(1);
-    	assert(_latLonDL != 0);
-
+    if (!_latLon.valid()) {
     	// Draw the chunk boundaries.
     	glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT);
-    	glNewList(_latLonDL, GL_COMPILE); {
+    	_latLon.begin(); {
     	    glColor3f(0.5, 0.5, 0.5);
     	    // Tell OpenGL where the vertex data is.
 
@@ -306,12 +296,12 @@ void Background::drawOutlines()
     	    glDrawElements(GL_LINES, _latLonLines.size(),
     			   GL_UNSIGNED_INT, _latLonLines.data());
     	}
-    	glEndList();
+	_latLon.end();
     	glPopClientAttrib();
     }
 
     // Draw all the chunk boundaries (AKA lat/lon lines).
-    glCallList(_latLonDL);
+    _latLon.call();
 
     // Highlight the current chunk and tile, if we have such a
     // thing.
@@ -366,7 +356,7 @@ void Background::notification(Notification::type n)
     if (n == Notification::MouseMoved) {
 	// EYE - moving the mouse doesn't make the background
 	// textures, etc, dirty, just the highlighted chunk and tile.
-	// _dirty = true;
+	// _bg.invalidate();
 
 	// EYE - we also need to deal with Moved, Zoomed,
 	// CursorLocation, and Rotated events, which can all change
