@@ -537,7 +537,7 @@ void WaypointOverlay::notification(Notification::type n)
 	// EYE - what about an initial value for _metresPerPixel?
 	// _labelSize?  Can we count on a zoom notification
 	// before we need to draw anything?
-	_metresPerPixel = globals.aw->scale();
+	_metresPerPixel = _overlays.aw()->scale();
 	_labelSize = (__labelPointSize + _fontBias()) * _metresPerPixel;
 	_waypointsDirty = true;
     } else if (n == Notification::FontSize) {
@@ -624,7 +624,7 @@ float WaypointOverlay::_iconRadius(Navaid *n, IconScalingPolicy& isp)
 
 int WaypointOverlay::_fontBias() 
 { 
-    return globals.aw->ac()->fontBias(); 
+    return _overlays.ac()->fontBias(); 
 }
 
 // This function is used in calls to count_if() in notification
@@ -688,7 +688,7 @@ void VOROverlay::notification(Notification::type n)
 	// we were tuned in both times, we just compare <nav1_rad,
 	// nav1_freq> and <nav2_rad, nav2_freq> from the previous and
 	// current flight data point.
-	FlightData *p = globals.aw->ac()->currentPoint();
+	FlightData *p = _overlays.ac()->currentPoint();
 	const set<Navaid *>& navaids = p->navaids();
 	bool radioactive = 
 	    count_if(navaids.begin(), navaids.end(), _isA<VOR *>);
@@ -802,7 +802,7 @@ void VOROverlay::_createVORRose()
 		AtlasString label;
 		label.printf("%d", i / 10);
 
-		LayoutManager lm(label.str(), globals.aw->regularFont(), 
+		LayoutManager lm(label.str(), _overlays.aw()->regularFont(), 
 				 pointSize);
 		lm.setAnchor(LayoutManager::LC);
 		lm.drawText();
@@ -1162,7 +1162,7 @@ void NDBOverlay::notification(Notification::type n)
 	//
 	// First, find out if we're tuned in to an NDB in our new
 	// position.
-	_p = globals.aw->ac()->currentPoint();
+	_p = _overlays.ac()->currentPoint();
 	const set<Navaid *>& navaids = _p->navaids();
 	bool radioactive = 
 	    count_if(navaids.begin(), navaids.end(), _isA<NDB *>);
@@ -1727,22 +1727,20 @@ void FixOverlay::_draw()
     assert(_currentPass == 0);
 
     // Fixes
-    // EYE - get aw from Overlays?
-    Overlays *ov = globals.aw->ov();
-    if (ov->isVisible(Overlays::FIXES_ENROUTE)) {
+    if (_overlays.isVisible(Overlays::FIXES_ENROUTE)) {
 	_drawLayer(_layers[EnrouteFixLayer], &FixOverlay::_drawEnrouteFixes);
     }
-    if (ov->isVisible(Overlays::FIXES_TERMINAL)) {
+    if (_overlays.isVisible(Overlays::FIXES_TERMINAL)) {
 	_drawLayer(_layers[TerminalFixLayer], &FixOverlay::_drawTerminalFixes);
     }
 
     // Labels
     if (_labels) {
-	if (ov->isVisible(Overlays::FIXES_ENROUTE)) {
+	if (_overlays.isVisible(Overlays::FIXES_ENROUTE)) {
 	    _drawLayer(_layers[EnrouteLabelLayer], 
 		       &FixOverlay::_drawEnrouteLabels);
 	} 
-	if (ov->isVisible(Overlays::FIXES_TERMINAL)) {
+	if (_overlays.isVisible(Overlays::FIXES_TERMINAL)) {
 	    _drawLayer(_layers[TerminalLabelLayer], 
 		       &FixOverlay::_drawTerminalLabels);
 	}
@@ -1851,7 +1849,7 @@ void FixOverlay::_drawLabels(Overlays::OverlayType t, float fullLabel)
     // EYE - make lm part of class?
     LayoutManager lm;
     glColor4fv(__fixLabelColour);
-    lm.setFont(globals.aw->regularFont(), labelSize);
+    lm.setFont(_overlays.aw()->regularFont(), labelSize);
     for (size_t i = 0; i < _waypoints.size(); i++) {
 	Fix *fix = dynamic_cast<Fix *>(_waypoints[i]);
 
@@ -2273,13 +2271,12 @@ void ILSOverlay::_drawLOCLabels()
 	    offset *= 1.75;
 	    LayoutManager lm;
 	    // EYE - magic number
-	    lm.setFont(globals.aw->regularFont(), p.labelSize * 1.25);
+	    lm.setFont(_overlays.regularFont(), p.labelSize * 1.25);
 	    lm.begin(offset, 0.0);
 	    // EYE - just record this once, when the navaid is loaded?
 	    double magvar = 0.0;
 	    const char *magTrue = "T";
-	    // EYE - these accessor chains are getting pretty long.
-	    if (globals.aw->ac()->magTrue()) {
+	    if (_overlays.ac()->magTrue()) {
 		magvar = magneticVariation(p.loc->lat(), p.loc->lon(), 
 					   p.loc->elev());
 		magTrue = "";
