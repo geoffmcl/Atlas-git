@@ -681,27 +681,32 @@ void VOROverlay::notification(Notification::type n)
 	//
 	// (a) We weren't tuned in before and we aren't now
 	// (b) We were tuned in before and we're tuned in now, and our
-	//     radial and/or frequency has changed.
+	//     radial and/or frequency hasn't changed.
 	//
 	// So what we do is see if our tuning status has changed (we
-	// were tuned before but aren't now, or vice-versa).  Then, if
+	// were tuned before but aren't now, or vice-versa).  Or, if
 	// we were tuned in both times, we just compare <nav1_rad,
 	// nav1_freq> and <nav2_rad, nav2_freq> from the previous and
-	// current flight data point.
+	// current flight data points.
+	bool radioactive = false;
 	FlightData *p = _overlays.ac()->currentPoint();
-	const set<Navaid *>& navaids = p->navaids();
-	bool radioactive = 
-	    count_if(navaids.begin(), navaids.end(), _isA<VOR *>);
+	if (p) {
+	    const set<Navaid *>& navaids = p->navaids();
+	    radioactive = count_if(navaids.begin(), navaids.end(), _isA<VOR *>);
+	}
 
-	// Were we tuned in before or now?
-	if (_radioactive || radioactive) {
-	    // Hmmm, we might need to redraw.  Have any of the
-	    // radial/frequency pairs changed?
+	if (_radioactive != radioactive) {
+	    // Our "tuned-in" status changed - we need to redraw.
+	    _layers[RadioLayer].invalidate();
+	} else if (_radioactive && radioactive) {
+	    // Hmmm, we were tuned in before and now, so we need to
+	    // redraw if any of the radial/frequency pairs changed.
 	    if ((_p->nav1_rad != p->nav1_rad) ||
 		(_p->nav1_freq != p->nav1_freq) ||
 		(_p->nav2_rad != p->nav2_rad) ||
 		(_p->nav2_freq != p->nav2_freq)) {
-		// Something changed, so we need to redraw.
+		// One or more radio frequencies or radials have
+		// changed, so we need to redraw.
 		_layers[RadioLayer].invalidate();
 	    }
 	}
@@ -1162,10 +1167,12 @@ void NDBOverlay::notification(Notification::type n)
 	//
 	// First, find out if we're tuned in to an NDB in our new
 	// position.
+	bool radioactive = false;
 	_p = _overlays.ac()->currentPoint();
-	const set<Navaid *>& navaids = _p->navaids();
-	bool radioactive = 
-	    count_if(navaids.begin(), navaids.end(), _isA<NDB *>);
+	if (_p) {
+	    const set<Navaid *>& navaids = _p->navaids();
+	    radioactive = count_if(navaids.begin(), navaids.end(), _isA<NDB *>);
+	}
 
 	// Were we tuned in before or now?
 	if (_radioactive || radioactive) {
@@ -1905,9 +1912,13 @@ void ILSOverlay::notification(Notification::type n)
 	_layers[LOCLayer].invalidate();
 	_layers[LOCLabelLayer].invalidate();
 
+	_radioactive = false;
 	_p = globals.aw->ac()->currentPoint();
-	const set<Navaid *>& navaids = _p->navaids();
-	_radioactive = count_if(navaids.begin(), navaids.end(), _isA<LOC *>);
+	if (_p) {
+	    const set<Navaid *>& navaids = _p->navaids();
+	    _radioactive = 
+		count_if(navaids.begin(), navaids.end(), _isA<LOC *>);
+	}
     } else if (n == Notification::MagTrue) {
 	_layers[LOCLabelLayer].invalidate();
     }
