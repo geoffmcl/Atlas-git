@@ -499,25 +499,32 @@ void __drawLabel(const char *fmt, Navaid *n,
 // WaypointOverlay
 //////////////////////////////////////////////////////////////////////
 
-WaypointOverlay::WaypointOverlay(int noOfPasses, int noOfLayers): 
-    _waypointsDirty(true), _currentPass(0), _noOfPasses(noOfPasses)
+WaypointOverlay::WaypointOverlay(Overlays& overlays, Overlays::OverlayType t, 
+				 int noOfPasses, int noOfLayers): 
+    _waypointsDirty(true), _overlays(overlays), _t(t), _currentPass(0), 
+    _noOfPasses(noOfPasses)
 {
     _layers.resize(noOfLayers);
 
     subscribe(Notification::Moved);
     subscribe(Notification::Zoomed);
     subscribe(Notification::FontSize);
+    subscribe(Notification::OverlayToggled);
 }
 
-void WaypointOverlay::draw(NavData *nd, bool labels)
+void WaypointOverlay::draw(NavData *nd)
 {
+    if (!_visible) {
+	return;
+    }
+
     if (_waypointsDirty) {
 	_waypoints.clear();
 	_getWaypoints(nd);
 	_waypointsDirty = false;
     }
 
-    _draw(labels);
+    _draw();
 
     _currentPass = (_currentPass + 1) % _noOfPasses;
 }
@@ -535,6 +542,9 @@ void WaypointOverlay::notification(Notification::type n)
 	_waypointsDirty = true;
     } else if (n == Notification::FontSize) {
 	_labelSize = (__labelPointSize + _fontBias()) * _metresPerPixel;
+    } else if (n == Notification::OverlayToggled) {
+	_labels = _overlays.isVisible(Overlays::LABELS);
+	_visible = _overlays.isVisible(_t);
     }
 }
 
@@ -635,7 +645,9 @@ const float VOROverlay::_maxLineWidth = 5.0;
 // How fat to make VOR radials.
 const float VOROverlay::_angularWidth = 10.0;
 
-VOROverlay::VOROverlay(): WaypointOverlay(1, _LayerCount), _radioactive(false)
+VOROverlay::VOROverlay(Overlays& overlays): 
+    WaypointOverlay(overlays, Overlays::VOR, 1, _LayerCount), 
+    _radioactive(false)
 {
     // The scaling policy for the VOR icons.
     _isp.rangeScaleFactor = 0.1;
@@ -653,6 +665,8 @@ VOROverlay::VOROverlay(): WaypointOverlay(1, _LayerCount), _radioactive(false)
 
 void VOROverlay::notification(Notification::type n)
 {
+    WaypointOverlay::notification(n);
+
     if ((n == Notification::Moved) ||
 	(n == Notification::Zoomed)) {
 	_layers[VORLayer].invalidate();
@@ -695,8 +709,6 @@ void VOROverlay::notification(Notification::type n)
 	_radioactive = radioactive;
 	_p = p;
     }
-
-    WaypointOverlay::notification(n);
 }
 
 // Creates a standard VOR rose of radius 1.0.  This is a circle with
@@ -898,7 +910,7 @@ void VOROverlay::_getWaypoints(NavData *nd)
     }
 }
 
-void VOROverlay::_draw(bool labels)
+void VOROverlay::_draw()
 {
     assert(_currentPass == 0);
 
@@ -920,7 +932,7 @@ void VOROverlay::_draw(bool labels)
     }
 
     // Labels (layer 2)
-    if (labels) {
+    if (_labels) {
 	_drawLayer(_layers[LabelLayer], &VOROverlay::_drawLabels);
     }
 }
@@ -1114,7 +1126,9 @@ const float NDBOverlay::_dotScale = 0.1;
 // How fat to make NDB radials (degrees).
 const float NDBOverlay::_angularWidth = 2.5;
 
-NDBOverlay::NDBOverlay(): WaypointOverlay(1, _LayerCount), _radioactive(false)
+NDBOverlay::NDBOverlay(Overlays& overlays): 
+    WaypointOverlay(overlays, Overlays::NDB, 1, _LayerCount), 
+    _radioactive(false)
 {
     _isp.rangeScaleFactor = 0.1;
     _isp.minSize = 1.0;
@@ -1131,6 +1145,8 @@ NDBOverlay::NDBOverlay(): WaypointOverlay(1, _LayerCount), _radioactive(false)
 
 void NDBOverlay::notification(Notification::type n)
 {
+    WaypointOverlay::notification(n);
+
     if ((n == Notification::Moved) ||
 	(n == Notification::Zoomed)) {
 	_layers[NDBLayer].invalidate();
@@ -1157,8 +1173,6 @@ void NDBOverlay::notification(Notification::type n)
 	}
 	_radioactive = radioactive;
     }
-
-    WaypointOverlay::notification(n);
 }
 
 // Create an NDB symbol and and NDB-DME symbol, in the WAC style.
@@ -1285,7 +1299,7 @@ void NDBOverlay::_getWaypoints(NavData *nd)
 
 // Draw the navaids.  Draw their labels if 'labels' is true, and draw
 // NDB radio "beams" if _radioactive is true.
-void NDBOverlay::_draw(bool labels)
+void NDBOverlay::_draw()
 {
     assert(_currentPass == 0);
 
@@ -1303,7 +1317,7 @@ void NDBOverlay::_draw(bool labels)
     }
 
     // Labels (layer 2)
-    if (labels) {
+    if (_labels) {
 	_drawLayer(_layers[LabelLayer], &NDBOverlay::_drawLabels);
     }
 }
@@ -1443,7 +1457,8 @@ void NDBOverlay::_drawLabels()
 // DMEOverlay
 //////////////////////////////////////////////////////////////////////
 
-DMEOverlay::DMEOverlay(): WaypointOverlay(1, _LayerCount)
+DMEOverlay::DMEOverlay(Overlays& overlays): 
+    WaypointOverlay(overlays, Overlays::DME, 1, _LayerCount)
 {
     _isp.rangeScaleFactor = 0.1;
     _isp.minSize = 1.0;
@@ -1452,6 +1467,8 @@ DMEOverlay::DMEOverlay(): WaypointOverlay(1, _LayerCount)
 
 void DMEOverlay::notification(Notification::type n)
 {
+    WaypointOverlay::notification(n);
+
     if ((n == Notification::Moved) ||
 	(n == Notification::Zoomed)) {
 	_layers[DMELayer].invalidate();
@@ -1459,8 +1476,6 @@ void DMEOverlay::notification(Notification::type n)
     } else if (n == Notification::FontSize) {
 	_layers[LabelLayer].invalidate();
     }
-
-    WaypointOverlay::notification(n);
 }
 
 // Creates DME symbols - TACANs and stand-alone DMEs (this includes
@@ -1543,7 +1558,7 @@ void DMEOverlay::_getWaypoints(NavData *nd)
     }
 }
 
-void DMEOverlay::_draw(bool labels)
+void DMEOverlay::_draw()
 {
     assert(_currentPass == 0);
 
@@ -1556,7 +1571,7 @@ void DMEOverlay::_draw(bool labels)
     _drawLayer(_layers[DMELayer], &DMEOverlay::_drawDMEs);
 
     // Labels (layer 1)
-    if (labels) {
+    if (_labels) {
 	_drawLayer(_layers[LabelLayer], &DMEOverlay::_drawLabels);
     }
 }
@@ -1675,12 +1690,15 @@ const sgVec4 __terminalFixColour = {1.0, 0.0, 1.0, 1.0};
 // EYE - match __ilsLabelColour?
 const sgVec4 __fixLabelColour = {0.2, 0.2, 0.2, 0.7};
 
-FixOverlay::FixOverlay(): WaypointOverlay(1, _LayerCount)
+FixOverlay::FixOverlay(Overlays& overlays): 
+    WaypointOverlay(overlays, Overlays::FIXES, 1, _LayerCount)
 {
 }
 
 void FixOverlay::notification(Notification::type n)
 {
+    WaypointOverlay::notification(n);
+
     if ((n == Notification::Moved) ||
 	(n == Notification::Zoomed)) {
 	_layers[EnrouteFixLayer].invalidate();
@@ -1691,8 +1709,6 @@ void FixOverlay::notification(Notification::type n)
 	_layers[EnrouteLabelLayer].invalidate();
 	_layers[TerminalLabelLayer].invalidate();
     }
-
-    WaypointOverlay::notification(n);
 }
 
 void FixOverlay::_getWaypoints(NavData *nd)
@@ -1706,7 +1722,7 @@ void FixOverlay::_getWaypoints(NavData *nd)
     }
 }
 
-void FixOverlay::_draw(bool labels)
+void FixOverlay::_draw()
 {
     assert(_currentPass == 0);
 
@@ -1721,7 +1737,7 @@ void FixOverlay::_draw(bool labels)
     }
 
     // Labels
-    if (labels) {
+    if (_labels) {
 	if (ov->isVisible(Overlays::FIXES_ENROUTE)) {
 	    _drawLayer(_layers[EnrouteLabelLayer], 
 		       &FixOverlay::_drawEnrouteLabels);
@@ -1861,7 +1877,9 @@ void FixOverlay::_drawLabels(Overlays::OverlayType t, float fullLabel)
 // How much to scale the ILS DME icon compared to a standard icon.
 const float ILSOverlay::_DMEScale = 0.5;
 
-ILSOverlay::ILSOverlay(): WaypointOverlay(2, _LayerCount), _radioactive(false)
+ILSOverlay::ILSOverlay(Overlays& overlays): 
+    WaypointOverlay(overlays, Overlays::ILS, 2, _LayerCount), 
+    _radioactive(false)
 {
     subscribe(Notification::AircraftMoved);
     subscribe(Notification::NewFlightTrack);
@@ -1870,6 +1888,8 @@ ILSOverlay::ILSOverlay(): WaypointOverlay(2, _LayerCount), _radioactive(false)
 
 void ILSOverlay::notification(Notification::type n)
 {
+    WaypointOverlay::notification(n);
+
     if ((n == Notification::Moved) ||
 	(n == Notification::Zoomed)) {
 	_layers[MarkerLayer].invalidate();
@@ -1893,8 +1913,6 @@ void ILSOverlay::notification(Notification::type n)
     } else if (n == Notification::MagTrue) {
 	_layers[LOCLabelLayer].invalidate();
     }
-
-    WaypointOverlay::notification(n);
 }
 
 // Creates ILS localizer symbol, with a length of 1.  The symbol is
@@ -2047,7 +2065,7 @@ void ILSOverlay::_getWaypoints(NavData *nd)
     }
 }
 
-void ILSOverlay::_draw(bool labels)
+void ILSOverlay::_draw()
 {
     // If we haven't created our basic symbols yet, do it now.
     if (!_ILSSymbolDL.valid()) {
@@ -2064,7 +2082,7 @@ void ILSOverlay::_draw(bool labels)
 	_drawLayer(_layers[LOCLayer], &ILSOverlay::_drawLOCs);
 
 	// 2: Localizer labels
-	if (labels) {
+	if (_labels) {
 	    _drawLayer(_layers[LOCLabelLayer], &ILSOverlay::_drawLOCLabels);
 	}
     } else if (_currentPass == 1) {
@@ -2072,7 +2090,7 @@ void ILSOverlay::_draw(bool labels)
 	_drawLayer(_layers[DMELayer], &ILSOverlay::_drawDMEs);
 
 	// 4: DME labels
-	if (labels) {
+	if (_labels) {
 	    _drawLayer(_layers[DMELabelLayer], &ILSOverlay::_drawDMELabels);
 	}
     } else {

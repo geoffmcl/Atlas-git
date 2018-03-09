@@ -39,11 +39,11 @@ Overlays::Overlays(AtlasWindow *aw): _aw(aw)
 {
     // Load data.
     _airports = new AirportsOverlay(*this);
-    _VORs = new VOROverlay();
-    _NDBs = new NDBOverlay();
-    _DMEs = new DMEOverlay();
-    _Fixes = new FixOverlay();
-    _ILSs = new ILSOverlay();
+    _VORs = new VOROverlay(*this);
+    _NDBs = new NDBOverlay(*this);
+    _DMEs = new DMEOverlay(*this);
+    _Fixes = new FixOverlay(*this);
+    _ILSs = new ILSOverlay(*this);
     _airways = new AirwaysOverlay(*this);
     _tracks = new FlightTracksOverlay(*this);
     _crosshairs = new CrosshairsOverlay(*this);
@@ -95,8 +95,8 @@ void Overlays::draw(NavData *navData)
 	_airports->drawBackgrounds(navData);
     }
     // We sandwich ILSs between runway backgrounds and the runways.
-    if (_overlays[NAVAIDS] && _overlays[ILS]) {
-	_ILSs->draw(navData, _overlays[LABELS]);
+    if (_overlays[NAVAIDS]) {
+	_ILSs->draw(navData);
     }
     if (_overlays[AIRPORTS]) {
 	_airports->drawForegrounds(navData);
@@ -108,25 +108,17 @@ void Overlays::draw(NavData *navData)
     // visibility.  I wonder if we should just move it all into the
     // various overlay subclasses?  It would certainly make for neater
     // code here.
-    if (_overlays[NAVAIDS] && _overlays[ILS]) {
-	_ILSs->draw(navData, _overlays[LABELS]);
+    if (_overlays[NAVAIDS]) {
+	_ILSs->draw(navData);
     }
     if (_overlays[AWYS]) {
 	_airways->draw(_overlays[AWYS_HIGH], _overlays[AWYS_LOW], navData);
     }
     if (_overlays[NAVAIDS]) {
-	if (_overlays[VOR]) {
-	    _VORs->draw(navData, _overlays[LABELS]);
-	}
-	if (_overlays[NDB]) {
-	    _NDBs->draw(navData, _overlays[LABELS]);
-	}
-	if (_overlays[DME]) {
-	    _DMEs->draw(navData, _overlays[LABELS]);
-	}
-	if (_overlays[FIXES]) {
-	    _Fixes->draw(navData, _overlays[LABELS]);
-	}
+	_VORs->draw(navData);
+	_NDBs->draw(navData);
+	_DMEs->draw(navData);
+	_Fixes->draw(navData);
     }
     if (_overlays[CROSSHAIRS]) {
     	_crosshairs->draw();

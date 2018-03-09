@@ -62,7 +62,9 @@ struct IconScalingPolicy {
 // from a Waypoint).  As a subscriber, it keeps track of whether a
 // zoom or move event has occurred, and uses that to repopulate a
 // vector of waypoints (_waypoints) and update the scale
-// (_metresPerPixel) and label size (_labelSize).
+// (_metresPerPixel) and label size (_labelSize).  It also follows
+// FontSize and OverlayToggled notifications to update _labelSize,
+// _visible, and _labels.
 //
 // It has the concepts of "passes" and "layers".  Layers are fairly
 // simple - a typical rendering of a waypoint might consist of the
@@ -95,22 +97,26 @@ struct IconScalingPolicy {
 //
 // (2) _draw() - This should check the current pass (_currentPass) and
 //     call _drawLayer() for the layers that need to be rendered in
-//     that pass.  It is passed a 'labels' boolean, which is true if
-//     labels should be rendered.  It's up to subclasses to choose
-//     which layers to draw - for example, if there's a flight track
-//     and the radio is tuned in to a navaid, they can draw a radio
-//     beam to indicate the navaid is active.
+//     that pass.  It's up to subclasses to choose which layers to
+//     draw - for example, if there's a flight track and the radio is
+//     tuned in to a navaid, they can draw a radio beam to indicate
+//     the navaid is active.
 //
 // Subclasses should also implement the notification() method, mostly
 // to invalidate layers that need to be rerendered.  Just remember to
-// call WaypointOverlay's notification() method, so that it can update
-// _waypointsDirty, _metresPerPixel, ...
+// call WaypointOverlay's notification() method first, so that it can
+// update _waypointsDirty, _metresPerPixel, ...
+//
+// Subclasses need to pass to the WaypointOverlay constructor: a
+// reference to the Overlays object, their type (in OverlayType
+// terms), and the number of passes and layers they require.
 class WaypointOverlay: public Subscriber {
   public:
-    WaypointOverlay(int noOfPasses, int noOfLayers);
+    WaypointOverlay(Overlays& overlays, Overlays::OverlayType t, 
+		    int noOfPasses, int noOfLayers);
     virtual ~WaypointOverlay() {}
 
-    void draw(NavData *nd, bool labels);
+    void draw(NavData *nd);
 
     // Subscriber interface.
     virtual void notification(Notification::type n);
@@ -118,7 +124,7 @@ class WaypointOverlay: public Subscriber {
   protected:
     // Methods that need to be implemented by subclasses.
     virtual void _getWaypoints(NavData *nd) = 0;
-    virtual void _draw(bool labels) = 0;
+    virtual void _draw() = 0;
 
     // Called by subclasses when they want to draw a specific layer.
     // It checks if the layer is invalid or not.  If it is, it begins
@@ -138,6 +144,16 @@ class WaypointOverlay: public Subscriber {
     // Useful values updated when we're notified of a zoom event.
     double _metresPerPixel;
     float _labelSize;		// In metres
+    Overlays& _overlays;
+    // Our type - this is used when we get a OverlayToggled event to
+    // decide if we are visible or not.
+    Overlays::OverlayType _t;
+    // True if the overlay is visible (_visible), and true if we need
+    // to draw labels (_labels).  The base class sets both in response
+    // to OverlayToggled events, and uses _visible to decide whether
+    // to call _draw().  Subclasses should check _labels in their
+    // _draw() methods.
+    bool _visible, _labels;
     // Keep track of our passes.
     int _currentPass, _noOfPasses;
     // The actual waypoints, and the rendering layers.
@@ -147,7 +163,7 @@ class WaypointOverlay: public Subscriber {
 
 class VOROverlay: public WaypointOverlay {
   public:
-    VOROverlay();
+    VOROverlay(Overlays& overlays);
 
     // Subscriber interface.
     void notification(Notification::type n);
@@ -159,7 +175,7 @@ class VOROverlay: public WaypointOverlay {
     enum {VORLayer, RadioLayer, LabelLayer, _LayerCount} _layerNames;
 
     void _getWaypoints(NavData *nd);
-    void _draw(bool labels);
+    void _draw();
 
     void _drawVORs();
     void _drawRadios();
@@ -182,7 +198,7 @@ class VOROverlay: public WaypointOverlay {
 
 class NDBOverlay: public WaypointOverlay {
   public:
-    NDBOverlay();
+    NDBOverlay(Overlays& overlays);
 
     // Subscriber interface.
     void notification(Notification::type n);
@@ -193,7 +209,7 @@ class NDBOverlay: public WaypointOverlay {
     enum {NDBLayer, RadioLayer, LabelLayer, _LayerCount} _layerNames;
 
     void _getWaypoints(NavData *nd);
-    void _draw(bool labels);
+    void _draw();
 
     void _drawNDBs();
     void _drawRadios();
@@ -212,7 +228,7 @@ class NDBOverlay: public WaypointOverlay {
 
 class DMEOverlay: public WaypointOverlay {
   public:
-    DMEOverlay();
+    DMEOverlay(Overlays& overlays);
 
     // Subscriber interface.
     void notification(Notification::type n);
@@ -223,7 +239,7 @@ class DMEOverlay: public WaypointOverlay {
     enum {DMELayer, LabelLayer, _LayerCount} _layerNames;
 
     void _getWaypoints(NavData *nd);
-    void _draw(bool labels);
+    void _draw();
 
     void _drawDMEs();
     void _drawLabels();
@@ -234,7 +250,7 @@ class DMEOverlay: public WaypointOverlay {
 
 class FixOverlay: public WaypointOverlay {
   public:
-    FixOverlay();
+    FixOverlay(Overlays& overlays);
 
     // Subscriber interface.
     void notification(Notification::type n);
@@ -244,7 +260,7 @@ class FixOverlay: public WaypointOverlay {
 	  EnrouteLabelLayer, TerminalLabelLayer, _LayerCount} _layerNames;
 
     void _getWaypoints(NavData *nd);
-    void _draw(bool labels);
+    void _draw();
 
     void _drawEnrouteFixes();
     void _drawTerminalFixes();
@@ -257,7 +273,7 @@ class FixOverlay: public WaypointOverlay {
 
 class ILSOverlay: public WaypointOverlay {
   public:
-    ILSOverlay();
+    ILSOverlay(Overlays& overlays);
 
     // Subscriber interface.
     void notification(Notification::type n);
@@ -283,7 +299,7 @@ class ILSOverlay: public WaypointOverlay {
     };
 
     void _getWaypoints(NavData *nd);
-    void _draw(bool labels);
+    void _draw();
 
     bool _ILSVisible(ILS *ils, DrawingParams& p);
     void _drawMarkers();
