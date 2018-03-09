@@ -517,7 +517,16 @@ void GraphsWindow::setSmoothing(unsigned int s)
 
 void GraphsWindow::setYAxisType(YAxisType t, bool b)
 {
+    // Don't do anything if its state isn't changing.
     if (_graphTypes[t] == b) {
+	return;
+    }
+    // We don't allow the sole remaining Y axis to be toggled off.
+    if ((_graphTypes.count() == 1) && !b) {
+	// Just in case, make sure the UI is correct (it's possible
+	// this method was called from a UI event, and has already
+	// been toggled off).
+	_ui->setYAxisType(t, !b);
 	return;
     }
     _graphTypes[t] = b;
@@ -699,10 +708,11 @@ void GraphsWindow::_display()
 	// Set our title.
 	setTitle(_track->niceName());
 
-	// No graphs to plot.  Just return.
-	if (_graphTypes.count() == 0) {
-	    return;
-	}
+	// // No graphs to plot.  Just return.
+	// if (_graphTypes.count() == 0) {
+	//     return;
+	// }
+	assert(_graphTypes.count() > 0);
 
 	// Start compiling a display list.
 	_graph.begin(); {
