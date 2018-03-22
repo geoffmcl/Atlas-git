@@ -231,8 +231,9 @@ void FlightTracksOverlay::_drawAirplane(FlightData *d, const sgVec4 colour)
 	if (_haveImage) {
 	    // Draw texture.
 	    float b = globals.prefs.airplaneImageSize / 2.0;
-	    glPushAttrib(GL_TEXTURE_BIT); {
+	    glPushAttrib(GL_TEXTURE_BIT | GL_ENABLE_BIT); {
 		glEnable(GL_TEXTURE_2D);
+		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 		glBindTexture(GL_TEXTURE_2D, _airplaneTexture.name());
 		glBegin(GL_QUADS); {
 		    glTexCoord2f(0.0, 1.0); glVertex3f(-b, -b, 0.0);
