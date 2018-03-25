@@ -26,12 +26,6 @@
 #ifndef _RANGERINGS_OVERLAY_H
 #define _RANGERINGS_OVERLAY_H
 
-// #if defined( __APPLE__)		// For GLuint
-// #  include <OpenGL/gl.h>
-// #else
-// #  include <GL/gl.h>
-// #endif
-
 #include "Notifications.hxx"
 #include "OOGL.hxx"
 #include "Overlays.hxx"
@@ -57,6 +51,7 @@ class RangeRingsOverlay: public Subscriber {
     void _popView();
 
     Overlays& _overlays;
+    bool _visible;
     DisplayList _crosshairs, _circle, _rose, _rangeRings;
 };
 

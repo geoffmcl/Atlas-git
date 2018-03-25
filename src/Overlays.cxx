@@ -91,44 +91,28 @@ void Overlays::draw(NavData *navData)
     // off.
     assert(!glIsEnabled(GL_DEPTH_TEST) && !glIsEnabled(GL_LIGHTING));
 
-    if (_overlays[AIRPORTS]) {
-	_airports->drawBackgrounds(navData);
-    }
-    // We sandwich ILSs between runway backgrounds and the runways.
-    if (_overlays[NAVAIDS]) {
-	_ILSs->draw(navData);
-    }
-    if (_overlays[AIRPORTS]) {
-	_airports->drawForegrounds(navData);
-	if (_overlays[LABELS]) {
-	    _airports->drawLabels(navData);
-	}
-    }
-    // EYE - we need to be more consistent about who checks overlay
-    // visibility.  I wonder if we should just move it all into the
-    // various overlay subclasses?  It would certainly make for neater
-    // code here.
-    if (_overlays[NAVAIDS]) {
-	_ILSs->draw(navData);
-    }
-    if (_overlays[AWYS]) {
-	_airways->draw(_overlays[AWYS_HIGH], _overlays[AWYS_LOW], navData);
-    }
-    if (_overlays[NAVAIDS]) {
-	_VORs->draw(navData);
-	_NDBs->draw(navData);
-	_DMEs->draw(navData);
-	_Fixes->draw(navData);
-    }
-    if (_overlays[CROSSHAIRS]) {
-    	_crosshairs->draw();
-    }
-    if (_overlays[RANGE_RINGS]) {
-	_rangeRings->draw();
-    }
-    if (_overlays[TRACKS]) {
-	_tracks->draw();
-    }
+    // We interleave ILSs and airports.  In particular, we draw the
+    // runway backgrounds, then the ILS "beams", then the runway
+    // foregrounds, then the other bits of the ILS systems (markers,
+    // DMEs, ...).  Note that since we use the WaypointOverlay class
+    // to implement the ILS overlay, we have the "feature" that
+    // successive calls to draw() render successive passes (and we
+    // know that ILSs have 2 passes).
+    _airports->drawBackgrounds(navData);
+    _ILSs->draw(navData);
+    _airports->drawForegrounds(navData);
+    _ILSs->draw(navData);
+
+    _airways->draw(navData);
+
+    _VORs->draw(navData);
+    _NDBs->draw(navData);
+    _DMEs->draw(navData);
+    _Fixes->draw(navData);
+
+    _crosshairs->draw();
+    _rangeRings->draw();
+    _tracks->draw();
 }
 
 void Overlays::toggle(OverlayType type, bool value)

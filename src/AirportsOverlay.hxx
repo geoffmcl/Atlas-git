@@ -82,7 +82,6 @@ class AirportsOverlay: public Subscriber {
 
     void drawBackgrounds(NavData *navData);
     void drawForegrounds(NavData *navData);
-    void drawLabels(NavData *navData); // Runways and airports
 
     // EYE - Airports::Policy instead?
     void setPolicy(const AirportPolicy& p);
@@ -100,11 +99,13 @@ class AirportsOverlay: public Subscriber {
 
     void _drawIcon(ARP *ap, float radius);
 
+    void _drawLabels(NavData *navData); // For runways and airports
     void _labelAirport(ARP *ap, int rA);
     void _labelRunway(RWY *rwy);
     void _labelRunwayEnd(const char *str, float pointSize, float hdg, RWY *rwy);
 
     Overlays& _overlays;
+    bool _visible, _labelsVisible;
 
     DisplayList _backgrounds, _runways, _labels;
     DisplayList _beacon, _airportIcon;

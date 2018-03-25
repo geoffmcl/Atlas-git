@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2012 Brian Schack
+  Copyright (C) 2009 - 2018 Brian Schack
 
   This file is part of Atlas.
 
@@ -61,6 +61,9 @@ FlightTracksOverlay::FlightTracksOverlay(Overlays& overlays):
     // second tells us if the current flight track has changed.
     subscribe(Notification::NewFlightTrack);
     subscribe(Notification::FlightTrackModified);
+    
+    // Keep track of if we're toggled on or off.
+    subscribe(Notification::OverlayToggled);
 }
 
 FlightTracksOverlay::~FlightTracksOverlay()
@@ -155,6 +158,10 @@ FlightTracksOverlay::~FlightTracksOverlay()
 // eventually have the option of drawing all tracks.
 void FlightTracksOverlay::draw()
 {
+    if (!_visible) {
+	return;
+    }
+
     FlightTrack *t = _overlays.ac()->currentTrack();
     if (!t) {
 	return;
@@ -202,6 +209,8 @@ void FlightTracksOverlay::notification(Notification::type n)
 	_dl.invalidate();
     } else if (n == Notification::FlightTrackModified) {
 	_dl.invalidate();
+    } else if (n == Notification::OverlayToggled) {
+	_visible = _overlays.isVisible(Overlays::TRACKS);
     } else {
 	assert(false);
     }

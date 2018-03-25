@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2008 - 2017 Brian Schack
+  Copyright (C) 2008 - 2018 Brian Schack
 
   This file is part of Atlas.
 
@@ -118,8 +118,9 @@ const float __labelPointSize = 12.0;
 AirwaysOverlay::AirwaysOverlay(Overlays& overlays):
     _overlays(overlays)
 {
-    // Subscribe to zoomed notifications.
+    // Subscribe to zoomed and overlay notifications.
     subscribe(Notification::Zoomed);
+    subscribe(Notification::OverlayToggled);
 }
 
 AirwaysOverlay::~AirwaysOverlay()
@@ -131,7 +132,7 @@ AirwaysOverlay::~AirwaysOverlay()
 // Therefore, we need to do all the low-altitude airways first
 // (they'll all have the same line width), and all the high-alitude
 // airways last.
-void AirwaysOverlay::draw(bool drawHigh, bool drawLow, NavData *navData)
+void AirwaysOverlay::draw(NavData *navData)
 {
     // I used to add individual airway segments to the culler and draw
     // them based on whether they were visible.  This turned out to be
@@ -142,7 +143,7 @@ void AirwaysOverlay::draw(bool drawHigh, bool drawLow, NavData *navData)
     // example, then we couldn't do this.
     const set<Segment *>& segments = Segment::segments();
     set<Segment *>::const_iterator it;
-    if (drawLow) {
+    if (_visibleLow) {
 	if (!_low.valid()) {
 	    _low.begin(); {
 		glColor4fv(awy_low_colour);
@@ -163,7 +164,7 @@ void AirwaysOverlay::draw(bool drawHigh, bool drawLow, NavData *navData)
 	_low.call();
     }
 
-    if (drawHigh) {
+    if (_visibleHigh) {
 	if (!_high.valid()) {
 	    _high.begin(); {
 		glColor4fv(awy_high_colour);
@@ -183,7 +184,7 @@ void AirwaysOverlay::draw(bool drawHigh, bool drawLow, NavData *navData)
     // Now label them.
     // EYE - we should create a display list, combine this with the
     // previous bit, blah blah blah
-    if (_overlays.isVisible(Overlays::LABELS)) {
+    if (_labels) {
 	// Initialize our standard label size.
 	int fontBias = globals.aw->ac()->fontBias(); 
 	_labelPointSize = __labelPointSize + fontBias;
@@ -194,10 +195,10 @@ void AirwaysOverlay::draw(bool drawHigh, bool drawLow, NavData *navData)
 	for (unsigned int i = 0; i < intersections.size(); i++) {
 	    Segment *seg = dynamic_cast<Segment *>(intersections[i]);
 	    assert(seg);
-	    if (seg->isLow() && drawLow) {
+	    if (seg->isLow() && _visibleLow) {
 		_label(seg);
 	    } 
-	    if (!seg->isLow() && drawHigh) {
+	    if (!seg->isLow() && _visibleHigh) {
 		_label(seg);
 	    }
 	}
@@ -434,6 +435,12 @@ void AirwaysOverlay::notification(Notification::type n)
 {
     if (n == Notification::Zoomed) {
 	_metresPerPixel = _overlays.aw()->scale();
+    } else if (n == Notification::OverlayToggled) {
+	_visibleHigh = _overlays.isVisible(Overlays::AWYS_HIGH) &&
+	    _overlays.isVisible(Overlays::AWYS);
+	_visibleLow = _overlays.isVisible(Overlays::AWYS_LOW) &&
+	    _overlays.isVisible(Overlays::AWYS);
+	_labels = _overlays.isVisible(Overlays::LABELS);
     } else {
 	assert(false);
     }

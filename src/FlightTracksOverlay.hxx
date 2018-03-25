@@ -60,6 +60,7 @@ class FlightTracksOverlay: public Subscriber {
 
   protected:
     Overlays& _overlays;
+    bool _visible;
 
     // std::map<FlightTrack*, TRACK_INFO> _tracks;
 

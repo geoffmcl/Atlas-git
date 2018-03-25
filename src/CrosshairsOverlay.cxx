@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2014 Brian Schack
+  Copyright (C) 2009 - 2018 Brian Schack
 
   This file is part of Atlas.
 
@@ -34,11 +34,16 @@
 #  include <GL/glu.h>
 #endif
 
+// Our project's include files.
+#include "Overlays.hxx"
+
 using namespace std;
 
 CrosshairsOverlay::CrosshairsOverlay(Overlays& overlays):
     _overlays(overlays)
 {
+    // Subscribe to overlay notifications.
+    subscribe(Notification::OverlayToggled);
 }
 
 CrosshairsOverlay::~CrosshairsOverlay()
@@ -47,6 +52,10 @@ CrosshairsOverlay::~CrosshairsOverlay()
 
 void CrosshairsOverlay::draw()
 {
+    if (!_visible) {
+	return;
+    }
+
     GLfloat viewport[4];
     float x, y;
     glGetFloatv(GL_VIEWPORT, viewport);
@@ -78,4 +87,11 @@ void CrosshairsOverlay::draw()
 	glMatrixMode(GL_MODELVIEW);
     }
     glPopMatrix();
+}
+
+void CrosshairsOverlay::notification(Notification::type n)
+{
+    if (n == Notification::OverlayToggled) {
+	_visible = _overlays.isVisible(Overlays::CROSSHAIRS);
+    }
 }

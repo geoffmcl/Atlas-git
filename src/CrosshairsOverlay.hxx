@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2009 - 2012 Brian Schack
+  Copyright (C) 2009 - 2018 Brian Schack
 
   Draws crosshairs.
 
@@ -26,18 +26,25 @@
 #ifndef _CROSSHAIRS_OVERLAY_H
 #define _CROSSHAIRS_OVERLAY_H
 
+// Our project's include files.
+#include "Notifications.hxx"
+
 // Forward class declarations
 class Overlays;
 
-class CrosshairsOverlay {
+class CrosshairsOverlay: public Subscriber {
   public:
     CrosshairsOverlay(Overlays& overlays);
     ~CrosshairsOverlay();
 
     void draw();
 
+    // Subscriber interface.
+    void notification(Notification::type n);
+
   protected:
     Overlays& _overlays;
+    bool _visible;
 };
 
 #endif

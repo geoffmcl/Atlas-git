@@ -42,8 +42,9 @@ RangeRingsOverlay::RangeRingsOverlay(Overlays& overlays): _overlays(overlays)
     _createCircle();
     _createRose();
 
-    // Subscribe to zoomed notifications.
+    // Subscribe to zoomed and overlay notifications.
     subscribe(Notification::Zoomed);
+    subscribe(Notification::OverlayToggled);
 }
 
 RangeRingsOverlay::~RangeRingsOverlay()
@@ -53,6 +54,10 @@ RangeRingsOverlay::~RangeRingsOverlay()
 // Draw a set of range rings on the map.
 void RangeRingsOverlay::draw()
 {
+    if (!_visible) {
+	return;
+    }
+
     if (!_rangeRings.valid()) {
 	_rangeRings.begin(); {
 	    // Get our centre.
@@ -150,6 +155,8 @@ void RangeRingsOverlay::notification(Notification::type n)
     if (n == Notification::Zoomed) {
 	// Record ourselves as dirty.
 	_rangeRings.invalidate();
+    } else if (n == Notification::OverlayToggled) {
+	_visible = _overlays.isVisible(Overlays::RANGE_RINGS);
     } else {
 	assert(false);
     }

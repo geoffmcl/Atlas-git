@@ -543,8 +543,9 @@ void WaypointOverlay::notification(Notification::type n)
     } else if (n == Notification::FontSize) {
 	_labelSize = (__labelPointSize + _fontBias()) * _metresPerPixel;
     } else if (n == Notification::OverlayToggled) {
+	_visible = _overlays.isVisible(_t) && 
+	    _overlays.isVisible(Overlays::NAVAIDS);
 	_labels = _overlays.isVisible(Overlays::LABELS);
-	_visible = _overlays.isVisible(_t);
     }
 }
 

@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2008 - 2014 Brian Schack
+  Copyright (C) 2008 - 2018 Brian Schack
 
   This file is part of Atlas.
 
@@ -82,7 +82,11 @@ AirportsOverlay::AirportsOverlay(Overlays& overlays):
     // Subscribe to moved and zoomed notifications.
     subscribe(Notification::Moved);
     subscribe(Notification::Zoomed);
+
+    // We also are interested in changes to font size and whether our
+    // overlay (and the labels overlay) is toggled.
     subscribe(Notification::FontSize);
+    subscribe(Notification::OverlayToggled);
 }
 
 AirportsOverlay::~AirportsOverlay()
@@ -248,6 +252,10 @@ void AirportsOverlay::setDirty()
 
 void AirportsOverlay::drawBackgrounds(NavData *navData)
 {
+    if (!_visible) {
+	return;
+    }
+
     if (!_backgrounds.valid()) {
 	const int rO = _policy.rO;
 	const int rI = _policy.rI;
@@ -313,6 +321,10 @@ void AirportsOverlay::drawBackgrounds(NavData *navData)
 // Draws the runways and the airport beacon.
 void AirportsOverlay::drawForegrounds(NavData *navData)
 {
+    if (!_visible) {
+	return;
+    }
+
     if (!_runways.valid()) {
 	const int rI = _policy.rI;
 	const int rAMin = _policy.rAMin;
@@ -390,10 +402,50 @@ void AirportsOverlay::drawForegrounds(NavData *navData)
     }
 
     _runways.call();
+
+    _drawLabels(navData);
 }
 
-void AirportsOverlay::drawLabels(NavData *navData)
+// EYE - makes no allowance for the curvature of the earth; assumes
+// that we're ignoring depth buffer; ignores great circleness; assumes
+// colour has been set.
+void drawRunway(RWY *rwy, const float sideBorder, const float endBorder)
 {
+    // EYE - create an AtlasCoord version of geodPushMatrix?
+    geodPushMatrix(rwy->centre(), rwy->lat(), rwy->lon(), rwy->hdg()); {
+	glBegin(GL_QUADS); {
+	    // Normal always points straight up.
+	    glNormal3f(1.0, 0.0, 0.0);
+
+	    float w = rwy->width() / 2.0 + sideBorder;
+	    float l = rwy->length() / 2.0 + endBorder;
+	    glVertex2f(-w, -l); // ll
+	    glVertex2f(w, -l);	// lr
+	    glVertex2f(w, l);	// ur
+	    glVertex2f(-w, l);	// ul
+	}
+	glEnd();
+    }
+    geodPopMatrix();
+}
+
+void AirportsOverlay::_drawIcon(ARP *ap, float radius)
+{
+    // Radius is passed in in pixels; we convert it to metres
+    radius = radius * _metresPerPixel;
+    geodPushMatrix(ap->bounds().center, ap->latitude(), ap->longitude()); {
+	glScalef(radius, radius, radius);
+	_airportIcon.call();
+    }
+    geodPopMatrix();
+}
+
+void AirportsOverlay::_drawLabels(NavData *navData)
+{
+    if (!_labelsVisible) {
+	return;
+    }
+
     if (!_labels.valid()) {
 	const int rI = _policy.rI;
 	const int rMin = _policy.rMin;
@@ -449,40 +501,6 @@ void AirportsOverlay::drawLabels(NavData *navData)
     }
 
     _labels.call();
-}
-
-// EYE - makes no allowance for the curvature of the earth; assumes
-// that we're ignoring depth buffer; ignores great circleness; assumes
-// colour has been set.
-void drawRunway(RWY *rwy, const float sideBorder, const float endBorder)
-{
-    // EYE - create an AtlasCoord version of geodPushMatrix?
-    geodPushMatrix(rwy->centre(), rwy->lat(), rwy->lon(), rwy->hdg()); {
-	glBegin(GL_QUADS); {
-	    // Normal always points straight up.
-	    glNormal3f(1.0, 0.0, 0.0);
-
-	    float w = rwy->width() / 2.0 + sideBorder;
-	    float l = rwy->length() / 2.0 + endBorder;
-	    glVertex2f(-w, -l); // ll
-	    glVertex2f(w, -l);	// lr
-	    glVertex2f(w, l);	// ur
-	    glVertex2f(-w, l);	// ul
-	}
-	glEnd();
-    }
-    geodPopMatrix();
-}
-
-void AirportsOverlay::_drawIcon(ARP *ap, float radius)
-{
-    // Radius is passed in in pixels; we convert it to metres
-    radius = radius * _metresPerPixel;
-    geodPushMatrix(ap->bounds().center, ap->latitude(), ap->longitude()); {
-	glScalef(radius, radius, radius);
-	_airportIcon.call();
-    }
-    geodPopMatrix();
 }
 
 // Labels a single airport.  Because we don't label many airports at a
@@ -727,6 +745,9 @@ void AirportsOverlay::notification(Notification::type n)
 
 	// This only changes the display of labels.
 	_labels.invalidate();
+    } else if (n == Notification::OverlayToggled) {
+	_visible = _overlays.isVisible(Overlays::AIRPORTS);
+	_labelsVisible = _overlays.isVisible(Overlays::LABELS);
     } else {
 	assert(false);
     }
