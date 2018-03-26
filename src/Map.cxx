@@ -5,7 +5,7 @@
   Based on a perl-script written by Alexei Novikov (anovikov@heron.itep.ru)
 
   Copyright (C) 2000 Per Liedman, liedman@home.se
-  Copyright (C) 2009 - 2012 Brian Schack
+  Copyright (C) 2009 - 2018 Brian Schack
 
   This file is part of Atlas.
 
@@ -434,7 +434,7 @@ int main(int argc, char **argv)
     }
 
     // Find out what our maximum desired map and buffer sizes are.
-    int bufferLevel;
+    int bufferLevel = -1;
     const bitset<TileManager::MAX_MAP_LEVEL>& mapLevels = 
 	tileManager->mapLevels();
     for (int i = TileManager::MAX_MAP_LEVEL - 1; i >= 0; i--) {
@@ -443,6 +443,9 @@ int main(int argc, char **argv)
 	    break;
 	}
     }
+    // We should always have at least one map level defined, but just
+    // in case...
+    assert(bufferLevel != -1);
 
     // The final buffer size needed to render maps is given by
     // bufferSize; the logarithm base 2 of bufferSize is bufferLevel

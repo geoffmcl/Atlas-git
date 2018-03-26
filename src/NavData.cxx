@@ -3,7 +3,7 @@
 
   Written by Brian Schack
 
-  Copyright (C) 2012 - 2017 Brian Schack
+  Copyright (C) 2012 - 2018 Brian Schack
 
   This file is part of Atlas.
 
@@ -1860,14 +1860,6 @@ void NavData::zoom(const sgdFrustum& frustum)
     }
 }
 
-// This denotes the radius of a marker's bounding sphere, in nautical
-// miles.  It must be an integer, and no smaller than the maximum
-// radius of a rendered marker.  We specify this because the navaid
-// database doesn't give a range for markers.
-
-// EYE - coordinate with markerRadii (in NavaidsOverlay.cxx)
-const int __markerRange = 1;
-
 void NavData::_loadNavaids(const char *fgRoot)
 {
     SGPath f(fgRoot);
@@ -2180,6 +2172,9 @@ void NavData::_loadNavaids810(float cycle, const gzFile& arp)
 		} else {
 		    fprintf(stderr, "%d: unknown LOC type: '%s'\n",
 			    lineNumber, type);
+		    // EYE - we should standardize our use of error
+		    // handling - it's pretty ad hoc at the moment.
+		    throw runtime_error("unknown LOC type");
 		}
 
 		LOC *loc = new LOC(id, lat, lon, elev, name, freq, range, 

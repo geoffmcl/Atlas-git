@@ -32,7 +32,7 @@
 // Forward class declarations
 class Overlays;
 class NavData;
-struct Segment;
+class Segment;
 class LayoutManager;
 
 class Overlays;
