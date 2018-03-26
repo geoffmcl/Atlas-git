@@ -1698,7 +1698,9 @@ void GraphsWindow::Altitudes::load()
 	    Radio radio;
 	    if (p->nav1_freq == gs->frequency()) {
 		radio = NAV1;
-	    } else if (p->nav2_freq == gs->frequency()) {
+	    } else {
+		// This should be true.
+		assert(p->nav2_freq == gs->frequency());
 		radio = NAV2;
 	    }
 
@@ -1932,12 +1934,11 @@ void GraphsWindow::RatesOfClimb::load()
 
     // EYE - pass _smoothing in?
 
+    float lastAlt, thisAlt;
+    float lastTime, thisTime;
+    float value;
     _data.clear();
     for (size_t i = 0, j = 0; i < _ft->size(); i++) {
-	float lastAlt, thisAlt;
-	float lastTime, thisTime;
-	float value;
-
 	thisAlt = _altAt(i);
 	thisTime = _timeAt(i);
 	// EYE - I really should check to make sure this is correct.
