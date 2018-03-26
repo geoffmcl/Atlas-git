@@ -1,3 +1,11 @@
+New in 0.6.1
+
+* A new class hierarchy for navaids.  Most of this is internal, but
+  the display of navaids should be more consistent.  
+* On the UI, terminal and en route fixes are now explicitly toggled,
+  rather than their display being dependent on zoom.  Text on navaids
+  can be adjust for better readability.
+
 New in 0.6.0
 
 * A stripped-down version of SimGear ("SlimGear") has been
