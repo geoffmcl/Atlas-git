@@ -275,10 +275,13 @@ namespace Prefs {
 	int operator==(const Bool& right) const;
 	int operator!=(const Bool& right) const;
 
+      protected:
+        // Note: I don't think it really matters if these are
+        // protected or public.  The important thing is their
+        // declaration within the namespace (see below).
 	friend std::ostream& operator<<(std::ostream& ostr, const Bool& b);
 	friend std::istream& operator>>(std::istream& istr, Bool& b);
 
-      protected:
 	bool _b;
     };
 
@@ -294,10 +297,10 @@ namespace Prefs {
 	int operator==(const Geometry& right) const;
 	int operator!=(const Geometry& right) const;
 
+      protected:
 	friend std::ostream& operator<<(std::ostream& ostr, const Geometry& g);
 	friend std::istream& operator>>(std::istream& istr, Geometry& g);
 
-      protected:
 	int _w, _h;
     };
 
@@ -313,11 +316,11 @@ namespace Prefs {
 	int operator==(const LightPosition& right) const;
 	int operator!=(const LightPosition& right) const;
 
-	friend std::ostream& operator<<(std::ostream& ostr, 
-					const LightPosition& g);
-	friend std::istream& operator>>(std::istream& istr, LightPosition& g);
-
       protected:
+	friend std::ostream& operator<<(std::ostream& ostr, 
+					const LightPosition& lp);
+	friend std::istream& operator>>(std::istream& istr, LightPosition& lp);
+
 	float _azimuth, _elevation;
     };
 
@@ -333,20 +336,29 @@ namespace Prefs {
 	int operator==(const SerialConnection& right) const;
 	int operator!=(const SerialConnection& right) const;
 
-	friend std::ostream& operator<<(std::ostream& ostr, 
-					const SerialConnection& g);
-	friend std::istream& operator>>(std::istream& istr, 
-					SerialConnection& g);
-
       protected:
+	friend std::ostream& operator<<(std::ostream& ostr, 
+					const SerialConnection& sc);
+	friend std::istream& operator>>(std::istream& istr, 
+					SerialConnection& sc);
+
 	std::string _device;
 	int _baud;
     };
+
+    // Why do I declare these here in addition to inside the classes?
+    // Because some C++ guru said so.  Otherwise, it won't compile (or
+    // has warnings).  And why is this so?  I have no idea.
+    std::ostream& operator<<(std::ostream& ostr, const Bool& b);
+    std::istream& operator>>(std::istream& istr, Bool& b);
+    std::ostream& operator<<(std::ostream& ostr, const Geometry& g);
+    std::istream& operator>>(std::istream& istr, Geometry& g);
+    std::ostream& operator<<(std::ostream& ostr, const LightPosition& lp);
+    std::istream& operator>>(std::istream& istr, LightPosition& lp);
+    std::ostream& operator<<(std::ostream& ostr, const SerialConnection& sc);
+    std::istream& operator>>(std::istream& istr, SerialConnection& sc);
 }
 
-// EYE - I wonder if we somehow need to move the other << and >>
-// operators out of the Prefs namespace?  Or is this special because
-// it involves a type defined elsewhere?
 std::ostream& operator<<(std::ostream& ostr, const TileMapper::ImageType& i);
 std::istream& operator>>(std::istream& istr, TileMapper::ImageType& i);
 

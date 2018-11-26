@@ -460,9 +460,9 @@ istream& Prefs::operator>>(istream& istr, LightPosition& g)
     return istr >> g._elevation;
 }
 
-ostream& Prefs::operator<<(ostream& ostr, const LightPosition& g)
+ostream& Prefs::operator<<(ostream& ostr, const LightPosition& lp)
 {
-    return ostr << g._azimuth << "," << g._elevation;
+    return ostr << lp._azimuth << "," << lp._elevation;
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -607,70 +607,6 @@ Preferences::Preferences():
 
     _atlasrcVersion(noAtlasrcFile)
 {
-    latitude.set(37.5, Pref::FACTORY);
-    longitude.set(-122.25, Pref::FACTORY);
-    zoom.set(125.0, Pref::FACTORY);
-    icao.set("", Pref::FACTORY);
-
-    // EYE - we could get all this from a running instance of FlightGear:
-    //
-    // /sim/fg-root
-    // /sim/fg-scenery
-    // /sim/fg-scenery[1]
-    char *env = getenv("FG_ROOT");
-    if (env == NULL) {
-	// EYE - can this not be defined?  Should we just get rid of
-	// FGBASE_DIR altogether?
-	fg_root.set(SGPath(FGBASE_DIR), Pref::FACTORY);
-    } else {
-	fg_root.set(SGPath(env), Pref::FACTORY);
-    }
-
-    env = getenv("FG_SCENERY");
-    if (env == NULL) {
-	SGPath p(fg_root.get());
-	p.append("Scenery");
-	scenery_root.set(p, Pref::FACTORY);
-    } else {
-	scenery_root.set(SGPath(env), Pref::FACTORY);
-    }
-
-    // EYE - just get()?
-    SGPath p(fg_root.get(Pref::FACTORY));
-    if (p.isNull()) {
-	p.set(FGBASE_DIR);
-    }
-    p.append("Atlas");
-    path.set(p, Pref::FACTORY);
-
-    Geometry g(1000, 750);
-    geometry.set(g, Pref::FACTORY);
-    textureFonts.set(true, Pref::FACTORY);
-    softcursor.set(false, Pref::FACTORY);
-
-    autocentreMode.set(false, Pref::FACTORY);
-    lineWidth.set(1.0, Pref::FACTORY);
-    p = path.get();
-    p.append("airplane_image.png");
-    airplaneImage.set(p, Pref::FACTORY);
-    airplaneImageSize.set(25.0, Pref::FACTORY);
-
-    update.set(1.0, Pref::FACTORY);
-    maxTrack.set(0, Pref::FACTORY);
-    networkConnections.set(5500, Pref::FACTORY);
-    SerialConnection sc;
-    serialConnections.set(sc, Pref::FACTORY);
-
-    discreteContours.set(true, Pref::FACTORY);
-    contourLines.set(false, Pref::FACTORY);
-    lightingOn.set(true, Pref::FACTORY);
-    smoothShading.set(true, Pref::FACTORY);
-    LightPosition l(315.0, 55.0);
-    lightPosition.set(l, Pref::FACTORY);
-    JPEGQuality.set(75, Pref::FACTORY);
-    imageType.set(TileMapper::JPEG, Pref::FACTORY);
-    palette.set("default.ap", Pref::FACTORY);
-
     int n = (int)Pref::options().size();
     _long_options = (struct option *)malloc(sizeof(struct option) * (n + 1));
     for (int i = 0; i < n; i++) {
@@ -847,6 +783,72 @@ bool Preferences::load(int argc, char *argv[])
 	usage();
 	return false;
     }
+
+    // For anything that wasn't set on the command-line or in the
+    // preferences file, set a default value.
+    latitude.set(37.5, Pref::FACTORY);
+    longitude.set(-122.25, Pref::FACTORY);
+    zoom.set(125.0, Pref::FACTORY);
+    icao.set("", Pref::FACTORY);
+
+    // EYE - we could get all this from a running instance of FlightGear:
+    //
+    // /sim/fg-root
+    // /sim/fg-scenery
+    // /sim/fg-scenery[1]
+    char *env = getenv("FG_ROOT");
+    if (env == NULL) {
+	// EYE - can this not be defined?  Should we just get rid of
+	// FGBASE_DIR altogether?
+	fg_root.set(SGPath(FGBASE_DIR), Pref::FACTORY);
+    } else {
+	fg_root.set(SGPath(env), Pref::FACTORY);
+    }
+
+    env = getenv("FG_SCENERY");
+    if (env == NULL) {
+	SGPath p(fg_root.get());
+	p.append("Scenery");
+	scenery_root.set(p, Pref::FACTORY);
+    } else {
+	scenery_root.set(SGPath(env), Pref::FACTORY);
+    }
+
+    // EYE - just get()?
+    SGPath p(fg_root.get(Pref::FACTORY));
+    if (p.isNull()) {
+	p.set(FGBASE_DIR);
+    }
+    p.append("Atlas");
+    path.set(p, Pref::FACTORY);
+
+    Geometry g(1000, 750);
+    geometry.set(g, Pref::FACTORY);
+    textureFonts.set(true, Pref::FACTORY);
+    softcursor.set(false, Pref::FACTORY);
+
+    autocentreMode.set(false, Pref::FACTORY);
+    lineWidth.set(1.0, Pref::FACTORY);
+    p = path.get();
+    p.append("airplane_image.png");
+    airplaneImage.set(p, Pref::FACTORY);
+    airplaneImageSize.set(25.0, Pref::FACTORY);
+
+    update.set(1.0, Pref::FACTORY);
+    maxTrack.set(0, Pref::FACTORY);
+    networkConnections.set(5500, Pref::FACTORY);
+    SerialConnection sc;
+    serialConnections.set(sc, Pref::FACTORY);
+
+    discreteContours.set(true, Pref::FACTORY);
+    contourLines.set(false, Pref::FACTORY);
+    lightingOn.set(true, Pref::FACTORY);
+    smoothShading.set(true, Pref::FACTORY);
+    LightPosition l(315.0, 55.0);
+    lightPosition.set(l, Pref::FACTORY);
+    JPEGQuality.set(75, Pref::FACTORY);
+    imageType.set(TileMapper::JPEG, Pref::FACTORY);
+    palette.set("default.ap", Pref::FACTORY);
 
     return true;
 }
