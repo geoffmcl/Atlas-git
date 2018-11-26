@@ -520,6 +520,7 @@ class NDB_DME: public PairedNavaidSystem {
 // ILS types:
 //
 // ILS-CAT-I, -II, -III - always straight-in, with GS (ie, 4)
+// LOC_GS - localizer offset, with GS (ie, 4)
 // IGS/LDA - localizer offset, GS optional (ie, 4 or 5)
 // SDF - straight-in or offset, never has GS (ie, 5)
 // LOC - always straight-in (?), without GS (ie, 5).  Can also be
@@ -532,7 +533,7 @@ class NDB_DME: public PairedNavaidSystem {
 class ILS: public NavaidSystem {
   public:
     enum Type {
-	ILS_CAT_I, ILS_CAT_II, ILS_CAT_III, LDA, IGS, Localizer, SDF
+        ILS_CAT_I, ILS_CAT_II, ILS_CAT_III, LOC_GS, LDA, IGS, Localizer, SDF
     };
 
     ILS(LOC *loc, Type type);

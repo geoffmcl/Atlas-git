@@ -2160,6 +2160,8 @@ void NavData::_loadNavaids810(float cycle, const gzFile& arp)
 		    t = ILS::ILS_CAT_II;
 		} else if (strcmp(type, "ILS-cat-III") == 0) {
 		    t = ILS::ILS_CAT_III;
+		} else if (strcmp(type, "LOC-GS") == 0) {
+		    t = ILS::LOC_GS;
 		} else if ((strcmp(type, "LDA-GS") == 0) ||
 			   (strcmp(type, "LDA") == 0)) {
 		    t = ILS::LDA;
