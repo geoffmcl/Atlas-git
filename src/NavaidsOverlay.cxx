@@ -24,6 +24,8 @@
 // Our include file
 #include "NavaidsOverlay.hxx"
 
+#include <algorithm>
+
 // Our project's include files
 #include "AtlasController.hxx"
 #include "AtlasWindow.hxx"
