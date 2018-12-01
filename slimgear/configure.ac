@@ -113,6 +113,18 @@ LIBS=""
 
 AC_SUBST(thread_LIBS)
 
+# Find out if we're running OS X (for use in a makefile).  For more
+# info, see:
+#
+# https://stackoverflow.com/questions/38898591/how-to-check-the-os-with-automake
+#
+# Other values: linux* = linux, cygwin*|mingw* = windows
+AC_CANONICAL_HOST
+case $host_os in
+    darwin*) AM_CONDITIONAL([OSX], true) ;;
+    *) AM_CONDITIONAL([OSX], false) ;;
+esac
+
 AC_OUTPUT
 
 echo ""

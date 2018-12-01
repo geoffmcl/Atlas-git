@@ -6,8 +6,11 @@ libsgmisc_la_SOURCES = \
 	sgstream.cxx sgstream.hxx \
 	stdint.hxx \
 	strutils.cxx strutils.hxx \
-	zfstream.cxx zfstream.hxx \
-	CocoaHelpers.mm
+	zfstream.cxx zfstream.hxx
+
+if OSX
+    libsgmisc_la_SOURCES += CocoaHelpers.mm
+endif
 
 libsgmisc_la_CPPFLAGS = -I$(top_srcdir)
 
