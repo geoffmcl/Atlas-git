@@ -28,6 +28,7 @@
 #include <fstream>
 #include <sstream>
 #include <algorithm>
+#include <string.h>
 
 // EYE - we don't want Boost
 // #include <boost/foreach.hpp>

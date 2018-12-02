@@ -34,6 +34,7 @@
 #include <errno.h>
 #include <fstream>
 #include <cstdlib>
+#include <string.h>
 
 #ifdef _WIN32
 #  include <direct.h>
