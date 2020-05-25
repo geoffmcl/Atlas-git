@@ -1,0 +1,14 @@
+*.vcxproj
+*.filters
+*.dir/*
+CMakeCache.txt
+CMakeFiles/*
+Debug/*
+Release/*
+atlas.sln
+bldlog-1.txt
+cmake_install.cmake
+simgear_config.h
+version.h
+x64/*
+
