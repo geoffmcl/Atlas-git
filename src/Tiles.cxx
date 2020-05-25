@@ -20,6 +20,10 @@
   You should have received a copy of the GNU General Public License
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
+#ifdef _MSC_VER //this needs to be the first!
+#include "config.h" // includes winsock2.h, and windows.h, and for VERSION
+#include <direct.h>
+#endif // _MSC_VER
 
 // Our include file(s)
 #include "Tiles.hxx"

@@ -592,13 +592,14 @@ x - n * y;
 where n is the integer nearest the exact value of x/y; if |n - x/y| = 1/2,
 then n is even. 
    ----------------------- */
-
+#if defined(_MSC_VER) && (_MSC_VER < 1900)
 float remainderf( float x, float y )
 {
    int n = (int)(( x / y ) + 0.5);
    float result = x - ( n * y );
    return result;
 }
+#endif // old _MSC_VER
 
 char * basename( char * name )
 {

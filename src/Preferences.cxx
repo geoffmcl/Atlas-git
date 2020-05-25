@@ -20,6 +20,10 @@
   You should have received a copy of the GNU General Public License
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
+#ifdef _MSC_VER //this needs to be the first!
+#include "config.h" // includes winsock2.h, and windows.h, and for VERSION
+extern char *basename(char *);
+#endif // _MSC_VER
 
 // Our include file
 #include "Preferences.hxx"
@@ -34,7 +38,9 @@
 #include <fstream>
 
 // Our project's include files
+#ifndef _MSC_VER
 #include "config.h"		// For VERSION
+#endif // !_MSC_VER
 #include "misc.hxx"
 
 using namespace std;
@@ -57,7 +63,11 @@ static vector<string> __chop(const char *str, int len = 80)
     size_t n = strlen(str);
     while (end < n) {
 	start = strspn(str + start, ws) + start;
+#ifdef _MSC_VER
+	end = ((start + len) < n) ? (start + len) : n;
+#else // !_MSC_VER
 	end = min(start + len, n);
+#endif // MSC_VER y/n
 	if (end < n) {
 	    // Move back until we get to a whitespace character.
 	    while(!strchr(ws, str[end]) && (end > start)) {
@@ -709,6 +719,13 @@ bool Preferences::load(int argc, char *argv[])
 	rcpath.set(homedir);
 	rcpath.append(atlasrc);
     } else {
+#ifdef _MSC_VER
+        homedir = getenv("USERPROFILE");
+        if (homedir != NULL) {
+            rcpath.set(homedir);
+            rcpath.append(atlasrc);
+        } else
+#endif // _MSC_VER
 	rcpath.set(atlasrc);
     }
 
@@ -911,7 +928,9 @@ bool Preferences::_load(int argc, char *argv[], Pref::PrefSource source)
     optind = 0;
 #else /* BSD style */
     optind = 1;
+#ifdef _BSD_SOURCE
     optreset = 1; 
+#endif
 #endif
 
     while ((c = getopt_long(argc, argv, ":", _long_options, &option_index)) 

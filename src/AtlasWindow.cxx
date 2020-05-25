@@ -40,6 +40,13 @@
 #include "Palette.hxx"
 #include "Scenery.hxx"
 
+#ifndef GL_MULTISAMPLE
+#define GL_MULTISAMPLE  0x809D
+#endif
+#ifndef GLUT_ACTIVE_CONTROL
+#define GLUT_ACTIVE_CONTROL GLUT_ACTIVE_CTRL
+#endif
+
 using namespace std;
 
 // Take 10 steps (0.1) to zoom by a factor of 10.

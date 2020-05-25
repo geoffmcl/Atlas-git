@@ -20,6 +20,9 @@
   You should have received a copy of the GNU General Public License
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
   ---------------------------------------------------------------------------*/
+#ifdef _MSC_VER //this needs to be the first!
+#include "config.h"
+#endif // _MSC_VER
 
 // This is a special exception to the usual rule of including our
 // include file first.  In TileMapper.hxx, pu.h includes gl.h.
@@ -82,8 +85,15 @@ unsigned int TileMapper::maxPossibleLevel()
 
     // The result is the minimum of our maximum map size, the maximum
     // texture size, and the maximum buffer size.
+#ifdef _MSC_VER
+    GLint tmp1 = (0x1 << TileManager::MAX_MAP_LEVEL);
+    GLint tmp2 = (maxTextureSize < maxBufferSize) ? maxTextureSize : maxBufferSize;
+    GLint tmp3 = (tmp1 < tmp2) ? tmp1 : tmp2;
+    return log2(tmp3);
+#else // !_MSC_VER
     return log2(min(0x1 << TileManager::MAX_MAP_LEVEL,
 		    min(maxTextureSize, maxBufferSize)));
+#endif // _MSC_VER y/n            
 }
 
 TileMapper::TileMapper(Palette *p, unsigned int maxDesiredLevel, 

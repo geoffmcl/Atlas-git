@@ -39,3 +39,4 @@ GetMap
 # Compilation and editing cruft
 *.o
 *~
+*.bak

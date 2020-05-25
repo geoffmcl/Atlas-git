@@ -192,10 +192,15 @@ void GreatCircle::draw(double metresPerPixel, const sgdFrustum& frustum,
     const float degreesPerSegment = 1 / 60.0;
     const int minPixelsPerSegment = 10;
     const float metresPerDegree = 1e7 / 90.0;
+#ifdef _MSC_VER
+    double tmp1 = (double)(degreesPerSegment * metresPerDegree);
+    double tmp2 = (double)(minPixelsPerSegment * metresPerPixel);
+    double metresPerSegment = (tmp1 > tmp2) ? tmp1 : tmp2;
+#else // !_MSC_VER
     double metresPerSegment = 
 	std::max((double)(degreesPerSegment * metresPerDegree),
 		 (double)(minPixelsPerSegment * metresPerPixel));
-
+#endif // _MSC_VER y/n
     // Now create the segments.  We start with a single segment
     // covering the whole great circle, then ask it to subdivide
     // itself.

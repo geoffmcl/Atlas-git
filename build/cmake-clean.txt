@@ -1,0 +1,3 @@
+config.h
+simgear_config.h
+version.h

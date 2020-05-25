@@ -20,6 +20,9 @@
   You should have received a copy of the GNU General Public License
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
 ---------------------------------------------------------------------------*/
+#ifdef _MSC_VER //this needs to be the first!
+#include "config.h" // includes winsock2.h, and windows.h, and for VERSION
+#endif // _MSC_VER
 
 // This is a special exception to the usual rule of including our
 // include file first.  We include gl.h in Scenery.hxx.  However, glew
@@ -847,9 +850,14 @@ void Scenery::zoom(const sgdFrustum& frustum, double metresPerPixel)
     // base-2 log to get the "level".  Because idealLevel is unsigned,
     // we have to make sure it isn't assigned a negative value (which
     // will be cast into a very large positive value).
+#ifdef _MSC_VER
+    unsigned int tmp = ceil(log2(SGGeodesy::EQURAD * SGD_PI / 180.0 / metresPerPixel));
+    unsigned int idealLevel = (tmp > 0) ? tmp : 0;
+#else // !_MSC_VER    
     unsigned int idealLevel = 
     	max(ceil(log2(SGGeodesy::EQURAD * SGD_PI / 180.0 / metresPerPixel)),
     	    0.0);
+#endif // _MSC_VER y/n
 
     // Find the best matching level.  We define "best" to be the
     // closest level greater than or equal to the ideal level.  If

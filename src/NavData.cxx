@@ -3277,14 +3277,20 @@ void NavData::_loadAirports1000(const gzFile& arp)
 		// (10,800 nautical miles) long!  This is clearly
 		// unsatisfactory, so we just clamp all values less
 		// than -90 to -90.
+#ifdef _MSC_VER
+		lat1 = (lat1 > -90.0) ? lat1 : -90.0;
+#else // !_MSC_VER       
 		lat1 = max(lat1, -90.0);
-
+#endif // _MSC_VER y/n
 		sscanf(line, "%3s %lf %lf %*f %*f %*d %*d %*d %*d %n", 
 		       rwyid2, &lat2, &lon2, &offset);
 		line += offset;
 		assert(strlen(rwyid2) <= 3);
+#ifdef _MSC_VER
+		lat2 = (lat2 > -90.0) ? lat2 : -90.0;
+#else // !_MSC_VER       
 		lat2 = max(lat2, -90.0); // EYE - hack (see above)
-
+#endif // _MSC_VER y/n
 		// Runway!
 		RWY *rwy = new RWY(rwyid1, lat1, lon1, rwyid2, lat2, lon2, 
 				   width, ap);

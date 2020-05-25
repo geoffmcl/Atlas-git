@@ -39,6 +39,7 @@
 #ifndef _SEARCHER_H_
 #define _SEARCHER_H_
 
+#include <iterator> // for inserter
 #include <map>
 #include <set>
 #include <string>

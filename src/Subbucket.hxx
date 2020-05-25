@@ -43,8 +43,10 @@
 // use the TR1 unordered_set and unordered_map, as they are about
 // twice as fast.
 #if (defined(_MSC_VER) && !defined(HAVE_TRI_UNORDERED))
-    #include <boost/tr1/unordered_set.hpp>
-    #include <boost/tr1/unordered_map.hpp>
+    //#include <boost/tri/unordered_set.hpp>
+    //#include <boost/tri/unordered_map.hpp>
+    #include <unordered_set>
+    #include <unordered_map>
 #else
     #include <tr1/unordered_set>
     #include <tr1/unordered_map>

@@ -40,6 +40,10 @@
 #  include <GL/glut.h>
 #endif
 
+#ifndef random
+#define random rand
+#endif
+
 using namespace std;
 
 // Class methods

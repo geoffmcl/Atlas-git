@@ -28,8 +28,10 @@
 
 #include <string>
 
+#if defined(_MSC_VER) && (_MSC_VER < 1900)
 float remainderf( float x, float y );
-char * basename( char * name );
+#endif // OLD _MSC_VER
+extern char * basename( char * name );
 extern void set_win_path_sep( std::string & s );
 extern bool is_valid_path( std::string path );
 extern void print_version_details(void);

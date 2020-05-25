@@ -39,9 +39,10 @@
 ---------------------------------------------------------------------------*/
 
 // C system files
-#ifdef _MSC_VER
-#include <windows.h>
-#endif
+#ifdef _MSC_VER //this needs to be the first!
+#include "config.h" // includes winsock2.h, and windows.h, and for VERSION
+extern void print_version_details();
+#endif // _MSC_VER
 
 // C++ system files
 #include <stdexcept>
@@ -50,7 +51,9 @@
 #include <GL/glew.h>
 
 // Our project's include files
+#ifndef _MSC_VER
 #include "config.h"		// For VERSION
+#endif // !_MSC_VER
 #include "misc.hxx"
 #include "Palette.hxx"
 #include "Tiles.hxx"
@@ -498,7 +501,12 @@ int main(int argc, char **argv)
     // ways this is immaterial to Map.  However, the user should be
     // warned if she is about to create maps that Atlas will be unable
     // to load.
+#ifdef _MSC_VER
+    GLint tmp = 0x1 << TileMapper::maxPossibleLevel();
+    GLint textureSize = (bufferSize < tmp) ? bufferSize : tmp;
+#else // 1_MSC_VER    
     GLint textureSize = min(bufferSize, 0x1 << TileMapper::maxPossibleLevel());
+#endif // _MSC_VER y/n    
     if (verbose) {
 	printf("Maximum supported texture/buffer size <= map size: %dx%d\n", 
 	       (int)textureSize, (int)textureSize);

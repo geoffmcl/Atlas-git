@@ -20,6 +20,9 @@
   You should have received a copy of the GNU General Public License
   along with Atlas.  If not, see <http://www.gnu.org/licenses/>.
 ---------------------------------------------------------------------------*/
+#ifdef _MSC_VER //this needs to be the first!
+#include "config.h"
+#endif // _MSC_VER
 
 // Our include file
 #include "RangeRingsOverlay.hxx"
@@ -98,34 +101,34 @@ void RangeRingsOverlay::draw()
 		float mantissa = size / pow(10.0, exponent);
 
 		// We want four range rings.
-		float big, medium, small, tiny;
+		float r_big, r_medium, r_small, r_tiny;
 		float base = pow(10.0, exponent);
 		if (mantissa < 2) {
-		    big = 1 * base;
-		    medium = 0.5 * base;
-		    small = 0.2 * base;
-		    tiny = 0.1 * base;
+		    r_big = 1 * base;
+		    r_medium = 0.5 * base;
+		    r_small = 0.2 * base;
+		    r_tiny = 0.1 * base;
 		} else if (mantissa < 5) {
-		    big = 2 * base;
-		    medium = 1 * base;
-		    small = 0.5 * base;
-		    tiny = 0.2 * base;
+		    r_big = 2 * base;
+		    r_medium = 1 * base;
+		    r_small = 0.5 * base;
+		    r_tiny = 0.2 * base;
 		} else {
-		    big = 5 * base;
-		    medium = 2 * base;
-		    small = 1 * base;
-		    tiny = 0.5 * base;
+		    r_big = 5 * base;
+		    r_medium = 2 * base;
+		    r_small = 1 * base;
+		    r_tiny = 0.5 * base;
 		}
 		// Convert back from nautical miles to pixels.
-		big *= SG_NM_TO_METER / metresPerPixel;
-		medium *= SG_NM_TO_METER / metresPerPixel;
-		small *= SG_NM_TO_METER / metresPerPixel;
-		tiny *= SG_NM_TO_METER / metresPerPixel;
+		r_big *= SG_NM_TO_METER / metresPerPixel;
+		r_medium *= SG_NM_TO_METER / metresPerPixel;
+		r_small *= SG_NM_TO_METER / metresPerPixel;
+		r_tiny *= SG_NM_TO_METER / metresPerPixel;
 
-		_drawCircle(x, y, big);
-		_drawCircle(x, y, medium);
-		_drawCircle(x, y, small);
-		_drawCircle(x, y, tiny);
+		_drawCircle(x, y, r_big);
+		_drawCircle(x, y, r_medium);
+		_drawCircle(x, y, r_small);
+		_drawCircle(x, y, r_tiny);
 
 		// // Draw a compass rose aligned with magnetic north.
 		// float smallest = w > h ? h : w;
