@@ -31,14 +31,14 @@ To build under Windows, follow these steps:-
     
 In both cases, Atlas depends of a considerable number of other, so called 3rdPary, headers, and libraries installed:-
 
-GLEW: http://glew.sourceforge.net/
-GLUT: http://freeglut.sourceforge.net/
-ZLIB: https://zlib.net/
-PNG: http://www.libpng.org/pub/png/libpng.html
-PLIB: https://github.com/www2000/libplib
-JPEG: https://sourceforge.net/projects/libjpeg/ 
-Boost: https://www.boost.org/users/download/ - headers only, no libs
-CURL: https://curl.haxx.se/dev/source.html - Optional, for GetMap
+    GLEW: http://glew.sourceforge.net/
+    GLUT: http://freeglut.sourceforge.net/
+    ZLIB: https://zlib.net/
+    PNG: http://www.libpng.org/pub/png/libpng.html
+    PLIB: https://github.com/www2000/libplib
+    JPEG: https://sourceforge.net/projects/libjpeg/ 
+    Boost: https://www.boost.org/users/download/ - headers only, no libs
+    CURL: https://curl.haxx.se/dev/source.html - Optional, for GetMap
 
 Now, for unix/linux/mac, these packages are usually available through distributions... But for Windows, it is quite a **TASK** to build, and install **all** these packages.
 
@@ -47,5 +47,5 @@ Thankfully most/all support a CMake build. The best plan is to `<1>` choose a ne
 Actually sf.net/p/flightgear has a [windows-3rd-party][100] which contains **most** of the above dependency, including `boost` and `curl`, but regretably is missing **GLEW**.
 
 
-  [100] https://sourceforge.net/p/flightgear/windows-3rd-party/ci/master/tree/
+  [100]: https://sourceforge.net/p/flightgear/windows-3rd-party/ci/master/tree/
 
