@@ -40,3 +40,4 @@ GetMap
 *.o
 *~
 *.bak
+temp*
