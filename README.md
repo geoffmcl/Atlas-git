@@ -42,7 +42,12 @@ In both cases, Atlas depends of a considerable number of other, so called 3rdPar
 
 Now, for unix/linux/mac, these packages are usually available through distributions... But for Windows, it is quite a **TASK** to build, and install **all** these packages.
 
-Thankfully most/all support a CMake build. The best plan is to `<1>` choose a new, empty directory, here called the `<ROOT>`; `<2>` Download each source to a sub-directory, like `<ROOT>\glew-2.1.0`, `<ROOT>\FreeGLUT`, `<ROOT>\zlib-1.2.11`, etc; `<3>` Build, and install each into `<ROOT>\3rdParty[.x64]`; `<4>` Finally, in `<ROOT>\Atlas-git\build`, build atlas, setting `-DCMAKE_INSTALL_PREFIX=<ROOT>\3rdParty.x64` and/or `-DCMAKE_PREFIX_PATH=<ROOT>\3rdParty.x64`... good luck.
+Thankfully most/all support a CMake build. The best plan is to:-
+
+    1. Choose a new, empty directory, here called the `<ROOT>`;
+    2. Download each source to a sub-directory, like `<ROOT>\glew-2.1.0`, `<ROOT>\FreeGLUT`, `<ROOT>\zlib-1.2.11`, etc;
+    3. Build, and install each into `<ROOT>\3rdParty[.x64]`;
+    4. Finally, in `<ROOT>\Atlas-git\build`, build atlas, setting `-DCMAKE_INSTALL_PREFIX=<ROOT>\3rdParty.x64` and/or `-DCMAKE_PREFIX_PATH=<ROOT>\3rdParty.x64`... good luck.
 
 Actually sf.net/p/flightgear has a [windows-3rd-party][100] which contains **most** of the above dependency, including `boost` and `curl`, but regretably is missing **GLEW**.
 
