@@ -213,6 +213,12 @@ int main( int argc, char **argv ) {
             fstr.close();
             std::cout << "Written '" << fname.str().c_str() << "'" << std::endl;
           }
+          else {
+              std::cerr << "Not 'image/jpeg'! got " << cType << "'" << std::endl;
+          }
+        }
+        else {
+            std::cerr << "Failed '" << url.c_str() << "'" << std::endl;
         }
       }
     }
