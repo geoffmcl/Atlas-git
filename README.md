@@ -53,7 +53,9 @@ Actually sf.net/p/flightgear has a [windows-3rd-party][100] which contains **mos
 
   [100]: https://sourceforge.net/p/flightgear/windows-3rd-party/ci/master/tree/
 
-#### Installing & Running Atlas
+### Installing & Running Atlas/Map
+
+#### Atlas
 
 **Atlas** will provide a `moving` map, `tracking` your flight in **fgfs**, but some considerable setup is required.
 
@@ -70,5 +72,15 @@ Have you got all that? Some help with the **Atlas** commands can be seen by runn
 Some of this information is documented in the FG Wiki - http://wiki.flightgear.org/Atlas - where it clearly states **"This article or section contains obsolete information. Please refer to Phi instead."**. And maybe - http://wiki.flightgear.org/Phi - better suits your needs. No, multiple, source builds - it is run in your browser; Simply run **fgfs** with `--httpd=8080`, then open your browser and enter `http://localhost:8080`... check it out...
 
 Some also very outdated information can be from - http://atlas.sourceforge.net/index.php?page=run - and my own ancient efforts to support Atlas - http://geoffair.net/fg/atlas-07.htm - but look at the 2010 date. Will try to do something about that.
+
+The current **Atlas** has the in-built code to generate/render the `jpg/png` map files on the fly. The `main` interface, toggled on/off by the space-bar, has a `Render` button at the base, and should show `Map: <chunk>/<tile>`, and potentially the number of tiles to render.
+
+Alternatively, the **Map** executable can be run first to pre-generate the tiles needed.
+
+#### Map
+
+**Map** has many of the same command line options as **Atlas**. Specifically it needs the `<fg-root>` directory for apt, nav, ... files, and the `<fg-scenery>` directory for the scenery.btg files, and a destination directory for its output. Run `map --help` to show the available commands.
+
+Rendering **map** images can take quite an amount of time, and CPU resources, so it is usually better to run this utility first, before **Atlas** and **fgfs**.
 
 HTH - 20200526 - Geoff.
